@@ -237,8 +237,10 @@ static int clip(int val, int min, int max)
 
 pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
 {
-  //TODO: Add error checking
   pic_buffer_t* buffer = (pic_buffer_t*)malloc(sizeof(pic_buffer_t));
+  if (buffer == NULL) {
+    return NULL; //TODO: Add error message?
+  }
 
   //Allocate enough memory to fit a width-by-height picture
   buffer->data = (pic_data_t*)malloc(sizeof(pic_data_t) * width * height);
@@ -262,6 +264,9 @@ pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
 yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+  if (yuv == NULL) {
+    return NULL; //TODO: Add error message?
+  }
   yuv->format =format;
   yuv->y = kvz_newPictureBuffer(width, height, has_tmp_row);
 
@@ -520,7 +525,9 @@ static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* con
 yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-
+  if (yuv == NULL) {
+    return NULL; //TODO: Add error message?
+  }
   //Allocate y pic_buffer
   yuv->y = newPictureBuffer_padded_uint8(y_data, width, height, stride, has_tmp_row);
 
@@ -567,15 +574,26 @@ yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const u
 static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
 {
   pic_buffer_t* ret = malloc(sizeof(pic_buffer_t));
+  if (ret == NULL) {
+    return NULL; //TODO: Add error message?
+  }
   int size = pic->width * pic->height;
 
   *ret = *pic;
   ret->data = malloc(sizeof(pic_data_t) * size);
+  if (ret->data == NULL) {
+    free(ret);
+    return NULL; //TODO: Add error message?
+  }
   memcpy(ret->data, pic->data, size * sizeof(pic_data_t));
 
   if (pic->tmp_row) {
     int tmp_size = MAX(pic->width, pic->height);
     ret->tmp_row = malloc(sizeof(pic_buffer_t) * tmp_size);
+    if (ret->tmp_row == NULL) {
+      deallocatePictureBuffer(ret);
+      return NULL; //TODO: Add error message?
+    }
     memcpy(ret->tmp_row, pic->tmp_row, tmp_size);
   }
 
@@ -585,7 +603,9 @@ static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
 yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv)
 {
   yuv_buffer_t* ret = malloc(sizeof(yuv_buffer_t));
-
+  if (ret == NULL) {
+    return NULL; //TODO: Add error message?
+  }
   ret->y = clonePictureBuffer(yuv->y);
   ret->u = clonePictureBuffer(yuv->u);
   ret->v = clonePictureBuffer(yuv->v);

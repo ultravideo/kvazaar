@@ -242,13 +242,13 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
       cu_info_t *cu = kvz_cu_array_at(cua, block_x, block_y);
 
       //Get co-located cu. Use center of 16x16 block to find co-located cu. TODO: Account for offsets?     
-      uint32_t col_px_x = block_x; //Go from scu pos to pixel pos
-      uint32_t col_px_y = block_y;
+      int32_t col_px_x = (int32_t)block_x; //Go from scu pos to pixel pos
+      int32_t col_px_y = (int32_t)block_y;
 
       if ( cu_pos_scale[0] != POS_SCALE_FAC_1X || cu_pos_scale[1] != POS_SCALE_FAC_1X) {
         //Need to round here for some reason acording to shm.
-        col_px_x = ((SCALE_POS_COORD(col_px_x + (block_w >> 1), cu_pos_scale[0]) + 4 ) >> 4 ) << 4;
-        col_px_y = ((SCALE_POS_COORD(col_px_y + (block_h >> 1), cu_pos_scale[1]) + 4 ) >> 4 ) << 4;
+        col_px_x = ((SCALE_POS_COORD(col_px_x + (int32_t)(block_w >> 1), cu_pos_scale[0]) + 4 ) >> 4 ) << 4;
+        col_px_y = ((SCALE_POS_COORD(col_px_y + (int32_t)(block_h >> 1), cu_pos_scale[1]) + 4 ) >> 4 ) << 4;
       }
       
       const cu_info_t *col = NULL;
@@ -263,10 +263,10 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
 
         //Scale mv
         if (!col->skipped && col->type == CU_INTER) {
-          cu->inter.mv[0][0] = SCALE_MV_COORD(col->inter.mv[0][0], mv_scale[0]);
-          cu->inter.mv[0][1] = SCALE_MV_COORD(col->inter.mv[0][1], mv_scale[1]);
-          cu->inter.mv[1][0] = SCALE_MV_COORD(col->inter.mv[1][0], mv_scale[0]);
-          cu->inter.mv[1][1] = SCALE_MV_COORD(col->inter.mv[1][1], mv_scale[1]);
+          cu->inter.mv[0][0] = (uint16_t)SCALE_MV_COORD((uint32_t)col->inter.mv[0][0], mv_scale[0]);
+          cu->inter.mv[0][1] = (uint16_t)SCALE_MV_COORD((uint32_t)col->inter.mv[0][1], mv_scale[1]);
+          cu->inter.mv[1][0] = (uint16_t)SCALE_MV_COORD((uint32_t)col->inter.mv[1][0], mv_scale[0]);
+          cu->inter.mv[1][1] = (uint16_t)SCALE_MV_COORD((uint32_t)col->inter.mv[1][1], mv_scale[1]);
         } else {
           cu->type = CU_INTRA;
         }

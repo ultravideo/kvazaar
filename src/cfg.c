@@ -673,8 +673,18 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("input"){
     //Allocate a new spot for the new input layer
     cfg->shared->max_input_layers++;
-    cfg->shared->input_widths = realloc(cfg->shared->input_widths, cfg->shared->max_input_layers * sizeof(int32_t*));
-    cfg->shared->input_heights = realloc(cfg->shared->input_heights, cfg->shared->max_input_layers * sizeof(int32_t*));
+    int32_t *tmp = realloc(cfg->shared->input_widths, cfg->shared->max_input_layers * sizeof(int32_t*));
+    if (tmp == NULL) {
+      fprintf(stderr, "Memory error: Could not realloc input size arrays.\n");
+      return 0;
+    }
+    cfg->shared->input_widths = tmp;
+    tmp = realloc(cfg->shared->input_heights, cfg->shared->max_input_layers * sizeof(int32_t*));
+    if (tmp == NULL) {
+      fprintf(stderr, "Memory error: Could not realloc input size arrays.\n");
+      return 0;
+    }
+    cfg->shared->input_heights = tmp;
 
     //If cur layers input layer has not been set, set the newest layer as the input layer set
     //Associates the first input in the layer with the input layer

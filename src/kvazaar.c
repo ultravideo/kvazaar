@@ -469,6 +469,10 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   //Pic_in should contain the input images chained using base_image.
   //Move them to a list for easier access
   kvz_picture **pics_in = calloc(enc->control->layer.max_layers, sizeof(kvz_picture*));
+  if (pics_in == NULL) {
+    fprintf(stderr, "Memory error: Could not allocate picture array.\n");
+    return 0;
+  }
   pics_in[0] = pic_in;
 
   if (pic_in != NULL) {

@@ -223,7 +223,13 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
         ok = 0;
         goto done;*/
         //Increase input array size
-        opts->input = realloc(opts->input, ++opts->num_inputs * sizeof(char*));
+        char **tmp = realloc(opts->input, ++opts->num_inputs * sizeof(char*));
+        if (tmp == NULL) {
+          fprintf(stderr, "Memory error: Could not realloc input array.\n");
+          ok = 0;
+          goto done;
+        }
+        opts->input = tmp;
 
       }
       opts->input[opts->num_inputs-1] = strdup(optarg);
@@ -240,11 +246,22 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
         /*fprintf(stderr, "Input error: More than one debug output file given.\n");
         ok = 0;
         goto done;*/
-        opts->debug = realloc(opts->debug, ++opts->num_debugs * sizeof(char*));
+        char **tmp = realloc(opts->debug, ++opts->num_debugs * sizeof(char*));
+        if (tmp == NULL) {
+          fprintf(stderr, "Memory error: Could not realloc input array.\n");
+          ok = 0;
+          goto done;
+        }
+        opts->debug = tmp;
       }
       else {
         opts->debug = calloc(1, sizeof(char*));
-        opts->num_debugs++;
+        if (opts->debug == NULL) {
+          fprintf(stderr, "Memory error: Could not alloc debug array.\n");
+          ok = 0;
+          goto done;
+        }
+        opts->num_debugs = 1;
       }
       opts->debug[opts->num_debugs-1] = strdup(optarg);
     } else if (!strcmp(name, "seek")) {
