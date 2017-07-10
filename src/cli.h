@@ -63,12 +63,9 @@ void print_usage(void);
 void print_version(void);
 void print_help(void);
 
-// ***********************************************
-// Modified for SHVC
+
 void print_frame_info(const kvz_frame_info * const info,
                          const double frame_psnr[3],
-                         const uint32_t bytes,
-                         const int layer_id);
-// ***********************************************
+                         const uint32_t bytes);
        
 #endif

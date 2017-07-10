@@ -531,6 +531,18 @@ typedef struct kvz_frame_info {
    */
   int ref_list_len[2];
 
+  // ***********************************************
+  // Modified for SHVC.
+  /**
+   * \brief Layer id for frame
+   */
+  uint8_t lid;
+  
+  /**
+   * \brief Temporal id for frame
+   */
+  uint8_t tid;
+  // ***********************************************
 } kvz_frame_info;
 
 /**

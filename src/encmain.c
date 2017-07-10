@@ -698,7 +698,7 @@ int main(int argc, char *argv[])
           layer_psnr_sum[layer_id][1] += frame_psnr[1];
           layer_psnr_sum[layer_id][2] += frame_psnr[2];
 
-          print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], layer_id); 
+          print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id]); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;

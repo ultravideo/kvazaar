@@ -587,12 +587,12 @@ void print_help(void)
 // Modified for SHVC
 void print_frame_info(const kvz_frame_info * const info,
                          const double frame_psnr[3],
-                         const uint32_t bytes,
-                         const int layer_id)
+                         const uint32_t bytes)
 {
-  fprintf(stderr, "POC %4d LId %2d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+  fprintf(stderr, "POC %4d LId %d TId %d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
           info->poc,
-          layer_id,
+          info->lid,
+          info->tid,
           info->qp,
           "BPI"[info->slice_type % 3],
           bytes << 3,

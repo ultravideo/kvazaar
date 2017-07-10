@@ -192,6 +192,11 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
   info->nal_unit_type = state->frame->pictype;
   info->slice_type = state->frame->slicetype;
   kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
+  // ***********************************************
+  // Modified for SHVC.
+  info->lid = state->encoder_control->layer.layer_id;
+  info->tid = state->encoder_control->cfg.gop[state->frame->gop_offset].tId;
+  // ***********************************************
 }
 
 
