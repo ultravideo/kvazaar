@@ -41,20 +41,28 @@ typedef struct
   int32_t *pocs;
   uint32_t size;       //!< \brief Array size.
   uint32_t used_size;
-} image_list_t;
 
-image_list_t * kvz_image_list_alloc(int size);
-int kvz_image_list_resize(image_list_t *list, unsigned size);
-int kvz_image_list_destroy(image_list_t *list);
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
-int kvz_image_list_rem(image_list_t *list, unsigned n);
+  // ***********************************************
+  // Modified for SHVC. TODO: Remove unused values?
+  //TODO: Better to use array of structs or struct of arrays?
+  struct kvz_picture_info_t *image_info; //!< \brief Array of picture info structs containing reference frame info.
+  // ***********************************************
+
+} image_list_t;
 
 // ***********************************************
   // Modified for SHVC
 
+image_list_t * kvz_image_list_alloc(int size);
+int kvz_image_list_resize(image_list_t *list, unsigned size);
+int kvz_image_list_destroy(image_list_t *list);
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc, uint8_t tid, uint8_t lid, uint8_t is_lt);
+int kvz_image_list_rem(image_list_t *list, unsigned n);
+
+
 //int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
 
-void kvz_image_list_rem_ILR( image_list_t *list, int32_t prev_poc);
+void kvz_image_list_rem_ILR( image_list_t *list, int32_t cur_poc, uint8_t cur_tid, uint8_t cur_lid);
 
 // ***********************************************
 

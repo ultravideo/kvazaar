@@ -984,15 +984,30 @@ static bool add_temporal_candidate(const encoder_state_t *state,
 
   if (ref_out) *ref_out = colocated_ref;
 
+  // ***********************************************
+  // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
+  bool is_cur_ref_long_term = state->frame->ref->image_info[current_ref].is_long_term ? true : false;
+  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[colocated_ref_mv_ref].is_long_term ? true : false; 
+
+  if (is_cur_ref_long_term != is_col_ref_long_term) {
+    return false;
+  }
+
   mv_out[0] = colocated->inter.mv[cand_list][0];
   mv_out[1] = colocated->inter.mv[cand_list][1];
-  apply_mv_scaling_pocs(
-    state->frame->poc,
-    state->frame->ref->pocs[current_ref],
-    state->frame->ref->pocs[colocated_ref],
-    state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
-    mv_out
-  );
+
+  if (!is_cur_ref_long_term) {
+    apply_mv_scaling_pocs(
+      state->frame->poc,
+      state->frame->ref->pocs[current_ref],
+      state->frame->ref->pocs[colocated_ref],
+      state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
+      mv_out
+      );
+  }
+
+  // ***********************************************    
+
   return true;
 }
 
@@ -1008,10 +1023,20 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
   const int cand_list = cand->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
   if (scaling) {
-    mv_cand_out[0] = cand->inter.mv[cand_list][0];
-    mv_cand_out[1] = cand->inter.mv[cand_list][1];
-    apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
-    return true;
+    // ***********************************************
+    // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
+    bool is_cur_ref_long_term = state->frame->ref->image_info[cur_cu->inter.mv_ref[reflist]].is_long_term ? true : false;
+    bool is_cand_ref_long_term = state->frame->ref->image_info[cand->inter.mv_ref[cand_list]].is_long_term ? true : false;
+    if (is_cur_ref_long_term == is_cand_ref_long_term) {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      if (!is_cur_ref_long_term){
+        apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
+      }
+      return true;
+    }
+    return false;
+    // ***********************************************
   }
 
   if (cand->inter.mv_dir & (1 << cand_list) &&

@@ -379,6 +379,16 @@ typedef struct kvz_config
 
 } kvz_config;
 
+// ***********************************************
+// Modified for SHVC. TODO: Remove unused values?
+//TODO: Better to use array of structs or struct of arrays?
+typedef struct kvz_picture_info_t
+{
+  uint8_t layer_id; //!< \brief Array of lids for reference frames. 
+  uint8_t temporal_id; //!< \brief Array of tids for reference frames.
+  uint8_t is_long_term; //!< \brief Array of bools if reference frame is a long term ref. Only used with EL frames
+} kvz_picture_info_t;
+// ***********************************************
 /**
  * \brief Struct which contains all picture data
  *
@@ -407,6 +417,10 @@ typedef struct kvz_picture {
   enum kvz_chroma_format chroma_format;
 
   int32_t ref_pocs[16];
+  // ***********************************************
+  // Modified for SHVC.
+  struct kvz_picture_info_t picture_info[16];
+  // ***********************************************
 } kvz_picture;
 
 /**

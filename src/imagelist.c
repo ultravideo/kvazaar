@@ -26,7 +26,8 @@
 #include "image.h"
 #include "threads.h"
 
-
+// ***********************************************
+  // Modified for SHVC.
 /**
  * \brief Allocate memory for image_list
  * \param size  initial array size
@@ -40,6 +41,7 @@ image_list_t * kvz_image_list_alloc(int size)
   list->cu_arrays = malloc(sizeof(cu_array_t*)  * size);
   list->pocs      = malloc(sizeof(int32_t)      * size);
   list->used_size = 0;
+  list->image_info = malloc(sizeof(kvz_picture_info_t) * size);
 
   return list;
 }
@@ -56,6 +58,7 @@ int kvz_image_list_resize(image_list_t *list, unsigned size)
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
   list->pocs = realloc(list->pocs, sizeof(int32_t) * size);
   list->size = size;
+  list->image_info = realloc(list->image_info, sizeof(kvz_picture_info_t) * size);
   return size == 0 || (list->images && list->cu_arrays && list->pocs);
 }
 
@@ -74,6 +77,7 @@ int kvz_image_list_destroy(image_list_t *list)
       kvz_cu_array_free(list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
       list->pocs[i] = 0;
+      memset(&list->image_info[i], 0, sizeof(kvz_picture_info_t));
     }
   }
 
@@ -81,10 +85,12 @@ int kvz_image_list_destroy(image_list_t *list)
     free(list->images);
     free(list->cu_arrays);
     free(list->pocs);
+    free(list->image_info);
   }
   list->images = NULL;
   list->cu_arrays = NULL;
   list->pocs = NULL;
+  list->image_info = NULL;
   free(list);
   return 1;
 }
@@ -93,9 +99,12 @@ int kvz_image_list_destroy(image_list_t *list)
  * \brief Add picture to the front of the picturelist
  * \param pic picture pointer to add
  * \param picture_list list to use
+ * \param tid temporal id of picture being added
+ * \param lid layer id of picture being added
+ * \param is_lt is picture a long term reference
  * \return 1 on success
  */
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc, uint8_t tid, uint8_t lid, uint8_t is_lt)
 {
   int i = 0;
   if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
@@ -119,11 +128,15 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
     list->images[i] = list->images[i - 1];
     list->cu_arrays[i] = list->cu_arrays[i - 1];
     list->pocs[i] = list->pocs[i - 1];
+    list->image_info[i] = list->image_info[i - 1];
   }
 
   list->images[0] = im;
   list->cu_arrays[0] = cua;
   list->pocs[0] = poc;
+  list->image_info->is_long_term = is_lt;
+  list->image_info->layer_id = lid;
+  list->image_info->temporal_id = tid;
   
   list->used_size++;
   return 1;
@@ -165,13 +178,28 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
 //  return 1;
 //}
 
-void kvz_image_list_rem_ILR( image_list_t *list, int32_t prev_poc)
+/**
+ * \brief Remove (inter) layer refs that are no longer valid/usable
+ * \param list target list
+ * \param cur_poc current poc
+ * \param cur_tid current temporal id
+ * \param cur_lid current layer id
+ */
+void kvz_image_list_rem_ILR( image_list_t *list, int32_t cur_poc, uint8_t cur_tid, uint8_t cur_lid)
 {
-  //Loop over refs and remove IL refs from the list
+  //TODO: Enforce temporally valid refs somewhere else? Enforce layer constraints somewhere else?
+  //Loop over refs and remove IL and temporal refs that are no longer valid from the list
   for( unsigned i = 0; i < list->used_size; i++) {
-    //TODO: Figure out a better way? Eg. extra info.
-    //If a ref poc matches the prev frames poc, the ref should have been an ILR in the prev frame.
-    if( list->pocs[i] == prev_poc ) {
+    uint8_t is_valid = 1;
+    assert(list->image_info[i].layer_id <= cur_lid); //Cannot reference higher layers
+    assert(list->image_info[i].temporal_id <= cur_tid); ////Cannot reference higher tid frames
+    if (list->pocs[i] != cur_poc && list->image_info[i].layer_id != cur_lid) {
+      is_valid = 0;
+    }
+    //else if( list->image_info[i].temporal_id > cur_tid ) { //Cannot reference higher tid frames
+    //  is_valid = 0;
+    //}
+    if (!is_valid) {
       kvz_image_list_rem( list, i);
     }
   }
@@ -205,6 +233,7 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
     list->images[n] = NULL;
     list->cu_arrays[n] = NULL;
     list->pocs[n] = 0;
+    memset(&list->image_info[n], 0, sizeof(kvz_picture_info_t));
     list->used_size--;
   } else {
     int i = n;
@@ -213,10 +242,12 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
       list->images[i] = list->images[i + 1];
       list->cu_arrays[i] = list->cu_arrays[i + 1];
       list->pocs[i] = list->pocs[i + 1];
+      list->image_info[i] = list->image_info[i + 1];
     }
     list->images[list->used_size - 1] = NULL;
     list->cu_arrays[list->used_size - 1] = NULL;
     list->pocs[list->used_size - 1] = 0;
+    memset(&list->image_info[list->used_size - 1], 0, sizeof(kvz_picture_info_t));
     list->used_size--;
   }
 
@@ -230,7 +261,8 @@ int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source) {
   }
   
   for (i = source->used_size - 1; i >= 0; --i) {
-    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i]);
+    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i],
+      source->image_info[i].temporal_id, source->image_info[i].layer_id, source->image_info[i].is_long_term);
   }
   return 1;
 }

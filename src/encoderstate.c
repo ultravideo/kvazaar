@@ -891,6 +891,14 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   
+  //*********************************************
+  //For scalable extension.
+  kvz_image_list_rem_ILR(state->frame->ref,
+                         state->frame->poc,
+                         encoder->cfg.gop[state->frame->gop_offset].tId,
+                         state->encoder_control->layer.layer_id );
+  //*********************************************
+
   int neg_refs = encoder->cfg.gop[state->frame->gop_offset].ref_neg_count;
   int pos_refs = encoder->cfg.gop[state->frame->gop_offset].ref_pos_count;
 
@@ -1168,10 +1176,11 @@ void kvz_encoder_prepare(encoder_state_t *state)
     kvz_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
   }
 
+  //TODO: remove
   // For SHVC.
-  if (encoder->layer.layer_id > 0 && prev_state->ILR_state != NULL) {
-      kvz_image_list_rem_ILR(state->frame->ref, prev_state->frame->poc); //Remove old ILR pics from the ref list so they don't interfere.
-  }
+  //if (encoder->layer.layer_id > 0 && prev_state->ILR_state != NULL) {
+  //    kvz_image_list_rem_ILR(state->frame->ref, prev_state->frame->poc); //Remove old ILR pics from the ref list so they don't interfere.
+  //}
 
   if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
@@ -1179,12 +1188,18 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
     // Store current list of POCs for use in TMVP derivation
     memcpy(prev_state->tile->frame->rec->ref_pocs, state->frame->ref->pocs, sizeof(int32_t)*state->frame->ref->used_size);
-
+    // For SHVC.
+    // Also store image info
+    memcpy(prev_state->tile->frame->rec->picture_info, state->frame->ref->image_info, sizeof(kvz_picture_info_t) * state->frame->ref->used_size);
+    // For SHVC.
     // Add previous reconstructed picture as a reference
     kvz_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
-                   prev_state->frame->poc);
+                   prev_state->frame->poc,
+                   prev_state->encoder_control->cfg.gop[prev_state->frame->gop_offset].tId,
+                   prev_state->encoder_control->layer.layer_id,
+                   0); //Currently only ILR can be a long term references
     kvz_cu_array_free(state->tile->frame->cu_array);
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
@@ -1213,7 +1228,10 @@ void kvz_encoder_prepare(encoder_state_t *state)
     kvz_image_list_add(state->frame->ref,
       scaled_pic,
       scaled_cu,
-      ILR_state->frame->poc);
+      ILR_state->frame->poc,
+      ILR_state->encoder_control->cfg.gop[ILR_state->frame->gop_offset].tId,
+      ILR_state->encoder_control->layer.layer_id,
+      1); //Currently only ILR can be a long term references
     //TODO: Add error handling?
     kvz_image_free(scaled_pic);
     kvz_cu_array_free(scaled_cu);
