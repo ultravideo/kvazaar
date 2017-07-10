@@ -362,7 +362,7 @@ typedef struct kvz_config
   //helps avoid the need to change code elsewhere that uses cfg values
   struct shared_t
   {
-    int32_t intra_period; 
+    int32_t intra_period;
     int wpp;
     int owf;
     int32_t threads;

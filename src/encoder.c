@@ -266,7 +266,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->cfg.wpp = cfg->shared->wpp;
     encoder->cfg.threads = cfg->shared->threads;
     encoder->cfg.owf = cfg->shared->owf;
-    if(encoder->cfg.owf == -1) encoder->cfg.intra_period = cfg->shared->intra_period;
+    encoder->cfg.intra_period = cfg->shared->intra_period;
     // ***********************************************
 
     if (encoder->cfg.threads == -1) {

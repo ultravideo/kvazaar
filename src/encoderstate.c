@@ -910,6 +910,10 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   }
   //*********************************************
   //For scalable extension.
+  //Check if an el layer is idr, need to remove normal refs
+  if( state->frame->is_idr_frame ) {
+    target_ref_num = 0;
+  }
   //Add space for irl to the list
   target_ref_num += encoder->cfg.ILR_frames;
   //*********************************************
@@ -1048,7 +1052,10 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
  
   if (state->frame->is_idr_frame) {
     encoder_state_reset_poc(state);
-    state->frame->slicetype = KVZ_SLICE_I;
+//*********************************************
+//For scalable extension. TODO: Enable encoding el frames with intra?
+    state->frame->slicetype = (cfg->ILR_frames > 0) ? KVZ_SLICE_P : KVZ_SLICE_I;
+//*********************************************
     state->frame->pictype = KVZ_NAL_IDR_W_RADL;
   } else {
     if (cfg->intra_period == 1) {
@@ -1139,6 +1146,45 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
     // Modified for SHVC.
 
 /**
+ * Prepare the encoder state for scalability related stuff.
+ *
+ * - Add ilr frame to the ref list if ilr is enabled
+ */
+static void scalability_prepare(encoder_state_t *state)
+{
+  const encoder_control_t * const encoder = state->encoder_control;
+  // For SHVC.
+  //TODO: Account for adding several ILR frames. Should ilr rec ever bee NULL?
+  if (state->encoder_control->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
+    //Also add base layer to the reference list.
+    //TODO: Don't skip on first frame? Skip if inter frame.
+    const encoder_state_t *ILR_state = state->ILR_state;
+    kvz_picture* scaled_pic = kvz_image_scaling(ILR_state->tile->frame->rec, &encoder->layer.upscaling);
+
+    //TODO: Account for offsets etc. Need to use something else than original sizes?
+    int32_t mv_scale[2] = {GET_SCALE_MV(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
+                           GET_SCALE_MV(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
+    int32_t pos_scale[2]= {GET_SCALE_POS(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
+                           GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
+    cu_array_t* scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
+                                                    state->tile->frame->width_in_lcu,
+                                                    state->tile->frame->height_in_lcu,
+                                                    mv_scale, pos_scale);
+
+    kvz_image_list_add(state->frame->ref,
+      scaled_pic,
+      scaled_cu,
+      ILR_state->frame->poc,
+      ILR_state->encoder_control->cfg.gop[ILR_state->frame->gop_offset].tId,
+      ILR_state->encoder_control->layer.layer_id,
+      1); //Currently only ILR can be a long term references
+    //TODO: Add error handling?
+    kvz_image_free(scaled_pic);
+    kvz_cu_array_free(scaled_cu);
+  }
+}
+
+/**
  * Prepare the encoder state for encoding the next frame.
  *
  * - Add the previous reconstructed picture as a reference, if needed.
@@ -1159,6 +1205,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->frame->poc   = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
+    scalability_prepare(state); //Need to do this here so that the first el frame can be inter
     state->frame->prepared = 1;
     return;
   }
@@ -1206,36 +1253,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
-  // For SHVC.
-  //TODO: Allow first EL frame to be a P-slice
-  //TODO: Account for adding several ILR frames
-  if (state->encoder_control->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
-    //Also add base layer to the reference list.
-    //TODO: Don't skip on first frame? Skip if inter frame.
-    const encoder_state_t *ILR_state = state->ILR_state;
-    kvz_picture* scaled_pic = kvz_image_scaling(ILR_state->tile->frame->rec, &encoder->layer.upscaling);
-
-    //TODO: Account for offsets etc. Need to use something else than original sizes?
-    int32_t mv_scale[2] = {GET_SCALE_MV(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
-                           GET_SCALE_MV(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
-    int32_t pos_scale[2]= {GET_SCALE_POS(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
-                           GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
-    cu_array_t* scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
-                                                    state->tile->frame->width_in_lcu,
-                                                    state->tile->frame->height_in_lcu,
-                                                    mv_scale, pos_scale);
-
-    kvz_image_list_add(state->frame->ref,
-      scaled_pic,
-      scaled_cu,
-      ILR_state->frame->poc,
-      ILR_state->encoder_control->cfg.gop[ILR_state->frame->gop_offset].tId,
-      ILR_state->encoder_control->layer.layer_id,
-      1); //Currently only ILR can be a long term references
-    //TODO: Add error handling?
-    kvz_image_free(scaled_pic);
-    kvz_cu_array_free(scaled_cu);
-  }
+  scalability_prepare(state);
 
   // Remove source and reconstructed picture.
   kvz_image_free(state->tile->frame->source);

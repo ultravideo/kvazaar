@@ -645,7 +645,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     
     //Do additional initialization
     cfg->next_cfg->layer = cfg->layer + 1;
-
+    
     //free(cfg->next_cfg->max_layers);
     //cfg->next_cfg->max_layers = cfg->max_layers;
     cfg->shared->max_layers += 1;
@@ -1591,10 +1591,10 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
     }
 
-    if( cfg->ref_frames > 0 && cfg->layer > 0) {
+    /*if( cfg->ref_frames > 0 && cfg->layer > 0) {
       fprintf(stderr, "Input error: Inter frame references currently not supported for layers with lid > 0\n");
       error = 1;
-    }
+    }*/
 
     if( cfg->ILR_frames + cfg->ref_frames == 0) {
       fprintf(stderr, "Input error: There needs to be at least one type of reference frame\n");
