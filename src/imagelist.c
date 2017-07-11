@@ -191,14 +191,14 @@ void kvz_image_list_rem_ILR( image_list_t *list, int32_t cur_poc, uint8_t cur_ti
   //Loop over refs and remove IL and temporal refs that are no longer valid from the list
   for( unsigned i = 0; i < list->used_size; i++) {
     uint8_t is_valid = 1;
-    assert(list->image_info[i].layer_id <= cur_lid); //Cannot reference higher layers
-    assert(list->image_info[i].temporal_id <= cur_tid); ////Cannot reference higher tid frames
+    //assert(list->image_info[i].layer_id <= cur_lid); //Cannot reference higher layers
+    //assert(list->image_info[i].temporal_id <= cur_tid); ////Cannot reference higher tid frames
     if (list->pocs[i] != cur_poc && list->image_info[i].layer_id != cur_lid) {
       is_valid = 0;
     }
-    //else if( list->image_info[i].temporal_id > cur_tid ) { //Cannot reference higher tid frames
-    //  is_valid = 0;
-    //}
+    else if( list->image_info[i].temporal_id > cur_tid ) { //Cannot reference higher tid frames
+      //is_valid = 0;
+    }
     if (!is_valid) {
       kvz_image_list_rem( list, i);
     }
