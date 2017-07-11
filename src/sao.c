@@ -261,17 +261,6 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
 }
 
 
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
-  // Mapping relationships between a, b and c to eo_idx.
-  static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-
-  int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
-  return sao_eo_idx_to_eo_category[eo_idx];
-}
-
-
 /**
  * \brief Reconstruct SAO.
  *
@@ -279,16 +268,12 @@ static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
  * \param buffer          Buffer containing the deblocked input pixels. The
  *                        area to filter starts at index 0.
  * \param stride          stride of buffer
- * \param x               x-coordinate of the top-left corner in pixels
- * \param y               y-coordinate of the top-left corner in pixels
+ * \param frame_x         x-coordinate of the top-left corner in pixels
+ * \param frame_y         y-coordinate of the top-left corner in pixels
  * \param width           width of the area to filter
  * \param height          height of the area to filter
  * \param sao             SAO information
  * \param color           color plane index
- * \param border_left     true, if the left border of the area exists
- * \param border_right    true, if the right border of the area exists
- * \param border_above    true, if the top border of the area exists
- * \param border_below    true, if the bottom border of the area exists
  */
 void kvz_sao_reconstruct(const encoder_state_t *state,
                          const kvz_pixel *buffer,
@@ -308,66 +293,45 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
   const int frame_height = frame->height >> shift;
   kvz_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_width];
 
-  switch (sao->type) {
+  if (sao->type == SAO_TYPE_EDGE) {
+    const vector2d_t *offset = g_sao_edge_offsets[sao->eo_class];
 
-    case SAO_TYPE_NONE:
-      break;
-
-    case SAO_TYPE_BAND: {
-      int offsets[1 << KVZ_BIT_DEPTH];
-      kvz_calc_sao_offset_array(ctrl, sao, offsets, color);
-      for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-          output[x + y * frame_width] = offsets[buffer[x + y * stride]];
-        }
-      }
-      break;
+    if (frame_x + width + offset[0].x > frame_width ||
+        frame_x + width + offset[1].x > frame_width)
+    {
+      // Nothing to do for the rightmost column.
+      width -= 1;
     }
-
-    case SAO_TYPE_EDGE: {
-      const int offset_v = color == COLOR_V ? 5 : 0;
-      const vector2d_t *offset = g_sao_edge_offsets[sao->eo_class];
-
-      int x_orig = 0;
-      int y_orig = 0;
-
-      if (frame_x + offset[0].x < 0 || frame_x + offset[1].x < 0) {
-        // Nothing to do for the leftmost column.
-        x_orig += 1;
-      }
-      if (frame_x + width + offset[0].x > frame_width ||
-          frame_x + width + offset[1].x > frame_width)
-      {
-        // Nothing to do for the rightmost column.
-        width -= 1;
-      }
-      if (frame_y + offset[0].y < 0 || frame_y + offset[1].y < 0) {
-        // Nothing to do for the topmost row.
-        y_orig += 1;
-      }
-      if (frame_y + height + offset[0].y > frame_height ||
-          frame_y + height + offset[1].y > frame_height)
-      {
-        // Nothing to do for the bottommost row.
-        height -= 1;
-      }
-
-      for (int y = y_orig; y < height; y++) {
-        for (int x = x_orig; x < width; x++) {
-          const kvz_pixel *data = &buffer[x + y * stride];
-
-          kvz_pixel a = data[offset[0].x + offset[0].y * stride];
-          kvz_pixel c = data[0];
-          kvz_pixel b = data[offset[1].x + offset[1].y * stride];
-
-          const int eo_cat = sao_calc_eo_cat(a, b, c);
-
-          output[x + y * frame_width] =
-            CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c + sao->offsets[eo_cat + offset_v]);
-        }
-      }
-      break;
+    if (frame_x + offset[0].x < 0 || frame_x + offset[1].x < 0) {
+      // Nothing to do for the leftmost column.
+      buffer += 1;
+      output += 1;
+      width -= 1;
     }
+    if (frame_y + height + offset[0].y > frame_height ||
+        frame_y + height + offset[1].y > frame_height)
+    {
+      // Nothing to do for the bottommost row.
+      height -= 1;
+    }
+    if (frame_y + offset[0].y < 0 || frame_y + offset[1].y < 0) {
+      // Nothing to do for the topmost row.
+      buffer += stride;
+      output += frame_width;
+      height -= 1;
+    }
+  }
+
+  if (sao->type != SAO_TYPE_NONE) {
+    kvz_sao_reconstruct_color(ctrl,
+                              buffer,
+                              output,
+                              sao,
+                              stride,
+                              frame_width,
+                              width,
+                              height,
+                              color);
   }
 }
 

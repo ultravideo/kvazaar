@@ -253,23 +253,22 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
                                        int block_width, int block_height,
                                        color_t color_i)
 {
-  int y, x;
   // Arrays orig_data and rec_data are quarter size for chroma.
   int offset_v = color_i == COLOR_V ? 5 : 0;
 
-  if(sao->type == SAO_TYPE_BAND) {
-    int offsets[1<<KVZ_BIT_DEPTH];
+  if (sao->type == SAO_TYPE_BAND) {
+    int offsets[1 << KVZ_BIT_DEPTH];
     kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
+    for (int y = 0; y < block_height; ++y) {
+      for (int x = 0; x < block_width; ++x) {
         new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
       }
     }
   } else {
     // Don't sample the edge pixels because this function doesn't have access to
     // their neighbours.
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; x+=8) {
+    for (int y = 0; y < block_height; ++y) {
+      for (int x = 0; x < block_width; x+=8) {
         vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
         vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
         const kvz_pixel *c_data = &rec_data[y * stride + x];
