@@ -129,7 +129,8 @@ matrix:
     - env: TEST_DIM=16x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
     
     # Test scalability extension.
-    - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r2 --gop=0 -p0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 -p0 --no-wpp"
+    - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r2 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-wpp"
+    - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r2 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-wpp"
     
     # Test encoder control initing failures when using layers
     - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--ilr=1"

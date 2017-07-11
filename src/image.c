@@ -584,8 +584,11 @@ kvz_picture* kvz_image_scaling(const kvz_picture* const pic_in, const scaling_pa
     kvz_deallocateYuvBuffer(trgt_pic);
     return NULL;
   }
+
+  //Copy other information
   pic_out->dts = pic_in->dts;
   pic_out->pts = pic_in->pts;
+  pic_out->interlacing = pic_in->interlacing;
 
   int chroma_shift = param->chroma == CHROMA_444 ? 0 : 1;
   pic_data_t* comp_list[] = {trgt_pic->y->data, trgt_pic->u->data, trgt_pic->v->data};
