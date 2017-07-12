@@ -978,7 +978,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   if (colocated_ref < 0) return false;
 
   int cand_list = colocated->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
-
+  
   // The reference id the colocated block is using
   uint32_t colocated_ref_mv_ref = colocated->inter.mv_ref[cand_list];
 

@@ -1156,10 +1156,10 @@ static void scalability_prepare(encoder_state_t *state)
   
   if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
     const encoder_state_t *ILR_state = state->ILR_state;
-    // Store current list of POCs for use in TMVP derivation
-    memcpy(ILR_state->tile->frame->rec->ref_pocs, state->frame->ref->pocs, sizeof(int32_t) * state->frame->ref->used_size);
+    // Store current ilr frames list of POCs for use in TMVP derivation
+    memcpy(ILR_state->tile->frame->rec->ref_pocs, ILR_state->frame->ref->pocs, sizeof(int32_t) * ILR_state->frame->ref->used_size);
     // Also store image info
-    memcpy(ILR_state->tile->frame->rec->picture_info, state->frame->ref->image_info, sizeof(kvz_picture_info_t) * state->frame->ref->used_size);
+    memcpy(ILR_state->tile->frame->rec->picture_info, ILR_state->frame->ref->image_info, sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
     
   }
 }
