@@ -443,25 +443,18 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue)
   return 1;
 }
 
-int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job_t * const job) {
-  int job_done = 0;
-  
-  //NULL job is clearly OK :-)
+int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job_t * const job)
+{
+  // NULL job is clearly OK.
   if (!job) return 1;
-  
-  //Lock the queue
+
+  PTHREAD_LOCK(&job->lock);
+  while (job->state != THREADQUEUE_JOB_STATE_DONE) {
+    PTHREAD_COND_WAIT(&threadqueue->cb_cond, &job->lock);
+  }
+  PTHREAD_UNLOCK(&job->lock);
+
   PTHREAD_LOCK(&threadqueue->lock);
-  do {
-    
-    PTHREAD_LOCK(&job->lock);
-    job_done = (job->state == THREADQUEUE_JOB_STATE_DONE);
-    PTHREAD_UNLOCK(&job->lock);
-    
-    if (!job_done) {
-      PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
-    }
-  } while (!job_done);
 
   // Free jobs submitted before this job.
   int i = 0;
@@ -478,7 +471,7 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue
   }
 
   PTHREAD_UNLOCK(&threadqueue->lock);
-  
+
   return 1;
 }
 
