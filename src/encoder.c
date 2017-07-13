@@ -642,9 +642,10 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->layer.input_layer = encoder->cfg.input_layer;
     encoder->layer.max_layers = cfg->shared->max_layers;
 
-    encoder->layer.num_short_term_ref_pic_sets = encoder->cfg.ref_frames;
-    encoder->layer.short_term_ref_pic_set_sps_flag = encoder->layer.max_layers > 1 ? 1 : 0;
-
+    //Use ref pic sets if not using gop
+    encoder->layer.short_term_ref_pic_set_sps_flag = encoder->cfg.gop_len == 0 ? 1 : 0;//encoder->layer.max_layers > 1 ? 1 : 0;
+    encoder->layer.num_short_term_ref_pic_sets = encoder->layer.short_term_ref_pic_set_sps_flag ? encoder->cfg.ref_frames : 0;
+    
     encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
     encoder->layer.list_modification_present_flag = (encoder->layer.layer_id > 0) && (encoder->cfg.ILR_frames > 0) && (encoder->cfg.intra_period != 1) ? 1 : 0;
     encoder->layer.sps_ext_or_max_sub_layers_minus1 = 7;
