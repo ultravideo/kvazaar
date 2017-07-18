@@ -1251,8 +1251,8 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   //*********************************************
   //For scalable extension. TODO: A better way to check if ILR?
 
-  bool is_ILR = state->frame->poc == state->frame->ref->pocs[ref_idx];
-  
+  bool is_ILR = state->frame->ref->image_info[ref_idx].is_long_term && state->encoder_control->layer.layer_id > state->frame->ref->image_info[ref_idx].layer_id;
+  bool is_ILR2 = state->frame->poc == state->frame->ref->pocs[ref_idx];
 
   vector2d_t mv = { 0, 0 };
   //Skip for ILR (bitsream requires 0-mv for ILR)

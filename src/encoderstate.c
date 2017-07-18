@@ -1177,16 +1177,16 @@ static void add_irl_frames(encoder_state_t *state)
   if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
     //Also add base layer to the reference list.
     const encoder_state_t *ILR_state = state->ILR_state;
-    kvz_picture *irl_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
-    kvz_picture* scaled_pic = kvz_image_scaling(irl_rec, &encoder->layer.upscaling);
-    if (irl_rec == NULL || scaled_pic == NULL) {
+    kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
+    kvz_picture* scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling);
+    if (ilr_rec == NULL || scaled_pic == NULL) {
       return; //TODO: Add error etc?
     }
     //Copy image ref info
     //TODO: Is there a way to determine how many refs irl_rec has? Otherwise just copy everything to be safe
-    memcpy(scaled_pic->ref_pocs, irl_rec->ref_pocs, sizeof(irl_rec->ref_pocs));//sizeof(int32_t) * ILR_state->frame->ref->used_size);
-    memcpy(scaled_pic->picture_info, irl_rec->picture_info, sizeof(irl_rec->picture_info));//sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
-    kvz_image_free(irl_rec);
+    memcpy(scaled_pic->ref_pocs, ilr_rec->ref_pocs, sizeof(ilr_rec->ref_pocs));//sizeof(int32_t) * ILR_state->frame->ref->used_size);
+    memcpy(scaled_pic->picture_info, ilr_rec->picture_info, sizeof(ilr_rec->picture_info));//sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
+    kvz_image_free(ilr_rec);
     
     //TODO: Account for offsets etc. Need to use something else than original sizes?
     int32_t mv_scale[2] = {GET_SCALE_MV(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
