@@ -561,7 +561,7 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out);
+        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr);
       }
 
       api->picture_free(cur_in_img);
@@ -581,7 +581,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, " Processed %d frames, %10llu bits",
             frames_done,
             (long long unsigned int)bitstream_length * 8);
-    if (frames_done > 0) {
+    if (encoder->cfg.calc_psnr && frames_done > 0) {
       fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
