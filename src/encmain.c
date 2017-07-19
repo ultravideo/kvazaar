@@ -582,7 +582,7 @@ int main(int argc, char *argv[])
             frames_done,
             (long long unsigned int)bitstream_length * 8);
     if (frames_done > 0) {
-      fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+      fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
               psnr_sum[2] / frames_done);

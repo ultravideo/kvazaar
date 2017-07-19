@@ -503,7 +503,7 @@ void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes)
 {
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR Y %2.4f U %2.4f V %2.4f",
           info->poc,
           info->qp,
           "BPI"[info->slice_type % 3],
