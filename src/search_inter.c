@@ -66,8 +66,8 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
     // bottom-left corner of the referenced block and the LCU containing
     // this block.
     const vector2d_t mv_lcu = {
-      .x = (((orig->x + width  + margin) << 2) + x) / (LCU_WIDTH << 2) - orig_lcu.x,
-      .y = (((orig->y + height + margin) << 2) + y) / (LCU_WIDTH << 2) - orig_lcu.y,
+      .x = (((orig->x + width  + margin) * 4) + x) / (LCU_WIDTH << 2) - orig_lcu.x,
+      .y = (((orig->y + height + margin) * 4) + y) / (LCU_WIDTH << 2) - orig_lcu.y,
     };
 
     if (mv_lcu.y > ctrl->max_inter_ref_lcu.down) {
@@ -92,7 +92,7 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
   }
 
   // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
-  const vector2d_t abs_mv = { (orig->x << 2) + x, (orig->y << 2) + y };
+  const vector2d_t abs_mv = { (orig->x * 4) + x, (orig->y * 4) + y };
 
   // Check that both margin constraints are satisfied.
   const int from_right  = (state->tile->frame->width  << 2) - (abs_mv.x + (width  << 2));
@@ -110,7 +110,7 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
  */
 static INLINE bool intmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int height)
 {
-  return fracmv_within_tile(state, orig, x << 2, y << 2, width, height);
+  return fracmv_within_tile(state, orig, x * 4, y * 4, width, height);
 }
 
 
@@ -235,8 +235,8 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
   int8_t merged      = 0;
   int8_t cur_mv_cand = 0;
 
-  x <<= mv_shift;
-  y <<= mv_shift;
+  x *= 1 << mv_shift;
+  y *= 1 << mv_shift;
 
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
@@ -318,8 +318,8 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
     // If best match is not better than threshold, we stop the search.
     if (*best_cost >= threshold) {
       // Return final movement vector in quarter-pixel precision.
-      mv_in_out->x = mv->x << 2;
-      mv_in_out->y = mv->y << 2;
+      mv_in_out->x = mv->x * 4;
+      mv_in_out->y = mv->y * 4;
 
       *bitcost_out = *best_bitcost;
       return true;
@@ -648,8 +648,8 @@ static unsigned tz_search(encoder_state_t * const state,
     }
   }
 
-  mv.x = mv.x << 2;
-  mv.y = mv.y << 2;
+  mv.x *= 4;
+  mv.y *= 4;
 
   *mv_in_out = mv;
   *bitcost_out = best_bitcost;
@@ -848,8 +848,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
   mv.y += small_hexbs[best_index].y;
 
   // Return final movement vector in quarter-pixel precision.
-  mv_in_out->x = mv.x << 2;
-  mv_in_out->y = mv.y << 2;
+  mv_in_out->x = mv.x * 4;
+  mv_in_out->y = mv.y * 4;
 
   *bitcost_out = best_bitcost;
 
@@ -980,8 +980,8 @@ static unsigned search_mv_full(encoder_state_t * const state,
     }
   }
 
-  mv_in_out->x = best_mv.x << 2;
-  mv_in_out->y = best_mv.y << 2;
+  mv_in_out->x = best_mv.x * 4;
+  mv_in_out->y = best_mv.y * 4;
 
   *bitcost_out = best_bitcost;
 
@@ -1086,18 +1086,18 @@ static unsigned search_frac(encoder_state_t * const state,
   int last_hpel_index = (fme_level == 1) ? 4 : 8;
 
   //Set mv to half-pixel precision
-  mv.x <<= 1;
-  mv.y <<= 1;
+  mv.x *= 2;
+  mv.y *= 2;
 
   // Search halfpel positions around best integer mv
   for (i = 1; i <= last_hpel_index; i+=4) {
     const vector2d_t *pattern[4] = { &square[i], &square[i + 1], &square[i + 2], &square[i + 3] };
     
     int8_t within_tile[4] = {
-      fracmv_within_tile(state, orig, (mv.x + pattern[0]->x) << 1, (mv.y + pattern[0]->y) << 1, width, height),
-      fracmv_within_tile(state, orig, (mv.x + pattern[1]->x) << 1, (mv.y + pattern[1]->y) << 1, width, height),
-      fracmv_within_tile(state, orig, (mv.x + pattern[2]->x) << 1, (mv.y + pattern[2]->y) << 1, width, height),
-      fracmv_within_tile(state, orig, (mv.x + pattern[3]->x) << 1, (mv.y + pattern[3]->y) << 1, width, height),
+      fracmv_within_tile(state, orig, (mv.x + pattern[0]->x) * 2, (mv.y + pattern[0]->y) * 2, width, height),
+      fracmv_within_tile(state, orig, (mv.x + pattern[1]->x) * 2, (mv.y + pattern[1]->y) * 2, width, height),
+      fracmv_within_tile(state, orig, (mv.x + pattern[2]->x) * 2, (mv.y + pattern[2]->y) * 2, width, height),
+      fracmv_within_tile(state, orig, (mv.x + pattern[3]->x) * 2, (mv.y + pattern[3]->y) * 2, width, height),
     };
 
     int hpel_strides[4] = {
@@ -1130,8 +1130,8 @@ static unsigned search_frac(encoder_state_t * const state,
   mv.y += square[best_index].y;
 
   //Set mv to quarterpel precision
-  mv.x <<= 1;
-  mv.y <<= 1;
+  mv.x *= 2;
+  mv.y *= 2;
 
   if (fme_level >= 3) {
 

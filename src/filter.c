@@ -168,7 +168,7 @@ static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const enc
   int16_t m4 = src[0];
   int16_t m5 = src[offset];
 
-  delta = CLIP(-tc,tc, (((m4 - m3) << 2) + m2 - m5 + 4 ) >> 3);
+  delta = CLIP(-tc,tc, (((m4 - m3) * 4) + m2 - m5 + 4 ) >> 3);
   if(!part_P_nofilter) {
     src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, m3 + delta);
   }
