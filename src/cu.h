@@ -271,7 +271,7 @@ typedef struct {
 
  \endverbatim
  */
-typedef struct {
+typedef ALIGNED(8) struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_CHROMA_SIZE];
   coeff_t v[LCU_CHROMA_SIZE];

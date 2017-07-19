@@ -225,6 +225,12 @@ typedef int16_t coeff_t;
 #define SIMD_ALIGNMENT 32
 
 #ifdef _MSC_VER
+  #define ALIGNED(alignment) __declspec(align(alignment))
+#else
+  #define ALIGNED(alignment) __attribute__((aligned (alignment)))
+#endif
+
+#ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
 #else
