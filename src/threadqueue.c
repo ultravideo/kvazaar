@@ -37,50 +37,46 @@ typedef struct {
 
 #define THREADQUEUE_LIST_REALLOC_SIZE 32
 
-//#define PTHREAD_COND_SIGNAL(c) fprintf(stderr, "%s:%d pthread_cond_signal(%s=%p)\n", __FUNCTION__, __LINE__, #c, c); if (pthread_cond_signal((c)) != 0) { fprintf(stderr, "pthread_cond_signal(%s=%p) failed!\n", #c, c); assert(0); return 0; }
-//#define PTHREAD_COND_BROADCAST(c) fprintf(stderr, "%s:%d pthread_cond_broadcast(%s=%p)\n", __FUNCTION__, __LINE__, #c, c); if (pthread_cond_broadcast((c)) != 0) { fprintf(stderr, "pthread_cond_broadcast(%s=%p) failed!\n", #c, c); assert(0); return 0; }
-//#define PTHREAD_COND_WAIT(c,l) fprintf(stderr, "%s:%d pthread_cond_wait(%s=%p, %s=%p)\n", __FUNCTION__, __LINE__, #c, c, #l, l); if (pthread_cond_wait((c),(l)) != 0) { fprintf(stderr, "pthread_cond_wait(%s=%p, %s=%p) failed!\n", #c, c, #l, l); assert(0); return 0; } else {fprintf(stderr, "%s:%d pthread_cond_wait(%s=%p, %s=%p) (done)\n", __FUNCTION__, __LINE__, #c, c, #l, l);}
-//#define PTHREAD_LOCK(l) fprintf(stderr, "%s:%d pthread_mutex_lock(%s=%p) (try)\n", __FUNCTION__, __LINE__, #l, l); if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s=%p) failed!\n", #l, l); assert(0); return 0; } else {fprintf(stderr, "%s:%d pthread_mutex_lock(%s=%p)\n", __FUNCTION__, __LINE__, #l, l);}
-//#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s=%p) failed!\n", #l, l); assert(0); return 0; }  else {fprintf(stderr, "%s:%d pthread_mutex_unlock(%s=%p)\n", __FUNCTION__, __LINE__, #l, l);}
+#define PTHREAD_COND_SIGNAL(c) \
+  if (pthread_cond_signal((c)) != 0) { \
+    fprintf(stderr, "pthread_cond_signal(%s=%p) failed!\n", #c, c); \
+    assert(0); \
+    return 0; \
+  }
 
+#define PTHREAD_COND_BROADCAST(c) \
+  if (pthread_cond_broadcast((c)) != 0) { \
+    fprintf(stderr, "pthread_cond_broadcast(%s=%p) failed!\n", #c, c); \
+    assert(0); \
+    return 0; \
+  }
 
-#define PTHREAD_COND_SIGNAL(c) if (pthread_cond_signal((c)) != 0) { fprintf(stderr, "pthread_cond_signal(%s=%p) failed!\n", #c, c); assert(0); return 0; }
-#define PTHREAD_COND_BROADCAST(c) if (pthread_cond_broadcast((c)) != 0) { fprintf(stderr, "pthread_cond_broadcast(%s=%p) failed!\n", #c, c); assert(0); return 0; }
+#define PTHREAD_COND_WAIT(c,l) \
+  if (pthread_cond_wait((c),(l)) != 0) { \
+    fprintf(stderr, "pthread_cond_wait(%s=%p, %s=%p) failed!\n", #c, c, #l, l); \
+    assert(0); \
+    return 0; \
+  }
 
-#ifndef _PTHREAD_DUMP
-#define PTHREAD_COND_WAIT(c,l) if (pthread_cond_wait((c),(l)) != 0) { fprintf(stderr, "pthread_cond_wait(%s=%p, %s=%p) failed!\n", #c, c, #l, l); assert(0); return 0; }
-#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
-#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
+#define PTHREAD_LOCK(l) \
+  if (pthread_mutex_lock((l)) != 0) { \
+    fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); \
+    assert(0); \
+    return 0; \
+  }
 
-#else  //PTHREAD_DUMP
-#define PTHREAD_LOCK(l) do { \
-  PERFORMANCE_MEASURE_START(); \
-  if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; } \
-  PERFORMANCE_MEASURE_END(NULL, "pthread_mutex_lock(%s=%p)@%s:%d",#l,l,__FUNCTION__, __LINE__); \
-} while (0);
-
-#define PTHREAD_UNLOCK(l) do { \
-  PERFORMANCE_MEASURE_START(); \
-  if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; } \
-  PERFORMANCE_MEASURE_END(NULL, "pthread_mutex_unlock(%s=%p)@%s:%d",#l,l,__FUNCTION__, __LINE__); \
-} while (0);
-
-#define PTHREAD_COND_WAIT(c,l) do { \
-  PERFORMANCE_MEASURE_START(); \
-  if (pthread_cond_wait((c),(l)) != 0) { fprintf(stderr, "pthread_cond_wait(%s=%p, %s=%p) failed!\n", #c, c, #l, l); assert(0); return 0;} \
-  PERFORMANCE_MEASURE_END(NULL, "pthread_cond_wait(%s=%p, %s=%p)@%s:%d",#c, c, #l, l,__FUNCTION__, __LINE__); \
-} while (0);
-#endif //PTHREAD_DUMP
+#define PTHREAD_UNLOCK(l) \
+  if (pthread_mutex_unlock((l)) != 0) { \
+    fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); \
+    assert(0); \
+    return 0; \
+  }
 
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
 {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
   threadqueue_queue_t * const threadqueue = threadqueue_worker_spec->threadqueue;
   threadqueue_job_t * next_job = NULL;
-
-#ifdef KVZ_DEBUG
-  KVZ_GET_TIME(&threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]);
-#endif //KVZ_DEBUG
 
   for(;;) {
     threadqueue_job_t * job = NULL;
@@ -153,17 +149,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
 
       PTHREAD_UNLOCK(&threadqueue->lock);
 
-#ifdef KVZ_DEBUG
-      job->debug_worker_id = threadqueue_worker_spec->worker_id;
-      KVZ_GET_TIME(&job->debug_clock_start);
-#endif //KVZ_DEBUG
-
       job->fptr(job->arg);
-
-#ifdef KVZ_DEBUG
-      job->debug_worker_id = threadqueue_worker_spec->worker_id;
-      KVZ_GET_TIME(&job->debug_clock_stop);
-#endif //KVZ_DEBUG
 
       // This lock is necessary because the main thread may try to add
       // reverse dependencies to the job while running.
@@ -234,13 +220,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
   // We got out of the loop because threadqueue->stop is true. The queue is locked.
   assert(threadqueue->stop);
   --threadqueue->threads_running;
-  
-#ifdef KVZ_DEBUG
-  KVZ_GET_TIME(&threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]);
-  
-  fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\tthread\n", threadqueue_worker_spec->worker_id, KVZ_CLOCK_T_AS_DOUBLE(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]), KVZ_CLOCK_T_DIFF(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id], threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]));
-#endif //KVZ_DEBUG
-  
+
   PTHREAD_UNLOCK(&threadqueue->lock);
   
   free(threadqueue_worker_spec_opaque);
@@ -280,14 +260,7 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
     fprintf(stderr, "Could not malloc threadqueue->threads!\n");
     return 0;
   }
-#ifdef KVZ_DEBUG
-  threadqueue->debug_clock_thread_start = MALLOC(KVZ_CLOCK_T, thread_count);
-  assert(threadqueue->debug_clock_thread_start);
-  threadqueue->debug_clock_thread_end = MALLOC(KVZ_CLOCK_T, thread_count);
-  assert(threadqueue->debug_clock_thread_end);
-  threadqueue->debug_log = fopen("threadqueue.log", "w");
-#endif //KVZ_DEBUG
-  
+
   threadqueue->queue = NULL;
   threadqueue->queue_size = 0;
   threadqueue->queue_count = 0;
@@ -358,10 +331,6 @@ void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
 
   assert(new_refcount >= 0);
 
-#ifdef KVZ_DEBUG
-  FREE_POINTER(job->debug_description);
-#endif
-
   FREE_POINTER(job->rdepends);
   pthread_mutex_destroy(&job->lock);
   FREE_POINTER(job);
@@ -408,12 +377,6 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue)
   threadqueue->queue_start = 0;
   PTHREAD_UNLOCK(&threadqueue->lock);
 
-#ifdef KVZ_DEBUG
-  FREE_POINTER(threadqueue->debug_clock_thread_start);
-  FREE_POINTER(threadqueue->debug_clock_thread_end);
-  fclose(threadqueue->debug_log);
-#endif
-  
   //Free allocated stuff
   FREE_POINTER(threadqueue->queue);
   threadqueue->queue_count = 0;
@@ -475,14 +438,12 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue
   return 1;
 }
 
-threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
+threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, void (*fptr)(void *arg), void *arg, int wait) {
   threadqueue_job_t *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
     //FIXME: This should be improved in order to handle dependencies
-    PERFORMANCE_MEASURE_START(KVZ_PERF_JOB);
     fptr(arg);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_JOB, threadqueue, "%s", debug_description);
     return NULL;
   }
   
@@ -490,28 +451,6 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
   
   job = MALLOC(threadqueue_job_t, 1);
   job->refcount = 1;
-  
-#ifdef KVZ_DEBUG
-  if (debug_description) {
-    size_t desc_len = MIN(255, strlen(debug_description));
-    char* desc;
-    
-    //Copy description
-    desc = MALLOC(char, desc_len + 1);
-    assert(desc);
-    memcpy(desc, debug_description, desc_len);
-    desc[desc_len] = 0;
-    
-    job->debug_description = desc;
-  } else {
-    char* desc;
-    desc = MALLOC(char, 255);
-    sprintf(desc, "(*%p)(%p)", fptr, arg);
-    
-    job->debug_description = desc;
-  }
-  KVZ_GET_TIME(&job->debug_clock_enqueue);
-#endif //KVZ_DEBUG
   
   if (!job) {
     fprintf(stderr, "Could not alloc job!\n");
@@ -620,49 +559,3 @@ int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * const threadqueue, thre
   
   return 1;
 }
-
-#ifdef KVZ_DEBUG
-int threadqueue_log(threadqueue_queue_t * threadqueue, const KVZ_CLOCK_T *start, const KVZ_CLOCK_T *stop, const char* debug_description) {
-  int i, thread_id = -1;
-  FILE* output;
-  
-  assert(start);
-  
-  if (threadqueue) {
-    //We need to lock to output safely
-    PTHREAD_LOCK(&threadqueue->lock);
-    
-    output = threadqueue->debug_log;
-    
-    //Find the thread
-    for(i = 0; i < threadqueue->threads_count; i++) {
-      if(pthread_equal(threadqueue->threads[i], pthread_self()) != 0) {
-        thread_id = i;
-        break;
-      }
-    }
-  } else {
-    thread_id = -1;
-    output = stderr;
-  }
-  
-  if (thread_id >= 0) {
-    if (stop) {
-      fprintf(output, "\t%d\t-\t%lf\t+%lf\t-\t%s\n", thread_id, KVZ_CLOCK_T_AS_DOUBLE(*start), KVZ_CLOCK_T_DIFF(*start, *stop), debug_description);
-    } else {
-      fprintf(output, "\t%d\t-\t%lf\t-\t-\t%s\n", thread_id, KVZ_CLOCK_T_AS_DOUBLE(*start), debug_description);
-    }
-  } else {
-    if (stop) {
-      fprintf(output, "\t\t-\t%lf\t+%lf\t-\t%s\n", KVZ_CLOCK_T_AS_DOUBLE(*start), KVZ_CLOCK_T_DIFF(*start, *stop), debug_description);
-    } else {
-      fprintf(output, "\t\t-\t%lf\t-\t-\t%s\n", KVZ_CLOCK_T_AS_DOUBLE(*start), debug_description);
-    }
-  }
-  
-  if (threadqueue) {
-    PTHREAD_UNLOCK(&threadqueue->lock);
-  }
-  return 1;
-}
-#endif //KVZ_DEBUG

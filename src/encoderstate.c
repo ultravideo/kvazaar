@@ -725,16 +725,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
 
     for (int i = 0; i < state->lcu_order_count; ++i) {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_LCU);
-
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
-
-#ifdef KVZ_DEBUG
-      {
-        const lcu_order_element_t * const lcu = &state->lcu_order[i];
-        PERFORMANCE_MEASURE_END(KVZ_PERF_LCU, ctrl->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
-      }
-#endif //KVZ_DEBUG
     }
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
@@ -769,14 +760,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
-#ifdef KVZ_DEBUG
-      char job_description[256];
-      sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
-#else
-      char* job_description = NULL;
-#endif
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
-      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(ctrl->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(ctrl->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1);
       threadqueue_job_t **job = &state->tile->wf_jobs[lcu->id];
 
       // If job object was returned, add dependancies and allow it to run.
@@ -911,26 +896,8 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       for (int i = 0; main_state->children[i].encoder_control; ++i) {
         //If we don't have wavefronts, parallelize encoding of children.
         if (main_state->children[i].type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-#ifdef KVZ_DEBUG
-          char job_description[256];
-          switch (main_state->children[i].type) {
-            case ENCODER_STATE_TYPE_TILE: 
-              sprintf(job_description, "type=encode_child,frame=%d,tile=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", main_state->children[i].frame->num, main_state->children[i].tile->id, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, 
-                      main_state->children[i].lcu_order[0].position_px.x + main_state->children[i].tile->lcu_offset_x * LCU_WIDTH, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position_px.x + main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].size.x + main_state->children[i].tile->lcu_offset_x * LCU_WIDTH - 1,
-                      main_state->children[i].lcu_order[0].position_px.y + main_state->children[i].tile->lcu_offset_y * LCU_WIDTH, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position_px.y + main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].size.y + main_state->children[i].tile->lcu_offset_y * LCU_WIDTH - 1);
-              break;
-            case ENCODER_STATE_TYPE_SLICE:
-              sprintf(job_description, "type=encode_child,frame=%d,slice=%d,start_in_ts=%d", main_state->children[i].frame->num, main_state->children[i].slice->id, main_state->children[i].slice->start_in_ts);
-              break;
-            default:
-              sprintf(job_description, "type=encode_child,frame=%d,invalid", main_state->children[i].frame->num);
-              break;
-          }
-#else
-          char* job_description = NULL;
-#endif
           kvz_threadqueue_free_job(&main_state->children[i].tqj_recon_done);
-          main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
+          main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].frame->is_idr_frame) {
 #if 0
             // Disabled due to non-determinism.
@@ -1256,39 +1223,24 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
 
 void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 {
-  {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
-    encoder_state_init_new_frame(state, frame);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=init_new_frame,frame=%d,poc=%d", state->frame->num, state->frame->poc);
-  }
-  {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
-    encoder_state_encode(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=encode,frame=%d", state->frame->num);
-  }
-  //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
-  {
-    threadqueue_job_t *job;
-#ifdef KVZ_DEBUG
-    char job_description[256];
-    sprintf(job_description, "type=write_bitstream,frame=%d", state->frame->num);
-#else
-    char* job_description = NULL;
-#endif
+  encoder_state_init_new_frame(state, frame);
+  encoder_state_encode(state);
 
-    job = kvz_threadqueue_submit(state->encoder_control->threadqueue, kvz_encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
-    
-    _encode_one_frame_add_bitstream_deps(state, job);
-    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
-      //We need to depend on previous bitstream generation
-      kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
-    }
-    kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
-    assert(!state->tqj_bitstream_written);
-    state->tqj_bitstream_written = job;
+  threadqueue_job_t *job =
+    kvz_threadqueue_submit(state->encoder_control->threadqueue,
+                           kvz_encoder_state_worker_write_bitstream,
+                           (void*) state,
+                           1);
+
+  _encode_one_frame_add_bitstream_deps(state, job);
+  if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
+    //We need to depend on previous bitstream generation
+    kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
   }
+  kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
+  assert(!state->tqj_bitstream_written);
+  state->tqj_bitstream_written = job;
   state->frame->done = 0;
-  //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
 
