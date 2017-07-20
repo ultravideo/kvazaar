@@ -450,7 +450,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 * \param pic        Image for the block we are trying to find.
 * \param ref        Image where we are trying to find the block.
 *
-* \returns  
+* \returns          Sum of absolute differences
 */
 unsigned kvz_image_calc_sad(const kvz_picture *pic,
                             const kvz_picture *ref,
@@ -459,19 +459,10 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
                             int ref_x,
                             int ref_y,
                             int block_width,
-                            int block_height,
-                            int max_px_below_lcu) {
+                            int block_height)
+{
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
-  
-  // Check that we are not referencing pixels that are not final.
-  if (max_px_below_lcu >= 0) {
-    int next_lcu_row_px = ((pic_y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
-    int px_below_lcu = ref_y + block_height - next_lcu_row_px;
-    if (px_below_lcu > max_px_below_lcu) {
-      return INT_MAX;
-    }
-  }
 
   if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
       ref_y >= 0 && ref_y <= ref->height - block_height)

@@ -173,7 +173,7 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
       state->tile->offset_x + orig->x + mv->x,
       state->tile->offset_y + orig->y + mv->y,
-      width, height, -1);
+      width, height);
     cost += calc_mvd(state, mv->x, mv->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -301,7 +301,7 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
         state->tile->offset_x + orig->x + mv->x + offset->x,
         state->tile->offset_y + orig->y + mv->y + offset->y,
-        width, height, -1);
+        width, height);
       unsigned bitcost;
       cost += calc_mvd(state, mv->x + offset->x, mv->y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -459,7 +459,7 @@ unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture 
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                             state->tile->offset_x + orig->x + mv->x + current->x,
                             state->tile->offset_y + orig->y + mv->y + current->y,
-                            width, height, -1);
+                            width, height);
       cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     }
 
@@ -518,7 +518,7 @@ unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
           state->tile->offset_x + orig->x + mv->x + k,
           state->tile->offset_y + orig->y + mv->y + i,
-          width, height, -1);
+          width, height);
         cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
       }
 
@@ -574,7 +574,7 @@ static unsigned tz_search(encoder_state_t * const state,
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    state->tile->offset_x + orig->x,
                                    state->tile->offset_y + orig->y,
-                                   width, height, -1);
+                                   width, height);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
     best_index = num_cand + 1;
   }
@@ -586,7 +586,7 @@ static unsigned tz_search(encoder_state_t * const state,
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                       state->tile->offset_x + orig->x + mv.x,
                                       state->tile->offset_y + orig->y + mv.y,
-                                      width, height, -1);
+                                      width, height);
     unsigned bitcost;
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     if (cost < best_cost) {
@@ -725,7 +725,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    state->tile->offset_x + orig->x,
                                    state->tile->offset_y + orig->y,
-                                   width, height, -1);
+                                   width, height);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
     best_index = num_cand + 1;
@@ -738,7 +738,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    state->tile->offset_x + orig->x + mv.x,
                                    state->tile->offset_y + orig->y + mv.y,
-                                   width, height, -1);
+                                   width, height);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -770,7 +770,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    state->tile->offset_x + orig->x + mv.x + pattern->x,
                                    state->tile->offset_y + orig->y + mv.y + pattern->y,
-                                   width, height, -1);
+                                   width, height);
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -807,7 +807,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                      state->tile->offset_x + orig->x + mv.x + offset->x,
                                      state->tile->offset_y + orig->y + mv.y + offset->y,
-                                     width, height, -1);
+                                     width, height);
       cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
       if (cost < best_cost) {
@@ -833,7 +833,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    state->tile->offset_x + orig->x + mv.x + offset->x,
                                    state->tile->offset_y + orig->y + mv.y + offset->y,
-                                   width, height, -1);
+                                   width, height);
     cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
@@ -887,7 +887,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
@@ -914,7 +914,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
@@ -968,7 +968,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
