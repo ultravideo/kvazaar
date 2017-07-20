@@ -761,7 +761,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
-      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(ctrl->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1);
+      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu, (void*)lcu);
       threadqueue_job_t **job = &state->tile->wf_jobs[lcu->id];
 
       // If job object was returned, add dependancies and allow it to run.
@@ -799,7 +799,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           }
         }
 
-        kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
+        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
         // The wavefront row is done when the last LCU in the row is done.
         if (i + 1 == state->lcu_order_count) {
@@ -897,8 +897,12 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         //If we don't have wavefronts, parallelize encoding of children.
         if (main_state->children[i].type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
           kvz_threadqueue_free_job(&main_state->children[i].tqj_recon_done);
-          main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1);
-          if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].frame->is_idr_frame) {
+          main_state->children[i].tqj_recon_done =
+            kvz_threadqueue_job_create(encoder_state_worker_encode_children, &main_state->children[i]);
+          if (main_state->children[i].previous_encoder_state != &main_state->children[i] &&
+              main_state->children[i].previous_encoder_state->tqj_recon_done &&
+              !main_state->children[i].frame->is_idr_frame)
+          {
 #if 0
             // Disabled due to non-determinism.
             if (main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN)
@@ -914,7 +918,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
               }
             }
           }
-          kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
+          kvz_threadqueue_submit(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
@@ -1227,19 +1231,17 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   encoder_state_encode(state);
 
   threadqueue_job_t *job =
-    kvz_threadqueue_submit(state->encoder_control->threadqueue,
-                           kvz_encoder_state_worker_write_bitstream,
-                           (void*) state,
-                           1);
+    kvz_threadqueue_job_create(kvz_encoder_state_worker_write_bitstream, state);
 
   _encode_one_frame_add_bitstream_deps(state, job);
   if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
     //We need to depend on previous bitstream generation
     kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
   }
-  kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
+  kvz_threadqueue_submit(state->encoder_control->threadqueue, job);
   assert(!state->tqj_bitstream_written);
   state->tqj_bitstream_written = job;
+
   state->frame->done = 0;
 }
 
