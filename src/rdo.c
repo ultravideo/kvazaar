@@ -152,36 +152,38 @@ int32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                            int32_t type,
                            int8_t scan_mode)
 {
-  int32_t cost = 0;
-  int i;
-  int found = 0;
-  encoder_state_t state_copy;
-
   // Make sure there are coeffs present
-  for(i = 0; i < width*width; i++) {
+  bool found = false;
+  for (int i = 0; i < width*width; i++) {
     if (coeff[i] != 0) {
       found = 1;
       break;
     }
   }
+  if (!found) return 0;
 
-  if(!found) return 0;
-
-  // Store cabac state and contexts
-  memcpy(&state_copy,state,sizeof(encoder_state_t));
+  // Take a copy of the CABAC so that we don't overwrite the contexts when
+  // counting the bits.
+  cabac_data_t cabac_copy;
+  memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
 
   // Clear bytes and bits and set mode to "count"
-  state_copy.cabac.only_count = 1;
-  state_copy.cabac.num_buffered_bytes = 0;
-  state_copy.cabac.bits_left = 23;
+  cabac_copy.only_count = 1;
+  cabac_copy.num_buffered_bytes = 0;
+  cabac_copy.bits_left = 23;
 
-  // Execute the coding function
-  kvz_encode_coeff_nxn(&state_copy, coeff, width, type, scan_mode, 0);
+  // Execute the coding function.
+  // It is safe to drop the const modifier since state won't be modified
+  // when cabac.only_count is set.
+  kvz_encode_coeff_nxn((encoder_state_t*) state,
+                       &cabac_copy,
+                       coeff,
+                       width,
+                       type,
+                       scan_mode,
+                       0);
 
-  // Store bitcost before restoring cabac
-  cost = (23-state_copy.cabac.bits_left) + (state_copy.cabac.num_buffered_bytes << 3);
-
-  return cost;
+  return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
 
