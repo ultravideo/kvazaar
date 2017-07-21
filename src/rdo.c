@@ -215,14 +215,14 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
     int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
-      rate += (length+1+abs_go_rice) << CTX_FRAC_BITS;
+      rate += (length+1+abs_go_rice) * (1 << CTX_FRAC_BITS);
     } else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
         symbol -=  (1<<(length++));
       }
-      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) << CTX_FRAC_BITS;
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
     }
     if (c1_idx < C1FLAG_NUMBER) {
       rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
@@ -287,7 +287,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
 
   min_abs_level    = ( max_abs_level > 1 ? max_abs_level - 1 : 1 );
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
-    double err       = (double)(level_double - ( abs_level << q_bits ) );
+    double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
     double cur_cost  = err * err * temp + state->lambda *
                        kvz_get_ic_rate( state, abs_level, ctx_num_one, ctx_num_abs,
                                     abs_go_rice, c1_idx, c2_idx, type);
@@ -454,8 +454,8 @@ void kvz_rdoq_sign_hiding(
           dec_bits -= 4 * CTX_FRAC_ONE_BIT;
         }
 
-        inc_bits = -quant_cost_in_bits + (inc_bits << PRECISION_INC);
-        dec_bits = quant_cost_in_bits + (dec_bits << PRECISION_INC);
+        inc_bits = -quant_cost_in_bits + inc_bits * (1 << PRECISION_INC);
+        dec_bits = quant_cost_in_bits + dec_bits * (1 << PRECISION_INC);
 
         if (inc_bits < dec_bits) {
           current.change = 1;
@@ -476,7 +476,7 @@ void kvz_rdoq_sign_hiding(
 
         // Add sign bit, other bits and sig_coeff goes to one.
         int bits = CTX_FRAC_ONE_BIT + sh_rates->inc[current.pos] + sh_rates->sig_coeff_inc[current.pos];
-        current.cost = -llabs(quant_cost_in_bits) + (bits << PRECISION_INC);
+        current.cost = -llabs(quant_cost_in_bits) + bits * (1 << PRECISION_INC);
         current.change = 1;
 
         if (coeff_scan < first_nz_scan) {
@@ -662,7 +662,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       }
 
       if (encoder->cfg.signhide_enable) {
-        sh_rates.quant_delta[blkpos] = (level_double - (level << q_bits)) >> (q_bits - 8);
+        sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
           int32_t rate_now  = kvz_get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
           int32_t rate_up   = kvz_get_ic_rate(state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
@@ -907,8 +907,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
   int8_t merged = 0;
   int8_t cur_mv_cand = 0;
 
-  x <<= mv_shift;
-  y <<= mv_shift;
+  x *= 1 << mv_shift;
+  y *= 1 << mv_shift;
 
   // Check every candidate to find a match
   for (merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
