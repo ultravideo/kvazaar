@@ -378,7 +378,7 @@ SUITE(sad_tests)
     sad_test_env.tested_func = strategies.strategies[i].fptr;
     sad_test_env.strategy = &strategies.strategies[i];
     int num_dim_tests = sizeof(tested_dims) / sizeof(tested_dims[0]);
-    for (int dim_test = 0; dim_test < num_dim_tests; ++dim_test) {
+    for (volatile int dim_test = 0; dim_test < num_dim_tests; ++dim_test) {
       sad_test_env.width = tested_dims[dim_test].width;
       sad_test_env.height = tested_dims[dim_test].height;
       RUN_TEST(test_reg_sad);
