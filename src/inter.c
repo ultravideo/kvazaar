@@ -1120,14 +1120,19 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     candidates = 1;
   }
 
-  // Use Temporal Motion Vector Prediction when enabled.
+  // ***********************************************
+  // Modified for SHVC. Not scalability specific. TODO: Can use tmvp if referencing a lower el? Account for ref structure. Account for if first EL frame can be I
+
   // TMVP required at least two sequential P/B-frames.
   bool can_use_tmvp =
     state->encoder_control->cfg.tmvp_enable &&
-    state->frame->poc > 1 &&
+    (state->frame->poc > 1 || 
+      state->encoder_control->cfg.ILR_frames > 0 && (state->frame->poc > 0 || state->encoder_control->layer.layer_id > 1)
+    ) &&
     state->frame->ref->used_size &&
     candidates < AMVP_MAX_NUM_CANDS &&
     (h != NULL || c3 != NULL);
+  // ***********************************************
 
   if (can_use_tmvp && add_temporal_candidate(state,
                                              cur_cu->inter.mv_ref[reflist],

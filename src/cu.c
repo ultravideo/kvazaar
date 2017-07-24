@@ -261,15 +261,15 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
         //Copy stuff from col to cu
         memcpy(cu, col, sizeof(cu_info_t));
 
-        //Scale mv
-        if (!col->skipped && col->type == CU_INTER) {
+        //Scale mv. TODO: Skipped not actually tested? Only that  col is inside pic?
+        if (/*!col->skipped &&*/ col->type == CU_INTER) {
           cu->inter.mv[0][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][0], mv_scale[0]);
           cu->inter.mv[0][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][1], mv_scale[1]);
           cu->inter.mv[1][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][0], mv_scale[0]);
           cu->inter.mv[1][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][1], mv_scale[1]);
-        } else {
+        } /*else {
           cu->type = CU_INTRA;
-        }
+        }*/
       } else {
         //Col is outside of the picture so set block to CU_INTRA
         cu->type = CU_INTRA;
