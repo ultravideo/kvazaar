@@ -43,11 +43,8 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-// Cost treshold for doing intra search in inter frames with --rd=0.
-#ifndef INTRA_TRESHOLD
-# define INTRA_TRESHOLD 20
-#endif
-
+// Cost threshold for doing intra search in inter frames with --rd=0.
+static const int INTRA_THRESHOLD = 8;
 
 // Modify weight of luma SSD.
 #ifndef LUMA_MULT
@@ -484,7 +481,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // decision after reconstructing the inter frame.
     bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
-                      && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
+                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD;
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
