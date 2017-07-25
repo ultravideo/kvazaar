@@ -636,12 +636,11 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     while (main_state->parent) main_state = main_state->parent;
     assert(main_state != state);
 
-    const unsigned tile_x_px = state->tile->lcu_offset_x << LOG2_LCU_WIDTH;
-    const unsigned tile_y_px = state->tile->lcu_offset_y << LOG2_LCU_WIDTH;
     const unsigned x_px = lcu->position_px.x;
     const unsigned y_px = lcu->position_px.y;
     kvz_cu_array_copy(main_state->tile->frame->cu_array,
-                      x_px + tile_x_px, y_px + tile_y_px,
+                      x_px + state->tile->offset_x,
+                      y_px + state->tile->offset_y,
                       state->tile->frame->cu_array,
                       x_px, y_px,
                       LCU_WIDTH, LCU_WIDTH);
@@ -889,8 +888,8 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       encoder_state_t *sub_state = &(main_state->children[i]);
       
       if (sub_state->tile != main_state->tile) {
-        const int offset_x = sub_state->tile->lcu_offset_x * LCU_WIDTH;
-        const int offset_y = sub_state->tile->lcu_offset_y * LCU_WIDTH;
+        const int offset_x = sub_state->tile->offset_x;
+        const int offset_y = sub_state->tile->offset_y;
         const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
         

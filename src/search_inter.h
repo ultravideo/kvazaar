@@ -73,4 +73,10 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        double *inter_cost,
                        uint32_t *inter_bitcost);
 
+
+unsigned kvz_inter_satd_cost(const encoder_state_t* state,
+                             const lcu_t *lcu,
+                             int x,
+                             int y);
+
 #endif // SEARCH_INTER_H_

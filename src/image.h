@@ -74,8 +74,24 @@ void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv);
 
 
 //Algorithms
-unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_lcu_below);
+unsigned kvz_image_calc_sad(const kvz_picture *pic,
+                            const kvz_picture *ref,
+                            int pic_x,
+                            int pic_y,
+                            int ref_x,
+                            int ref_y,
+                            int block_width,
+                            int block_height);
+
+
+unsigned kvz_image_calc_satd(const kvz_picture *pic,
+                             const kvz_picture *ref,
+                             int pic_x,
+                             int pic_y,
+                             int ref_x,
+                             int ref_y,
+                             int block_width,
+                             int block_height);
 
 
 void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,

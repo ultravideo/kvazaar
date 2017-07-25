@@ -43,11 +43,8 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-// Cost treshold for doing intra search in inter frames with --rd=0.
-#ifndef INTRA_TRESHOLD
-# define INTRA_TRESHOLD 20
-#endif
-
+// Cost threshold for doing intra search in inter frames with --rd=0.
+static const int INTRA_THRESHOLD = 8;
 
 // Modify weight of luma SSD.
 #ifndef LUMA_MULT
@@ -484,7 +481,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // decision after reconstructing the inter frame.
     bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
-                      && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
+                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD;
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
@@ -719,11 +716,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->frame->num, state->tile->id, state->slice->id,
-                          (state->tile->lcu_offset_x * LCU_WIDTH) + x,
-                          (state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 
-                          (state->tile->lcu_offset_y * LCU_WIDTH) + y,
-                          (state->tile->lcu_offset_y * LCU_WIDTH) + y + (LCU_WIDTH >> depth), 
-                          depth, debug_split, (cur_cu->type==CU_INTRA)?1:0);
+                          state->tile->offset_x + x,
+                          state->tile->offset_x + x + cu_width,
+                          state->tile->offset_y + y,
+                          state->tile->offset_y + y + cu_width,
+                          depth, debug_split, (cur_cu->type == CU_INTRA) ? 1 : 0);
 
   assert(cur_cu->type != CU_NOTSET);
 

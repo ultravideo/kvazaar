@@ -171,9 +171,9 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 
     uint32_t bitcost = 0;
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-      (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x,
-      (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y,
-      width, height, -1);
+      state->tile->offset_x + orig->x + mv->x,
+      state->tile->offset_y + orig->y + mv->y,
+      width, height);
     cost += calc_mvd(state, mv->x, mv->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -299,9 +299,9 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
       }
 
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + offset->x,
-        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + offset->y,
-        width, height, -1);
+        state->tile->offset_x + orig->x + mv->x + offset->x,
+        state->tile->offset_y + orig->y + mv->y + offset->y,
+        width, height);
       unsigned bitcost;
       cost += calc_mvd(state, mv->x + offset->x, mv->y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -457,9 +457,9 @@ unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture 
 
     {
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
-                            width, height, -1);
+                            state->tile->offset_x + orig->x + mv->x + current->x,
+                            state->tile->offset_y + orig->y + mv->y + current->y,
+                            width, height);
       cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     }
 
@@ -516,9 +516,9 @@ unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *
 
       {
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
-          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
-          width, height, -1);
+          state->tile->offset_x + orig->x + mv->x + k,
+          state->tile->offset_y + orig->y + mv->y + i,
+          width, height);
         cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
       }
 
@@ -572,9 +572,9 @@ static unsigned tz_search(encoder_state_t * const state,
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   if (intmv_within_tile(state, orig, 0, 0, width, height)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
-                                   width, height, -1);
+                                   state->tile->offset_x + orig->x,
+                                   state->tile->offset_y + orig->y,
+                                   width, height);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
     best_index = num_cand + 1;
   }
@@ -584,9 +584,9 @@ static unsigned tz_search(encoder_state_t * const state,
       intmv_within_tile(state, orig, mv.x, mv.y, width, height))
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                      (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                      (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                      width, height, -1);
+                                      state->tile->offset_x + orig->x + mv.x,
+                                      state->tile->offset_y + orig->y + mv.y,
+                                      width, height);
     unsigned bitcost;
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     if (cost < best_cost) {
@@ -723,9 +723,9 @@ static unsigned hexagon_search(encoder_state_t * const state,
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   if (intmv_within_tile(state, orig, 0, 0, width, height)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
-                                   width, height, -1);
+                                   state->tile->offset_x + orig->x,
+                                   state->tile->offset_y + orig->y,
+                                   width, height);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
     best_index = num_cand + 1;
@@ -736,9 +736,9 @@ static unsigned hexagon_search(encoder_state_t * const state,
       intmv_within_tile(state, orig, mv.x, mv.y, width, height)) 
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                   width, height, -1);
+                                   state->tile->offset_x + orig->x + mv.x,
+                                   state->tile->offset_y + orig->y + mv.y,
+                                   width, height);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -768,9 +768,9 @@ static unsigned hexagon_search(encoder_state_t * const state,
     }
 
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
-                                   width, height, -1);
+                                   state->tile->offset_x + orig->x + mv.x + pattern->x,
+                                   state->tile->offset_y + orig->y + mv.y + pattern->y,
+                                   width, height);
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -805,9 +805,9 @@ static unsigned hexagon_search(encoder_state_t * const state,
       }
 
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                     (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                                     (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                                     width, height, -1);
+                                     state->tile->offset_x + orig->x + mv.x + offset->x,
+                                     state->tile->offset_y + orig->y + mv.y + offset->y,
+                                     width, height);
       cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
       if (cost < best_cost) {
@@ -831,9 +831,9 @@ static unsigned hexagon_search(encoder_state_t * const state,
     }
 
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                                   width, height, -1);
+                                   state->tile->offset_x + orig->x + mv.x + offset->x,
+                                   state->tile->offset_y + orig->y + mv.y + offset->y,
+                                   width, height);
     cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
@@ -887,7 +887,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
@@ -914,7 +914,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
@@ -968,7 +968,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
         unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                            orig->x + x,
                                            orig->y + y,
-                                           width, height, -1);
+                                           width, height);
         cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         if (cost < best_cost) {
           best_cost = cost;
@@ -1064,8 +1064,8 @@ static unsigned search_frac(encoder_state_t * const state,
   }
 
   kvz_get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
-                state->tile->lcu_offset_x * LCU_WIDTH,
-                state->tile->lcu_offset_y * LCU_WIDTH,
+                state->tile->offset_x,
+                state->tile->offset_y,
                 ref->y, ref->width, ref->height, FILTER_SIZE, width+1, height+1, &src);
 
   kvz_filter_frac_blocks_luma(state->encoder_control, src.orig_topleft, src.stride, width,
@@ -1245,8 +1245,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   const videoframe_t * const frame = state->tile->frame;
   kvz_picture *ref_image = state->frame->ref->images[ref_idx];
   const vector2d_t orig = { x, y };
-  uint32_t temp_bitcost = 0;
-  uint32_t temp_cost = 0;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
@@ -1263,12 +1261,8 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
-    const vector2d_t tile_top_left_corner = {
-        (state->tile->lcu_offset_x << LOG2_LCU_WIDTH),
-        (state->tile->lcu_offset_y << LOG2_LCU_WIDTH)
-    };
-    const int mid_x = tile_top_left_corner.x + x + (width >> 1);
-    const int mid_y = tile_top_left_corner.y + y + (height >> 1);
+    const int mid_x = state->tile->offset_x + x + (width >> 1);
+    const int mid_y = state->tile->offset_y + y + (height >> 1);
     const cu_array_t* ref_array = state->frame->ref->cu_arrays[ref_idx];
     const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
@@ -1291,19 +1285,21 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     default: break;
   }
 
+  uint32_t temp_cost = 0;
+  uint32_t temp_bitcost = 0;
   switch (state->encoder_control->cfg.ime_algorithm) {
     case KVZ_IME_TZ:
-      temp_cost += tz_search(state,
-                             width, height,
-                             frame->source,
-                             ref_image,
-                             &orig,
-                             &mv,
-                             mv_cand,
-                             merge_cand,
-                             num_cand,
-                             ref_idx,
-                             &temp_bitcost);
+      temp_cost = tz_search(state,
+                            width, height,
+                            frame->source,
+                            ref_image,
+                            &orig,
+                            &mv,
+                            mv_cand,
+                            merge_cand,
+                            num_cand,
+                            ref_idx,
+                            &temp_bitcost);
       break;
 
 
@@ -1312,32 +1308,32 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     case KVZ_IME_FULL16:
     case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
-      temp_cost += search_mv_full(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  search_range,
-                                  &temp_bitcost);
+      temp_cost = search_mv_full(state,
+                                 width, height,
+                                 frame->source,
+                                 ref_image,
+                                 &orig,
+                                 &mv,
+                                 mv_cand,
+                                 merge_cand,
+                                 num_cand,
+                                 ref_idx,
+                                 search_range,
+                                 &temp_bitcost);
       break;
 
     default:
-      temp_cost += hexagon_search(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  &temp_bitcost);
+      temp_cost = hexagon_search(state,
+                                 width, height,
+                                 frame->source,
+                                 ref_image,
+                                 &orig,
+                                 &mv,
+                                 mv_cand,
+                                 merge_cand,
+                                 num_cand,
+                                 ref_idx,
+                                 &temp_bitcost);
       break;
   }
 
@@ -1353,8 +1349,20 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                             num_cand,
                             ref_idx,
                             &temp_bitcost);
+  } else if (temp_cost < INT_MAX) {
+    // Recalculate inter cost with SATD.
+    temp_cost = kvz_image_calc_satd(
+        frame->source,
+        ref_image,
+        orig.x,
+        orig.y,
+        state->tile->offset_x + orig.x + (mv.x >> 2),
+        state->tile->offset_y + orig.y + (mv.y >> 2),
+        width,
+        height);
+    temp_cost += temp_bitcost * (int)(state->lambda_sqrt + 0.5);
   }
-  
+
   merged = 0;
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
@@ -1571,14 +1579,16 @@ static void search_pu_inter(encoder_state_t * const state,
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
+          const uint8_t mv_ref_coded[2] = {
+            state->frame->refmap[merge_cand[i].ref[0]].idx,
+            state->frame->refmap[merge_cand[j].ref[1]].idx
+          };
+          const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
+          cost += state->lambda_sqrt * extra_bits + 0.5;
+
+
           if (cost < *inter_cost) {
-
             cur_cu->inter.mv_dir = 3;
-            uint8_t mv_ref_coded[2] = {
-              state->frame->refmap[merge_cand[i].ref[0]].idx,
-              state->frame->refmap[merge_cand[j].ref[1]].idx
-            };
-
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
 
@@ -1587,15 +1597,15 @@ static void search_pu_inter(encoder_state_t * const state,
             cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
             cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
             cur_cu->merged = 0;
-                        
+
             // Check every candidate to find a match
             for(int merge_idx = 0; merge_idx < num_cand; merge_idx++) {
               if (
                   merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
-                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&     
+                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
                   merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
-                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&    
-                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] && 
+                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
+                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
                   merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1]) {
                 cur_cu->merged = 1;
                 cur_cu->merge_idx = merge_idx;
@@ -1621,13 +1631,14 @@ static void search_pu_inter(encoder_state_t * const state,
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {
-                  cu_mv_cand = 1;                  
+                  cu_mv_cand = 1;
                 }
               }
               CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
             }
+
             *inter_cost = cost;
-            *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + mv_ref_coded[0] + mv_ref_coded[1];
+            *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
           }
         }
       }
