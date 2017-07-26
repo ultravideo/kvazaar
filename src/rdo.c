@@ -39,6 +39,8 @@
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
 
+static const double COEFF_SUM_MULTIPLIER = 1.9;
+
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
 
@@ -140,17 +142,22 @@ struct sh_rates_t {
 };
 
 
-/** Calculate actual (or really close to actual) bitcost for coding coefficients
+/**
+ * \brief Calculate actual (or really close to actual) bitcost for coding
+ * coefficients.
+ *
  * \param coeff coefficient array
  * \param width coeff block width
  * \param type data type (0 == luma)
+ *
  * \returns bits needed to code input coefficients
  */
-int32_t kvz_get_coeff_cost(const encoder_state_t * const state,
-                           const coeff_t *coeff,
-                           int32_t width,
-                           int32_t type,
-                           int8_t scan_mode)
+static INLINE uint32_t get_coeff_cabac_cost(
+    const encoder_state_t * const state,
+    const coeff_t *coeff,
+    int32_t width,
+    int32_t type,
+    int8_t scan_mode)
 {
   // Make sure there are coeffs present
   bool found = false;
@@ -186,6 +193,47 @@ int32_t kvz_get_coeff_cost(const encoder_state_t * const state,
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
+
+/**
+ * \brief Calculate a fast estimate of coefficient bitcost.
+ *
+ * \param coeff   coefficient array
+ * \param width   coeff block width
+ *
+ * \returns       number of bits needed to code coefficients
+ */
+static INLINE uint32_t get_coeff_fast_cost(const coeff_t *coeff, int32_t width)
+{
+  uint32_t coeff_sum = 0;
+  for (int i = 0; i < width * width; i++) {
+    coeff_sum += abs(coeff[i]);
+  }
+  return (uint32_t) COEFF_SUM_MULTIPLIER * coeff_sum + 0.5;
+}
+
+
+/**
+ * \brief Estimate bitcost for coding coefficients.
+ *
+ * \param coeff   coefficient array
+ * \param width   coeff block width
+ * \param type    data type (0 == luma)
+ *
+ * \returns       number of bits needed to code coefficients
+ */
+uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+                            const coeff_t *coeff,
+                            int32_t width,
+                            int32_t type,
+                            int8_t scan_mode)
+{
+  if (state->encoder_control->cfg.rdo > 0) {
+    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+
+  } else {
+    return get_coeff_fast_cost(coeff, width);
+  }
+}
 
 
 #define COEF_REMAIN_BIN_REDUCTION 3
