@@ -88,7 +88,7 @@ const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, uns
 {
   assert(x_px < cua->width);
   assert(y_px < cua->height);
-  return &(cua)->data[(x_px >> 2) + (y_px >> 2) * ((cua)->width >> 2)];
+  return &(cua)->data[(x_px >> 2) + (y_px >> 2) * ((cua)->stride >> 2)];
 }
 
 
@@ -98,81 +98,98 @@ const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, uns
  * \param width   width of the array in luma pixels
  * \param height  height of the array in luma pixels
  */
-cu_array_t * kvz_cu_array_alloc(const int width, const int height) {
+cu_array_t * kvz_cu_array_alloc(const int width, const int height)
+{
   cu_array_t *cua = MALLOC(cu_array_t, 1);
 
-  // Round up to a multiple of cell width and divide by cell width.
-  const int width_scu  = (width  + 15) >> 2;
-  const int height_scu = (height + 15) >> 2;
-  assert(width_scu  * 16 >= width);
-  assert(height_scu * 16 >= height);
+  // Round up to a multiple of LCU width and divide by cell width.
+  const int width_scu  = CEILDIV(width,  LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
+  const int height_scu = CEILDIV(height, LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
   const unsigned cu_array_size = width_scu * height_scu;
-  cua->data = calloc(cu_array_size, sizeof(cu_info_t));
-  cua->width  = width_scu  << 2;
-  cua->height = height_scu << 2;
+
+  cua->base     = NULL;
+  cua->data     = calloc(cu_array_size, sizeof(cu_info_t));
+  cua->width    = width_scu  * SCU_WIDTH;
+  cua->height   = height_scu * SCU_WIDTH;
+  cua->stride   = cua->width;
   cua->refcount = 1;
 
   return cua;
 }
 
 
-int kvz_cu_array_free(cu_array_t * const cua)
+cu_array_t * kvz_cu_subarray(cu_array_t *base,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height)
 {
-  int32_t new_refcount;
-  if (!cua) return 1;
+  assert(x_offset + width <= base->width);
+  assert(y_offset + height <= base->height);
 
-  new_refcount = KVZ_ATOMIC_DEC(&(cua->refcount));
-  //Still we have some references, do nothing
-  if (new_refcount > 0) return 1;
+  if (x_offset == 0 &&
+      y_offset == 0 &&
+      width == base->width &&
+      height == base->height)
+  {
+    return kvz_cu_array_copy_ref(base);
+  }
 
-  FREE_POINTER(cua->data);
-  free(cua);
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
 
-  return 1;
+  // Find the real base array.
+  cu_array_t *real_base = base;
+  while (real_base->base) {
+    real_base = real_base->base;
+  }
+  cua->base     = kvz_cu_array_copy_ref(real_base);
+  cua->data     = kvz_cu_array_at(base, x_offset, y_offset);
+  cua->width    = width;
+  cua->height   = height;
+  cua->stride   = base->stride;
+  cua->refcount = 1;
+
+  return cua;
+}
+
+void kvz_cu_array_free(cu_array_t **cua_ptr)
+{
+  cu_array_t *cua = *cua_ptr;
+  if (cua == NULL) return;
+  *cua_ptr = NULL;
+
+  int new_refcount = KVZ_ATOMIC_DEC(&cua->refcount);
+  if (new_refcount > 0) {
+    // Still we have some references, do nothing.
+    return;
+  }
+
+  assert(new_refcount == 0);
+
+  if (!cua->base) {
+    FREE_POINTER(cua->data);
+  } else {
+    kvz_cu_array_free(&cua->base);
+    cua->data = NULL;
+  }
+
+  FREE_POINTER(cua);
 }
 
 
 /**
- * \brief Copy part of a cu array to another cu array.
+ * \brief Get a new pointer to a cu array.
  *
- * All values are in luma pixels.
- *
- * \param dst     destination array
- * \param dst_x   x-coordinate of the left edge of the copied area in dst
- * \param dst_y   y-coordinate of the top edge of the copied area in dst
- * \param src     source array
- * \param src_x   x-coordinate of the left edge of the copied area in src
- * \param src_y   y-coordinate of the top edge of the copied area in src
- * \param width   width of the area to copy
- * \param height  height of the area to copy
+ * Increment reference count and return the cu array.
  */
-void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
-                       const cu_array_t* src, int src_x, int src_y,
-                       int width, int height)
+cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua)
 {
-  // Convert values from pixel coordinates to array indices.
-  int src_stride = src->width >> 2;
-  int dst_stride = dst->width >> 2;
-  const cu_info_t* src_ptr = &src->data[(src_x >> 2) + (src_y >> 2) * src_stride];
-  cu_info_t* dst_ptr       = &dst->data[(dst_x >> 2) + (dst_y >> 2) * dst_stride];
-
-  // Number of bytes to copy per row.
-  const size_t row_size = sizeof(cu_info_t) * (width >> 2);
-
-  width = MIN(width,   MIN(src->width  - src_x, dst->width  - dst_x));
-  height = MIN(height, MIN(src->height - src_y, dst->height - dst_y));
-
-  assert(src_x + width  <= src->width);
-  assert(src_y + height <= src->height);
-  assert(dst_x + width  <= dst->width);
-  assert(dst_y + height <= dst->height);
-
-  for (int i = 0; i < (height >> 2); ++i) {
-    memcpy(dst_ptr, src_ptr, row_size);
-    src_ptr += src_stride;
-    dst_ptr += dst_stride;
-  }
+  // The caller should have had another reference.
+  assert(cua->refcount > 0);
+  KVZ_ATOMIC_INC(&cua->refcount);
+  return cua;
 }
+
 
 /**
  * \brief Copy an lcu to a cu array.
@@ -186,7 +203,7 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
  */
 void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
 {
-  const int dst_stride = dst->width >> 2;
+  const int dst_stride = dst->stride >> 2;
   for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {
     for (int x = 0; x < LCU_WIDTH; x += SCU_WIDTH) {
       const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);

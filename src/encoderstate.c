@@ -627,35 +627,13 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     encoder_sao_reconstruct(state, lcu);
   }
 
-  // Copy LCU cu_array to main states cu_array, because that is the only one
-  // which is given to the next frame through image_list_t.
-  {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
-
-    encoder_state_t *main_state = state;
-    while (main_state->parent) main_state = main_state->parent;
-    assert(main_state != state);
-
-    const unsigned x_px = lcu->position_px.x;
-    const unsigned y_px = lcu->position_px.y;
-    kvz_cu_array_copy(main_state->tile->frame->cu_array,
-                      x_px + state->tile->offset_x,
-                      y_px + state->tile->offset_y,
-                      state->tile->frame->cu_array,
-                      x_px, y_px,
-                      LCU_WIDTH, LCU_WIDTH);
-
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=copy_cuinfo,frame=%d,tile=%d", state->frame->num, state->tile->id);
-  }
-  
   //Now write data to bitstream (required to have a correct CABAC state)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
-  
+
   //Encode SAO
   if (encoder->cfg.sao_enable) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
-  
 
   // QP delta is not used when rate control is turned off.
   state->must_code_qp_delta = encoder->lcu_dqp_enabled;
@@ -880,40 +858,57 @@ static int encoder_state_tree_is_a_chain(const encoder_state_t * const state) {
 static void encoder_state_encode(encoder_state_t * const main_state) {
   //If we have children, encode at child level
   if (main_state->children[0].encoder_control) {
-    int i=0;
     //If we have only one child, than it cannot be the last split in tree
     int node_is_the_last_split_in_tree = (main_state->children[1].encoder_control != 0);
-    
-    for (i=0; main_state->children[i].encoder_control; ++i) {
+
+    for (int i = 0; main_state->children[i].encoder_control; ++i) {
       encoder_state_t *sub_state = &(main_state->children[i]);
-      
+
       if (sub_state->tile != main_state->tile) {
         const int offset_x = sub_state->tile->offset_x;
         const int offset_y = sub_state->tile->offset_y;
         const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
-        
-        if (sub_state->tile->frame->source) {
-          kvz_image_free(sub_state->tile->frame->source);
-          sub_state->tile->frame->source = NULL;
-        }
-        if (sub_state->tile->frame->rec) {
-          kvz_image_free(sub_state->tile->frame->rec);
-          sub_state->tile->frame->rec = NULL;
-        }
-        
-        assert(!sub_state->tile->frame->source);
-        assert(!sub_state->tile->frame->rec);
-        sub_state->tile->frame->source = kvz_image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
-        sub_state->tile->frame->rec = kvz_image_make_subimage(main_state->tile->frame->rec, offset_x, offset_y, width, height);
+
+        kvz_image_free(sub_state->tile->frame->source);
+        sub_state->tile->frame->source = NULL;
+
+        kvz_image_free(sub_state->tile->frame->rec);
+        sub_state->tile->frame->rec = NULL;
+
+        kvz_cu_array_free(&sub_state->tile->frame->cu_array);
+
+        sub_state->tile->frame->source = kvz_image_make_subimage(
+            main_state->tile->frame->source,
+            offset_x,
+            offset_y,
+            width,
+            height
+        );
+        sub_state->tile->frame->rec = kvz_image_make_subimage(
+            main_state->tile->frame->rec,
+            offset_x,
+            offset_y,
+            width,
+            height
+        );
+        sub_state->tile->frame->cu_array = kvz_cu_subarray(
+            main_state->tile->frame->cu_array,
+            offset_x,
+            offset_y,
+            sub_state->tile->frame->width_in_lcu * LCU_WIDTH,
+            sub_state->tile->frame->height_in_lcu * LCU_WIDTH
+        );
       }
-      
+
       //To be the last split, we require that every child is a chain
-      node_is_the_last_split_in_tree = node_is_the_last_split_in_tree && encoder_state_tree_is_a_chain(&main_state->children[i]);
+      node_is_the_last_split_in_tree =
+        node_is_the_last_split_in_tree &&
+        encoder_state_tree_is_a_chain(&main_state->children[i]);
     }
     //If it's the latest split point
     if (node_is_the_last_split_in_tree) {
-      for (i=0; main_state->children[i].encoder_control; ++i) {
+      for (int i = 0; main_state->children[i].encoder_control; ++i) {
         //If we don't have wavefronts, parallelize encoding of children.
         if (main_state->children[i].type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
 #ifdef KVZ_DEBUG
@@ -960,7 +955,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         }
       }
     } else {
-      for (i=0; main_state->children[i].encoder_control; ++i) {
+      for (int i = 0; main_state->children[i].encoder_control; ++i) {
         encoder_state_worker_encode_children(&(main_state->children[i]));
       }
     }
@@ -1186,6 +1181,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   encoder_set_source_picture(state, frame);
 
+  assert(!state->tile->frame->cu_array);
+  state->tile->frame->cu_array = kvz_cu_array_alloc(
+      state->tile->frame->width,
+      state->tile->frame->height
+  );
+
   // Check whether the frame is a keyframe or not.
   if (state->frame->num == 0) {
     state->frame->is_idr_frame = true;
@@ -1312,6 +1313,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->frame->poc   = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
+    assert(!state->tile->frame->cu_array);
     state->frame->prepared = 1;
     return;
   }
@@ -1320,8 +1322,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   encoder_state_t *prev_state = state->previous_encoder_state;
 
   if (state->previous_encoder_state != state) {
-    kvz_cu_array_free(state->tile->frame->cu_array);
-    state->tile->frame->cu_array = NULL;
+    kvz_cu_array_free(&state->tile->frame->cu_array);
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
@@ -1341,7 +1342,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
                    prev_state->frame->poc);
-    kvz_cu_array_free(state->tile->frame->cu_array);
+    kvz_cu_array_free(&state->tile->frame->cu_array);
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
@@ -1350,8 +1351,11 @@ void kvz_encoder_prepare(encoder_state_t *state)
   // Remove source and reconstructed picture.
   kvz_image_free(state->tile->frame->source);
   state->tile->frame->source = NULL;
+
   kvz_image_free(state->tile->frame->rec);
   state->tile->frame->rec = NULL;
+
+  kvz_cu_array_free(&state->tile->frame->cu_array);
 
   // Update POC and frame count.
   state->frame->num = prev_state->frame->num + 1;
