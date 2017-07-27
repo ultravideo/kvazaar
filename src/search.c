@@ -36,6 +36,7 @@
 #include "transform.h"
 #include "videoframe.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-quant.h"
 
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \

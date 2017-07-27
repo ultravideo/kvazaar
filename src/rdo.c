@@ -33,6 +33,8 @@
 #include "tables.h"
 #include "transform.h"
 
+#include "strategies/strategies-quant.h"
+
 
 #define QUANT_SHIFT          14
 #define SCAN_SET_SIZE        16
@@ -195,24 +197,6 @@ static INLINE uint32_t get_coeff_cabac_cost(
 
 
 /**
- * \brief Calculate a fast estimate of coefficient bitcost.
- *
- * \param coeff   coefficient array
- * \param width   coeff block width
- *
- * \returns       number of bits needed to code coefficients
- */
-static INLINE uint32_t get_coeff_fast_cost(const coeff_t *coeff, int32_t width)
-{
-  uint32_t coeff_sum = 0;
-  for (int i = 0; i < width * width; i++) {
-    coeff_sum += abs(coeff[i]);
-  }
-  return (uint32_t) COEFF_SUM_MULTIPLIER * coeff_sum + 0.5;
-}
-
-
-/**
  * \brief Estimate bitcost for coding coefficients.
  *
  * \param coeff   coefficient array
@@ -231,7 +215,7 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
     return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
 
   } else {
-    return get_coeff_fast_cost(coeff, width);
+    return COEFF_SUM_MULTIPLIER * kvz_coeff_abs_sum(coeff, width * width) + 0.5;
   }
 }
 
