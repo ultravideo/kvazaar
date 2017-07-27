@@ -1189,6 +1189,7 @@ static void add_irl_frames(encoder_state_t *state)
     kvz_image_free(ilr_rec);
     
     //TODO: Account for offsets etc. Need to use something else than original sizes?
+    //TODO: Shm doesn't upsample the cua if frame is idr; need to do something else as well when idr? Does it even matter?
     int32_t mv_scale[2] = {GET_SCALE_MV(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
                            GET_SCALE_MV(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
     int32_t pos_scale[2]= {GET_SCALE_POS(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
@@ -1196,7 +1197,8 @@ static void add_irl_frames(encoder_state_t *state)
     cu_array_t* scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
                                                     state->tile->frame->width_in_lcu,
                                                     state->tile->frame->height_in_lcu,
-                                                    mv_scale, pos_scale);
+                                                    mv_scale, pos_scale,
+                                                    0);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet
   
     kvz_image_list_add(state->frame->ref,
       scaled_pic,

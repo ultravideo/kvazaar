@@ -202,7 +202,7 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 // Modified for SHVC.
 
 // Adapted from shm
-cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale)
+cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init)
 {
   //Define a few basic things
   //TODO: Just use MAX_DEPTH or MAX_PU_DEPTH?    v----log2_min_luma_transform_block_size
@@ -257,26 +257,33 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
         col = kvz_cu_array_at_const(base_cua, col_px_x, col_px_y);
       }
       
-      if (col != NULL) {
-        //Copy stuff from col to cu
-        memcpy(cu, col, sizeof(cu_info_t));
 
-        //Scale mv. TODO: Skipped not actually tested? Only that  col is inside pic?
-        if (/*!col->skipped &&*/ col->type == CU_INTER) {
-          cu->inter.mv[0][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][0], mv_scale[0]);
-          cu->inter.mv[0][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][1], mv_scale[1]);
-          cu->inter.mv[1][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][0], mv_scale[0]);
-          cu->inter.mv[1][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][1], mv_scale[1]);
-        } /*else {
-          cu->type = CU_INTRA;
-        }*/
+      //Copy stuff from col to cu
+      //TODO: Copy only Mv field info and pred mode, nothing else?
+      //memcpy(cu, col, sizeof(cu_info_t));
+
+      //Scale mv. TODO: Skipped not actually tested? Only that  col is inside pic?
+      if (col != NULL && /*!col->skipped &&*/ col->type == CU_INTER && !only_init) {
+        cu->inter.mv[0][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][0], mv_scale[0]);
+        cu->inter.mv[0][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[0][1], mv_scale[1]);
+        cu->inter.mv[1][0] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][0], mv_scale[0]);
+        cu->inter.mv[1][1] = (int16_t)SCALE_MV_COORD((int32_t)col->inter.mv[1][1], mv_scale[1]);
+        
+        cu->inter.mv_ref[0] = col->inter.mv_ref[0];
+        cu->inter.mv_ref[1] = col->inter.mv_ref[1];
+
+        //cu->inter.mv_cand0 = col->inter.mv_cand0;
+        //cu->inter.mv_cand1 = col->inter.mv_cand1;
+        cu->inter.mv_dir = col->inter.mv_dir; //TODO: Can bi-pred be used or should just set to 1?
+        
+        cu->type = CU_INTER;
       } else {
-        //Col is outside of the picture so set block to CU_INTRA
+        //Col is outside of the picture so set block to CU_INTRA or only init
         cu->type = CU_INTRA;
       }
 
       if( cu->type == CU_INTRA) {
-          //TODO: Need to do something for intra? Should not access inter data structures.
+        //TODO: Need to do something for intra? Should not access inter data structures.
 
       }
       
@@ -288,7 +295,24 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
         uint32_t sub_x = block_x + IND2X(i,w_min_pu,block_w);
         uint32_t sub_y = block_y + IND2Y(i,h_min_pu,part_w);
         cu_info_t *sub_cu = kvz_cu_array_at(cua, sub_x, sub_y);
-        memcpy(sub_cu,cu,sizeof(cu_info_t));
+        
+        //memcpy(sub_cu,cu,sizeof(cu_info_t));
+        
+        if (cu->type == CU_INTER) {
+          sub_cu->inter.mv[0][0] = cu->inter.mv[0][0];
+          sub_cu->inter.mv[0][1] = cu->inter.mv[0][1];
+          sub_cu->inter.mv[1][0] = cu->inter.mv[1][0];
+          sub_cu->inter.mv[1][1] = cu->inter.mv[1][1];
+
+          sub_cu->inter.mv_ref[0] = cu->inter.mv_ref[0];
+          sub_cu->inter.mv_ref[1] = cu->inter.mv_ref[1];
+
+          //sub_cu->inter.mv_cand0 = cu->inter.mv_cand0;
+          //sub_cu->inter.mv_cand1 = cu->inter.mv_cand1;
+          sub_cu->inter.mv_dir = cu->inter.mv_dir; 
+        }
+        sub_cu->part_size = SIZE_2Nx2N;
+        sub_cu->type = cu->type;
       }
     }
   }
