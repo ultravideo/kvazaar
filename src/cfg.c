@@ -645,6 +645,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     
     //Do additional initialization
     cfg->next_cfg->layer = cfg->layer + 1;
+    cfg->next_cfg->ILR_frames = 1; //By default use one ilr frame
     
     //free(cfg->next_cfg->max_layers);
     //cfg->next_cfg->max_layers = cfg->max_layers;
