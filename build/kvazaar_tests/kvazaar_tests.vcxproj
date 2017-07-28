@@ -97,6 +97,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\tests\coeff_sum_tests.c" />
     <ClCompile Include="..\..\tests\dct_tests.c" />
     <ClCompile Include="..\..\tests\test_strategies.c" />
     <ClCompile Include="..\..\tests\intra_sad_tests.c" />
