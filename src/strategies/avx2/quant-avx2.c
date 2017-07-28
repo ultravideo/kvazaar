@@ -504,6 +504,27 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
+static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
+{
+  assert(length % 8 == 0);
+
+  __m256i total = _mm256_abs_epi32(_mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i*) coeffs)));
+
+  for (int i = 8; i < length; i += 8) {
+    __m256i temp = _mm256_abs_epi32(_mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i*) &coeffs[i])));
+    total = _mm256_add_epi32(total, temp);
+  }
+
+  __m128i result128 = _mm_add_epi32(
+    _mm256_castsi256_si128(total),
+    _mm256_extractf128_si256(total, 1)
+  );
+
+  uint32_t parts[4];
+  _mm_storeu_si128((__m128i*) parts, result128);
+
+  return parts[0] + parts[1] + parts[2] + parts[3];
+}
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 {
@@ -515,6 +536,7 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
     success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
   }
+  success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;

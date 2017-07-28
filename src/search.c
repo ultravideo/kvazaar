@@ -36,6 +36,7 @@
 #include "transform.h"
 #include "videoframe.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-quant.h"
 
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
@@ -261,7 +262,6 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    // Code coeffs using cabac to get a better estimate of real coding costs.
     coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
@@ -329,8 +329,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   {
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-
-    // Code coeffs using cabac to get a better estimate of real coding costs.
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);

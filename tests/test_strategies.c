@@ -44,4 +44,9 @@ void init_test_strategies()
     fprintf(stderr, "strategy_register_dct failed!\n");
     return;
   }
+
+  if (!kvz_strategy_register_quant(&strategies, KVZ_BIT_DEPTH)) {
+    fprintf(stderr, "strategy_register_quant failed!\n");
+    return;
+  }
 }
