@@ -1386,7 +1386,10 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   while (candidates != MRG_MAX_NUM_CANDS) {
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
-    mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
+    //*********************************************
+    //For scalable extension. TODO: zero_idx needs to go to num_ref-1?
+    mv_cand[candidates].ref[0] = (zero_idx > num_ref - 1) ? 0 : zero_idx;
+    //*********************************************
     mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
     if (state->frame->slicetype == KVZ_SLICE_B) {
