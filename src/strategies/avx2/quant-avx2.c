@@ -502,8 +502,6 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   }
 }
 
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
-
 static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
 {
   assert(length % 8 == 0);
@@ -525,6 +523,8 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
 
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
+
+#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 {

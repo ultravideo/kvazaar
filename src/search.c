@@ -95,7 +95,7 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 /**
  * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree)
 {
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
@@ -107,7 +107,7 @@ static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t work_tr
 /**
  * Copy all non-reference CU data from current level to all lower levels.
  */
-static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree)
 {
   const int width = LCU_WIDTH >> depth;
   for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
@@ -386,7 +386,7 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
