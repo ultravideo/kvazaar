@@ -351,29 +351,29 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   // Copy pixels that will be filtered and bordering pixels from right and
   // below.
   const int from_index = (lcu->position_px.x + x_offsets[0]) +
-                         (lcu->position_px.y + y_offsets[0]) * frame->width;
+                         (lcu->position_px.y + y_offsets[0]) * frame->rec->stride;
   const int to_index = x_offsets[0] + y_offsets[0] * SAO_BUF_WIDTH;
   kvz_pixels_blit(&frame->rec->y[from_index],
                   &sao_buf_y[to_index],
                   width + border_right,
                   height + border_below,
-                  frame->width,
+                  frame->rec->stride,
                   SAO_BUF_WIDTH);
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
     const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 +
-                             (lcu->position_px.y + y_offsets[0])/2 * frame->width/2;
+                             (lcu->position_px.y + y_offsets[0])/2 * frame->rec->stride/2;
     const int to_index_c = x_offsets[0]/2 + y_offsets[0]/2 * SAO_BUF_WIDTH_C;
     kvz_pixels_blit(&frame->rec->u[from_index_c],
                     &sao_buf_u[to_index_c],
                     width/2 + border_right,
                     height/2 + border_below,
-                    frame->width/2,
+                    frame->rec->stride/2,
                     SAO_BUF_WIDTH_C);
     kvz_pixels_blit(&frame->rec->v[from_index_c],
                     &sao_buf_v[to_index_c],
                     width/2 + border_right,
                     height/2 + border_below,
-                    frame->width/2,
+                    frame->rec->stride/2,
                     SAO_BUF_WIDTH_C);
   }
 

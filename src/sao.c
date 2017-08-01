@@ -291,7 +291,8 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
 
   const int frame_width = frame->width >> shift;
   const int frame_height = frame->height >> shift;
-  kvz_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_width];
+  const int frame_stride = frame->rec->stride >> shift;
+  kvz_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_stride];
 
   if (sao->type == SAO_TYPE_EDGE) {
     const vector2d_t *offset = g_sao_edge_offsets[sao->eo_class];
@@ -317,7 +318,7 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
     if (frame_y + offset[0].y < 0 || frame_y + offset[1].y < 0) {
       // Nothing to do for the topmost row.
       buffer += stride;
-      output += frame_width;
+      output += frame_stride;
       height -= 1;
     }
   }
@@ -328,7 +329,7 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
                               output,
                               sao,
                               stride,
-                              frame_width,
+                              frame_stride,
                               width,
                               height,
                               color);
