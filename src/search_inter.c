@@ -375,12 +375,15 @@ static uint32_t calc_mvd_cost(const encoder_state_t *state,
 
 static bool early_terminate(inter_search_info_t *info)
 {
-  static const vector2d_t small_hexbs[5] = {
-      { 0, 0 },
-      { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 },
+  static const vector2d_t small_hexbs[7] = {
+      { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 },
+      { 0, -1 }, { -1, 0 }, { 0, 0 },
   };
 
   vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
+  int first_index = 0;
+  int last_index = 3;
 
   for (int k = 0; k < 2; ++k) {
     double threshold;
@@ -392,8 +395,8 @@ static bool early_terminate(inter_search_info_t *info)
       threshold = info->best_cost;
     }
 
-    unsigned best_index = 0;
-    for (int i = 1; i < 5; ++i) {
+    int best_index = 6;
+    for (int i = first_index; i <= last_index; i++) {
       int x = mv.x + small_hexbs[i].x;
       int y = mv.y + small_hexbs[i].y;
 
@@ -410,6 +413,9 @@ static bool early_terminate(inter_search_info_t *info)
     if (info->best_cost >= threshold) {
       return true;
     }
+
+    first_index = (best_index + 3) % 4;
+    last_index = first_index + 2;
   }
   return false;
 }
