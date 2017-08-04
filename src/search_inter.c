@@ -659,7 +659,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
   int best_index = 0;
 
   // Search the initial 7 points of the hexagon.
-  for (int i = 0; i < 7; ++i) {
+  for (int i = 1; i < 7; ++i) {
     if (check_mv_cost(info, mv.x + large_hexbs[i].x, mv.y + large_hexbs[i].y)) {
       best_index = i;
     }
