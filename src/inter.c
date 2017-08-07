@@ -1017,7 +1017,9 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
   }
 
   if (cand->inter.mv_dir & (1 << cand_list) &&
-      cand->inter.mv_ref[cand_list] == cur_cu->inter.mv_ref[reflist]) {
+      state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] == 
+      state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
+  {
     mv_cand_out[0] = cand->inter.mv[cand_list][0];
     mv_cand_out[1] = cand->inter.mv[cand_list][1];
     return true;

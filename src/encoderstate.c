@@ -830,8 +830,8 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
     state->frame->ref_LX[1][j] = (uint8_t) -1;
   }
 
-  encoder_ref_insertion_sort(state, state->frame->ref_LX[0], state->frame->ref_LX_size[0]);
-  encoder_ref_insertion_sort(state, state->frame->ref_LX[1], state->frame->ref_LX_size[1]);
+  //encoder_ref_insertion_sort(state, state->frame->ref_LX[0], state->frame->ref_LX_size[0]);
+  //encoder_ref_insertion_sort(state, state->frame->ref_LX[1], state->frame->ref_LX_size[1]);
 }
 
 /**
