@@ -38,11 +38,23 @@
 typedef struct {
   encoder_state_t *state;
 
+  /**
+   * \brief Current frame
+   */
   const kvz_picture *pic;
+  /**
+   * \brief Reference frame
+   */
   const kvz_picture *ref;
 
+  /**
+   * \brief Index of the reference frame
+   */
   int32_t ref_idx;
 
+  /**
+   * \brief Top-left corner of the PU
+   */
   const vector2d_t origin;
   int32_t width;
   int32_t height;
@@ -52,6 +64,19 @@ typedef struct {
   int32_t num_merge_cand;
 
   kvz_mvd_cost_func *mvd_cost_func;
+
+  /**
+   * \brief Best motion vector among the ones tested so far
+   */
+  vector2d_t best_mv;
+  /**
+   * \brief Cost of best_mv
+   */
+  uint32_t best_cost;
+  /**
+   * \brief Bit cost of best_mv
+   */
+  uint32_t best_bitcost;
 } inter_search_info_t;
 
 
@@ -140,22 +165,22 @@ static INLINE bool intmv_within_tile(const inter_search_info_t *info, int x, int
 
 
 /**
- * \brief Try to calculate cost for an integer motion vector.
+ * \brief Calculate cost for an integer motion vector.
+ *
+ * Updates info->best_mv, info->best_cost and info->best_bitcost to the new
+ * motion vector if it yields a lower cost than the current one.
  *
  * If the motion vector violates the MV constraints for tiles or WPP, the
- * cost is not set and the function returns false.
+ * cost is not set.
  *
- * \return true if the MV the cost was calculated, false otherwise
+ * \return true if info->best_mv was changed, false otherwise
  */
-static bool mv_total_cost(inter_search_info_t *info,
-                          int x,
-                          int y,
-                          uint32_t *cost_out,
-                          uint32_t *bitcost_out)
+static bool check_mv_cost(inter_search_info_t *info, int x, int y)
 {
   if (!intmv_within_tile(info, x, y)) return false;
 
-  *cost_out = kvz_image_calc_sad(
+  uint32_t bitcost = 0;
+  uint32_t cost = kvz_image_calc_sad(
       info->pic,
       info->ref,
       info->origin.x,
@@ -166,15 +191,25 @@ static bool mv_total_cost(inter_search_info_t *info,
       info->height
   );
 
-  *cost_out += info->mvd_cost_func(
+  if (cost >= info->best_cost) return false;
+
+  cost += info->mvd_cost_func(
       info->state,
       x, y, 2,
       info->mv_cand,
       info->merge_cand,
       info->num_merge_cand,
       info->ref_idx,
-      bitcost_out
+      &bitcost
   );
+
+  if (cost >= info->best_cost) return false;
+
+  // Set to motion vector in quarter pixel precision.
+  info->best_mv.x = x * 4;
+  info->best_mv.y = y * 4;
+  info->best_cost = cost;
+  info->best_bitcost = bitcost;
 
   return true;
 }
@@ -201,9 +236,10 @@ static unsigned get_ep_ex_golomb_bitcost(unsigned symbol)
 }
 
 
-/**Checks if mv is one of the merge candidates
-* \return true if found else return false
-*/
+/**
+ * \brief Checks if mv is one of the merge candidates.
+ * \return true if found else return false
+ */
 static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
 {
   for (int i = 0; i < info->num_merge_cand; ++i) {
@@ -220,43 +256,37 @@ static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
 }
 
 
-static unsigned select_starting_point(inter_search_info_t *info,
-                                      vector2d_t *mv_in_out,
-                                      vector2d_t *mv,
-                                      unsigned best_cost,
-                                      unsigned *best_index,
-                                      uint32_t *best_bitcost)
+/**
+ * \brief Select starting point for integer motion estimation search.
+ *
+ * Checks the zero vector, extra_mv and merge candidates and updates
+ * info->best_mv to the best one.
+ */
+static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv)
 {
+  // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
+  check_mv_cost(info, 0, 0);
+
+  // Change to integer precision.
+  extra_mv.x >>= 2;
+  extra_mv.y >>= 2;
+
+  // Check mv_in if it's not one of the merge candidates.
+  if ((extra_mv.x != 0 || extra_mv.y != 0) && !mv_in_merge(info, extra_mv)) {
+    check_mv_cost(info, extra_mv.x, extra_mv.y);
+  }
+
   // Go through candidates
   for (unsigned i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
-    mv->x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2;
-    mv->y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2;
 
-    if (mv->x == 0 && mv->y == 0) continue;
+    int x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2;
+    int y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2;
 
-    uint32_t cost = 0;
-    uint32_t bitcost = 0;
-    if (mv_total_cost(info, mv->x, mv->y, &cost, &bitcost) &&
-        cost < best_cost)
-    {
-      best_cost = cost;
-      *best_index = i;
-      *best_bitcost = bitcost;
-    }
+    if (x == 0 && y == 0) continue;
+
+    check_mv_cost(info, x, y);
   }
-
-  if (*best_index < info->num_merge_cand) {
-    mv->x = info->merge_cand[*best_index].mv[info->merge_cand[*best_index].dir - 1][0] >> 2;
-    mv->y = info->merge_cand[*best_index].mv[info->merge_cand[*best_index].dir - 1][1] >> 2;
-  } else if (*best_index == info->num_merge_cand) {
-    mv->x = mv_in_out->x >> 2;
-    mv->y = mv_in_out->y >> 2;
-  } else {
-    mv->x = 0;
-    mv->y = 0;
-  }
-  return best_cost;
 }
 
 
@@ -343,54 +373,41 @@ static uint32_t calc_mvd_cost(const encoder_state_t *state,
 }
 
 
-static bool early_terminate(inter_search_info_t *info,
-                            vector2d_t *mv_in_out,
-                            vector2d_t *mv,
-                            unsigned *best_cost,
-                            uint32_t *bitcost_out,
-                            uint32_t *best_bitcost)
+static bool early_terminate(inter_search_info_t *info)
 {
   static const vector2d_t small_hexbs[5] = {
       { 0, 0 },
       { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 },
   };
 
+  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
   for (int k = 0; k < 2; ++k) {
     double threshold;
     if (info->state->encoder_control->cfg.me_early_termination ==
         KVZ_ME_EARLY_TERMINATION_SENSITIVE)
     {
-      threshold = *best_cost * 0.95;
+      threshold = info->best_cost * 0.95;
     } else {
-      threshold = *best_cost;
+      threshold = info->best_cost;
     }
 
     unsigned best_index = 0;
     for (int i = 1; i < 5; ++i) {
-      vector2d_t offset = small_hexbs[i];
-      vector2d_t new_mv = { mv->x + offset.x, mv->y + offset.y };
+      int x = mv.x + small_hexbs[i].x;
+      int y = mv.y + small_hexbs[i].y;
 
-      uint32_t cost = 0;
-      uint32_t bitcost = 0;
-      if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-          cost < *best_cost)
-      {
-        *best_cost = cost;
-        *best_bitcost = bitcost;
+      if (check_mv_cost(info, x, y)) {
         best_index = i;
       }
     }
+
     // Adjust the movement vector
-    mv->x += small_hexbs[best_index].x;
-    mv->y += small_hexbs[best_index].y;
+    mv.x += small_hexbs[best_index].x;
+    mv.y += small_hexbs[best_index].y;
 
     // If best match is not better than threshold, we stop the search.
-    if (*best_cost >= threshold) {
-      // Return final movement vector in quarter-pixel precision.
-      mv_in_out->x = mv->x * 4;
-      mv_in_out->y = mv->y * 4;
-
-      *bitcost_out = *best_bitcost;
+    if (info->best_cost >= threshold) {
       return true;
     }
   }
@@ -398,24 +415,15 @@ static bool early_terminate(inter_search_info_t *info,
 }
 
 
-unsigned kvz_tz_pattern_search(inter_search_info_t *info,
-                               unsigned pattern_type,
-                               const int iDist,
-                               vector2d_t *mv,
-                               unsigned best_cost,
-                               int *best_dist,
-                               uint32_t *best_bitcost)
+void kvz_tz_pattern_search(inter_search_info_t *info,
+                           unsigned pattern_type,
+                           const int iDist,
+                           int *best_dist)
 {
-  int n_points;
-  int best_index = -1;
-
-  vector2d_t mv_best = { 0, 0 };
-
-
   assert(pattern_type < 4);
 
   //implemented search patterns
-  vector2d_t pattern[4][8] = {
+  const vector2d_t pattern[4][8] = {
       //diamond (8 points)
       //[ ][ ][ ][ ][1][ ][ ][ ][ ]
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
@@ -475,14 +483,12 @@ unsigned kvz_tz_pattern_search(inter_search_info_t *info,
         { iDist / 2, iDist }, { iDist, 0 }, { iDist / 2, -iDist }, { -iDist, 0 },
         { iDist / 2, iDist }, { -iDist / 2, -iDist }, { 0, 0 }, { 0, 0 }
       }
-
   };
 
-  //set the number of points to be checked
-  if (iDist == 1)
-  {
-    switch (pattern_type)
-    {
+  // Set the number of points to be checked.
+  int n_points;
+  if (iDist == 1) {
+    switch (pattern_type) {
       case 0:
         n_points = 4;
         break;
@@ -496,11 +502,8 @@ unsigned kvz_tz_pattern_search(inter_search_info_t *info,
         n_points = 8;
         break;
     };
-  }
-  else
-  {
-    switch (pattern_type)
-    {
+  } else {
+    switch (pattern_type) {
       case 3:
         n_points = 6;
         break;
@@ -510,72 +513,43 @@ unsigned kvz_tz_pattern_search(inter_search_info_t *info,
     };
   }
 
-  //compute SAD values for all chosen points
+  const vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
+  // Compute SAD values for all chosen points.
+  int best_index = -1;
   for (int i = 0; i < n_points; i++) {
     vector2d_t offset = pattern[pattern_type][i];
-    vector2d_t new_mv = { mv->x + offset.x, mv->y + offset.y };
+    int x = mv.x + offset.x;
+    int y = mv.y + offset.y;
 
-    uint32_t cost = 0;
-    uint32_t bitcost = 0;
-    if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-        cost < best_cost)
-    {
-      best_cost = cost;
-      *best_bitcost = bitcost;
+    if (check_mv_cost(info, x, y)) {
       best_index = i;
     }
   }
 
-  if (best_index >= 0)
-  {
-    mv_best = pattern[pattern_type][best_index];
+  if (best_index >= 0) {
     *best_dist = iDist;
   }
-
-  mv->x += mv_best.x;
-  mv->y += mv_best.y;
-
-  return best_cost;
 }
 
 
-unsigned kvz_tz_raster_search(inter_search_info_t *info,
-                              vector2d_t *mv,
-                              unsigned best_cost,
-                              uint32_t *best_bitcost,
-                              int iSearchRange,
-                              int iRaster)
+void kvz_tz_raster_search(inter_search_info_t *info,
+                          int iSearchRange,
+                          int iRaster)
 {
-  vector2d_t mv_best = *mv;
+  const vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
   //compute SAD values for every point in the iRaster downsampled version of the current search area
   for (int y = iSearchRange; y >= -iSearchRange; y -= iRaster) {
     for (int x = -iSearchRange; x <= iSearchRange; x += iRaster) {
-      vector2d_t new_mv = { mv->x + x, mv->y + y };
-
-      uint32_t cost = 0;
-      uint32_t bitcost = 0;
-      if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-          cost < best_cost)
-      {
-        best_cost = cost;
-        *best_bitcost = bitcost;
-        mv_best = new_mv;
-      }
+      check_mv_cost(info, mv.x + x, mv.y + y);
     }
   }
-
-  *mv = mv_best;
-
-  return best_cost;
 }
 
 
-static unsigned tz_search(inter_search_info_t *info,
-                          vector2d_t *mv_in_out,
-                          uint32_t *bitcost_out)
+static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
 {
-
   //TZ parameters
   const int iSearchRange = 96;  // search range for each stage
   const int iRaster = 5;  // search distance limit and downsampling factor for step 3
@@ -584,62 +558,29 @@ static unsigned tz_search(inter_search_info_t *info,
   const bool bRasterRefinementEnable = true;  // enable step 4 mode 1
   const bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
 
-  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-
-  unsigned best_cost = UINT32_MAX;
-  uint32_t best_bitcost = 0;
   int best_dist = 0;
-  unsigned best_index = info->num_merge_cand + 1;
+  info->best_cost = UINT32_MAX;
 
-  // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
-  if (mv_total_cost(info, 0, 0, &best_cost, &best_bitcost)) {
-    best_index = info->num_merge_cand + 1;
-  }
-
-  // Check mv_in if it's not one of the merge candidates.
-  uint32_t cost = 0;
-  uint32_t bitcost = 0;
-  if (!mv_in_merge(info, mv) &&
-      mv_total_cost(info, mv.x, mv.y, &cost, &bitcost) &&
-      cost < best_cost)
-  {
-    best_cost    = cost;
-    best_bitcost = bitcost;
-    best_index   = info->num_merge_cand;
-  }
-
-  // Select starting point from among merge candidates. These should include
-  // both mv_cand vectors and (0, 0).
-  best_cost = select_starting_point(info, mv_in_out, &mv, best_cost, &best_index, &best_bitcost);
+  // Select starting point from among merge candidates. These should
+  // include both mv_cand vectors and (0, 0).
+  select_starting_point(info, extra_mv);
 
   // Check if we should stop search
   if (info->state->encoder_control->cfg.me_early_termination &&
-      early_terminate(info, mv_in_out, &mv, &best_cost, bitcost_out, &best_bitcost))
+      early_terminate(info))
   {
-    return best_cost;
+    return;
   }
 
   //step 2, grid search
-  for (int iDist = 1; iDist <= iSearchRange; iDist *= 2)
-  {
-    best_cost = kvz_tz_pattern_search(info,
-                                      step2_type,
-                                      iDist,
-                                      &mv,
-                                      best_cost,
-                                      &best_dist,
-                                      &best_bitcost);
+  for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
+    kvz_tz_pattern_search(info, step2_type, iDist, &best_dist);
   }
 
   //step 3, raster scan
   if (best_dist > iRaster) {
     best_dist = iRaster;
-    best_cost = kvz_tz_raster_search(info,
-                                     &mv,
-                                     best_cost,
-                                     &best_bitcost,
-                                     iSearchRange,
-                                     iRaster);
+    kvz_tz_raster_search(info, iSearchRange, iRaster);
   }
 
   //step 4
@@ -647,63 +588,35 @@ static unsigned tz_search(inter_search_info_t *info,
   //raster refinement
   if (bRasterRefinementEnable && best_dist > 0) {
     for (int iDist = best_dist >> 1; iDist > 0; iDist >>= 1) {
-      best_cost = kvz_tz_pattern_search(info,
-                                        step4_type,
-                                        iDist,
-                                        &mv,
-                                        best_cost,
-                                        &best_dist,
-                                        &best_bitcost);
+      kvz_tz_pattern_search(info, step4_type, iDist, &best_dist);
     }
   }
 
   //star refinement (repeat step 2 for the current starting point)
   if (bStarRefinementEnable && best_dist > 0) {
     for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
-      best_cost = kvz_tz_pattern_search(info,
-                                        step4_type,
-                                        iDist,
-                                        &mv,
-                                        best_cost,
-                                        &best_dist,
-                                        &best_bitcost);
+      kvz_tz_pattern_search(info, step4_type, iDist, &best_dist);
     }
   }
-
-  mv.x *= 4;
-  mv.y *= 4;
-
-  *mv_in_out = mv;
-  *bitcost_out = best_bitcost;
-
-  return best_cost;
 }
 
 
 /**
  * \brief Do motion search using the HEXBS algorithm.
  *
- * \param width      width of the block to search
- * \param height     height of the block to search
- * \param pic        Picture motion vector is searched for.
- * \param ref        Picture motion vector is searched from.
- * \param orig       Top left corner of the searched for block.
- * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
- *
- * \returns  Cost of the motion vector.
+ * \param info      search info
+ * \param extra_mv  extra motion vector to check
  *
  * Motion vector is searched by first searching iteratively with the large
  * hexagon pattern until the best match is at the center of the hexagon.
  * As a final step a smaller hexagon is used to check the adjacent pixels.
  *
- * If a non 0,0 predicted motion vector predictor is given as mv_in_out,
+ * If a non 0,0 predicted motion vector predictor is given as extra_mv,
  * the 0,0 vector is also tried. This is hoped to help in the case where
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(inter_search_info_t *info,
-                               vector2d_t *mv_in_out,
-                               uint32_t *bitcost_out)
+static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
 {
   // The start of the hexagonal pattern has been repeated at the end so that
   // the indices between 1-6 can be used as the start of a 3-point list of new
@@ -727,61 +640,36 @@ static unsigned hexagon_search(inter_search_info_t *info,
       { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }
   };
 
-  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  unsigned best_cost = UINT32_MAX;
-  uint32_t best_bitcost = 0;
-  // Current best index, either to merge_cands, large_hebx or small_hexbs.
-  unsigned best_index = info->num_merge_cand + 1;
+  info->best_cost = UINT32_MAX;
 
-  // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
-  if (mv_total_cost(info, 0, 0, &best_cost, &best_bitcost)) {
-    best_index = info->num_merge_cand + 1;
-  }
-
-  // Check mv_in if it's not one of the merge candidates.
-  uint32_t cost = 0;
-  uint32_t bitcost = 0;
-  if (!mv_in_merge(info, mv) &&
-      mv_total_cost(info, mv.x, mv.y, &cost, &bitcost) &&
-      cost < best_cost)
-  {
-    best_cost    = cost;
-    best_bitcost = bitcost;
-    best_index   = info->num_merge_cand;
-  }
-
-  // Select starting point from among merge candidates. These should include
-  // both mv_cand vectors and (0, 0).
-  best_cost = select_starting_point(info, mv_in_out, &mv, best_cost, &best_index, &best_bitcost);
+  // Select starting point from among merge candidates. These should
+  // include both mv_cand vectors and (0, 0).
+  select_starting_point(info, extra_mv);
 
   // Check if we should stop search
   if (info->state->encoder_control->cfg.me_early_termination &&
-      early_terminate(info, mv_in_out, &mv, &best_cost, bitcost_out, &best_bitcost))
+      early_terminate(info))
   {
-    return best_cost;
+    return;
   }
 
-  // Search the initial 7 points of the hexagon.
-  best_index = 0;
-  for (int i = 0; i < 7; ++i) {
-    vector2d_t offset = large_hexbs[i];
-    vector2d_t new_mv = { mv.x + offset.x, mv.y + offset.y };
+  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
-    uint32_t cost = 0;
-    uint32_t bitcost = 0;
-    if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-        cost < best_cost)
-    {
-      best_cost    = cost;
-      best_bitcost = bitcost;
-      best_index   = i;
+  // Current best index, either to merge_cands, large_hebx or small_hexbs.
+  int best_index = 0;
+
+  // Search the initial 7 points of the hexagon.
+  for (int i = 0; i < 7; ++i) {
+    if (check_mv_cost(info, mv.x + large_hexbs[i].x, mv.y + large_hexbs[i].y)) {
+      best_index = i;
     }
   }
 
   // Iteratively search the 3 new points around the best match, until the best
   // match is in the center.
   while (best_index != 0) {
-    unsigned start; // Starting point of the 3 offsets to be searched.
+    // Starting point of the 3 offsets to be searched.
+    unsigned start;
     if (best_index == 1) {
       start = 6;
     } else if (best_index == 8) {
@@ -798,14 +686,8 @@ static unsigned hexagon_search(inter_search_info_t *info,
     // Iterate through the next 3 points.
     for (int i = 0; i < 3; ++i) {
       vector2d_t offset = large_hexbs[start + i];
-      vector2d_t new_mv = { mv.x + offset.x, mv.y + offset.y };
-
-      if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-          cost < best_cost)
-      {
-        best_cost    = cost;
-        best_bitcost = bitcost;
-        best_index   = start + i;
+      if (check_mv_cost(info, mv.x + offset.x, mv.y + offset.y)) {
+        best_index = start + i;
       }
     }
   }
@@ -817,80 +699,31 @@ static unsigned hexagon_search(inter_search_info_t *info,
 
   // Do the final step of the search with a small pattern.
   for (int i = 1; i < 5; ++i) {
-    vector2d_t offset = small_hexbs[i];
-    vector2d_t new_mv = { mv.x + offset.x, mv.y + offset.y };
-
-    if (mv_total_cost(info, new_mv.x, new_mv.y, &cost, &bitcost) &&
-        cost > 0 && cost < best_cost)
-    {
-      best_cost    = cost;
-      best_bitcost = bitcost;
-      best_index   = i;
-    }
+    check_mv_cost(info, mv.x + small_hexbs[i].x, mv.y + small_hexbs[i].y);
   }
-
-  // Adjust the movement vector according to the final best match.
-  mv.x += small_hexbs[best_index].x;
-  mv.y += small_hexbs[best_index].y;
-
-  // Return final movement vector in quarter-pixel precision.
-  mv_in_out->x = mv.x * 4;
-  mv_in_out->y = mv.y * 4;
-
-  *bitcost_out = best_bitcost;
-
-  return best_cost;
 }
 
 
-static uint32_t search_mv_full(inter_search_info_t *info,
-                               int32_t search_range,
-                               vector2d_t *mv_in_out,
-                               uint32_t *bitcost_out)
+static void search_mv_full(inter_search_info_t *info,
+                           int32_t search_range,
+                           vector2d_t extra_mv)
 {
-  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  vector2d_t best_mv = { 0, 0 };
-  uint32_t best_cost = UINT32_MAX;
-  uint32_t best_bitcost = 0;
-
-  {
-    // Search around the 0-vector.
-    vector2d_t min_mv = { 0 - search_range, 0 - search_range };
-    vector2d_t max_mv = { 0 + search_range, 0 + search_range };
-
-    for (int y = min_mv.y; y <= max_mv.y; ++y) {
-      for (int x = min_mv.x; x <= max_mv.x; ++x) {
-        uint32_t cost = 0;
-        uint32_t bitcost = 0;
-        if (mv_total_cost(info, x, y, &cost, &bitcost) &&
-            cost < best_cost)
-        {
-          best_cost = cost;
-          best_bitcost = bitcost;
-          best_mv.x = x;
-          best_mv.y = y;
-        }
-      }
+  // Search around the 0-vector.
+  for (int y = -search_range; y <= search_range; y++) {
+    for (int x = -search_range; x <= search_range; x++) {
+      check_mv_cost(info, x, y);
     }
   }
 
-  // Check around mv if it's not one of the merge candidates.
-  if (!mv_in_merge(info, mv)) {
-    vector2d_t min_mv = { mv.x - search_range, mv.y - search_range };
-    vector2d_t max_mv = { mv.x + search_range, mv.y + search_range };
+  // Change to integer precision.
+  extra_mv.x >>= 2;
+  extra_mv.y >>= 2;
 
-    for (int y = min_mv.y; y <= max_mv.y; ++y) {
-      for (int x = min_mv.x; x <= max_mv.x; ++x) {
-        uint32_t cost = 0;
-        uint32_t bitcost = 0;
-        if (mv_total_cost(info, x, y, &cost, &bitcost) &&
-            cost < best_cost)
-        {
-          best_cost = cost;
-          best_bitcost = bitcost;
-          best_mv.x = x;
-          best_mv.y = y;
-        }
+  // Check around extra_mv if it's not one of the merge candidates.
+  if (!mv_in_merge(info, extra_mv)) {
+    for (int y = -search_range; y <= search_range; y++) {
+      for (int x = -search_range; x <= search_range; x++) {
+        check_mv_cost(info, extra_mv.x + x, extra_mv.y + y);
       }
     }
   }
@@ -899,8 +732,11 @@ static uint32_t search_mv_full(inter_search_info_t *info,
   // both mv_cand vectors and (0, 0).
   for (int i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
-    mv.x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2;
-    mv.y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2;
+
+    vector2d_t mv = {
+      .x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2,
+      .y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2,
+    };
 
     // Ignore 0-vector because it has already been checked.
     if (mv.x == 0 && mv.y == 0) continue;
@@ -934,47 +770,20 @@ static uint32_t search_mv_full(inter_search_info_t *info,
         }
         if (already_tested) continue;
 
-        uint32_t cost = 0;
-        uint32_t bitcost = 0;
-        if (mv_total_cost(info, x, y, &cost, &bitcost) &&
-            cost < best_cost)
-        {
-          best_cost = cost;
-          best_bitcost = bitcost;
-          best_mv.x = x;
-          best_mv.y = y;
-        }
+        check_mv_cost(info, x, y);
       }
     }
   }
-
-  mv_in_out->x = best_mv.x * 4;
-  mv_in_out->y = best_mv.y * 4;
-
-  *bitcost_out = best_bitcost;
-
-  return best_cost;
 }
 
 
 /**
  * \brief Do fractional motion estimation
  *
- * \param width      width of the block
- * \param height     height of the block
- * \param pic        Picture motion vector is searched for.
- * \param ref        Picture motion vector is searched from.
- * \param orig       Top left corner of the searched for block.
- * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
- *
- * \returns  Cost of the motion vector.
- *
  * Algoritm first searches 1/2-pel positions around integer mv and after best match is found,
  * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
  */
-static unsigned search_frac(inter_search_info_t *info,
-                            vector2d_t *mv_in_out,
-                            uint32_t *bitcost_out)
+static void search_frac(inter_search_info_t *info)
 {
   // Map indexes to relative coordinates in the following way:
   // 5 3 6
@@ -986,8 +795,9 @@ static unsigned search_frac(inter_search_info_t *info,
       {  1, -1 },  { -1,  1 },  {  1,  1 }
   };
 
-  //Set mv to halfpel precision
-  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  // Set mv to pixel precision
+  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0;
   uint32_t bitcosts[4] = { 0 };
@@ -1219,13 +1029,11 @@ static unsigned search_frac(inter_search_info_t *info,
     mv.y += square[best_index].y;
   }
 
-  *mv_in_out = mv;
-
-  *bitcost_out = best_bitcost;
+  info->best_mv = mv;
+  info->best_cost = best_cost;
+  info->best_bitcost = best_bitcost;
 
   if (src.malloc_used) free(src.buffer);
-
-  return best_cost;
 }
 
 
@@ -1238,13 +1046,9 @@ static void search_pu_inter_ref(inter_search_info_t *info,
                                 double *inter_cost,
                                 uint32_t *inter_bitcost)
 {
-  const videoframe_t * const frame = info->state->tile->frame;
-  const encoder_state_config_frame_t *frame_state = info->state->frame;
   const kvz_config *cfg = &info->state->encoder_control->cfg;
-  int32_t merged = 0;
-  uint8_t cu_mv_cand = 0;
-  int8_t merge_idx = 0;
-  int8_t ref_list = frame_state->refmap[info->ref_idx].list-1;
+
+  int8_t ref_list = info->state->frame->refmap[info->ref_idx].list-1;
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = info->ref_idx;
@@ -1259,7 +1063,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
                         ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
-
   vector2d_t mv = { 0, 0 };
   {
     // Take starting point for MV search from previous frame.
@@ -1267,7 +1070,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     // no point to this anymore, but for now it helps.
     const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
     const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
-    const cu_array_t* ref_array = frame_state->ref->cu_arrays[info->ref_idx];
+    const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
     const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
@@ -1289,11 +1092,11 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     default: break;
   }
 
-  uint32_t temp_cost = 0;
-  uint32_t temp_bitcost = 0;
+  info->best_cost = UINT32_MAX;
+
   switch (cfg->ime_algorithm) {
     case KVZ_IME_TZ:
-      temp_cost = tz_search(info, &mv, &temp_bitcost);
+      tz_search(info, mv);
       break;
 
     case KVZ_IME_FULL64:
@@ -1301,32 +1104,35 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     case KVZ_IME_FULL16:
     case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
-      temp_cost = search_mv_full(info, search_range, &mv, &temp_bitcost);
+      search_mv_full(info, search_range, mv);
       break;
 
     default:
-      temp_cost = hexagon_search(info, &mv, &temp_bitcost);
+      hexagon_search(info, mv);
       break;
   }
 
-  if (cfg->fme_level > 0 && temp_cost < *inter_cost) {
-    temp_cost = search_frac(info, &mv, &temp_bitcost);
+  if (cfg->fme_level > 0 && info->best_cost < *inter_cost) {
+    search_frac(info);
 
-  } else if (temp_cost < INT_MAX) {
+  } else if (info->best_cost < UINT32_MAX) {
     // Recalculate inter cost with SATD.
-    temp_cost = kvz_image_calc_satd(
-        frame->source,
+    info->best_cost = kvz_image_calc_satd(
+        info->state->tile->frame->source,
         info->ref,
         info->origin.x,
         info->origin.y,
-        info->state->tile->offset_x + info->origin.x + (mv.x >> 2),
-        info->state->tile->offset_y + info->origin.y + (mv.y >> 2),
+        info->state->tile->offset_x + info->origin.x + (info->best_mv.x >> 2),
+        info->state->tile->offset_y + info->origin.y + (info->best_mv.y >> 2),
         info->width,
         info->height);
-    temp_cost += temp_bitcost * (int)(info->state->lambda_sqrt + 0.5);
+    info->best_cost += info->best_bitcost * (int)(info->state->lambda_sqrt + 0.5);
   }
 
-  merged = 0;
+  mv = info->best_mv;
+
+  int merged = 0;
+  int merge_idx = 0;
   // Check every candidate to find a match
   for (merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
     if (info->merge_cand[merge_idx].dir != 3 &&
@@ -1340,6 +1146,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   }
 
   // Only check when candidates are different
+  int cu_mv_cand = 0;
   if (!merged && (
         info->mv_cand[0][0] != info->mv_cand[1][0] ||
         info->mv_cand[0][1] != info->mv_cand[1][1]))
@@ -1366,7 +1173,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     }
   }
 
-  if (temp_cost < *inter_cost) {
+  if (info->best_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
     uint8_t mv_ref_coded = info->state->frame->refmap[info->ref_idx].idx;
@@ -1378,8 +1185,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
     CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
 
-    *inter_cost = temp_cost;
-    *inter_bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
+    *inter_cost = info->best_cost;
+    *inter_bitcost = info->best_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
   }
 }
 
