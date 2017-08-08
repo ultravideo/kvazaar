@@ -87,12 +87,24 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
 {
   const encoder_control_t *ctrl = info->state->encoder_control;
 
+  const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;
+  const bool is_frac_chroma = x % 8 != 0 || y % 8 != 0;
+
   if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Check that the block does not reference pixels that are not final.
 
-    // Fractional motion estimation and odd chroma interpolation need
-    // 4 pixels below the bottom edge of the block.
-    int margin = 4;
+    // Margin as luma pixels.
+    int margin = 0;
+    if (is_frac_luma) {
+      // Fractional motion estimation needs up to 4 pixels outside the
+      // block.
+      margin = 4;
+    } else if (is_frac_chroma) {
+      // Odd chroma interpolation needs up to 2 luma pixels outside the
+      // block.
+      margin = 2;
+    }
+
     if (ctrl->cfg.sao_type) {
       // Make sure we don't refer to pixels for which SAO reconstruction
       // has not been done.
@@ -111,8 +123,8 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     // bottom-left corner of the referenced block and the LCU containing
     // this block.
     const vector2d_t mv_lcu = {
-      (((info->origin.x + info->width  + margin) * 4) + x) / (LCU_WIDTH << 2) - orig_lcu.x,
-      (((info->origin.y + info->height + margin) * 4) + y) / (LCU_WIDTH << 2) - orig_lcu.y,
+      ((info->origin.x + info->width  + margin) * 4 + x) / (LCU_WIDTH << 2) - orig_lcu.x,
+      ((info->origin.y + info->height + margin) * 4 + y) / (LCU_WIDTH << 2) - orig_lcu.y,
     };
 
     if (mv_lcu.y > ctrl->max_inter_ref_lcu.down) {
@@ -130,16 +142,20 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     return true;
   }
 
+  // Margin as luma quater pixels.
   int margin = 0;
   if (ctrl->cfg.mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
-    // Enforce a distance of 8 from any tile boundary.
-    margin = 4 * 4;
+    if (is_frac_luma) {
+      margin = 4 << 2;
+    } else if (is_frac_chroma) {
+      margin = 2 << 2;
+    }
   }
 
   // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
   const vector2d_t abs_mv = {
-    (info->origin.x * 4) + x,
-    (info->origin.y * 4) + y,
+    info->origin.x * 4 + x,
+    info->origin.y * 4 + y,
   };
 
   // Check that both margin constraints are satisfied.
