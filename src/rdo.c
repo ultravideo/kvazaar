@@ -883,7 +883,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 * \returns int
 * Calculates cost of actual motion vectors using CABAC coding
 */
-uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* real_cabac) 
+uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
+                                       vector2d_t *mvd,
+                                       const cabac_data_t* real_cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -910,13 +912,15 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
   }
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+      // It is safe to drop const here because cabac->only_count is set.
+      kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_hor_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+      // It is safe to drop const here because cabac->only_count is set.
+      kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_ver_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
   }
@@ -929,10 +933,16 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
 */
-int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_shift,
-  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
-
+uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
+                                 int x,
+                                 int y,
+                                 int mv_shift,
+                                 int16_t mv_cand[2][2],
+                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                                 int16_t num_cand,
+                                 int32_t ref_idx,
+                                 uint32_t *bitcost)
+{
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;
   uint32_t merge_idx;
@@ -1068,7 +1078,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
 
           if (hor_abs_gr0) {
             if (mvd_hor_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+              // It is safe to drop const because cabac->only_count is set.
+              kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_hor_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
@@ -1076,7 +1087,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
 
           if (ver_abs_gr0) {
             if (mvd_ver_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+              // It is safe to drop const because cabac->only_count is set.
+              kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_ver_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
@@ -1094,5 +1106,5 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
   *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
 
   // Store bitcost before restoring cabac
-  return *bitcost * (int32_t)(state->lambda_sqrt + 0.5);
+  return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
 }
