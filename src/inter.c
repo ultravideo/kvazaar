@@ -502,6 +502,7 @@ static void inter_clear_cu_unused(cu_info_t* cu)
     cu->inter.mv[i][0] = 0;
     cu->inter.mv[i][1] = 0;
     cu->inter.mv_ref[i] = 255;
+    cu->inter.poc[i] = (uint32_t) -1;
   }
 }
 
@@ -956,8 +957,6 @@ static INLINE void apply_mv_scaling(const encoder_state_t *state,
  * \param colocated     colocated CU
  * \param reflist       either 0 (for L0) or 1 (for L1)
  * \param[out] mv_out   Returns the motion vector
- * \param[out] ref_out  Returns the index of the picture referenced by the
- *                      colocated CU. May be NULL.
  *
  * \return Whether a temporal candidate was added or not.
  */
@@ -965,8 +964,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
                                    uint8_t current_ref,
                                    const cu_info_t *colocated,
                                    int32_t reflist,
-                                   int16_t mv_out[2],
-                                   uint8_t *ref_out)
+                                   int16_t mv_out[2])
 {
   if (!colocated) return false;
 
@@ -981,18 +979,13 @@ static bool add_temporal_candidate(const encoder_state_t *state,
 
   int cand_list = colocated->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
-  // The reference id the colocated block is using
-  uint32_t colocated_ref_mv_ref = state->frame->ref_LX[cand_list][colocated->inter.mv_ref[cand_list]];
-
-  if (ref_out) *ref_out = 0; //colocated_ref;
-
   mv_out[0] = colocated->inter.mv[cand_list][0];
   mv_out[1] = colocated->inter.mv[cand_list][1];
   apply_mv_scaling_pocs(
     state->frame->poc,
     state->frame->ref->pocs[current_ref],
     state->frame->ref->pocs[colocated_ref],
-    state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
+    colocated->inter.poc[cand_list],
     mv_out
   );
   return true;
@@ -1112,8 +1105,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                              state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]],
                                              (h != NULL) ? h : c3,
                                              reflist,
-                                             mv_cand[candidates],
-                                             NULL)) {
+                                             mv_cand[candidates])) {
     candidates++;
   }
 
@@ -1298,8 +1290,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  ref_idx,
                                  temporal_cand,
                                  reflist,
-                                 mv_cand[candidates].mv[reflist],
-                                 &mv_cand[candidates].ref[reflist])) {
+                                 mv_cand[candidates].mv[reflist])) {
+        mv_cand[candidates].ref[reflist] = 0;
         mv_cand[candidates].dir |= (1 << reflist);
       }
     }

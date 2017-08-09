@@ -824,7 +824,7 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
     }
   }
 
-  // Fill the rest of ref_list_poc_out array with -1s.
+  // Fill the rest with -1s.
   for (; j < 16; j++) {
     state->frame->ref_LX[0][j] = (uint8_t) -1;
     state->frame->ref_LX[1][j] = (uint8_t) -1;

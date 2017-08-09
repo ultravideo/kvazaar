@@ -143,6 +143,7 @@ typedef struct
 #endif
     } intra;
     struct {
+      uint32_t poc[2];
       int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
       uint8_t mv_ref[2]; // \brief Index of the L0 and L1 array.
       uint8_t mv_cand0 : 3; // \brief selected MV candidate
