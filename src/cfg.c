@@ -44,7 +44,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_enable  = 1;
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
-  cfg->sao_enable      = 1;
+  cfg->sao_type        = 3;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;
@@ -315,6 +315,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 
+  static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
+
   static const char * const preset_values[11][20*2] = {
       { 
         "ultrafast", 
@@ -349,7 +351,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "0",
         "subme", "0",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "0",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -372,7 +374,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "0",
         "subme", "2",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "0",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -395,7 +397,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "0",
         "subme", "2",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "0",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -418,7 +420,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "0",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "0",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -441,7 +443,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "0",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "1",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -464,7 +466,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "1",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -487,7 +489,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "1",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -510,7 +512,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "1",
         "rdoq-skip", "1",
         "transform-skip", "0",
@@ -533,7 +535,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
-        "sao", "1",
+        "sao", "3",
         "rdoq", "1",
         "rdoq-skip", "0",
         "transform-skip", "1",
@@ -601,8 +603,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->deblock_enable = atobool(value);
     }
   }
-  else if OPT("sao")
-    cfg->sao_enable = atobool(value);
+  else if OPT("sao") {
+    int8_t sao_type = 0;
+    if (!parse_enum(value, sao_names, &sao_type)) return 0;
+    cfg->sao_type = sao_type;
+  }
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")

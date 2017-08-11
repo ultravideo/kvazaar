@@ -597,7 +597,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   // lossless coding.
   if (encoder->cfg.lossless) {
     encoder->cfg.deblock_enable  = false;
-    encoder->cfg.sao_enable      = false;
+    encoder->cfg.sao_type        = false;
     encoder->cfg.signhide_enable = false;
     encoder->cfg.trskip_enable   = false;
   }

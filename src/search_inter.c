@@ -93,7 +93,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     // Fractional motion estimation and odd chroma interpolation need
     // 4 pixels below the bottom edge of the block.
     int margin = 4;
-    if (ctrl->cfg.sao_enable) {
+    if (ctrl->cfg.sao_type) {
       // Make sure we don't refer to pixels for which SAO reconstruction
       // has not been done.
       margin += SAO_DELAY_PX;

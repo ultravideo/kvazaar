@@ -616,7 +616,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
-  if (encoder->cfg.sao_enable) {
+  if (encoder->cfg.sao_type) {
     // Save the post-deblocking but pre-SAO pixels of the LCU to a buffer
     // so that they can be used in SAO reconstruction later.
     encoder_state_recdata_before_sao_to_bufs(state,
@@ -631,7 +631,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
 
   //Encode SAO
-  if (encoder->cfg.sao_enable) {
+  if (encoder->cfg.sao_type) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 

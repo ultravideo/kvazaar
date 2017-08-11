@@ -483,7 +483,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   band_sao.offsets[5] = 0;
   band_sao.eo_class = SAO_EO0;
 
-  if (state->encoder_control->cfg.sao_enable & 1){
+  if (state->encoder_control->cfg.sao_type & 1){
     sao_search_edge_sao(state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_edge(state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * state->lambda + 0.5);
@@ -501,7 +501,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     edge_sao.ddistortion = INT_MAX;
   }
 
-  if (state->encoder_control->cfg.sao_enable & 2){
+  if (state->encoder_control->cfg.sao_type & 2){
     sao_search_band_sao(state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_band(state, band_sao.band_position, band_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * state->lambda + 0.5);

@@ -101,7 +101,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   state->tile->hor_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
   state->tile->ver_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
 
-  if (encoder->cfg.sao_enable) {
+  if (encoder->cfg.sao_type) {
     state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
     state->tile->ver_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
   } else {
