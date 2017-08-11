@@ -1018,19 +1018,13 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
-  {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
-    encoder_state_write_bitstream_children(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->frame->num, state->type);
-  }
-  
+  encoder_state_write_bitstream_children(state);
+
   if (state->encoder_control->cfg.hash != KVZ_HASH_NONE) {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->frame->num, state->type);
   }
-  
+
   //Get bitstream length for stats
   uint64_t newpos = kvz_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);

@@ -399,10 +399,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
-#ifdef KVZ_DEBUG
-  int debug_split = 0;
-#endif
-  PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
 
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame->width || y >= frame->height) {
@@ -712,13 +708,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
   }
-
-  PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->frame->num, state->tile->id, state->slice->id,
-                          state->tile->offset_x + x,
-                          state->tile->offset_x + x + cu_width,
-                          state->tile->offset_y + y,
-                          state->tile->offset_y + y + cu_width,
-                          depth, debug_split, (cur_cu->type == CU_INTRA) ? 1 : 0);
 
   assert(cur_cu->type != CU_NOTSET);
 

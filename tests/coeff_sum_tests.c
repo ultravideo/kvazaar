@@ -52,7 +52,7 @@ SUITE(coeff_sum_tests)
 {
   setup();
 
-  for (int i = 0; i < strategies.count; ++i) {
+  for (volatile int i = 0; i < strategies.count; ++i) {
     if (strcmp(strategies.strategies[i].type, "coeff_abs_sum") != 0) {
       continue;
     }

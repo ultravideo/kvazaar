@@ -286,11 +286,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     }
   }
 
-  encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
-  if (!encoder->threadqueue ||
-      !kvz_threadqueue_init(encoder->threadqueue,
-                        encoder->cfg.threads,
-                        encoder->cfg.owf > 0)) {
+  encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
+  if (!encoder->threadqueue) {
     fprintf(stderr, "Could not initialize threadqueue.\n");
     goto init_failed;
   }
@@ -653,10 +650,8 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   kvz_scalinglist_destroy(&encoder->scaling_list);
 
-  if (encoder->threadqueue) {
-    kvz_threadqueue_finalize(encoder->threadqueue);
-  }
-  FREE_POINTER(encoder->threadqueue);
+  kvz_threadqueue_free(encoder->threadqueue);
+  encoder->threadqueue = NULL;
 
   free(encoder);
 }

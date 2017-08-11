@@ -405,7 +405,7 @@ SUITE(speed_tests)
       int num_tested_dims = sizeof(tested_dims) / sizeof(*tested_dims);
 
       // Call reg_sad with all the sizes it is actually called with.
-      for (int dim_i = 0; dim_i < num_tested_dims; ++dim_i) {
+      for (volatile int dim_i = 0; dim_i < num_tested_dims; ++dim_i) {
         test_env.width = tested_dims[dim_i].x;
         test_env.height = tested_dims[dim_i].y;
         RUN_TEST(inter_sad);
