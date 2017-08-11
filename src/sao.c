@@ -483,10 +483,8 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   band_sao.offsets[5] = 0;
   band_sao.eo_class = SAO_EO0;
 
-  sao_search_edge_sao(state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
-  sao_search_band_sao(state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
-
-  {
+  if (state->encoder_control->cfg.sao_enable & 1){
+    sao_search_edge_sao(state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_edge(state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * state->lambda + 0.5);
     unsigned buf_i;
@@ -499,8 +497,12 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     
     edge_sao.ddistortion = ddistortion;
   }
+  else{
+    edge_sao.ddistortion = INT_MAX;
+  }
 
-  {
+  if (state->encoder_control->cfg.sao_enable & 2){
+    sao_search_band_sao(state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_band(state, band_sao.band_position, band_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * state->lambda + 0.5);
     unsigned buf_i;
@@ -512,6 +514,9 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     }
     
     band_sao.ddistortion = ddistortion;
+  }
+  else{
+    band_sao.ddistortion = INT_MAX;
   }
 
   if (edge_sao.ddistortion <= band_sao.ddistortion) {
@@ -648,7 +653,8 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
   int32_t merge_cost_chroma[3] = { INT32_MAX };
   sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
   sao_info_t *sao_chroma = NULL;
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  int enable_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  if (enable_chroma) {
     sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
   }
 
@@ -657,13 +663,13 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
   sao_info_t *sao_left_luma   = lcu_x != 0 ? &frame->sao_luma  [lcu_y       * stride + lcu_x - 1] : NULL;
   sao_info_t *sao_top_chroma  = NULL;
   sao_info_t *sao_left_chroma = NULL;
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (enable_chroma) {
     if (lcu_y != 0) sao_top_chroma =  &frame->sao_chroma[(lcu_y - 1) * stride + lcu_x];
     if (lcu_x != 0) sao_left_chroma = &frame->sao_chroma[lcu_y       * stride + lcu_x - 1];
   }
 
   sao_search_luma(state, frame, lcu_x, lcu_y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (enable_chroma) {
     sao_search_chroma(state, frame, lcu_x, lcu_y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
   } else {
     merge_cost_chroma[0] = 0;
