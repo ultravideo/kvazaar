@@ -605,8 +605,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("sao") {
     int8_t sao_type = 0;
-    if (!parse_enum(value, sao_names, &sao_type)) sao_type = atoi(value);
-    if (sao_type > 3) return 0;
+    if (!parse_enum(value, sao_names, &sao_type)) sao_type = atobool(value) ? 3 : 0;
     cfg->sao_type = sao_type;
   }
   else if OPT("rdoq")
