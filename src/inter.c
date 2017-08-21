@@ -985,9 +985,15 @@ static bool add_temporal_candidate(const encoder_state_t *state,
     state->frame->poc,
     state->frame->ref->pocs[current_ref],
     state->frame->ref->pocs[colocated_ref],
-    colocated->inter.poc[cand_list],
+    state->frame->ref->images[colocated_ref]->ref_pocs[
+      state->frame->ref->ref_LXs[colocated_ref]
+        [cand_list][colocated->inter.mv_ref[cand_list]]],
     mv_out
   );
+  assert(colocated->inter.poc[cand_list] ==
+    state->frame->ref->images[colocated_ref]->ref_pocs[
+      state->frame->ref->ref_LXs[colocated_ref]
+        [cand_list][colocated->inter.mv_ref[cand_list]]]);
   return true;
 }
 

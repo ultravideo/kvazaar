@@ -1116,7 +1116,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
     kvz_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
-                   prev_state->frame->poc);
+                   prev_state->frame->poc,
+                   prev_state->frame->ref_LX);
     kvz_cu_array_free(state->tile->frame->cu_array);
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;

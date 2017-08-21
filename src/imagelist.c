@@ -36,9 +36,10 @@ image_list_t * kvz_image_list_alloc(int size)
 {
   image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
   list->size      = size;
-  list->images    = malloc(sizeof(kvz_picture*) * size);
-  list->cu_arrays = malloc(sizeof(cu_array_t*)  * size);
-  list->pocs      = malloc(sizeof(int32_t)      * size);
+  list->images    = malloc(sizeof(kvz_picture*)  * size);
+  list->cu_arrays = malloc(sizeof(cu_array_t*)   * size);
+  list->pocs      = malloc(sizeof(int32_t)       * size);
+  list->ref_LXs   = malloc(sizeof(*list->ref_LXs) * size);
   list->used_size = 0;
 
   return list;
@@ -55,6 +56,7 @@ int kvz_image_list_resize(image_list_t *list, unsigned size)
   list->images = (kvz_picture**)realloc(list->images, sizeof(kvz_picture*) * size);
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
   list->pocs = realloc(list->pocs, sizeof(int32_t) * size);
+  list->ref_LXs = realloc(list->ref_LXs, sizeof(*list->ref_LXs) * size);
   list->size = size;
   return size == 0 || (list->images && list->cu_arrays && list->pocs);
 }
@@ -74,6 +76,10 @@ int kvz_image_list_destroy(image_list_t *list)
       kvz_cu_array_free(list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
       list->pocs[i] = 0;
+      for (int j = 0; j < 16; j++) {
+        list->ref_LXs[i][0][j] = 0;
+        list->ref_LXs[i][1][j] = 0;
+      }
     }
   }
 
@@ -81,10 +87,12 @@ int kvz_image_list_destroy(image_list_t *list)
     free(list->images);
     free(list->cu_arrays);
     free(list->pocs);
+    free(list->ref_LXs);
   }
   list->images = NULL;
   list->cu_arrays = NULL;
   list->pocs = NULL;
+  list->ref_LXs = NULL;
   free(list);
   return 1;
 }
@@ -95,7 +103,7 @@ int kvz_image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc, int8_t ref_LX[2][16])
 {
   int i = 0;
   if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
@@ -119,11 +127,19 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
     list->images[i] = list->images[i - 1];
     list->cu_arrays[i] = list->cu_arrays[i - 1];
     list->pocs[i] = list->pocs[i - 1];
+    for (int j = 0; j < 16; j++) {
+      list->ref_LXs[i][0][j] = list->ref_LXs[i - 1][0][j];
+      list->ref_LXs[i][1][j] = list->ref_LXs[i - 1][1][j];
+    }
   }
 
   list->images[0] = im;
   list->cu_arrays[0] = cua;
   list->pocs[0] = poc;
+  for (int j = 0; j < 16; j++) {
+    list->ref_LXs[0][0][j] = ref_LX[0][j];
+    list->ref_LXs[0][1][j] = ref_LX[1][j];
+  }
   
   list->used_size++;
   return 1;
@@ -156,6 +172,10 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
     list->images[n] = NULL;
     list->cu_arrays[n] = NULL;
     list->pocs[n] = 0;
+    for (int j = 0; j < 16; j++) {
+      list->ref_LXs[n][0][j] = 0;
+      list->ref_LXs[n][1][j] = 0;
+    }
     list->used_size--;
   } else {
     int i = n;
@@ -164,10 +184,18 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
       list->images[i] = list->images[i + 1];
       list->cu_arrays[i] = list->cu_arrays[i + 1];
       list->pocs[i] = list->pocs[i + 1];
+      for (int j = 0; j < 16; j++) {
+        list->ref_LXs[i][0][j] = list->ref_LXs[i + 1][0][j];
+        list->ref_LXs[i][1][j] = list->ref_LXs[i + 1][1][j];
+      }
     }
     list->images[list->used_size - 1] = NULL;
     list->cu_arrays[list->used_size - 1] = NULL;
     list->pocs[list->used_size - 1] = 0;
+    for (int j = 0; j < 16; j++) {
+      list->ref_LXs[list->used_size - 1][0][j] = 0;
+      list->ref_LXs[list->used_size - 1][1][j] = 0;
+    }
     list->used_size--;
   }
 
@@ -181,7 +209,7 @@ int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source) {
   }
   
   for (i = source->used_size - 1; i >= 0; --i) {
-    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i]);
+    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i], source->ref_LXs[i]);
   }
   return 1;
 }
