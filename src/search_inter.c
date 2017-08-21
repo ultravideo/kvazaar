@@ -1373,15 +1373,18 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   //*********************************************
   merged = 0;
   // Check every candidate to find a match
-  for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-    if (merge_cand[merge_idx].dir != 3 &&
+  //TODO: Merge not allowed when ILR ?
+  //if (!is_ILR) {
+    for (merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+      if (merge_cand[merge_idx].dir != 3 &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
         (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
-      merged = 1;
-      break;
+        merged = 1;
+        break;
+      }
     }
-  }
+  //}
 
   // Only check when candidates are different
   if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
@@ -1498,7 +1501,7 @@ static void search_pu_inter(encoder_state_t * const state,
                                           merge_a1, merge_b1,
                                           merge_cand,
                                           lcu,
-                                          ref_idx);
+                                          0);
     }
     search_pu_inter_ref(state,
                         x, y,

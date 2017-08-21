@@ -986,8 +986,8 @@ static bool add_temporal_candidate(const encoder_state_t *state,
 
   // ***********************************************
   // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
-  bool is_cur_ref_long_term = state->frame->ref->image_info[current_ref].is_long_term ? true : false;
-  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[colocated_ref_mv_ref].is_long_term ? true : false; 
+  bool is_cur_ref_long_term = state->frame->ref->image_info[current_ref].is_long_term;
+  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[colocated_ref_mv_ref].is_long_term; 
 
   if (is_cur_ref_long_term != is_col_ref_long_term) {
     return false;
