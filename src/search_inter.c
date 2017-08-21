@@ -1373,18 +1373,15 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   //*********************************************
   merged = 0;
   // Check every candidate to find a match
-  //TODO: Merge not allowed when ILR ?
-  //if (!is_ILR) {
-    for (merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-      if (merge_cand[merge_idx].dir != 3 &&
+  for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+    if (merge_cand[merge_idx].dir != 3 &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
         (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
-        merged = 1;
-        break;
-      }
+      merged = 1;
+      break;
     }
-  //}
+  }
 
   // Only check when candidates are different
   if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
@@ -1495,13 +1492,14 @@ static void search_pu_inter(encoder_state_t * const state,
   for (ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
     if (state->encoder_control->cfg.tmvp_enable) {
       // Get list of candidates, TMVP required MV scaling for each reference
+      //TODO: ref idx seems to need to be 0 when getting mergecand when mixing normal and ILR. Add a better check?
       num_cand = kvz_inter_get_merge_cand(state,
                                           x, y,
                                           width, height,
                                           merge_a1, merge_b1,
                                           merge_cand,
                                           lcu,
-                                          0);
+                                          state->encoder_control->layer.layer_id == 0 ? ref_idx : 0);
     }
     search_pu_inter_ref(state,
                         x, y,
