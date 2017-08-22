@@ -1469,7 +1469,12 @@ static void search_pu_inter(encoder_state_t * const state,
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
   int16_t num_cand = 0;
-  if (!state->encoder_control->cfg.tmvp_enable) {
+
+  // ***********************************************
+  // Modified for SHVC.
+  //TODO: ref idx seems to need to be 0 when getting mergecand when mixing normal and ILR. Add a better check?
+  bool mixed_el_ref = state->encoder_control->cfg.ILR_frames > 0 && state->encoder_control->cfg.ref_frames > 0;
+  if (!state->encoder_control->cfg.tmvp_enable || mixed_el_ref) {
     num_cand = kvz_inter_get_merge_cand(state,
                                         x, y,
                                         width, height,
@@ -1490,16 +1495,15 @@ static void search_pu_inter(encoder_state_t * const state,
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
-    if (state->encoder_control->cfg.tmvp_enable) {
+    if (state->encoder_control->cfg.tmvp_enable && !mixed_el_ref) {
       // Get list of candidates, TMVP required MV scaling for each reference
-      //TODO: ref idx seems to need to be 0 when getting mergecand when mixing normal and ILR. Add a better check?
       num_cand = kvz_inter_get_merge_cand(state,
                                           x, y,
                                           width, height,
                                           merge_a1, merge_b1,
                                           merge_cand,
                                           lcu,
-                                          state->encoder_control->layer.layer_id == 0 ? ref_idx : 0);
+                                          ref_idx);
     }
     search_pu_inter_ref(state,
                         x, y,
@@ -1513,6 +1517,7 @@ static void search_pu_inter(encoder_state_t * const state,
                         inter_cost,
                         inter_bitcost);
   }
+  // ***********************************************
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
