@@ -200,6 +200,13 @@ enum kvz_slices {
   KVZ_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
 };
 
+enum kvz_sao {
+  KVZ_SAO_OFF = 0,
+  KVZ_SAO_EDGE = 1,
+  KVZ_SAO_BAND = 2,
+  KVZ_SAO_FULL = 3
+};
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -248,7 +255,7 @@ typedef struct kvz_config
   int32_t framerate_num; /*!< \brief Framerate numerator */
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
-  int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
+  enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */

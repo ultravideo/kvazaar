@@ -33,11 +33,15 @@
 #include "tables.h"
 #include "transform.h"
 
+#include "strategies/strategies-quant.h"
+
 
 #define QUANT_SHIFT          14
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
+
+static const double COEFF_SUM_MULTIPLIER = 1.9;
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
@@ -140,50 +144,80 @@ struct sh_rates_t {
 };
 
 
-/** Calculate actual (or really close to actual) bitcost for coding coefficients
+/**
+ * \brief Calculate actual (or really close to actual) bitcost for coding
+ * coefficients.
+ *
  * \param coeff coefficient array
  * \param width coeff block width
  * \param type data type (0 == luma)
+ *
  * \returns bits needed to code input coefficients
  */
-int32_t kvz_get_coeff_cost(const encoder_state_t * const state,
-                           const coeff_t *coeff,
-                           int32_t width,
-                           int32_t type,
-                           int8_t scan_mode)
+static INLINE uint32_t get_coeff_cabac_cost(
+    const encoder_state_t * const state,
+    const coeff_t *coeff,
+    int32_t width,
+    int32_t type,
+    int8_t scan_mode)
 {
-  int32_t cost = 0;
-  int i;
-  int found = 0;
-  encoder_state_t state_copy;
-
   // Make sure there are coeffs present
-  for(i = 0; i < width*width; i++) {
+  bool found = false;
+  for (int i = 0; i < width*width; i++) {
     if (coeff[i] != 0) {
       found = 1;
       break;
     }
   }
+  if (!found) return 0;
 
-  if(!found) return 0;
-
-  // Store cabac state and contexts
-  memcpy(&state_copy,state,sizeof(encoder_state_t));
+  // Take a copy of the CABAC so that we don't overwrite the contexts when
+  // counting the bits.
+  cabac_data_t cabac_copy;
+  memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
 
   // Clear bytes and bits and set mode to "count"
-  state_copy.cabac.only_count = 1;
-  state_copy.cabac.num_buffered_bytes = 0;
-  state_copy.cabac.bits_left = 23;
+  cabac_copy.only_count = 1;
+  cabac_copy.num_buffered_bytes = 0;
+  cabac_copy.bits_left = 23;
 
-  // Execute the coding function
-  kvz_encode_coeff_nxn(&state_copy, coeff, width, type, scan_mode, 0);
+  // Execute the coding function.
+  // It is safe to drop the const modifier since state won't be modified
+  // when cabac.only_count is set.
+  kvz_encode_coeff_nxn((encoder_state_t*) state,
+                       &cabac_copy,
+                       coeff,
+                       width,
+                       type,
+                       scan_mode,
+                       0);
 
-  // Store bitcost before restoring cabac
-  cost = (23-state_copy.cabac.bits_left) + (state_copy.cabac.num_buffered_bytes << 3);
-
-  return cost;
+  return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
+
+/**
+ * \brief Estimate bitcost for coding coefficients.
+ *
+ * \param coeff   coefficient array
+ * \param width   coeff block width
+ * \param type    data type (0 == luma)
+ *
+ * \returns       number of bits needed to code coefficients
+ */
+uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+                            const coeff_t *coeff,
+                            int32_t width,
+                            int32_t type,
+                            int8_t scan_mode)
+{
+  if (state->encoder_control->cfg.rdo > 0) {
+    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+
+  } else {
+    return COEFF_SUM_MULTIPLIER * kvz_coeff_abs_sum(coeff, width * width) + 0.5;
+  }
+}
 
 
 #define COEF_REMAIN_BIN_REDUCTION 3
@@ -215,14 +249,14 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
     int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
-      rate += (length+1+abs_go_rice) << CTX_FRAC_BITS;
+      rate += (length+1+abs_go_rice) * (1 << CTX_FRAC_BITS);
     } else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
         symbol -=  (1<<(length++));
       }
-      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) << CTX_FRAC_BITS;
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
     }
     if (c1_idx < C1FLAG_NUMBER) {
       rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
@@ -287,7 +321,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
 
   min_abs_level    = ( max_abs_level > 1 ? max_abs_level - 1 : 1 );
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
-    double err       = (double)(level_double - ( abs_level << q_bits ) );
+    double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
     double cur_cost  = err * err * temp + state->lambda *
                        kvz_get_ic_rate( state, abs_level, ctx_num_one, ctx_num_abs,
                                     abs_go_rice, c1_idx, c2_idx, type);
@@ -454,8 +488,8 @@ void kvz_rdoq_sign_hiding(
           dec_bits -= 4 * CTX_FRAC_ONE_BIT;
         }
 
-        inc_bits = -quant_cost_in_bits + (inc_bits << PRECISION_INC);
-        dec_bits = quant_cost_in_bits + (dec_bits << PRECISION_INC);
+        inc_bits = -quant_cost_in_bits + inc_bits * (1 << PRECISION_INC);
+        dec_bits = quant_cost_in_bits + dec_bits * (1 << PRECISION_INC);
 
         if (inc_bits < dec_bits) {
           current.change = 1;
@@ -476,7 +510,7 @@ void kvz_rdoq_sign_hiding(
 
         // Add sign bit, other bits and sig_coeff goes to one.
         int bits = CTX_FRAC_ONE_BIT + sh_rates->inc[current.pos] + sh_rates->sig_coeff_inc[current.pos];
-        current.cost = -llabs(quant_cost_in_bits) + (bits << PRECISION_INC);
+        current.cost = -llabs(quant_cost_in_bits) + bits * (1 << PRECISION_INC);
         current.change = 1;
 
         if (coeff_scan < first_nz_scan) {
@@ -662,7 +696,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       }
 
       if (encoder->cfg.signhide_enable) {
-        sh_rates.quant_delta[blkpos] = (level_double - (level << q_bits)) >> (q_bits - 8);
+        sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
           int32_t rate_now  = kvz_get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
           int32_t rate_up   = kvz_get_ic_rate(state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
@@ -849,7 +883,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 * \returns int
 * Calculates cost of actual motion vectors using CABAC coding
 */
-uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* real_cabac) 
+uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
+                                       vector2d_t *mvd,
+                                       const cabac_data_t* real_cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -876,13 +912,15 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
   }
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+      // It is safe to drop const here because cabac->only_count is set.
+      kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_hor_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+      // It is safe to drop const here because cabac->only_count is set.
+      kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_ver_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
   }
@@ -895,10 +933,16 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
 */
-int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_shift,
-  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
-
+uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
+                                 int x,
+                                 int y,
+                                 int mv_shift,
+                                 int16_t mv_cand[2][2],
+                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                                 int16_t num_cand,
+                                 int32_t ref_idx,
+                                 uint32_t *bitcost)
+{
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;
   uint32_t merge_idx;
@@ -907,8 +951,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
   int8_t merged = 0;
   int8_t cur_mv_cand = 0;
 
-  x <<= mv_shift;
-  y <<= mv_shift;
+  x *= 1 << mv_shift;
+  y *= 1 << mv_shift;
 
   // Check every candidate to find a match
   for (merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
@@ -1034,7 +1078,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
 
           if (hor_abs_gr0) {
             if (mvd_hor_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+              // It is safe to drop const because cabac->only_count is set.
+              kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_hor_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
@@ -1042,7 +1087,8 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
 
           if (ver_abs_gr0) {
             if (mvd_ver_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+              // It is safe to drop const because cabac->only_count is set.
+              kvz_cabac_write_ep_ex_golomb((encoder_state_t*)state, cabac, mvd_ver_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
@@ -1060,5 +1106,5 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
   *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
 
   // Store bitcost before restoring cabac
-  return *bitcost * (int32_t)(state->lambda_sqrt + 0.5);
+  return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
 }

@@ -146,6 +146,28 @@ typedef int16_t coeff_t;
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
+/**
+ * \brief Number of pixels to delay deblocking.
+ *
+ * Number of pixels at the bottom and right side of the LCU that are not
+ * deblocked until when filtering the neighboring LCU. The last four chroma
+ * pixels of the horizontal edges within the LCU are deblocked with the LCU
+ * to the right. Therefore, DEBLOCK_DELAY_PX is set to 8 pixels.
+ */
+#define DEBLOCK_DELAY_PX 8
+
+/**
+ * \brief Number of pixels to delay SAO in horizontal and vertical
+ * directions.
+ *
+ * Number of pixels at the bottom and right side of the LCU that are not
+ * filtered with SAO until when filtering the neighboring LCU. SAO
+ * reconstruction requires that a one pixels border has been deblocked for
+ * both luma and chroma.  Therefore, SAO_DELAY_PX is set to
+ * DEBLOCK_DELAY_PX + 2.
+ */
+#define SAO_DELAY_PX (DEBLOCK_DELAY_PX + 2)
+
 #define MAX_REF_PIC_COUNT 16
 
 #define AMVP_MAX_NUM_CANDS 2
@@ -201,6 +223,12 @@ typedef int16_t coeff_t;
 #define ALIGNED_POINTER(p, alignment) (void*)((intptr_t)(p) + (alignment) - ((intptr_t)(p) % (alignment)))
 // 32 bytes is enough for AVX2
 #define SIMD_ALIGNMENT 32
+
+#ifdef _MSC_VER
+  #define ALIGNED(alignment) __declspec(align(alignment))
+#else
+  #define ALIGNED(alignment) __attribute__((aligned (alignment)))
+#endif
 
 #ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.

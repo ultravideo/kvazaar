@@ -181,20 +181,26 @@ typedef struct
   (cu).inter.cost, (cu).inter.bitcost, (cu).inter.mv[0], (cu).inter.mv[1], (cu).inter.mvd[0], (cu).inter.mvd[1], \
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
-typedef struct {
-  cu_info_t *data; //!< \brief cu array
+typedef struct cu_array_t {
+  struct cu_array_t *base; //!< \brief base cu array or NULL
+  cu_info_t *data;  //!< \brief cu array
   int32_t width;    //!< \brief width of the array in pixels
   int32_t height;   //!< \brief height of the array in pixels
+  int32_t stride;   //!< \brief stride of the array in pixels
   int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
-cu_array_t * kvz_cu_array_alloc(int width, int height);
-int kvz_cu_array_free(cu_array_t *cua);
 cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
 const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
-void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
-                       const cu_array_t* src, int src_x, int src_y,
-                       int width, int height);
+
+cu_array_t * kvz_cu_array_alloc(const int width, const int height);
+cu_array_t * kvz_cu_subarray(cu_array_t *base,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height);
+void kvz_cu_array_free(cu_array_t **cua_ptr);
+cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
 
 // ***********************************************
     // Modified for SHVC.
@@ -284,7 +290,7 @@ typedef struct {
 
  \endverbatim
  */
-typedef struct {
+typedef ALIGNED(8) struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_CHROMA_SIZE];
   coeff_t v[LCU_CHROMA_SIZE];

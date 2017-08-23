@@ -320,6 +320,15 @@ void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   }
 }
 
+static uint32_t coeff_abs_sum_generic(const coeff_t *coeffs, size_t length)
+{
+  uint32_t sum = 0;
+  for (int i = 0; i < length; i++) {
+    sum += abs(coeffs[i]);
+  }
+  return sum;
+}
+
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -327,6 +336,7 @@ int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "quant", "generic", 0, &kvz_quant_generic);
   success &= kvz_strategyselector_register(opaque, "quantize_residual", "generic", 0, &kvz_quantize_residual_generic);
   success &= kvz_strategyselector_register(opaque, "dequant", "generic", 0, &kvz_dequant_generic);
+  success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "generic", 0, &coeff_abs_sum_generic);
 
   return success;
 }

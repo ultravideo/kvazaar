@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#include "strategies/strategies-ipol.h"
 #include "strategies/strategies-picture.h"
 #include "threads.h"
 
@@ -191,12 +192,14 @@ yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size)
   return yuv;
 }
 
-void kvz_yuv_t_free(yuv_t * yuv)
+void kvz_yuv_t_free(yuv_t *yuv)
 {
-  free(yuv->y);
-  free(yuv->u);
-  free(yuv->v);
-  free(yuv);
+  if (yuv) {
+    FREE_POINTER(yuv->y);
+    FREE_POINTER(yuv->u);
+    FREE_POINTER(yuv->v);
+  }
+  FREE_POINTER(yuv);
 }
 
 hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
@@ -447,21 +450,19 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 * \param pic        Image for the block we are trying to find.
 * \param ref        Image where we are trying to find the block.
 *
-* \returns  
+* \returns          Sum of absolute differences
 */
-unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_px_below_lcu) {
+unsigned kvz_image_calc_sad(const kvz_picture *pic,
+                            const kvz_picture *ref,
+                            int pic_x,
+                            int pic_y,
+                            int ref_x,
+                            int ref_y,
+                            int block_width,
+                            int block_height)
+{
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
-  
-  // Check that we are not referencing pixels that are not final.
-  if (max_px_below_lcu >= 0) {
-    int next_lcu_row_px = ((pic_y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
-    int px_below_lcu = ref_y + block_height - next_lcu_row_px;
-    if (px_below_lcu > max_px_below_lcu) {
-      return INT_MAX;
-    }
-  }
 
   if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
       ref_y >= 0 && ref_y <= ref->height - block_height)
@@ -476,6 +477,74 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int 
     return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
   }
 }
+
+
+/**
+* \brief Calculate interpolated SATD between two blocks.
+*
+* \param pic        Image for the block we are trying to find.
+* \param ref        Image where we are trying to find the block.
+*/
+unsigned kvz_image_calc_satd(const kvz_picture *pic,
+                             const kvz_picture *ref,
+                             int pic_x,
+                             int pic_y,
+                             int ref_x,
+                             int ref_y,
+                             int block_width,
+                             int block_height)
+{
+  assert(pic_x >= 0 && pic_x <= pic->width - block_width);
+  assert(pic_y >= 0 && pic_y <= pic->height - block_height);
+
+  if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
+      ref_y >= 0 && ref_y <= ref->height - block_height)
+  {
+    // Reference block is completely inside the frame, so just calculate the
+    // SAD directly. This is the most common case, which is why it's first.
+    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    return kvz_satd_any_size(block_width,
+                             block_height,
+                             pic_data,
+                             pic->stride,
+                             ref_data,
+                             ref->stride) >> (KVZ_BIT_DEPTH - 8);
+  } else {
+    // Extrapolate pixels from outside the frame.
+    kvz_extended_block block;
+    kvz_get_extended_block(pic_x,
+                           pic_y,
+                           ref_x - pic_x,
+                           ref_y - pic_y,
+                           0,
+                           0,
+                           ref->y,
+                           ref->width,
+                           ref->height,
+                           0,
+                           block_width,
+                           block_height,
+                           &block);
+
+    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+
+    unsigned satd = kvz_satd_any_size(block_width,
+                                      block_height,
+                                      pic_data,
+                                      pic->stride,
+                                      block.buffer,
+                                      block.stride) >> (KVZ_BIT_DEPTH - 8);
+
+    if (block.malloc_used) {
+      FREE_POINTER(block.buffer);
+    }
+
+    return satd;
+  }
+}
+
+
 
 
 /**

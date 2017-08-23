@@ -50,14 +50,14 @@ enum hpel_position {
   HPEL_POS_DIA = 2
 };
 
-typedef int kvz_mvd_cost_func(encoder_state_t * const state,
-                              int x, int y,
-                              int mv_shift,
-                              int16_t mv_cand[2][2],
-                              inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-                              int16_t num_cand,
-                              int32_t ref_idx,
-                              uint32_t *bitcost);
+typedef uint32_t kvz_mvd_cost_func(const encoder_state_t *state,
+                                  int x, int y,
+                                  int mv_shift,
+                                  int16_t mv_cand[2][2],
+                                  inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                                  int16_t num_cand,
+                                  int32_t ref_idx,
+                                  uint32_t *bitcost);
 
 void kvz_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
@@ -72,5 +72,11 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        lcu_t *lcu,
                        double *inter_cost,
                        uint32_t *inter_bitcost);
+
+
+unsigned kvz_inter_satd_cost(const encoder_state_t* state,
+                             const lcu_t *lcu,
+                             int x,
+                             int y);
 
 #endif // SEARCH_INTER_H_

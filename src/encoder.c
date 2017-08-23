@@ -40,88 +40,84 @@ static const double ERP_AQP_STRENGTH = 3.0;
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
-static int size_of_wpp_ends(int threads)
-{
-  // Based on the shape of the area where all threads can't yet run in parallel.
-  return 4 * threads * threads - 2 * threads;
-}
-
-static int select_owf_auto(const kvz_config *const cfg)
-{
-  if (cfg->intra_period == 1) {
-    if (cfg->wpp) {
-      // If wpp is on, select owf such that less than 15% of the
-      // frame is covered by the are threads can not work at the same time.
-      const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
-      const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
-
-      // Find the largest number of threads per frame that satifies the
-      // the condition: wpp start/stop inefficiency takes up  less than 15%
-      // of frame area.
-      int threads_per_frame = 1;
-      const int wpp_treshold = lcu_width * lcu_height * 15 / 100;
-      while ((threads_per_frame + 1) * 2 < lcu_width &&
-        threads_per_frame + 1 < lcu_height &&
-        size_of_wpp_ends(threads_per_frame + 1) < wpp_treshold) {
-        ++threads_per_frame;
-      }
-
-      const int threads = MAX(cfg->threads, 1);
-      const int frames = CEILDIV(threads, threads_per_frame);
-
-      // Convert from number of parallel frames to number of additional frames.
-      return CLIP(0, threads - 1, frames - 1);
-    } else {
-      // If wpp is not on, select owf such that there is enough
-      // tiles for twice the number of threads.
-
-      int tiles_per_frame = cfg->tiles_width_count * cfg->tiles_height_count;
-      int threads = (cfg->threads > 1 ? cfg->threads : 1);
-      int frames = CEILDIV(threads * 4, tiles_per_frame);
-
-      // Limit number of frames to 1.25x the number of threads for the case
-      // where there is only 1 tile per frame.
-      frames = CLIP(1, threads * 4 / 3, frames);
-      return frames - 1;
-    }
-  } else {
-    // Try and estimate a good number of parallel frames for inter.
-    const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
-    const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
-    int threads_per_frame = MIN(lcu_width / 2, lcu_height);
-    int threads = cfg->threads;
-
-    // If all threads fit into one frame, at least two parallel frames should
-    // be used to reduce the effect of WPP spin-up and wind-down.
-    int frames = 1;
-
-    while (threads > 0 && threads_per_frame > 0) {
-      frames += 1;
-      threads -= threads_per_frame;
-      threads_per_frame -= 2;
-    }
-
-    if (cfg->gop_len && cfg->gop_lowdelay && cfg->gop_lp_definition.t > 1) {
-      // Temporal skipping makes every other frame very fast to encode so
-      // more parallel frames should be used.
-      frames *= 2;
-    }
-    return CLIP(0, cfg->threads * 2 - 1, frames - 1);
-  }
-}
-
-
 static unsigned cfg_num_threads(void)
 {
-  unsigned cpus = kvz_g_hardware_flags.physical_cpu_count;
-  unsigned fake_cpus = kvz_g_hardware_flags.logical_cpu_count - cpus;
+  if (kvz_g_hardware_flags.logical_cpu_count == 0) {
+    // Default to 4 if we don't know the number of CPUs.
+    return 4;
+  }
 
-  // Default to 4 if we don't know the number of CPUs.
-  if (cpus == 0) return 4;
+  return kvz_g_hardware_flags.logical_cpu_count;
+}
 
-  // 1.5 times the number of physical cores seems to be a good compromise
-  // when hyperthreading is available on Haswell.
-  return cpus + fake_cpus / 2;
+
+static int get_max_parallelism(const encoder_control_t *const encoder)
+{
+  const int width_lcu  = CEILDIV(encoder->cfg.width, LCU_WIDTH);
+  const int height_lcu = CEILDIV(encoder->cfg.height, LCU_WIDTH);
+  const int wpp_limit  = MIN(height_lcu, CEILDIV(width_lcu, 2));
+  const int par_frames = encoder->cfg.owf + 1;
+
+  int parallelism = 0;
+
+  if (encoder->cfg.intra_period == 1) {
+    int threads_per_frame;
+    if (encoder->cfg.wpp) {
+      // Usually limited by width because starting to code a CTU requires
+      // that the next two CTUs in the row above have been completed.
+      threads_per_frame = wpp_limit;
+    } else {
+      // One thread for each tile.
+      threads_per_frame = encoder->cfg.tiles_width_count *
+                          encoder->cfg.tiles_height_count;
+    }
+    // Divide by two since all frames cannot achieve the maximum
+    // parallelism all the time.
+    parallelism = par_frames * threads_per_frame / 2;
+
+  } else {
+    if (encoder->cfg.wpp) {
+      const int last_diagonal = (width_lcu - 1) + (height_lcu - 1) * 2;
+
+      // Index of a diagonal. The diagonal contains CTUs whose coordinates
+      // satisfy x + 2*y == diagonal. We start the sum from the longest
+      // diagonal.
+      int diagonal = CEILDIV(last_diagonal, 2);
+
+      // Difference between diagonal indices in consecutive frames.
+      const int frame_delay = 1 + encoder->max_inter_ref_lcu.right +
+                              2 * encoder->max_inter_ref_lcu.down;
+      int step = frame_delay;
+      int direction = -1;
+
+      // Compute number of threads for each parallel frame.
+      for (int num_frames = 0; num_frames < par_frames; num_frames++) {
+        if (diagonal < 0 || diagonal > last_diagonal) {
+          // No room for more threads.
+          break;
+        }
+
+        // Count number of CTUs on the diagonal.
+        if (diagonal < MIN(2 * height_lcu, width_lcu)) {
+          parallelism += 1 + diagonal / 2;
+        } else {
+          parallelism += MIN(
+            wpp_limit,
+            height_lcu + CEILDIV(width_lcu, 2) - 1 - CEILDIV(diagonal, 2)
+          );
+        }
+        diagonal += direction * step;
+        step += frame_delay;
+        direction = -direction;
+      }
+
+    } else {
+      parallelism = encoder->cfg.tiles_width_count *
+                    encoder->cfg.tiles_height_count;
+    }
+  }
+
+  return parallelism;
 }
 
 
@@ -269,37 +265,66 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->cfg.intra_period = cfg->shared->intra_period;
     // ***********************************************
 
-    if (encoder->cfg.threads == -1) {
-      encoder->cfg.threads = cfg_num_threads();
-    }
 
     if (encoder->cfg.gop_len > 0) {
       if (encoder->cfg.gop_lowdelay) {
         kvz_config_process_lp_gop(&encoder->cfg);
       }
     }
+  encoder->max_inter_ref_lcu.right = 1;
+  encoder->max_inter_ref_lcu.down  = 1;
 
-    // Need to set owf before initializing threadqueue.
-    if (encoder->cfg.owf < 0) {
-      encoder->cfg.owf = select_owf_auto(&encoder->cfg);
-      fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
-    }
-    if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
-      // If using interlaced coding with OWF, the OWF has to be an even number
-      // to ensure that the pair of fields will be output for the same picture.
-      if (encoder->cfg.owf % 2 == 1) {
-        encoder->cfg.owf += 1;
+  int max_threads = encoder->cfg.threads;
+  if (max_threads < 0) {
+    max_threads = cfg_num_threads();
+  }
+  max_threads = MAX(1, max_threads);
+
+  // Need to set owf before initializing threadqueue.
+  if (encoder->cfg.owf < 0) {
+    int best_parallelism = 0;
+
+    for (encoder->cfg.owf = 0; true; encoder->cfg.owf++) {
+      int parallelism = get_max_parallelism(encoder);
+
+      if (parallelism <= best_parallelism) {
+        // No improvement over previous OWF.
+        encoder->cfg.owf--;
+        break;
+      }
+
+      best_parallelism = parallelism;
+      if (parallelism >= max_threads) {
+        // Cannot have more parallelism than there are threads.
+        break;
       }
     }
 
-    encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
-    if (!encoder->threadqueue ||
-      !kvz_threadqueue_init(encoder->threadqueue,
-      encoder->cfg.threads,
-      encoder->cfg.owf > 0)) {
-      fprintf(stderr, "Could not initialize threadqueue.\n");
-      goto init_failed;
+    // Add two frames so that we have frames ready to be coded when one is
+    // completed.
+    encoder->cfg.owf += 2;
+
+    fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
+  }
+
+  if (encoder->cfg.threads < 0) {
+    encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
+    fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
+  }
+
+  if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+    // If using interlaced coding with OWF, the OWF has to be an even number
+    // to ensure that the pair of fields will be output for the same picture.
+    if (encoder->cfg.owf % 2 == 1) {
+      encoder->cfg.owf += 1;
     }
+  }
+
+  encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
+  if (!encoder->threadqueue) {
+    fprintf(stderr, "Could not initialize threadqueue.\n");
+    goto init_failed;
+  }
 
     encoder->bitdepth = KVZ_BIT_DEPTH;
 
@@ -612,7 +637,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     // lossless coding.
     if (encoder->cfg.lossless) {
       encoder->cfg.deblock_enable = false;
-      encoder->cfg.sao_enable = false;
+      encoder->cfg.sao_type = false;
       encoder->cfg.signhide_enable = false;
       encoder->cfg.trskip_enable = false;
     }
@@ -729,10 +754,8 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   kvz_scalinglist_destroy(&encoder->scaling_list);
 
-  if (encoder->threadqueue) {
-    kvz_threadqueue_finalize(encoder->threadqueue);
-  }
-  FREE_POINTER(encoder->threadqueue);
+  kvz_threadqueue_free(encoder->threadqueue);
+  encoder->threadqueue = NULL;
 
   free(encoder);
 }

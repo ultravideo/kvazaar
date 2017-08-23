@@ -61,8 +61,8 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
                          ypos,
                          mv_param[0] >> 2,
                          mv_param[1] >> 2,
-                         state->tile->lcu_offset_x * LCU_WIDTH,
-                         state->tile->lcu_offset_y * LCU_WIDTH,
+                         state->tile->offset_x,
+                         state->tile->offset_y,
                          ref->y,
                          ref->width,
                          ref->height,
@@ -106,8 +106,8 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
                          ypos,
                          mv_param[0] >> 2,
                          mv_param[1] >> 2,
-                         state->tile->lcu_offset_x * LCU_WIDTH,
-                         state->tile->lcu_offset_y * LCU_WIDTH,
+                         state->tile->offset_x,
+                         state->tile->offset_y,
                          ref->y,
                          ref->width,
                          ref->height,
@@ -154,14 +154,34 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
   kvz_extended_block src_v = { 0, 0, 0, 0 };
 
   //Fractional chroma U
-  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
-    ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_height, &src_u);
+  kvz_get_extended_block(xpos, ypos,
+                         (mv_param[0] >> 2) >> 1,
+                         (mv_param[1] >> 2) >> 1,
+                         state->tile->offset_x >> 1,
+                         state->tile->offset_y >> 1,
+                         ref->u,
+                         ref->width >> 1,
+                         ref->height >> 1,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_u);
   kvz_sample_octpel_chroma(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_height, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
-  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
-    ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_height, &src_v);
+  kvz_get_extended_block(xpos, ypos,
+                         (mv_param[0] >> 2) >> 1,
+                         (mv_param[1] >> 2) >> 1,
+                         state->tile->offset_x >> 1,
+                         state->tile->offset_y >> 1,
+                         ref->v,
+                         ref->width >> 1,
+                         ref->height >> 1,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_v);
   kvz_sample_octpel_chroma(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_height, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
@@ -198,8 +218,8 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          ypos,
                          (mv_param[0] >> 2) >> 1,
                          (mv_param[1] >> 2) >> 1,
-                         state->tile->lcu_offset_x * LCU_WIDTH_C,
-                         state->tile->lcu_offset_y * LCU_WIDTH_C,
+                         state->tile->offset_x >> 1,
+                         state->tile->offset_y >> 1,
                          ref->u,
                          ref->width >> 1,
                          ref->height >> 1,
@@ -223,8 +243,8 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          ypos,
                          (mv_param[0] >> 2) >> 1,
                          (mv_param[1] >> 2) >> 1,
-                         state->tile->lcu_offset_x * LCU_WIDTH_C,
-                         state->tile->lcu_offset_y * LCU_WIDTH_C,
+                         state->tile->offset_x >> 1,
+                         state->tile->offset_y >> 1,
                          ref->v,
                          ref->width >> 1,
                          ref->height >> 1,
@@ -308,17 +328,13 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
                          lcu_t *lcu,
                          hi_prec_buf_t *hi_prec_out)
 {
-  const vector2d_t tile_in_frame = {
-    state->tile->lcu_offset_x * LCU_WIDTH,
-    state->tile->lcu_offset_y * LCU_WIDTH
-  };
   const vector2d_t pu_in_tile = { xpos, ypos };
   const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
 
   const vector2d_t mv_in_pu = { mv_param[0] >> 2, mv_param[1] >> 2 };
   const vector2d_t mv_in_frame = {
-    mv_in_pu.x + pu_in_tile.x + tile_in_frame.x,
-    mv_in_pu.y + pu_in_tile.y + tile_in_frame.y
+    mv_in_pu.x + pu_in_tile.x + state->tile->offset_x,
+    mv_in_pu.y + pu_in_tile.y + state->tile->offset_y
   };
 
   const bool mv_is_outside_frame = mv_in_frame.x < 0 ||
@@ -1020,6 +1036,7 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
 {
   if (!cand) return false;
 
+  assert(cand->inter.mv_dir != 0);
   const int cand_list = cand->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
   if (scaling) {

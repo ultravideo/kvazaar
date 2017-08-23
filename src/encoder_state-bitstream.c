@@ -1001,7 +1001,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  WRITE_U(stream, encoder->cfg.sao_enable ? 1 : 0, 1,
+  WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1,
     "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
 #if ENABLE_PCM == 1
@@ -1246,7 +1246,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   s += sprintf(s, " %dx%d", cfg->width, cfg->height);
   s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
                cfg->deblock_beta, cfg->deblock_tc);
-  s += sprintf(s, " sao=%d", cfg->sao_enable);
+  s += sprintf(s, " sao=%d", cfg->sao_type);
   s += sprintf(s, " intra_period=%d", cfg->intra_period);
   s += sprintf(s, " qp=%d", cfg->qp);
   s += sprintf(s, " ref=%d", cfg->ref_frames);
@@ -1452,7 +1452,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   }
   
 
-  if (encoder->cfg.sao_enable) {
+  if (encoder->cfg.sao_type) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
     if (encoder->chroma_format != KVZ_CSP_400) {
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
@@ -1741,19 +1741,14 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   
  // ***********************************************
-  {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
-    encoder_state_write_bitstream_children(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->frame->num, state->type);
-  }
   
+  encoder_state_write_bitstream_children(state);
+
   if (state->encoder_control->cfg.hash != KVZ_HASH_NONE) {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->frame->num, state->type);
   }
-  
+
   //Get bitstream length for stats
   uint64_t newpos = kvz_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);

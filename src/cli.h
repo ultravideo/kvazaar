@@ -62,10 +62,9 @@ void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
 void print_usage(void);
 void print_version(void);
 void print_help(void);
+void print_frame_info(const kvz_frame_info *const info,
+                      const double frame_psnr[3],
+                      const uint32_t bytes,
+                      const bool print_psnr);
 
-
-void print_frame_info(const kvz_frame_info * const info,
-                         const double frame_psnr[3],
-                         const uint32_t bytes);
-       
 #endif

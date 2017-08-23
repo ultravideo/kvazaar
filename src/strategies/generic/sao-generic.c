@@ -40,9 +40,12 @@ static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
 }
 
 
-int kvz_sao_edge_ddistortion_generic(const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                         int block_width, int block_height,
-                         int eo_class, int offsets[NUM_SAO_EDGE_CATEGORIES])
+static int sao_edge_ddistortion_generic(const kvz_pixel *orig_data,
+                                        const kvz_pixel *rec_data,
+                                        int block_width,
+                                        int block_height,
+                                        int eo_class,
+                                        int offsets[NUM_SAO_EDGE_CATEGORIES])
 {
   int y, x;
   int sum = 0;
@@ -76,9 +79,12 @@ int kvz_sao_edge_ddistortion_generic(const kvz_pixel *orig_data, const kvz_pixel
  * \param dir_offsets
  * \param is_chroma  0 for luma, 1 for chroma. Indicates
  */
-void kvz_calc_sao_edge_dir_generic(const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                              int eo_class, int block_width, int block_height,
-                              int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
+static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
+                                      const kvz_pixel *rec_data,
+                                      int eo_class,
+                                      int block_width,
+                                      int block_height,
+                                      int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
 {
   int y, x;
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
@@ -103,30 +109,32 @@ void kvz_calc_sao_edge_dir_generic(const kvz_pixel *orig_data, const kvz_pixel *
 }
 
 
-void kvz_sao_reconstruct_color_generic(const encoder_control_t * const encoder, 
-                                  const kvz_pixel *rec_data, kvz_pixel *new_rec_data,
-                                  const sao_info_t *sao,
-                                  int stride, int new_stride,
-                                  int block_width, int block_height,
-                                  color_t color_i)
+static void sao_reconstruct_color_generic(const encoder_control_t * const encoder,
+                                          const kvz_pixel *rec_data,
+                                          kvz_pixel *new_rec_data,
+                                          const sao_info_t *sao,
+                                          int stride,
+                                          int new_stride,
+                                          int block_width,
+                                          int block_height,
+                                          color_t color_i)
 {
-  int y, x;
   // Arrays orig_data and rec_data are quarter size for chroma.
   int offset_v = color_i == COLOR_V ? 5 : 0;
 
-  if(sao->type == SAO_TYPE_BAND) {
+  if (sao->type == SAO_TYPE_BAND) {
     int offsets[1<<KVZ_BIT_DEPTH];
     kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
+    for (int y = 0; y < block_height; ++y) {
+      for (int x = 0; x < block_width; ++x) {
         new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
       }
     }
   } else {
     // Don't sample the edge pixels because this function doesn't have access to
     // their neighbours.
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
+    for (int y = 0; y < block_height; ++y) {
+      for (int x = 0; x < block_width; ++x) {
         vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
         vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
         const kvz_pixel *c_data = &rec_data[y * stride + x];
@@ -144,9 +152,13 @@ void kvz_sao_reconstruct_color_generic(const encoder_control_t * const encoder,
 }
 
 
-int kvz_sao_band_ddistortion_generic(const encoder_state_t * const state, const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                         int block_width, int block_height,
-                         int band_pos, int sao_bands[4])
+static int sao_band_ddistortion_generic(const encoder_state_t * const state,
+                                        const kvz_pixel *orig_data,
+                                        const kvz_pixel *rec_data,
+                                        int block_width,
+                                        int block_height,
+                                        int band_pos,
+                                        int sao_bands[4])
 {
   int y, x;
   int shift = state->encoder_control->bitdepth-5;
@@ -174,11 +186,11 @@ int kvz_sao_band_ddistortion_generic(const encoder_state_t * const state, const 
 int kvz_strategy_register_sao_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-  
-  success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "generic", 0, &kvz_sao_edge_ddistortion_generic);
-  success &= kvz_strategyselector_register(opaque, "calc_sao_edge_dir", "generic", 0, &kvz_calc_sao_edge_dir_generic);
-  success &= kvz_strategyselector_register(opaque, "sao_reconstruct_color", "generic", 0, &kvz_sao_reconstruct_color_generic);
-  success &= kvz_strategyselector_register(opaque, "sao_band_ddistortion", "generic", 0, &kvz_sao_band_ddistortion_generic);
+
+  success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "generic", 0, &sao_edge_ddistortion_generic);
+  success &= kvz_strategyselector_register(opaque, "calc_sao_edge_dir", "generic", 0, &calc_sao_edge_dir_generic);
+  success &= kvz_strategyselector_register(opaque, "sao_reconstruct_color", "generic", 0, &sao_reconstruct_color_generic);
+  success &= kvz_strategyselector_register(opaque, "sao_band_ddistortion", "generic", 0, &sao_band_ddistortion_generic);
 
   return success;
 }

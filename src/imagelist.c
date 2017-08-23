@@ -74,7 +74,7 @@ int kvz_image_list_destroy(image_list_t *list)
     for (i = 0; i < list->used_size; ++i) {
       kvz_image_free(list->images[i]);
       list->images[i] = NULL;
-      kvz_cu_array_free(list->cu_arrays[i]);
+      kvz_cu_array_free(&list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
       list->pocs[i] = 0;
       memset(&list->image_info[i], 0, sizeof(kvz_picture_info_t));
@@ -222,11 +222,7 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
 
   kvz_image_free(list->images[n]);
 
-  if (!kvz_cu_array_free(list->cu_arrays[n])) {
-    fprintf(stderr, "Could not free cu_array!\n");
-    assert(0); //Stop here
-    return 0;
-  }
+  kvz_cu_array_free(&list->cu_arrays[n]);
 
   // The last item is easy to remove
   if (n == list->used_size - 1) {

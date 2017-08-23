@@ -36,6 +36,7 @@
 #include "transform.h"
 #include "videoframe.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-quant.h"
 
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
@@ -43,11 +44,8 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-// Cost treshold for doing intra search in inter frames with --rd=0.
-#ifndef INTRA_TRESHOLD
-# define INTRA_TRESHOLD 20
-#endif
-
+// Cost threshold for doing intra search in inter frames with --rd=0.
+static const int INTRA_THRESHOLD = 8;
 
 // Modify weight of luma SSD.
 #ifndef LUMA_MULT
@@ -97,7 +95,7 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 /**
  * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree)
 {
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
@@ -109,7 +107,7 @@ static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t work_tr
 /**
  * Copy all non-reference CU data from current level to all lower levels.
  */
-static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree)
 {
   const int width = LCU_WIDTH >> depth;
   for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
@@ -264,7 +262,6 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    // Code coeffs using cabac to get a better estimate of real coding costs.
     coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
@@ -332,8 +329,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   {
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-
-    // Code coeffs using cabac to get a better estimate of real coding costs.
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
@@ -391,7 +386,7 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -404,10 +399,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
-#ifdef KVZ_DEBUG
-  int debug_split = 0;
-#endif
-  PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
 
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame->width || y >= frame->height) {
@@ -484,7 +475,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // decision after reconstructing the inter frame.
     bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
-                      && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
+                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD;
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
@@ -717,13 +708,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
   }
-
-  PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->frame->num, state->tile->id, state->slice->id,
-                          (state->tile->lcu_offset_x * LCU_WIDTH) + x,
-                          (state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 
-                          (state->tile->lcu_offset_y * LCU_WIDTH) + y,
-                          (state->tile->lcu_offset_y * LCU_WIDTH) + y + (LCU_WIDTH >> depth), 
-                          depth, debug_split, (cur_cu->type==CU_INTRA)?1:0);
 
   assert(cur_cu->type != CU_NOTSET);
 

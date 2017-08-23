@@ -46,13 +46,11 @@
  * This method encodes the X and Y component within a block of the last
  * significant coefficient.
  */
-static void encode_last_significant_xy(encoder_state_t * const state,
+static void encode_last_significant_xy(cabac_data_t * const cabac,
                                        uint8_t lastpos_x, uint8_t lastpos_y,
                                        uint8_t width, uint8_t height,
                                        uint8_t type, uint8_t scan)
 {
-  cabac_data_t * const cabac = &state->cabac;
-
   const int index = kvz_math_floor_log2(width) - 2;
   uint8_t ctx_offset = type ? 0 : (index * 3 + (index + 1) / 4);
   uint8_t shift = type ? index : (index + 3) / 4;
@@ -103,6 +101,7 @@ static void encode_last_significant_xy(encoder_state_t * const state,
 }
 
 void kvz_encode_coeff_nxn(encoder_state_t * const state,
+                          cabac_data_t * const cabac,
                           const coeff_t *coeff,
                           uint8_t width,
                           uint8_t type,
@@ -110,7 +109,6 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
                           int8_t tr_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  cabac_data_t * const cabac = &state->cabac;
   int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -183,8 +181,13 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  encode_last_significant_xy(state, last_coeff_x, last_coeff_y, width, width,
-                             type, scan_mode);
+  encode_last_significant_xy(cabac,
+                             last_coeff_x,
+                             last_coeff_y,
+                             width,
+                             width,
+                             type,
+                             scan_mode);
 
   scan_pos_sig  = scan_pos_last;
 
@@ -300,14 +303,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       }
       if (be_valid && sign_hidden) {
     	coeff_signs = coeff_signs >> 1;
-    	if(!state->cabac.only_count)
-    	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
+    	if (!cabac->only_count)
+    	  if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
     	    coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->crypto_hdl, num_non_zero-1);
     	  }
         CABAC_BINS_EP(cabac, coeff_signs , (num_non_zero - 1), "coeff_sign_flag");
       } else {
-        if(!state->cabac.only_count)
-    	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
+        if (!cabac->only_count)
+    	  if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
     	    coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->crypto_hdl, num_non_zero);
         CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
       }
@@ -319,9 +322,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           int32_t base_level  = (idx < C1FLAG_NUMBER) ? (2 + first_coeff2) : 1;
 
           if (abs_coeff[idx] >= base_level) {
-        	if(!state->cabac.only_count) {
-        	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
-                kvz_cabac_write_coeff_remain_encry(state, cabac, abs_coeff[idx] - base_level, go_rice_param, base_level);
+        	if (!cabac->only_count) {
+        	  if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
+                    kvz_cabac_write_coeff_remain_encry(state, cabac, abs_coeff[idx] - base_level, go_rice_param, base_level);
         	  else
         		kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
         	} else
@@ -363,7 +366,13 @@ static void encode_transform_unit(encoder_state_t * const state,
 
     // CoeffNxN
     // Residual Coding
-    kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_pu->intra.tr_skip);
+    kvz_encode_coeff_nxn(state,
+                         &state->cabac,
+                         coeff_y,
+                         width,
+                         0,
+                         scan_idx,
+                         cur_pu->intra.tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1) {
@@ -393,11 +402,11 @@ static void encode_transform_unit(encoder_state_t * const state,
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      kvz_encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      kvz_encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
 }
@@ -1012,8 +1021,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   uint8_t split_model = 0;
 
   // Absolute coordinates
-  uint16_t abs_x = x + state->tile->lcu_offset_x * LCU_WIDTH;
-  uint16_t abs_y = y + state->tile->lcu_offset_y * LCU_WIDTH;
+  uint16_t abs_x = x + state->tile->offset_x;
+  uint16_t abs_y = y + state->tile->offset_y;
 
   // Check for slice border FIXME
   bool border_x = ctrl->in.width  < abs_x + (LCU_WIDTH >> depth);

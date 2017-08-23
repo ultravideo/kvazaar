@@ -47,7 +47,7 @@ static const struct option long_options[] = {
   { "input-fps",          required_argument, NULL, 0 },
   { "deblock",            required_argument, NULL, 0 },
   { "no-deblock",               no_argument, NULL, 0 },
-  { "sao",                      no_argument, NULL, 0 },
+  { "sao",                optional_argument, NULL, 0 },
   { "no-sao",                   no_argument, NULL, 0 },
   { "rdoq",                     no_argument, NULL, 0 },
   { "no-rdoq",                  no_argument, NULL, 0 },
@@ -605,18 +605,22 @@ void print_help(void)
 
 // ***********************************************
 // Modified for SHVC
-void print_frame_info(const kvz_frame_info * const info,
-                         const double frame_psnr[3],
-                         const uint32_t bytes)
+void print_frame_info(const kvz_frame_info *const info,
+                      const double frame_psnr[3],
+                      const uint32_t bytes,
+                      const bool print_psnr)
 {
-  fprintf(stderr, "POC %4d LId %d TId %d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+  fprintf(stderr, "POC %4d LId %d TId %d QP %2d (%c-frame) %10d bits",
           info->poc,
           info->lid,
           info->tid,
           info->qp,
           "BPI"[info->slice_type % 3],
-          bytes << 3,
-          frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+          bytes << 3);
+  if (print_psnr) {
+    fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
+            frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+  }
 
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists

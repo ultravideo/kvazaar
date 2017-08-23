@@ -81,10 +81,12 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
     printf("Error allocating videoframe!\r\n");
     return 0;
   }
-  
+
   state->tile->lcu_offset_x = lcu_offset_x;
   state->tile->lcu_offset_y = lcu_offset_y;
-  
+  state->tile->offset_x     = lcu_offset_x * LCU_WIDTH;
+  state->tile->offset_y     = lcu_offset_y * LCU_WIDTH;
+
   state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
   
   // hor_buf_search and ver_buf_search store single row/col from each LCU row/col.
@@ -98,13 +100,15 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
 
   state->tile->hor_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
   state->tile->ver_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
-  
-  if (encoder->cfg.sao_enable) {
+
+  if (encoder->cfg.sao_type) {
     state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
+    state->tile->ver_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
   } else {
     state->tile->hor_buf_before_sao = NULL;
+    state->tile->ver_buf_before_sao = NULL;
   }
-  
+
   if (encoder->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
@@ -125,10 +129,10 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
 static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   if (state->tile == NULL) return;
 
-  if (state->tile->hor_buf_before_sao) kvz_yuv_t_free(state->tile->hor_buf_before_sao);
-
   kvz_yuv_t_free(state->tile->hor_buf_search);
   kvz_yuv_t_free(state->tile->ver_buf_search);
+  kvz_yuv_t_free(state->tile->hor_buf_before_sao);
+  kvz_yuv_t_free(state->tile->ver_buf_before_sao);
 
   if (state->encoder_control->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;

@@ -177,7 +177,7 @@ SUITE(intra_sad_tests)
 
   // Loop through all strategies picking out the intra sad ones and run
   // selectec strategies though all tests.
-  for (unsigned i = 0; i < strategies.count; ++i) {
+  for (volatile unsigned i = 0; i < strategies.count; ++i) {
     const char * type = strategies.strategies[i].type;
 
     if (strcmp(type, "sad_4x4") == 0) {

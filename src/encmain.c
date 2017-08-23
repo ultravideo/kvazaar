@@ -698,7 +698,7 @@ int main(int argc, char *argv[])
           layer_psnr_sum[layer_id][1] += frame_psnr[1];
           layer_psnr_sum[layer_id][2] += frame_psnr[2];
 
-          print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id]); 
+          print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], cfg->calc_psnr); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
@@ -726,10 +726,10 @@ int main(int argc, char *argv[])
             frames_done / opts->config->shared->max_layers,
             opts->config->shared->max_layers,
             (long long unsigned int)bitstream_length * 8);
-    if (frames_done > 0) {
+    if (encoder->cfg.calc_psnr && frames_done > 0) {
       // ***********************************************
       // Modified for SHVC.
-      fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+      fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
               psnr_sum[2] / frames_done);
