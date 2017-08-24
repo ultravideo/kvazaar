@@ -12,9 +12,9 @@ TESTS = $(check_PROGRAMS) \
     test_smp.sh \
     test_tools.sh \
     test_weird_shapes.sh \
-    test_scalability \
-    test_temporal \
-    test_sequence_breaks
+    test_scalability.sh \
+    test_temporal.sh \
+    test_sequence_breaks.sh
 
 check_PROGRAMS = kvazaar_tests
 
