@@ -1008,13 +1008,17 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_lp_definition.d = gop.d;
       cfg->gop_lp_definition.t = gop.t;
 
-    } else if (atoi(value) == 8) {
+    } else if (atoi(value) == 8 || strcmp(value, "t8") == 0) {
+      bool use_temporal = strcmp(value, "t8") == 0;
+
       cfg->gop_lowdelay = 0;
       // GOP
       cfg->gop_len = 8;
       cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;
       cfg->gop[0].ref_pos_count = 0;
-      //cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16; //Not compatible with temporal scalability
+      if (!use_temporal) {
+        cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16; //Not compatible with temporal scalability
+      }
       cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[2] = 16;
 
       cfg->gop[1].poc_offset = 4; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.3536; cfg->gop[1].is_ref = 1;
@@ -1045,15 +1049,17 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
 
-      cfg->max_temporal_layer = 4;
+      cfg->max_temporal_layer = use_temporal ? 4 : 1;
       
-      //tIds for 7 max_layers. Can be used for smaller max_layers ( tId = tIds[i]-7+max_temporal_layers-1, i!=0 )
-      static const uint8_t tIds[] = {0, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6,
-                                     1, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6};
+      if (use_temporal) {
+        //tIds for 7 max_layers. Can be used for smaller max_layers ( tId = tIds[i]-7+max_temporal_layers-1, i!=0 )
+        static const uint8_t tIds[] = { 0, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6,
+          1, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6 };
 
-      for (int i = 0; i < cfg->gop_len; i++) {
-        uint8_t t_offset = cfg->gop[i].poc_offset%cfg->gop_len == 0 ? 0 : cfg->max_temporal_layer - 7;
-        cfg->gop[i].tId = tIds[cfg->gop[i].poc_offset%cfg->gop_len] + t_offset;
+        for (int i = 0; i < cfg->gop_len; i++) {
+          uint8_t t_offset = cfg->gop[i].poc_offset%cfg->gop_len == 0 ? 0 : cfg->max_temporal_layer - 7;
+          cfg->gop[i].tId = tIds[cfg->gop[i].poc_offset%cfg->gop_len] + t_offset;
+        }
       }
 
     } else if (atoi(value) == 0) {
@@ -1453,6 +1459,14 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
   
+  if (cfg->gop_len && (cfg->intra_period || cfg->shared->intra_period) && !cfg->gop_lowdelay &&
+     ( cfg->intra_period > 0 || cfg->shared->intra_period > 0 ) && cfg->max_temporal_layer > 1)
+  {
+    fprintf(stderr,
+            "Input error: intra period (%d > 0) not supported with temporal scalability\n",
+            cfg->intra_period);
+    error = 1;
+  }
 
   if ((cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) && cfg->layer == 0) {
     fprintf(stderr, "Input error: --ref out of range [1..%d]\n", MAX_REF_PIC_COUNT - 1);
