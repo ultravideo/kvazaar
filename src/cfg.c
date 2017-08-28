@@ -123,6 +123,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->slices = KVZ_SLICES_NONE;
 
+  cfg->optional_key = NULL;
+
   return 1;
 }
 
@@ -134,6 +136,7 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
+    FREE_POINTER(cfg->optional_key);
   }
   free(cfg);
 
@@ -227,6 +230,43 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     (*array)[i] = values[i];
   }
   
+  return 1;
+}
+
+static double parse_number_or_die(const char *numstr,double min, double max)                               
+{
+  char *tail;
+  double d = strtod(numstr, &tail);
+  if (*tail)
+    fprintf(stderr,"Expected number\n");
+  else
+    return d;
+  exit(1);
+  return 0;
+}
+
+static int parse_array(const char *array, uint8_t *coeff_key, int size,
+                            int min, int max)
+{
+  char *key = strdup(array);
+  const char delim[] = ",";
+  char *token;
+  int i = 0;
+
+  token = strtok(key, delim);
+  while(token!=NULL&&i<size){
+    coeff_key[i] = (uint8_t)parse_number_or_die(token,min,max);
+    i++;
+    token = strtok(NULL, delim);
+  }
+  if(i>=size && (token != NULL)){
+    fprintf(stderr, "\x1B[31mparsing of the array failed : too many members.\n\x1B[0m");
+    return 0;
+  }
+  else if (i<size){
+    fprintf(stderr, "\x1B[31mparsing of the array failed : too few members.\n\x1B[0m");
+    return 0;
+  }
   return 1;
 }
 
@@ -951,6 +991,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
 
     return 1;
+  }
+  else if OPT("key"){
+    int size_key = 16;
+    cfg->optional_key = (uint8_t *)malloc(sizeof(uint8_t)*size_key);
+    return parse_array(value,cfg->optional_key,size_key,0,255);
   }
   else if OPT("me-early-termination"){
     int8_t mode = 0;

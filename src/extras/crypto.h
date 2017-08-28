@@ -2,6 +2,7 @@
 #define CRYPTO_H_
 
 #include "global.h"
+#include "../cfg.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -20,7 +21,7 @@ extern "C" {
 
 typedef struct crypto_handle_t crypto_handle_t;
 
-STUBBED crypto_handle_t* kvz_crypto_create();
+STUBBED crypto_handle_t* kvz_crypto_create(const kvz_config *cfg);
 STUBBED void kvz_crypto_decrypt(crypto_handle_t* hdl,
                                 const uint8_t *in_stream,
                                 int size_bits,

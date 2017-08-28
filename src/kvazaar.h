@@ -320,6 +320,7 @@ typedef struct kvz_config
   enum kvz_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
 
   enum kvz_crypto_features crypto_features; /*!< \since 3.7.0 */
+  uint8_t *optional_key;
 
   enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
 
