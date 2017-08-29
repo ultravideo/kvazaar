@@ -1609,15 +1609,15 @@ static void search_pu_inter(encoder_state_t * const state,
 
             cur_cu->inter.mv_dir = 3;
             uint8_t mv_ref_coded[2] = {
-              state->frame->ref_LX[0][merge_cand[i].ref[0]],
-              state->frame->ref_LX[1][merge_cand[j].ref[1]]
+              merge_cand[i].ref[0],
+              merge_cand[j].ref[1]
             };
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
 
-            cur_cu->inter.poc[0] = state->frame->ref->pocs[mv_ref_coded[0]];
-            cur_cu->inter.poc[1] = state->frame->ref->pocs[mv_ref_coded[1]];
+            cur_cu->inter.poc[0] = state->frame->ref->pocs[state->frame->ref_LX[0][merge_cand[i].ref[0]]];
+            cur_cu->inter.poc[1] = state->frame->ref->pocs[state->frame->ref_LX[1][merge_cand[j].ref[1]]];
 
             cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
             cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];

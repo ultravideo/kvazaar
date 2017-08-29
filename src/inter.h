@@ -35,7 +35,7 @@
 
 typedef struct {
   uint8_t dir;
-  uint8_t ref[2];
+  uint8_t ref[2]; // index to L0/L1
   int16_t mv[2][2];
 
 } inter_merge_cand_t;
