@@ -46,7 +46,7 @@ STUBBED unsigned kvz_crypto_get_key(crypto_handle_t *hdl, int num_bits);
 // Provide them in the header so we can avoid compiling the cpp file, which
 // means we don't need a C++ compiler when crypto is not enabled.
 
-static INLINE crypto_handle_t* kvz_crypto_create()
+static INLINE crypto_handle_t* kvz_crypto_create(const kvz_config *cfg)
 {
   return NULL;
 }
