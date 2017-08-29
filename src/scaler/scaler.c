@@ -929,7 +929,9 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
     .trgt_height = trgt_height,
     .chroma = chroma,
     .src_padding_x = 0,
-    .src_padding_y = 0
+    .src_padding_y = 0,
+    .trgt_padding_x = 0,
+    .trgt_padding_y = 0
   };
 
   //Calculate Resampling parameters

@@ -700,6 +700,9 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
                                                       encoder->in.real_width,
                                                       encoder->in.real_height,
                                                       csp);
+    encoder->layer.downscaling.trgt_padding_x = (CU_MIN_SIZE_PIXELS - encoder->layer.downscaling.trgt_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->layer.downscaling.trgt_padding_y = (CU_MIN_SIZE_PIXELS - encoder->layer.downscaling.trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+
     if( prev_enc != NULL ){
       encoder->layer.upscaling = kvz_newScalingParameters(prev_enc->layer.upscaling.trgt_width,
                                                       prev_enc->layer.upscaling.trgt_height,
@@ -714,10 +717,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
                                                       encoder->in.real_height,
                                                       csp);
     }
-    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
+    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM.
     //Scaling parameters need to be calculated for the true sizes.
     encoder->layer.upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     encoder->layer.upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->layer.upscaling.trgt_padding_x = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.trgt_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->layer.upscaling.trgt_padding_y = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
 
     //*********************************************

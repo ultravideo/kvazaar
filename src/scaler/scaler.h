@@ -77,6 +77,8 @@ typedef struct
   //Padding for when the src image size differes from the parameters
   int src_padding_x;
   int src_padding_y;
+  int trgt_padding_x;
+  int trgt_padding_y;
 
 } scaling_parameter_t;
 

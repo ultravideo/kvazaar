@@ -620,19 +620,120 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
 
 // ***********************************************
   // Modified for SHVC
+typedef struct {
+  kvz_picture *pic_in;
+  kvz_picture *pic_out;
+
+  const scaling_parameter_t *param;
+} kvz_pic_scaling_parameters;
+
+// Worker will free the parameter struct after execution. pic_in and pic_out are also freed (ref count decreased)
+static void picture_scaler_worker( void *opaque_param)
+{
+  kvz_pic_scaling_parameters *in_param = opaque_param;
+  kvz_picture *pic_in = in_param->pic_in;
+  kvz_picture *pic_out = in_param->pic_out;
+  const scaling_parameter_t *const param = in_param->param;
+
+  yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v,
+                                                        param->src_width + param->src_padding_x,
+                                                        param->src_height + param->src_padding_y,
+                                                        pic_in->stride, param->chroma, 0);
+  //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
+  
+  yuv_buffer_t* trgt_pic = kvz_yuvScaling(src_pic, param, NULL );
+
+  if (trgt_pic != NULL) {
+    //Get out_img padding
+    uint8_t padding_x = param->trgt_padding_x;
+    uint8_t padding_y = param->trgt_padding_y;
+
+    //Copy other information
+    pic_out->dts = pic_in->dts;
+    pic_out->pts = pic_in->pts;
+    pic_out->interlacing = pic_in->interlacing;
+
+    int chroma_shift = param->chroma == CHROMA_444 ? 0 : 1;
+    pic_data_t* comp_list[] = { trgt_pic->y->data, trgt_pic->u->data, trgt_pic->v->data };
+    int stride_list[] = { trgt_pic->y->width, trgt_pic->u->width, trgt_pic->v->width };
+    int height_list[] = { trgt_pic->y->height, trgt_pic->u->height, trgt_pic->v->height };
+    int padd_x[] = { padding_x, padding_x >> chroma_shift, padding_x >> chroma_shift };
+    int padd_y[] = { padding_y, padding_y >> chroma_shift, padding_y >> chroma_shift };
+    assert(sizeof(kvz_pixel) == sizeof(char)); //Image copy (memset) only works if the pixels are the same size as char 
+
+    //Loop over components
+    for (int comp = 0, i = 0; comp < 3; comp++) {
+      int comp_size = height_list[comp] * stride_list[comp];
+      int pic_out_stride = pic_out->stride >> (comp < 1 ? 0 : chroma_shift);
+      for (int src_ind = 0; src_ind < comp_size; i++, src_ind++) {
+        //TODO: go over src image correctly
+        //TODO: Make a better loop
+        //Copy value normally
+        pic_out->fulldata[i] = comp_list[comp][src_ind];
+
+        if (padding_x != 0 && (src_ind % stride_list[comp] == stride_list[comp] - 1)) { //Padd end of row by copying last pixel
+          memset(pic_out->fulldata + i + 1, pic_out->fulldata[i], padd_x[comp]);
+          i += padd_x[comp];
+        }
+      }
+      if (padd_y[comp] != 0) { //Padd image with lines copied from the prev row
+        for (int j = 0; j < padd_y[comp]; j++) {
+          memcpy(pic_out->fulldata + i, pic_out->fulldata + i - pic_out_stride, pic_out_stride);
+          i += pic_out_stride;
+        }
+      }
+    }
+  }
+
+  //Do deallocation
+  kvz_deallocateYuvBuffer(src_pic);
+  kvz_deallocateYuvBuffer(trgt_pic);
+  kvz_image_free(pic_in);
+  kvz_image_free(pic_out);
+  free(in_param);
+}
+
+// Scale image by adding a scaling job to the job queue
+kvz_picture* kvz_deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, threadqueue_queue_t *queue)
+{
+  if(pic_in == NULL) {
+    return NULL;
+  }
+
+  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
+                                         param->trgt_width + param->trgt_padding_x,
+                                         param->trgt_height + param->trgt_padding_y);
+
+  //Allocate scaling parameters to give to the worker. Worker should handle freeing.
+  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
+  scaling_param->pic_in = kvz_image_copy_ref(pic_in);
+  scaling_param->pic_out = kvz_image_copy_ref(pic_out);
+  scaling_param->param = param;
+
+  //Make job
+  threadqueue_job_t *job = kvz_threadqueue_job_create(picture_scaler_worker, scaling_param);
+
+  //Add dependency to ilr state so that pic_in contains the reconstructed base layer
+
+  //Submit job and set it to encoder state
+  kvz_threadqueue_submit(queue, job);
+
+  return pic_out;
+}
+
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
 //Create a new kvz picture based on pic_in with size given by width and height
-kvz_picture* kvz_image_scaling(const kvz_picture* const pic_in, const scaling_parameter_t *const param)
+kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8
   
-  if( pic_in == NULL) {
-    return NULL;
-  }
-
-  yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
+  //if( pic_in == NULL) {
+  //  return NULL;
+  //}
+  //TODO:Remove
+  /*yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
   //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
   
   yuv_buffer_t* trgt_pic = kvz_yuvScaling(src_pic, param, NULL );
@@ -642,9 +743,9 @@ kvz_picture* kvz_image_scaling(const kvz_picture* const pic_in, const scaling_pa
     return NULL;
   }
   
-  //TODO: Add proper padding
-  uint8_t padding_x = (CU_MIN_SIZE_PIXELS - param->trgt_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-  uint8_t padding_y = (CU_MIN_SIZE_PIXELS - param->trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+  //Get out_img padding
+  uint8_t padding_x = param->trgt_padding_x;
+  uint8_t padding_y = param->trgt_padding_y;
 
   //Create a new kvz picture from the buffer
   kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,param->trgt_width+padding_x, param->trgt_height+padding_y);
@@ -692,7 +793,27 @@ kvz_picture* kvz_image_scaling(const kvz_picture* const pic_in, const scaling_pa
 
   //Do deallocation
   kvz_deallocateYuvBuffer(src_pic);
-  kvz_deallocateYuvBuffer(trgt_pic);
-  
+  kvz_deallocateYuvBuffer(trgt_pic); */
+
+  if(pic_in == NULL) {
+    return NULL;
+  }
+
+  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
+                                         param->trgt_width + param->trgt_padding_x,
+                                         param->trgt_height + param->trgt_padding_y);
+
+  //Allocate scaling parameters to give to the worker. Worker should handle freeing.
+  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
+  scaling_param->pic_in = kvz_image_copy_ref(pic_in);
+  scaling_param->pic_out = kvz_image_copy_ref(pic_out);
+  scaling_param->param = param;
+
+  //Do scaling
+  picture_scaler_worker(scaling_param);
+
+  //Pic out should now contain the scaled image
   return pic_out;
 }
+
+// ***********************************************
