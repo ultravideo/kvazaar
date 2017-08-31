@@ -1162,6 +1162,10 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   //Clear the jobs
   kvz_threadqueue_free_job(&state->tqj_bitstream_written);
   kvz_threadqueue_free_job(&state->tqj_recon_done);
+  //*********************************************
+  //For scalable extension.
+  kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done);
+  //*********************************************
 
   for (int i = 0; state->children[i].encoder_control; ++i) {
     encoder_state_init_children(&state->children[i]);
@@ -1309,6 +1313,42 @@ static void scalability_prepare(encoder_state_t *state)
   }
 }
 
+// Scale image by adding a scaling worker job to the job queue
+static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state )
+{
+  if(pic_in == NULL) {
+    return NULL;
+  }
+
+  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
+                                         param->trgt_width + param->trgt_padding_x,
+                                         param->trgt_height + param->trgt_padding_y);
+
+  //Allocate scaling parameters to give to the worker. Worker should handle freeing.
+  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
+  scaling_param->pic_in = kvz_image_copy_ref(pic_in);
+  scaling_param->pic_out = kvz_image_copy_ref(pic_out);
+  scaling_param->param = param;
+
+  //Make new job and free previous
+  kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done);
+  state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_picture_scaler_worker, scaling_param);
+
+  //Figure out dependency. ILR recon needs to be completed before scaling can be done.
+  // If tqj_recon_done is set, use that as the dependency. TODO: Other possibilities?
+  threadqueue_job_t *dep = state->ILR_state->tqj_recon_done;
+    
+  //Add dependency to ilr state so that pic_in contains the reconstructed base layer
+  if( dep != NULL ){
+    kvz_threadqueue_job_dep_add(state->tqj_ilr_rec_scaling_done, dep);
+  }
+
+  //Submit job and set it to encoder state
+  kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
+
+  return pic_out;
+}
+
 /**
  * Handle adding ilr frames to the ref list.
  *
@@ -1343,7 +1383,7 @@ static void add_irl_frames(encoder_state_t *state)
                                                     state->tile->frame->width_in_lcu,
                                                     state->tile->frame->height_in_lcu,
                                                     mv_scale, pos_scale,
-                                                    0);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet
+                                                    !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet
   
     kvz_image_list_add(state->frame->ref,
       scaled_pic,

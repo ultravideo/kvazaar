@@ -620,15 +620,8 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
 
 // ***********************************************
   // Modified for SHVC
-typedef struct {
-  kvz_picture *pic_in;
-  kvz_picture *pic_out;
 
-  const scaling_parameter_t *param;
-} kvz_pic_scaling_parameters;
-
-// Worker will free the parameter struct after execution. pic_in and pic_out are also freed (ref count decreased)
-static void picture_scaler_worker( void *opaque_param)
+void kvz_picture_scaler_worker( void *opaque_param)
 {
   kvz_pic_scaling_parameters *in_param = opaque_param;
   kvz_picture *pic_in = in_param->pic_in;
@@ -693,33 +686,7 @@ static void picture_scaler_worker( void *opaque_param)
   free(in_param);
 }
 
-// Scale image by adding a scaling job to the job queue
-kvz_picture* kvz_deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, threadqueue_queue_t *queue)
-{
-  if(pic_in == NULL) {
-    return NULL;
-  }
 
-  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
-                                         param->trgt_width + param->trgt_padding_x,
-                                         param->trgt_height + param->trgt_padding_y);
-
-  //Allocate scaling parameters to give to the worker. Worker should handle freeing.
-  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
-  scaling_param->pic_in = kvz_image_copy_ref(pic_in);
-  scaling_param->pic_out = kvz_image_copy_ref(pic_out);
-  scaling_param->param = param;
-
-  //Make job
-  threadqueue_job_t *job = kvz_threadqueue_job_create(picture_scaler_worker, scaling_param);
-
-  //Add dependency to ilr state so that pic_in contains the reconstructed base layer
-
-  //Submit job and set it to encoder state
-  kvz_threadqueue_submit(queue, job);
-
-  return pic_out;
-}
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
@@ -810,7 +777,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   scaling_param->param = param;
 
   //Do scaling
-  picture_scaler_worker(scaling_param);
+  kvz_picture_scaler_worker(scaling_param);
 
   //Pic out should now contain the scaled image
   return pic_out;

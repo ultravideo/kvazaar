@@ -317,6 +317,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   
   // ***********************************************
     // Modified for SHVC.
+  child_state->tqj_ilr_rec_scaling_done = NULL;
   child_state->ILR_state = NULL; //Set later
   // ***********************************************
 
@@ -714,4 +715,8 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
 
   kvz_threadqueue_free_job(&state->tqj_recon_done);
   kvz_threadqueue_free_job(&state->tqj_bitstream_written);
+  // ***********************************************
+  // Modified for SHVC
+  kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done);
+  // ***********************************************
 }
