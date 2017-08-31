@@ -151,7 +151,6 @@ enum kvz_crypto_features {
   KVZ_CRYPTO_TRANSF_COEFF_SIGNS = (1 << 3),
   KVZ_CRYPTO_INTRA_MODE = (1 << 4),
   KVZ_CRYPTO_ON = (1 << 5) - 1,
-
 };
 
 /**
