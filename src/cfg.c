@@ -236,7 +236,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
 static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)                               
 {
   char *tail;
-  int d = strtod(numstr, &tail);
+  int d = strtol(numstr, &tail, 10);
   if (*tail || d < min || d > max){
     fprintf(stderr, "Expected number between %d and %d\n", min, max);
     if(number)
