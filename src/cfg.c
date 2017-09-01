@@ -1616,10 +1616,10 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
     }
     
-    if( (cfg->shared->owf > 1 || cfg->shared->owf < 0 || cfg->shared->threads > 0) && cfg->shared->wpp) {
-      fprintf(stderr, "Input error: wpp not currently supported with layers when owf and threads are used\n");
-      error = 1;
-    }
+    //if( (cfg->shared->owf > 1 || cfg->shared->owf < 0 || cfg->shared->threads > 0) && cfg->shared->wpp) {
+    //  fprintf(stderr, "Input error: wpp not currently supported with layers when owf and threads are used\n");
+    //  error = 1;
+    //}
 
     /*if( cfg->ref_frames > 0 && cfg->layer > 0) {
       fprintf(stderr, "Input error: Inter frame references currently not supported for layers with lid > 0\n");

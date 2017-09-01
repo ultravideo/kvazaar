@@ -814,6 +814,14 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           }
         }
 
+        //*********************************************
+        //For scalable extension.
+        //Add dependency to ilr recon upscaling
+        if(state->tqj_ilr_rec_scaling_done != NULL){
+          kvz_threadqueue_job_dep_add(job[0], state->tqj_ilr_rec_scaling_done);
+        }
+        //*********************************************
+
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
         // The wavefront row is done when the last LCU in the row is done.
@@ -1313,6 +1321,28 @@ static void scalability_prepare(encoder_state_t *state)
   }
 }
 
+static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t *parent){
+  if (parent->encoder_control != NULL){
+    for (int i = 0; parent->children[i].encoder_control; i++){
+      parent->children[i].tqj_ilr_rec_scaling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_rec_scaling_done);
+      propagate_tqj_ilr_rec_scaling_done_to_children(&parent->children[i]);
+    }
+  }
+}
+
+//TODO: Propably overkill, figure out a better way
+static void add_tqj_recon_done_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state){
+  if (state->encoder_control != NULL ){
+    for (int i = 0; state->children[i].encoder_control; i++){
+      if(state->children[i].tqj_recon_done != NULL) {
+        kvz_threadqueue_job_dep_add(job, state->children[i].tqj_recon_done);
+      }
+      add_tqj_recon_done_dep_from_children(job, &state->children[i]);
+    }
+  }
+}
+
+
 // Scale image by adding a scaling worker job to the job queue
 static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state )
 {
@@ -1335,16 +1365,13 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_picture_scaler_worker, scaling_param);
 
   //Figure out dependency. ILR recon needs to be completed before scaling can be done.
-  // If tqj_recon_done is set, use that as the dependency. TODO: Other possibilities?
-  threadqueue_job_t *dep = state->ILR_state->tqj_recon_done;
-    
-  //Add dependency to ilr state so that pic_in contains the reconstructed base layer
-  if( dep != NULL ){
-    kvz_threadqueue_job_dep_add(state->tqj_ilr_rec_scaling_done, dep);
-  }
+  add_tqj_recon_done_dep_from_children(state->tqj_ilr_rec_scaling_done, state->ILR_state);
 
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
+
+  //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
+  propagate_tqj_ilr_rec_scaling_done_to_children(state);
 
   return pic_out;
 }
