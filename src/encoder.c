@@ -617,6 +617,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     encoder->cfg.vps_period = -1;
   }
 
+  if(encoder->cfg.optional_key){
+    encoder->cfg.optional_key = MALLOC(uint8_t,16);
+    if (!encoder->cfg.optional_key) goto init_failed;
+    memcpy(encoder->cfg.optional_key, cfg->optional_key, 16);
+  }
+
   return encoder;
 
 init_failed:
@@ -647,6 +653,7 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
   FREE_POINTER(encoder->tiles_tile_id);
 
   FREE_POINTER(encoder->cfg.roi.dqps);
+  FREE_POINTER(encoder->cfg.optional_key);
 
   kvz_scalinglist_destroy(&encoder->scaling_list);
 

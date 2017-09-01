@@ -712,7 +712,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   state->ref_qp = state->frame->QP;
 
   if (cfg->crypto_features) {
-    state->crypto_hdl = kvz_crypto_create();
+    state->crypto_hdl = kvz_crypto_create(cfg);
     state->crypto_prev_pos = 0;
   }
 
