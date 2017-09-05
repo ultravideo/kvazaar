@@ -1367,6 +1367,11 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   //Figure out dependency. ILR recon needs to be completed before scaling can be done.
   add_tqj_recon_done_dep_from_children(state->tqj_ilr_rec_scaling_done, state->ILR_state);
 
+  //Need to add bitstream written?
+  if(state->ILR_state->tqj_bitstream_written){
+    kvz_threadqueue_job_dep_add(state->tqj_ilr_rec_scaling_done, state->ILR_state->tqj_bitstream_written);
+  }
+
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
 
@@ -1390,7 +1395,12 @@ static void add_irl_frames(encoder_state_t *state)
     //Also add base layer to the reference list.
     const encoder_state_t *ILR_state = state->ILR_state;
     kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
-    kvz_picture* scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling);
+    kvz_picture *scaled_pic = NULL;
+    if (encoder->cfg.threads > 0 ){
+      scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state);
+    } else {
+      scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling);
+    }
     if (ilr_rec == NULL || scaled_pic == NULL) {
       return; //TODO: Add error etc?
     }
