@@ -793,7 +793,7 @@ static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8
     const uint8_t cur_idx = reflist[i];
     const int32_t cur_poc = state->frame->ref->pocs[cur_idx];
     int8_t j = i;
-    while (j > 0 && cur_poc < state->frame->ref->pocs[reflist[j - 1]]) {
+    while (j > 0 && cur_poc > state->frame->ref->pocs[reflist[j - 1]]) {
       reflist[j] = reflist[j - 1];
       --j;
     }
