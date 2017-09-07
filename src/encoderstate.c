@@ -1330,14 +1330,17 @@ static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t
   }
 }
 
-//TODO: Propably overkill, figure out a better way
-static void add_tqj_recon_done_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state){
+//TODO: Propably overkill, figure out a better way. Need to add bitsream written?
+static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state){
   if (state->encoder_control != NULL ){
     for (int i = 0; state->children[i].encoder_control; i++){
       if(state->children[i].tqj_recon_done != NULL) {
         kvz_threadqueue_job_dep_add(job, state->children[i].tqj_recon_done);
       }
-      add_tqj_recon_done_dep_from_children(job, &state->children[i]);
+      if(state->children[i].tqj_bitstream_written != NULL) {
+        kvz_threadqueue_job_dep_add(job, state->children[i].tqj_bitstream_written);
+      }
+      add_dep_from_children(job, &state->children[i]);
     }
   }
 }
@@ -1365,12 +1368,7 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_picture_scaler_worker, scaling_param);
 
   //Figure out dependency. ILR recon needs to be completed before scaling can be done.
-  add_tqj_recon_done_dep_from_children(state->tqj_ilr_rec_scaling_done, state->ILR_state);
-
-  //Need to add bitstream written?
-  if(state->ILR_state->tqj_bitstream_written){
-    kvz_threadqueue_job_dep_add(state->tqj_ilr_rec_scaling_done, state->ILR_state->tqj_bitstream_written);
-  }
+  add_dep_from_children(state->tqj_ilr_rec_scaling_done, state->ILR_state);
 
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
@@ -1398,6 +1396,7 @@ static void add_irl_frames(encoder_state_t *state)
     kvz_picture *scaled_pic = NULL;
     if (encoder->cfg.threads > 0 ){
       scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state);
+      kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
     } else {
       scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling);
     }
