@@ -103,7 +103,7 @@ int kvz_image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc, int8_t ref_LX[2][16])
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc, uint8_t ref_LX[2][16])
 {
   int i = 0;
   if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {

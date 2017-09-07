@@ -502,7 +502,6 @@ static void inter_clear_cu_unused(cu_info_t* cu)
     cu->inter.mv[i][0] = 0;
     cu->inter.mv[i][1] = 0;
     cu->inter.mv_ref[i] = 255;
-    cu->inter.poc[i] = (uint32_t) -1;
   }
 }
 
@@ -990,10 +989,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
         [cand_list][colocated->inter.mv_ref[cand_list]]],
     mv_out
   );
-  assert(colocated->inter.poc[cand_list] ==
-    state->frame->ref->images[colocated_ref]->ref_pocs[
-      state->frame->ref->ref_LXs[colocated_ref]
-        [cand_list][colocated->inter.mv_ref[cand_list]]]);
+
   return true;
 }
 

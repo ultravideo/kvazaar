@@ -1273,17 +1273,14 @@ static void search_pu_inter_ref(encoder_state_t * const state,
 
   // store temp values to be stored back later
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
-  int8_t temp_poc = cur_cu->inter.poc[ref_list];
 
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = LX_idx;
-  cur_cu->inter.poc[ref_list] = state->frame->ref->pocs[ref_idx];
 
   kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
 
   // store old values back
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
-  cur_cu->inter.poc[ref_list] = temp_poc;
 
   vector2d_t mv = { 0, 0 };
   {
@@ -1422,7 +1419,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     cur_cu->merged                  = merged;
     cur_cu->merge_idx               = merge_idx;
     cur_cu->inter.mv_ref[ref_list]  = LX_idx;
-    cur_cu->inter.poc[ref_list]     = state->frame->ref->pocs[ref_idx];
     cur_cu->inter.mv[ref_list][0]   = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1]   = (int16_t)mv.y;
     CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
@@ -1615,9 +1611,6 @@ static void search_pu_inter(encoder_state_t * const state,
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
-
-            cur_cu->inter.poc[0] = state->frame->ref->pocs[state->frame->ref_LX[0][merge_cand[i].ref[0]]];
-            cur_cu->inter.poc[1] = state->frame->ref->pocs[state->frame->ref_LX[1][merge_cand[j].ref[1]]];
 
             cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
             cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];
