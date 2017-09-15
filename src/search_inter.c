@@ -1249,7 +1249,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   // the index of the ref_idx in L0 or L1 list
   int8_t LX_idx;
   // max value of LX_idx plus one
-  const int8_t LX_IDX_MAX_PLUS_1 = max(state->frame->ref_LX_size[0],
+  const int8_t LX_IDX_MAX_PLUS_1 = MAX(state->frame->ref_LX_size[0],
                                        state->frame->ref_LX_size[1]);
 
   for (LX_idx = 0; LX_idx < LX_IDX_MAX_PLUS_1; LX_idx++)
