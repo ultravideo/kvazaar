@@ -1071,10 +1071,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
                                 uint32_t *inter_bitcost)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
-  const videoframe_t * const frame = info->state->tile->frame;
-  kvz_picture *ref_image = info->state->frame->ref->images[info->ref_idx];
-  uint32_t temp_bitcost = 0;
-  uint32_t temp_cost = 0;
 
   // which list, L0 or L1, ref_idx is in and in what index
   int8_t ref_list = -1;
