@@ -91,15 +91,14 @@ typedef struct encoder_state_config_frame_t {
   //! \brief quantization factor
   double QP_factor;
 
-  //Current picture available references
+  //! Current pictures available for references
   image_list_t *ref;
   int8_t ref_list;
 
-  struct {
-    int32_t poc;
-    int8_t list;
-    int8_t idx;
-  } refmap[16];
+  //! L0 and L1 reference index list
+  uint8_t ref_LX[2][16];
+  //! L0 reference index list size
+  uint8_t ref_LX_size[2];
   
   bool is_idr_frame;
   uint8_t pictype;
@@ -292,9 +291,7 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 
-void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
-                               int ref_list_len_out[2],
-                               int ref_list_poc_out[2][16]);
+void kvz_encoder_create_ref_lists(const encoder_state_t *const state);
 
 lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
 

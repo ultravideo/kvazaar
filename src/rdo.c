@@ -959,7 +959,10 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
     if (merge_cand[merge_idx].dir == 3) continue;
     if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
       merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
-      merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+      state->frame->ref_LX[merge_cand[merge_idx].dir - 1][
+        merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1]
+      ] == ref_idx)
+    {
       merged = 1;
       break;
     }

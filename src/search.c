@@ -544,8 +544,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         if (cur_pu->inter.mv_dir == 3) {
           const kvz_picture *const refs[2] = {
-            state->frame->ref->images[cur_pu->inter.mv_ref[0]],
-            state->frame->ref->images[cur_pu->inter.mv_ref[1]],
+            state->frame->ref->images[
+              state->frame->ref_LX[0][
+                cur_pu->inter.mv_ref[0]]],
+            state->frame->ref->images[
+              state->frame->ref_LX[1][
+                cur_pu->inter.mv_ref[1]]],
           };
           kvz_inter_recon_lcu_bipred(state,
                                      refs[0], refs[1],
@@ -555,8 +559,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                                      lcu);
         } else {
           const int mv_idx = cur_pu->inter.mv_dir - 1;
+          
           const kvz_picture *const ref =
-              state->frame->ref->images[cur_pu->inter.mv_ref[mv_idx]];
+              state->frame->ref->images[
+                state->frame->ref_LX[mv_idx][
+                  cur_pu->inter.mv_ref[mv_idx]]];
+
           kvz_inter_recon_lcu(state,
                               ref,
                               pu_x, pu_y,
