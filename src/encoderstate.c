@@ -741,7 +741,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
                state->previous_encoder_state != state)
     {
       // For LP-gop, depend on the state of the first reference.
-      int ref_neg = cfg->gop[(state->frame->poc - 1) % cfg->gop_len].ref_neg[0];
+      int ref_neg = cfg->gop[state->frame->gop_offset].ref_neg[0];
       if (ref_neg > cfg->owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
@@ -901,7 +901,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             kvz_threadqueue_job_create(encoder_state_worker_encode_children, &main_state->children[i]);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] &&
               main_state->children[i].previous_encoder_state->tqj_recon_done &&
-              !main_state->children[i].frame->is_idr_frame)
+              !main_state->children[i].frame->is_irap)
           {
 #if 0
             // Disabled due to non-determinism.
@@ -1036,6 +1036,13 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
         }
       }
 
+      if (ref_poc < state->frame->irap_poc &&
+          state->frame->irap_poc < state->frame->poc)
+      {
+        // Trailing frames cannot refer to leading frames.
+        is_referenced = false;
+      }
+
       if (!is_referenced) {
         // This reference is not referred to by this frame, it must be removed.
         kvz_image_list_rem(state->frame->ref, ref);
@@ -1129,22 +1136,21 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Check whether the frame is a keyframe or not.
   if (state->frame->num == 0) {
-    state->frame->is_idr_frame = true;
+    state->frame->is_irap = true;
+  } else if (cfg->intra_period == 1) {
+    state->frame->is_irap = state->frame->num % 2 == 0;
+  } else if (cfg->intra_period > 1) {
+    if (cfg->gop_len > 0 && !cfg->gop_lowdelay) {
+      state->frame->is_irap = (state->frame->num - 1) % cfg->intra_period == 0;
+    } else {
+      state->frame->is_irap = state->frame->num % cfg->intra_period == 0;
+    }
   } else {
-    bool is_i_idr = (cfg->intra_period == 1 && state->frame->num % 2 == 0);
-    bool is_p_idr = (cfg->intra_period > 1 && (state->frame->num % cfg->intra_period) == 0);
-    state->frame->is_idr_frame = is_i_idr || is_p_idr;
-  }
-
-  // Set pictype.
-  if (state->frame->is_idr_frame) {
-    state->frame->pictype = KVZ_NAL_IDR_W_RADL;
-  } else {
-    state->frame->pictype = KVZ_NAL_TRAIL_R;
+    state->frame->is_irap = false;
   }
 
   // Set slicetype.
-  if (state->frame->is_idr_frame || cfg->intra_period == 1) {
+  if (state->frame->is_irap || cfg->intra_period == 1) {
     state->frame->slicetype = KVZ_SLICE_I;
   } else if (cfg->gop_len > 0 && !cfg->gop_lowdelay) {
     state->frame->slicetype = KVZ_SLICE_B;
@@ -1153,20 +1159,40 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   // Set POC.
-  if (state->frame->is_idr_frame) {
-    encoder_state_reset_poc(state);
-  } else if (cfg->intra_period != 1 && cfg->gop_len > 0) {
+  if (cfg->intra_period != 1 &&
+      cfg->gop_len > 0 &&
+      !cfg->gop_lowdelay &&
+      state->frame->num > 0)
+  {
     // Calculate POC according to the global frame counter and GOP
     // structure.
-    int32_t poc;
     if (cfg->intra_period > 0) {
-      poc = state->frame->num % cfg->intra_period - 1;
+      int32_t poc = (state->frame->num - 1) % cfg->intra_period;
+      int poc_offset = cfg->gop[state->frame->gop_offset].poc_offset - 1;
+      state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
     } else {
-      poc = state->frame->num - 1;
+      int32_t poc = state->frame->num;
+      int poc_offset = cfg->gop[state->frame->gop_offset].poc_offset - 1;
+      state->frame->poc = poc - (poc - 1) % cfg->gop_len + poc_offset;
     }
-    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
-    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+  } else if (state->frame->is_irap) {
+    encoder_state_reset_poc(state);
+  }
+
+  // Set pictype.
+  if (state->frame->is_irap) {
+    if (cfg->gop_len > 0 && !cfg->gop_lowdelay && state->frame->num > 0) {
+      state->frame->pictype = KVZ_NAL_BLA_W_RADL;
+    } else {
+      state->frame->pictype = KVZ_NAL_IDR_W_RADL;
+    }
+    state->frame->irap_poc = state->frame->poc;
+
+  } else if (state->frame->poc < state->frame->irap_poc) {
+    state->frame->pictype = KVZ_NAL_RADL_R;
+  } else {
+    state->frame->pictype = KVZ_NAL_TRAIL_R;
   }
 
   encoder_state_remove_refs(state);
@@ -1233,7 +1259,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
   if (state->frame->num == -1) {
     // We're at the first frame, so don't care about all this stuff.
     state->frame->num = 0;
-    state->frame->poc   = 0;
+    state->frame->poc = 0;
+    state->frame->irap_poc = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
     assert(!state->tile->frame->cu_array);
@@ -1283,7 +1310,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   // Update POC and frame count.
   state->frame->num = prev_state->frame->num + 1;
-  state->frame->poc   = prev_state->frame->poc   + 1;
+  state->frame->poc = prev_state->frame->poc + 1;
+  state->frame->irap_poc = prev_state->frame->irap_poc;
 
   state->frame->prepared = 1;
 }

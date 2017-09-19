@@ -81,6 +81,7 @@ typedef struct encoder_state_config_frame_t {
   int32_t num;       /*!< \brief Frame number */
   int32_t poc;       /*!< \brief Picture order count */
   int8_t gop_offset; /*!< \brief Offset in the gop structure */
+  int32_t irap_poc;  /*!< \brief POC of the associated IRAP picture */
 
   /**
    * \brief Frame-level quantization parameter
@@ -99,8 +100,8 @@ typedef struct encoder_state_config_frame_t {
   uint8_t ref_LX[2][16];
   //! L0 reference index list size
   uint8_t ref_LX_size[2];
-  
-  bool is_idr_frame;
+
+  bool is_irap;
   uint8_t pictype;
   enum kvz_slice_type slicetype;
 

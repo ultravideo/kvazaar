@@ -942,9 +942,7 @@ static void encoder_state_write_slice_header(
   encoder_state_t * state,
   bool independent)
 {
-  uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-
-  kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
+  kvz_nal_write(stream, state->frame->pictype, 0, state->frame->first_nal);
   state->frame->first_nal = false;
 
   kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
