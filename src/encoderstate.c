@@ -1427,7 +1427,7 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
 
   //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
-  propagate_tqj_ilr_rec_scaling_done_to_children(state);
+  propagate_tqj_ilr_cua_upsampling_done_to_children(state);
 
   return cua;
 }
