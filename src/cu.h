@@ -204,6 +204,21 @@ cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
 
 // ***********************************************
     // Modified for SHVC.
+
+//Struct for passing parameter to worker
+typedef struct {
+  
+  cu_array_t *base_cua;
+  cu_array_t *out_cua;
+
+  int32_t nw_in_lcu;
+  int32_t nh_in_lcu;
+  int32_t *mv_scale;
+  int32_t *cu_pos_scale;
+  uint8_t only_init;
+
+} kvz_cua_upsampling_parameters;
+
 /**
  * \brief Return a cu array that has been upsampled from base_cua.
  *
@@ -212,7 +227,14 @@ cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
  * cu_pos_scale the factors for mapping the base_cua positions to the target cua.
  * only_init if the cu array should only be initialized and no data actually copied
  */
-cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init);
+void kvz_cu_array_upsampling_worker(void *opaque_param);
+
+cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua,
+                                    int32_t nw_in_lcu,
+                                    int32_t nh_in_lcu,
+                                    int32_t * mv_scale,
+                                    int32_t * cu_pos_scale,
+                                    uint8_t only_init);
 // ***********************************************
     
 

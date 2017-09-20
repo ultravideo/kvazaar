@@ -217,10 +217,18 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 
 // ***********************************************
 // Modified for SHVC.
-
-// Adapted from shm
-cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init)
+// Adapted from shm. Dealocates given parameters
+void kvz_cu_array_upsampling_worker(void *opaque_param)
 {
+  kvz_cua_upsampling_parameters *param = opaque_param;
+  cu_array_t *base_cua = param->base_cua;
+  int32_t nw_in_lcu = param->nw_in_lcu;
+  int32_t nh_in_lcu = param->nh_in_lcu;
+  int32_t *mv_scale = param->mv_scale;
+  int32_t *cu_pos_scale = param->cu_pos_scale;
+  uint8_t only_init = param->only_init;
+  cu_array_t *cua = param->out_cua;
+
   //Define a few basic things
   //TODO: Just use MAX_DEPTH or MAX_PU_DEPTH?    v----log2_min_luma_transform_block_size
   uint8_t max_depth = MAX_DEPTH + MAX(0,MIN_SIZE-2); //If chroma format is 422 and log2_min_luma_transform_block_size > 2 need to add 1 
@@ -234,10 +242,8 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
   int8_t part_num = MAX( 1, (int8_t)( (block_w/w_min_pu) * (block_h/h_min_pu))); //Number of scu in a 16x16 block, e.g. how many scu to skip to get to the next 16x16 block
   uint16_t num_blocks = num_partitions / part_num; //Number of 16x16 blocks in lcu
 
-  //Allocate the new cua. Use cu_pos_scale to calculate the new size
   uint32_t n_width = nw_in_lcu * LCU_WIDTH;
-  uint32_t n_height = nh_in_lcu * LCU_WIDTH;
-  cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
+  //uint32_t n_height = nh_in_lcu * LCU_WIDTH;
 
 //#define LCUIND2X(ind,stride) (((ind) * LCU_WIDTH) % (stride))
 //#define LCUIND2Y(ind,lcu_stride) (((ind) * LCU_WIDTH) / (lcu_stride))
@@ -336,6 +342,28 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
 
 #undef IND2X
 #undef IND2Y
+
+  free(param);
+}
+
+
+cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init)
+{
+  //Allocate the new cua. Use cu_pos_scale to calculate the new size
+  uint32_t n_width = nw_in_lcu * LCU_WIDTH;
+  uint32_t n_height = nh_in_lcu * LCU_WIDTH;
+  cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
+
+  kvz_cua_upsampling_parameters *param = calloc(1, sizeof(kvz_cua_upsampling_parameters));
+  param->base_cua = base_cua;
+  param->cu_pos_scale = cu_pos_scale;
+  param->mv_scale = mv_scale;
+  param->nh_in_lcu = nh_in_lcu;
+  param->nw_in_lcu = nw_in_lcu;
+  param->only_init = only_init;
+  param->out_cua = cua;
+  
+  kvz_cu_array_upsampling_worker(param);
 
   return cua;
 }

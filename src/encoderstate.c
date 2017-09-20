@@ -820,6 +820,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         if(state->tqj_ilr_rec_scaling_done != NULL){
           kvz_threadqueue_job_dep_add(job[0], state->tqj_ilr_rec_scaling_done);
         }
+        //Add dependency to ilr cua upsampling
+        if(state->tqj_ilr_cua_upsampling_done != NULL){
+          kvz_threadqueue_job_dep_add(job[0], state->tqj_ilr_cua_upsampling_done);
+        }
         //*********************************************
 
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
@@ -1173,6 +1177,7 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   //*********************************************
   //For scalable extension.
   kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done);
+  kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);  
   //*********************************************
 
   for (int i = 0; state->children[i].encoder_control; ++i) {
@@ -1321,6 +1326,7 @@ static void scalability_prepare(encoder_state_t *state)
   }
 }
 
+//TODO: A better way?
 static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t *parent){
   if (parent->encoder_control != NULL){
     for (int i = 0; parent->children[i].encoder_control; i++){
@@ -1329,6 +1335,18 @@ static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t
     }
   }
 }
+
+
+//TODO: A better way?
+static void propagate_tqj_ilr_cua_upsampling_done_to_children(const encoder_state_t *parent){
+  if (parent->encoder_control != NULL){
+    for (int i = 0; parent->children[i].encoder_control; i++){
+      parent->children[i].tqj_ilr_cua_upsampling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_cua_upsampling_done);
+      propagate_tqj_ilr_rec_scaling_done_to_children(&parent->children[i]);
+    }
+  }
+}
+
 
 //TODO: Propably overkill, figure out a better way. Need to add bitsream written?
 static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state){
@@ -1379,6 +1397,42 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   return pic_out;
 }
 
+// Scale cu_array by adding a scaling worker job to the job queue
+static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2] )
+{
+ 
+  //Allocate the new cua.
+  uint32_t n_width = state->tile->frame->width_in_lcu * LCU_WIDTH;
+  uint32_t n_height =  state->tile->frame->height_in_lcu * LCU_WIDTH;
+  cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
+
+  //Allocate scaling parameters to give to the worker. Worker should handle freeing.
+  kvz_cua_upsampling_parameters *param = calloc(1, sizeof(kvz_cua_upsampling_parameters));
+  param->base_cua = state->ILR_state->tile->frame->cu_array;
+  param->cu_pos_scale = pos_scale;
+  param->mv_scale = mv_scale;
+  param->nh_in_lcu = state->tile->frame->height_in_lcu;
+  param->nw_in_lcu = state->tile->frame->width_in_lcu;
+  param->only_init = !state->encoder_control->cfg.tmvp_enable;
+  param->out_cua = cua;      
+
+  //Make new job and free previous
+  kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);
+  state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, param);
+
+  //Figure out dependency. ILR recon needs to be completed before scaling can be done.
+  add_dep_from_children(state->tqj_ilr_cua_upsampling_done, state->ILR_state);
+
+  //Submit job and set it to encoder state
+  kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
+
+  //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
+  propagate_tqj_ilr_rec_scaling_done_to_children(state);
+
+  return cua;
+}
+
+
 /**
  * Handle adding ilr frames to the ref list.
  *
@@ -1395,6 +1449,7 @@ static void add_irl_frames(encoder_state_t *state)
     kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
     kvz_picture *scaled_pic = NULL;
     if (encoder->cfg.threads > 0 ){
+      //TODO: fix dependencies etc. so that waitfor does not need to be called here
       scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state);
       kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
     } else {
@@ -1415,11 +1470,19 @@ static void add_irl_frames(encoder_state_t *state)
                            GET_SCALE_MV(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
     int32_t pos_scale[2]= {GET_SCALE_POS(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
                            GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
-    cu_array_t* scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
-                                                    state->tile->frame->width_in_lcu,
-                                                    state->tile->frame->height_in_lcu,
-                                                    mv_scale, pos_scale,
-                                                    !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet
+    cu_array_t* scaled_cu = NULL;
+      
+    if (encoder->cfg.threads > 0) {
+      //TODO: fix dependencies etc. so that waitfor does not need to be called here
+      scaled_cu = deferred_cu_array_upsampling( state, mv_scale, pos_scale);
+      kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
+    } else{
+      scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
+        state->tile->frame->width_in_lcu,
+        state->tile->frame->height_in_lcu,
+        mv_scale, pos_scale,
+        !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet 
+    }
   
     kvz_image_list_add(state->frame->ref,
       scaled_pic,

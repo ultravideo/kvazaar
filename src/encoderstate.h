@@ -285,6 +285,7 @@ typedef struct encoder_state_t {
   // ***********************************************
     // Modified for SHVC. TODO: Account for a more complex reference structure?
   threadqueue_job_t *tqj_ilr_rec_scaling_done; //ilr recon scaling done
+  threadqueue_job_t *tqj_ilr_cua_upsampling_done; //ilr cua upsampling done
 
   const struct encoder_state_t *ILR_state;
   // ***********************************************
