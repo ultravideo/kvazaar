@@ -1326,26 +1326,27 @@ static void scalability_prepare(encoder_state_t *state)
   }
 }
 
-//TODO: A better way?
-static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t *parent){
-  if (parent->encoder_control != NULL){
-    for (int i = 0; parent->children[i].encoder_control; i++){
-      parent->children[i].tqj_ilr_rec_scaling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_rec_scaling_done);
-      propagate_tqj_ilr_rec_scaling_done_to_children(&parent->children[i]);
-    }
-  }
-}
-
-
-//TODO: A better way?
-static void propagate_tqj_ilr_cua_upsampling_done_to_children(const encoder_state_t *parent){
-  if (parent->encoder_control != NULL){
-    for (int i = 0; parent->children[i].encoder_control; i++){
-      parent->children[i].tqj_ilr_cua_upsampling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_cua_upsampling_done);
-      propagate_tqj_ilr_rec_scaling_done_to_children(&parent->children[i]);
-    }
-  }
-}
+//TODO: disable for now, until the need for a waitfor after this function is fixed
+////TODO: A better way?
+//static void propagate_tqj_ilr_rec_scaling_done_to_children(const encoder_state_t *parent){
+//  if (parent->encoder_control != NULL){
+//    for (int i = 0; parent->children[i].encoder_control; i++){
+//      parent->children[i].tqj_ilr_rec_scaling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_rec_scaling_done);
+//      propagate_tqj_ilr_rec_scaling_done_to_children(&parent->children[i]);
+//    }
+//  }
+//}
+//
+//
+////TODO: A better way?
+//static void propagate_tqj_ilr_cua_upsampling_done_to_children(const encoder_state_t *parent){
+//  if (parent->encoder_control != NULL){
+//    for (int i = 0; parent->children[i].encoder_control; i++){
+//      parent->children[i].tqj_ilr_cua_upsampling_done = kvz_threadqueue_copy_ref(parent->tqj_ilr_cua_upsampling_done);
+//      propagate_tqj_ilr_cua_upsampling_done_to_children(&parent->children[i]);
+//    }
+//  }
+//}
 
 
 //TODO: Propably overkill, figure out a better way. Need to add bitsream written?
@@ -1392,7 +1393,8 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
 
   //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
-  propagate_tqj_ilr_rec_scaling_done_to_children(state);
+  //TODO: disable for now, until the need for a waitfor after this function is fixed
+  //propagate_tqj_ilr_rec_scaling_done_to_children(state);
 
   return pic_out;
 }
@@ -1426,8 +1428,9 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
 
-  //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
-  propagate_tqj_ilr_cua_upsampling_done_to_children(state);
+  //Propagate tqj_ilr_cua_upsampling_done to child states in order to set it as a dependency
+  //TODO: disable for now, until the need for a waitfor after this function is fixed
+  //propagate_tqj_ilr_cua_upsampling_done_to_children(state);
 
   return cua;
 }
