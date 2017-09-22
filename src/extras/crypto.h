@@ -2,6 +2,7 @@
 #define CRYPTO_H_
 
 #include "global.h"
+#include "../cfg.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -20,7 +21,7 @@ extern "C" {
 
 typedef struct crypto_handle_t crypto_handle_t;
 
-STUBBED crypto_handle_t* kvz_crypto_create();
+STUBBED crypto_handle_t* kvz_crypto_create(const kvz_config *cfg);
 STUBBED void kvz_crypto_decrypt(crypto_handle_t* hdl,
                                 const uint8_t *in_stream,
                                 int size_bits,
@@ -45,7 +46,7 @@ STUBBED unsigned kvz_crypto_get_key(crypto_handle_t *hdl, int num_bits);
 // Provide them in the header so we can avoid compiling the cpp file, which
 // means we don't need a C++ compiler when crypto is not enabled.
 
-static INLINE crypto_handle_t* kvz_crypto_create()
+static INLINE crypto_handle_t* kvz_crypto_create(const kvz_config *cfg)
 {
   return NULL;
 }

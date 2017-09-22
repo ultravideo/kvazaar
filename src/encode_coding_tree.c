@@ -592,16 +592,20 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
     for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
       if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-        if (ref_list[ref_list_idx] > 1) {
+
+        // size of the current reference index list (L0/L1)
+        uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
+
+        if (ref_LX_size > 1) {
           // parseRefFrmIdx
-          int32_t ref_frame = state->frame->refmap[cur_cu->inter.mv_ref[ref_list_idx]].idx;
+          int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
 
           cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
           CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
 
           if (ref_frame > 0) {
             int32_t i;
-            int32_t ref_num = ref_list[ref_list_idx] - 2;
+            int32_t ref_num = ref_LX_size - 2;
 
             cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
             ref_frame--;

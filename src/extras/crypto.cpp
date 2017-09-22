@@ -26,22 +26,24 @@ struct crypto_handle_t {
 };
 
 
-static const int init_val[32] = {
-  201,  75, 219, 152,   6, 245, 237, 107,
-  179, 194,  81,  29,  66,  98, 198,   0,
-   16, 213,  27,  56, 255, 127, 242, 112,
-   97, 126, 197, 204,  25,  59,  38,  30,
-};
+static uint8_t default_IV[16] = {201, 75, 219, 152, 6, 245, 237, 107, 179, 194, 81, 29, 66, 98, 198, 0};
+static uint8_t default_key[16] = {16, 213, 27, 56, 255, 127, 242, 112, 97, 126, 197, 204, 25, 59, 38, 30};
 
 
-crypto_handle_t* kvz_crypto_create()
+crypto_handle_t* kvz_crypto_create(const kvz_config *cfg)
 {
   crypto_handle_t* hdl = (crypto_handle_t*)calloc(1, sizeof(crypto_handle_t));
 
+  uint8_t *key;
+  if(cfg->optional_key!=NULL)
+    key = cfg->optional_key;
+  else
+    key = default_key;
+
   for (int i = 0; i < 16; i++) {
-    hdl->iv [i]     = init_val[i];
-    hdl->counter[i] = init_val[i + 5];
-    hdl->key[i]     = init_val[i + 16];
+    hdl->iv [i]     = default_IV[i];
+    hdl->counter[i] = (i<11)? default_IV[5+i] : key[i-11];
+    hdl->key[i]     = key[i];
   }
 
   hdl->cipher = new cipher_t(hdl->key, CryptoPP::AES::DEFAULT_KEYLENGTH, hdl->iv);

@@ -107,6 +107,7 @@ static const struct option long_options[] = {
   { "hash",               required_argument, NULL, 0 },
   {"cu-split-termination",required_argument, NULL, 0 },
   { "crypto",             required_argument, NULL, 0 },
+  { "key",                required_argument, NULL, 0 },
   { "me-early-termination",required_argument, NULL, 0 },
   { "lossless",                 no_argument, NULL, 0 },
   { "no-lossless",              no_argument, NULL, 0 },

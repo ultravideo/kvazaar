@@ -727,7 +727,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   state->ref_qp = state->frame->QP;
 
   if (cfg->crypto_features) {
-    state->crypto_hdl = kvz_crypto_create();
+    state->crypto_hdl = kvz_crypto_create(cfg);
     state->crypto_prev_pos = 0;
   }
 
@@ -756,7 +756,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
                state->previous_encoder_state != state)
     {
       // For LP-gop, depend on the state of the first reference.
-      int ref_neg = cfg->gop[(state->frame->poc - 1) % cfg->gop_len].ref_neg[0];
+      int ref_neg = cfg->gop[state->frame->gop_offset].ref_neg[0];
       if (ref_neg > cfg->owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
@@ -928,7 +928,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             kvz_threadqueue_job_create(encoder_state_worker_encode_children, &main_state->children[i]);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] &&
               main_state->children[i].previous_encoder_state->tqj_recon_done &&
-              !main_state->children[i].frame->is_idr_frame)
+              !main_state->children[i].frame->is_irap)
           {
 #if 0
             // Disabled due to non-determinism.
@@ -972,31 +972,30 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-static void encoder_ref_insertion_sort(int reflist[16], int length) {
+static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8_t reflist[16], uint8_t length) {
 
   for (uint8_t i = 1; i < length; ++i) {
-    const int16_t cur_poc = reflist[i];
-    int16_t j = i;
-    while (j > 0 && cur_poc < reflist[j - 1]) {
+    const uint8_t cur_idx = reflist[i];
+    const int32_t cur_poc = state->frame->ref->pocs[cur_idx];
+    int8_t j = i;
+    while (j > 0 && cur_poc > state->frame->ref->pocs[reflist[j - 1]]) {
       reflist[j] = reflist[j - 1];
       --j;
     }
-    reflist[j] = cur_poc;
+    reflist[j] = cur_idx;
   }
 }
 
 /**
- * \brief Return reference picture lists.
+ * \brief Generate reference picture lists.
  *
  * \param state             main encoder state
- * \param ref_list_len_out  Returns the lengths of the reference lists.
- * \param ref_list_poc_out  Returns two lists of POCs of the reference pictures.
  */
-void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
-                               int ref_list_len_out[2],
-                               int ref_list_poc_out[2][16])
+void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
 {
-  FILL_ARRAY(ref_list_len_out, 0, 2);
+  // TODO check possibility to add L0 references to L1 list also
+  
+  FILL_ARRAY(state->frame->ref_LX_size, 0, 2);
 
   // List all pocs of lists
   int j = 0;
@@ -1005,54 +1004,22 @@ void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
   // ***********************************************
   for (j = 0; j < state->frame->ref->used_size; j++) {
     if (state->frame->ref->pocs[j] <= state->frame->poc) {
-      ref_list_poc_out[0][ref_list_len_out[0]] = state->frame->ref->pocs[j];
-      ref_list_len_out[0]++;
+      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = j;
+      state->frame->ref_LX_size[0] += 1;
     } else {
-      ref_list_poc_out[1][ref_list_len_out[1]] = state->frame->ref->pocs[j];
-      ref_list_len_out[1]++;
+      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = j;
+      state->frame->ref_LX_size[1] += 1;
     }
     
   }
 // ***********************************************
-  // Fill the rest of ref_list_poc_out array with -1s.
+  // Fill the rest with -1s.
   for (; j < 16; j++) {
-    ref_list_poc_out[0][j] = -1;
-    ref_list_poc_out[1][j] = -1;
+    state->frame->ref_LX[0][j] = (uint8_t) -1;
+    state->frame->ref_LX[1][j] = (uint8_t) -1;
   }
 
-  encoder_ref_insertion_sort(ref_list_poc_out[0], ref_list_len_out[0]);
-  encoder_ref_insertion_sort(ref_list_poc_out[1], ref_list_len_out[1]);
-}
-
-static void encoder_state_ref_sort(encoder_state_t *state) {
-  int ref_list_len[2];
-  int ref_list_poc[2][16];
-
-  kvz_encoder_get_ref_lists(state, ref_list_len, ref_list_poc);
-  // ***********************************************
-  // Modified for SHVC. TODO: Does <= really help?
-  for (int j = 0; j < state->frame->ref->used_size; j++) {
-    if (state->frame->ref->pocs[j] <= state->frame->poc) {
-      for (int ref_idx = 0; ref_idx < ref_list_len[0]; ref_idx++) {
-        if (ref_list_poc[0][ref_idx] == state->frame->ref->pocs[j]) {
-          state->frame->refmap[j].idx = ref_list_len[0] - ref_idx - 1;
-          break;
-        }
-      }
-      state->frame->refmap[j].list = 1;
-
-    } else {
-      for (int ref_idx = 0; ref_idx < ref_list_len[1]; ref_idx++) {
-        if (ref_list_poc[1][ref_idx] == state->frame->ref->pocs[j]) {
-          state->frame->refmap[j].idx = ref_idx;
-          break;
-        }
-      }
-      state->frame->refmap[j].list = 2;
-    }
-    state->frame->refmap[j].poc = state->frame->ref->pocs[j];
-  }
-  // ***********************************************
+  encoder_ref_insertion_sort(state, state->frame->ref_LX[0], state->frame->ref_LX_size[0]);
 }
 
 /**
@@ -1081,7 +1048,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   //*********************************************
   //For scalable extension.
   //Check if an el layer is idr, need to remove normal refs
-  if( state->frame->is_idr_frame ) {
+  if( state->frame->is_irap ) {
     target_ref_num = 0;
   }
   //Add space for irl to the list
@@ -1116,6 +1083,13 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
           is_referenced = true;
           break;
         }
+      }
+
+      if (ref_poc < state->frame->irap_poc &&
+          state->frame->irap_poc < state->frame->poc)
+      {
+        // Trailing frames cannot refer to leading frames.
+        is_referenced = false;
       }
 
       if (!is_referenced) {
@@ -1216,22 +1190,21 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Check whether the frame is a keyframe or not.
   if (state->frame->num == 0) {
-    state->frame->is_idr_frame = true;
+    state->frame->is_irap = true;
+  } else if (cfg->intra_period == 1) {
+    state->frame->is_irap = state->frame->num % 2 == 0;
+  } else if (cfg->intra_period > 1) {
+    if (cfg->gop_len > 0 && !cfg->gop_lowdelay) {
+      state->frame->is_irap = (state->frame->num - 1) % cfg->intra_period == 0;
+    } else {
+      state->frame->is_irap = state->frame->num % cfg->intra_period == 0;
+    }
   } else {
-    bool is_i_idr = (cfg->intra_period == 1 && state->frame->num % 2 == 0);
-    bool is_p_idr = (cfg->intra_period > 1 && (state->frame->num % cfg->intra_period) == 0);
-    state->frame->is_idr_frame = is_i_idr || is_p_idr;
-  }
-
-  // Set pictype.
-  if (state->frame->is_idr_frame) {
-    state->frame->pictype = KVZ_NAL_IDR_W_RADL;
-  } else {
-    state->frame->pictype = KVZ_NAL_TRAIL_R;
+    state->frame->is_irap = false;
   }
 
   // Set slicetype.
-  if (state->frame->is_idr_frame || cfg->intra_period == 1) {
+  if (state->frame->is_irap || cfg->intra_period == 1) {
     //*********************************************
     //For scalable extension. TODO: Enable encoding el frames with intra based on intra period?
     state->frame->slicetype = (cfg->ILR_frames > 0) ? KVZ_SLICE_P : KVZ_SLICE_I;
@@ -1243,24 +1216,44 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   // Set POC.
-  if (state->frame->is_idr_frame) {
-    encoder_state_reset_poc(state);
-  } else if (cfg->intra_period != 1 && cfg->gop_len > 0) {
+  if (cfg->intra_period != 1 &&
+      cfg->gop_len > 0 &&
+      !cfg->gop_lowdelay &&
+      state->frame->num > 0)
+  {
     // Calculate POC according to the global frame counter and GOP
     // structure.
-    int32_t poc;
     if (cfg->intra_period > 0) {
-      poc = state->frame->num % cfg->intra_period - 1;
+      int32_t poc = (state->frame->num - 1) % cfg->intra_period;
+      int poc_offset = cfg->gop[state->frame->gop_offset].poc_offset - 1;
+      state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
     } else {
-      poc = state->frame->num - 1;
+      int32_t poc = state->frame->num;
+      int poc_offset = cfg->gop[state->frame->gop_offset].poc_offset - 1;
+      state->frame->poc = poc - (poc - 1) % cfg->gop_len + poc_offset;
     }
-    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
-    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+  } else if (state->frame->is_irap) {
+    encoder_state_reset_poc(state);
+  }
+
+  // Set pictype.
+  if (state->frame->is_irap) {
+    if (cfg->gop_len > 0 && !cfg->gop_lowdelay && state->frame->num > 0) {
+      state->frame->pictype = KVZ_NAL_BLA_W_RADL;
+    } else {
+      state->frame->pictype = KVZ_NAL_IDR_W_RADL;
+    }
+    state->frame->irap_poc = state->frame->poc;
+
+  } else if (state->frame->poc < state->frame->irap_poc) {
+    state->frame->pictype = KVZ_NAL_RADL_R;
+  } else {
+    state->frame->pictype = KVZ_NAL_TRAIL_R;
   }
 
   encoder_state_remove_refs(state);
-  encoder_state_ref_sort(state);
+  kvz_encoder_create_ref_lists(state);
 
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
     normalize_lcu_weights(state);
@@ -1491,6 +1484,7 @@ static void add_irl_frames(encoder_state_t *state)
       scaled_pic,
       scaled_cu,
       ILR_state->frame->poc,
+      ILR_state->frame->ref_LX,
       ILR_state->encoder_control->cfg.gop[ILR_state->frame->gop_offset].tId,
       ILR_state->encoder_control->layer.layer_id,
       1); //Currently only ILR can be a long term references
@@ -1518,7 +1512,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
   if (state->frame->num == -1) {
     // We're at the first frame, so don't care about all this stuff.
     state->frame->num = 0;
-    state->frame->poc   = 0;
+    state->frame->poc = 0;
+    state->frame->irap_poc = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
     assert(!state->tile->frame->cu_array);
@@ -1563,6 +1558,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
                    prev_state->frame->poc,
+                   prev_state->frame->ref_LX,
                    prev_state->encoder_control->cfg.gop[prev_state->frame->gop_offset].tId,
                    prev_state->encoder_control->layer.layer_id,
                    0); //Currently only ILR can be a long term references
@@ -1585,7 +1581,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   // Update POC and frame count.
   state->frame->num = prev_state->frame->num + 1;
-  state->frame->poc   = prev_state->frame->poc   + 1;
+  state->frame->poc = prev_state->frame->poc + 1;
+  state->frame->irap_poc = prev_state->frame->irap_poc;
 
   state->frame->prepared = 1;
 }
