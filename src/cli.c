@@ -630,7 +630,7 @@ void print_frame_info(const kvz_frame_info *const info,
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists
     fprintf(stderr, " [L0 ");
-    for (int j = info->ref_list_len[0] - 1; j >= 0; j--) {
+    for (int j = 0; j < info->ref_list_len[0]; j++) {
       fprintf(stderr, "%d ", info->ref_list[0][j]);
     }
     fprintf(stderr, "] [L1 ");
