@@ -731,7 +731,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
 
       WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
-      WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
+      WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s0_flag");
     }
     last_poc = 0;
     poc_shift = 0;
@@ -758,12 +758,12 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       
       WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
       last_poc = delta_poc;
-      WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
+      WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s1_flag");
     }
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
     
     if (state->encoder_control->cfg.tmvp_enable) {
-      WRITE_U(stream, ref_negative?1:0, 1, "slice_temporal_mvp_enabled_flag");
+      WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
 
