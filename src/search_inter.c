@@ -1303,35 +1303,20 @@ static void search_pu_inter(encoder_state_t * const state,
   };
 
   // Search for merge mode candidates
-  if (!cfg->tmvp_enable) {
-    info.num_merge_cand = kvz_inter_get_merge_cand(
-        state,
-        x, y,
-        width, height,
-        merge_a1, merge_b1,
-        info.merge_cand,
-        lcu,
-        0
-    );
-  }
+  info.num_merge_cand = kvz_inter_get_merge_cand(
+      state,
+      x, y,
+      width, height,
+      merge_a1, merge_b1,
+      info.merge_cand,
+      lcu
+  );
 
   // Default to candidate 0
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);
 
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
-    if (cfg->tmvp_enable) {
-      // Get list of candidates, TMVP required MV scaling for each reference
-      info.num_merge_cand = kvz_inter_get_merge_cand(
-          state,
-          x, y,
-          width, height,
-          merge_a1, merge_b1,
-          info.merge_cand,
-          lcu,
-          ref_idx
-      );
-    }
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
