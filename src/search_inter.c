@@ -1321,47 +1321,26 @@ static void search_pu_inter(encoder_state_t * const state,
     .mvd_cost_func  = cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost,
   };
 
-  // ***********************************************
-  // Modified for SHVC.
-  //TODO: ref idx seems to need to be 0 when getting mergecand when mixing normal and ILR. Add a better check?
-  bool mixed_el_ref = state->encoder_control->cfg.ILR_frames > 0 && state->encoder_control->cfg.ref_frames > 0;
-
   // Search for merge mode candidates
-  if (!cfg->tmvp_enable || mixed_el_ref) {
-    info.num_merge_cand = kvz_inter_get_merge_cand(
-        state,
-        x, y,
-        width, height,
-        merge_a1, merge_b1,
-        info.merge_cand,
-        lcu,
-        0
-    );
-  }
+  info.num_merge_cand = kvz_inter_get_merge_cand(
+      state,
+      x, y,
+      width, height,
+      merge_a1, merge_b1,
+      info.merge_cand,
+      lcu
+  );
 
   // Default to candidate 0
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);
 
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
-    if (cfg->tmvp_enable && !mixed_el_ref) {
-      // Get list of candidates, TMVP required MV scaling for each reference
-      info.num_merge_cand = kvz_inter_get_merge_cand(
-          state,
-          x, y,
-          width, height,
-          merge_a1, merge_b1,
-          info.merge_cand,
-          lcu,
-          ref_idx
-      );
-    }
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
     search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost);
   }
-  // ***********************************************
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B

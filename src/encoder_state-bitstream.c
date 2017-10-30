@@ -951,7 +951,7 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
         }
 
         rps->delta_poc[j] = encoder->cfg.gop_len ? delta_poc : 0;
-        rps->is_used[j] = 1;
+        rps->is_used[j] = !state->frame->is_irap;
         
         last_poc = delta_poc;
       }
@@ -983,7 +983,7 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
         }
 
         rps->delta_poc[j+rps->num_negative_pics] = encoder->cfg.gop_len ? delta_poc : 0;
-        rps->is_used[j+rps->num_negative_pics] = 1;
+        rps->is_used[j+rps->num_negative_pics] = !state->frame->is_irap;
         
         last_poc = delta_poc;
       }
@@ -1607,7 +1607,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     }
 
     if (state->encoder_control->cfg.tmvp_enable) {
-      WRITE_U(stream, ref_negative?1:0, 1, "slice_temporal_mvp_enabled_flag");
+      WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
 

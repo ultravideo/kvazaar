@@ -992,19 +992,39 @@ static bool add_temporal_candidate(const encoder_state_t *state,
     return false;
   }
 
-  int cand_list = colocated->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
+  // When there are reference pictures from the future (POC > current POC)
+  // in L0 or L1, the primary list for the colocated PU is the inverse of
+  // collocated_from_l0_flag. Otherwise it is equal to reflist.
+  //
+  // In Kvazaar, the L1 list is only used for future pictures and the slice
+  // type is set to KVZ_SLICE_B if and only if L1 is used. Therefore we can
+  // simply check the slice type here. Kvazaar always sets
+  // collocated_from_l0_flag so the list is L1 for B-slices.
+  int col_list = state->frame->slicetype == KVZ_SLICE_P ? reflist : 1;
   
+  if ((colocated->inter.mv_dir & (col_list + 1)) == 0) {
+    // Use the other list if the colocated PU does not have a MV for the
+    // primary list.
+    col_list = 1 - col_list;
+  }
+
   // ***********************************************
   // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
   bool is_cur_ref_long_term = state->frame->ref->image_info[current_ref].is_long_term;
-  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[ state->frame->ref->ref_LXs[colocated_ref][cand_list][colocated->inter.mv_ref[cand_list]]].is_long_term; 
+  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[ state->frame->ref->ref_LXs[colocated_ref]
+          [col_list][colocated->inter.mv_ref[col_list]]].is_long_term; 
 
   if (is_cur_ref_long_term != is_col_ref_long_term) {
     return false;
   }
 
-  mv_out[0] = colocated->inter.mv[cand_list][0];
-  mv_out[1] = colocated->inter.mv[cand_list][1];
+  
+
+  mv_out[0] = colocated->inter.mv[col_list][0];
+  mv_out[1] = colocated->inter.mv[col_list][1];
+
+  if (!is_cur_ref_long_term) {
+    apply_mv_scaling_pocs(
 
   if (!is_cur_ref_long_term) {
     apply_mv_scaling_pocs(
@@ -1013,7 +1033,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
       state->frame->ref->pocs[colocated_ref],
       state->frame->ref->images[colocated_ref]->ref_pocs[
         state->frame->ref->ref_LXs[colocated_ref]
-          [cand_list][colocated->inter.mv_ref[cand_list]]],
+          [col_list][colocated->inter.mv_ref[col_list]]],
       mv_out
     );
   }
@@ -1154,7 +1174,8 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                              state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]],
                                              (h != NULL) ? h : c3,
                                              reflist,
-                                             mv_cand[candidates])) {
+                                             mv_cand[candidates]))
+  {
     candidates++;
   }
 
@@ -1282,7 +1303,6 @@ static bool add_merge_candidate(const cu_info_t *cand,
  * \param use_b1    true, if candidate b1 can be used
  * \param mv_cand   Returns the merge candidates.
  * \param lcu       lcu containing the block
- * \param ref_idx   current reference index (used only by TMVP)
  * \return          number of merge candidates
  */
 uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
@@ -1290,8 +1310,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,
                                  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu,
-                                 uint8_t ref_idx)
+                                 lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t zero_idx = 0;
@@ -1336,7 +1355,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         (merge_cand.h != NULL) ? merge_cand.h : merge_cand.c3;
 
       if (add_temporal_candidate(state,
-                                 ref_idx,
+                                 // Reference index 0 is always used for
+                                 // the temporal merge candidate.
+                                 state->frame->ref_LX[reflist][0],
                                  temporal_cand,
                                  reflist,
                                  mv_cand[candidates].mv[reflist])) {
