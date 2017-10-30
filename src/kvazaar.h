@@ -225,6 +225,25 @@ typedef struct kvz_gop_config {
   int8_t tId;          /*!< \brief temporal id for the current layer*/
 } kvz_gop_config;
 
+// ***********************************************
+  // Modified for SHVC.
+/**
+ * \brief Ref pic set configuration.
+ */
+typedef struct kvz_rps_config {
+  uint8_t inter_rps_pred_flag;
+  int16_t delta_rps;
+  int8_t delta_ridx;
+  uint8_t num_ref_idc;
+  uint8_t ref_idc[17];
+  uint16_t delta_poc[16];
+  uint8_t is_used[16];
+  uint8_t num_negative_pics;
+  uint8_t num_positive_pics;
+} kvz_rps_config;
+// ***********************************************
+
+
 /**
  * \brief Struct which contains all configuration data
  *
@@ -309,6 +328,12 @@ typedef struct kvz_config
   int8_t gop_lowdelay;       /*!< \brief specifies that the GOP does not use future pictures */
   kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
   uint8_t max_temporal_layer; /*!< \brief specify the maximum temporal layer */
+
+  // ***********************************************
+  // Modified for SHVC.
+  uint8_t num_rps;
+  kvz_rps_config rps[65];
+  // ***********************************************
 
   int32_t target_bitrate;
 

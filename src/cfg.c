@@ -146,6 +146,7 @@ int kvz_config_init(kvz_config *cfg)
   */
   cfg->next_cfg = NULL;
 
+  cfg->num_rps = 0;
   //*********************************************
 
   return 1;
@@ -1446,6 +1447,115 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   }
 }
 
+//*********************************************
+  //For scalable extension.
+//Generate rps for a gop structure. TODO: add extra rps for "intermediate" gop structures (when all ref not available yet)?
+static void generate_gop_rps(kvz_config *cfg){
+
+  //Generate a rps for every gop config in cfg->gop
+  cfg->num_rps = cfg->gop_len;
+
+  for (int i = 0; i < cfg->num_rps; i++){
+    kvz_gop_config *gop = &cfg->gop[i];
+    kvz_rps_config *rps = &cfg->rps[i];
+
+    rps->num_negative_pics = gop->ref_neg_count;
+    rps->num_positive_pics = gop->ref_pos_count;
+
+    //Populate delta_poc and is_used
+    for (int j = 0; j < gop->ref_neg_count; j++){
+      rps->delta_poc[j] = gop->ref_neg[j];
+      rps->is_used[j] = 1;
+    }
+    for (int j = gop->ref_neg_count; j < gop->ref_neg_count + gop->ref_pos_count; j++){
+      rps->delta_poc[j] = gop->ref_neg[j];
+      rps->is_used[j] = 1;
+    }
+
+    // Index to the ref prs is always the prev one
+    rps->delta_ridx = 1;
+
+    //First rps cannot use inter rps prediction
+    if (i==0){
+      rps->inter_rps_pred_flag = 0;
+      rps->num_ref_idc = 0;
+    } else {
+      // Try to use the prev rps as the ref rps
+      rps->inter_rps_pred_flag = 1;
+      kvz_rps_config *ref_rps = rps - 1;
+
+      int delta_rps = (gop - 1)->poc_offset - gop->poc_offset;
+      int num_ref_pic = ref_rps->num_negative_pics + ref_rps->num_positive_pics;
+      rps->delta_rps = delta_rps;
+      rps->num_ref_idc = num_ref_pic + 1;
+      
+      //loop through ref pics
+      int count = 0;
+      for( int j = 0; j <= num_ref_pic; j++){
+        int ref_delta_POC = (j < num_ref_pic) ? ref_rps->delta_poc[j] : 0;
+        rps->ref_idc[j] = 0;
+        //Loop through pics in the cur rps 
+        for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++){
+          if (rps->delta_poc[k] == ref_delta_POC + delta_rps){
+            //Found a poc that mathces the ref poc
+            rps->ref_idc[j] = rps->is_used[k] ? 1 : 2;
+            count++;
+            break;
+          }
+        }
+      }
+      //Check that we found a match for all ref idc
+      if (count != rps->num_negative_pics + rps->num_positive_pics){
+        fprintf(stderr, "Warning: could not find a matching delta poc for all ref idc in the ref rps for rps %d. Disabling inter rps pred for cur rps.\n",i);
+        rps->inter_rps_pred_flag = 0;
+      }
+    }
+  }
+}
+
+//Generate rps for the case where only N prev frames are referenced.
+static void generate_rps(kvz_config *cfg){
+  //We need one rps for every intermediate ref list, before the full cfg->ref_frames
+  //number of references.
+  cfg->num_rps = cfg->ref_frames + 1;
+  for( int i = 0; i < cfg->num_rps; i++){
+    kvz_rps_config *rps = &cfg->rps[i];
+
+    // Index to the ref prs is always the prev one
+    rps->delta_ridx = 1;
+
+    //first rps cannot use inter rps pred
+    if( i == 0 ){
+      rps->inter_rps_pred_flag = 0;
+      // Has no references; used for Intra-frames
+      rps->num_negative_pics = 0;
+      rps->num_positive_pics = 0;
+    } else {
+      // Use inter rps pred
+      rps->inter_rps_pred_flag = 1;
+      //Only have negative ref and as many as i
+      rps->num_negative_pics = i;
+      rps->num_positive_pics = 0;
+      rps->delta_rps = -1;
+      rps->num_ref_idc = i;
+      for( int j = 0; j < i; j++ ){ //Loop over ref rps idc
+        rps->ref_idc[j] = 1;
+      }
+    }
+  }
+}
+
+//Populates the rps structure as needed
+void kvz_generate_rps(kvz_config *cfg){
+  if( cfg->gop_len > 0){
+    generate_gop_rps(cfg);
+  } else {
+    generate_rps(cfg);
+  }
+
+}
+//*********************************************
+
 /**
  * \brief Check that configuration is sensible.
  *
@@ -1668,10 +1778,10 @@ int kvz_config_validate(const kvz_config *const cfg)
    //TODO: Relax constraints as more parameters become compatiple
   //Validity check for scalable extension
   if( cfg->shared != NULL && cfg->shared->max_layers > 1 ) {
-    if( cfg->gop_len > 0) {
+    /*if( cfg->gop_len > 0) {
       fprintf(stderr, "Input error: GoP is not currently supported with layers\n");
       error = 1;
-    }
+    }*/
     
     //if( (cfg->shared->owf > 1 || cfg->shared->owf < 0 || cfg->shared->threads > 0) && cfg->shared->wpp) {
     //  fprintf(stderr, "Input error: wpp not currently supported with layers when owf and threads are used\n");

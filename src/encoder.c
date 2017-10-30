@@ -271,54 +271,56 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
         kvz_config_process_lp_gop(&encoder->cfg);
       }
     }
-  encoder->max_inter_ref_lcu.right = 1;
-  encoder->max_inter_ref_lcu.down  = 1;
 
-  int max_threads = encoder->cfg.threads;
-  if (max_threads < 0) {
-    max_threads = cfg_num_threads();
-  }
-  max_threads = MAX(1, max_threads);
 
-  // Need to set owf before initializing threadqueue.
-  if (encoder->cfg.owf < 0) {
-    int best_parallelism = 0;
+    encoder->max_inter_ref_lcu.right = 1;
+    encoder->max_inter_ref_lcu.down  = 1;
 
-    for (encoder->cfg.owf = 0; true; encoder->cfg.owf++) {
-      int parallelism = get_max_parallelism(encoder);
+    int max_threads = encoder->cfg.threads;
+    if (max_threads < 0) {
+      max_threads = cfg_num_threads();
+    }
+    max_threads = MAX(1, max_threads);
 
-      if (parallelism <= best_parallelism) {
-        // No improvement over previous OWF.
-        encoder->cfg.owf--;
-        break;
+    // Need to set owf before initializing threadqueue.
+    if (encoder->cfg.owf < 0) {
+      int best_parallelism = 0;
+
+      for (encoder->cfg.owf = 0; true; encoder->cfg.owf++) {
+        int parallelism = get_max_parallelism(encoder);
+
+        if (parallelism <= best_parallelism) {
+          // No improvement over previous OWF.
+          encoder->cfg.owf--;
+          break;
+        }
+
+        best_parallelism = parallelism;
+        if (parallelism >= max_threads) {
+          // Cannot have more parallelism than there are threads.
+          break;
+        }
       }
 
-      best_parallelism = parallelism;
-      if (parallelism >= max_threads) {
-        // Cannot have more parallelism than there are threads.
-        break;
+      // Add two frames so that we have frames ready to be coded when one is
+      // completed.
+      encoder->cfg.owf += 2;
+
+      fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
+    }
+
+    if (encoder->cfg.threads < 0) {
+      encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
+      fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
+    }
+
+    if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+      // If using interlaced coding with OWF, the OWF has to be an even number
+      // to ensure that the pair of fields will be output for the same picture.
+      if (encoder->cfg.owf % 2 == 1) {
+        encoder->cfg.owf += 1;
       }
     }
-
-    // Add two frames so that we have frames ready to be coded when one is
-    // completed.
-    encoder->cfg.owf += 2;
-
-    fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
-  }
-
-  if (encoder->cfg.threads < 0) {
-    encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
-    fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
-  }
-
-  if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
-    // If using interlaced coding with OWF, the OWF has to be an even number
-    // to ensure that the pair of fields will be output for the same picture.
-    if (encoder->cfg.owf % 2 == 1) {
-      encoder->cfg.owf += 1;
-    }
-  }
 
 
     // ***********************************************
@@ -377,33 +379,33 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       goto init_failed;
     }
     
-  if (cfg->erp_aqp) {
-    init_erp_aqp_roi(encoder,
-                     cfg->roi.dqps,
-                     cfg->roi.width,
-                     cfg->roi.height);
+    if (cfg->erp_aqp) {
+      init_erp_aqp_roi(encoder,
+                       cfg->roi.dqps,
+                       cfg->roi.width,
+                       cfg->roi.height);
 
-  } else if (cfg->roi.dqps) {
-    // Copy delta QP array for ROI coding.
-    const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
-    encoder->cfg.roi.dqps = calloc(roi_size, sizeof(cfg->roi.dqps[0]));
-    memcpy(encoder->cfg.roi.dqps,
-           cfg->roi.dqps,
-           roi_size * sizeof(*cfg->roi.dqps));
+    } else if (cfg->roi.dqps) {
+      // Copy delta QP array for ROI coding.
+      const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
+      encoder->cfg.roi.dqps = calloc(roi_size, sizeof(cfg->roi.dqps[0]));
+      memcpy(encoder->cfg.roi.dqps,
+             cfg->roi.dqps,
+             roi_size * sizeof(*cfg->roi.dqps));
 
-  }
+    }
 
-  encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || encoder->cfg.roi.dqps;
+    encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || encoder->cfg.roi.dqps;
 
-  // When tr_depth_inter is equal to 0, inter transform split flag defaults
-  // to 1 for SMP and AMP partition units. We want to avoid the extra
-  // transform split so we set tr_depth_inter to 1 when SMP or AMP
-  // partition modes are enabled.
-  encoder->tr_depth_inter = (encoder->cfg.smp_enable || encoder->cfg.amp_enable) ? 1 : 0;
+    // When tr_depth_inter is equal to 0, inter transform split flag defaults
+    // to 1 for SMP and AMP partition units. We want to avoid the extra
+    // transform split so we set tr_depth_inter to 1 when SMP or AMP
+    // partition modes are enabled.
+    encoder->tr_depth_inter = (encoder->cfg.smp_enable || encoder->cfg.amp_enable) ? 1 : 0;
 
-  //Tiles
-  encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
-                          encoder->cfg.tiles_height_count > 1;
+    //Tiles
+    encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
+                            encoder->cfg.tiles_height_count > 1;
 
     {
       const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
@@ -677,10 +679,15 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->layer.input_layer = encoder->cfg.input_layer;
     encoder->layer.max_layers = cfg->shared->max_layers;
 
-    //Use ref pic sets if not using gop
-    encoder->layer.short_term_ref_pic_set_sps_flag = encoder->cfg.gop_len == 0 ? 1 : 0;//encoder->layer.max_layers > 1 ? 1 : 0;
-    encoder->layer.num_short_term_ref_pic_sets = encoder->layer.short_term_ref_pic_set_sps_flag ? encoder->cfg.ref_frames : 0;
+    //Use ref pic sets if scalability is used
+    encoder->layer.short_term_ref_pic_set_sps_flag = encoder->layer.max_layers > 1 ? 1 : 0;//encoder->cfg.gop_len == 0 ? 1 : 0;//
+    //encoder->layer.num_short_term_ref_pic_sets = encoder->layer.short_term_ref_pic_set_sps_flag ? encoder->cfg.ref_frames : 0;
     
+    //Generate rps
+    if( encoder->layer.short_term_ref_pic_set_sps_flag ){
+      kvz_generate_rps(&encoder->cfg);
+    }
+
     encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
     encoder->layer.list_modification_present_flag = (encoder->layer.layer_id > 0) && (encoder->cfg.ILR_frames > 0) && (encoder->cfg.intra_period != 1) ? 1 : 0;
     encoder->layer.sps_ext_or_max_sub_layers_minus1 = 7;

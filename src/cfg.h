@@ -39,4 +39,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value);
 void kvz_config_process_lp_gop(kvz_config *cfg);
 int kvz_config_validate(const kvz_config *cfg);
 
+//*********************************************
+  //For scalable extension.
+void kvz_generate_rps(kvz_config *cfg);
+//*********************************************
+
 #endif

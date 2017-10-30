@@ -154,7 +154,7 @@ typedef struct encoder_control_t
     uint8_t input_layer; //Index into the input image list used for this layer
     uint8_t max_layers; //Total number of layers
 
-    uint8_t num_short_term_ref_pic_sets; //how many ref pic sets are written
+    //uint8_t num_short_term_ref_pic_sets; //how many ref pic sets are written <depricated>
     uint8_t short_term_ref_pic_set_sps_flag; //If rps is given in sps
 
     uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
