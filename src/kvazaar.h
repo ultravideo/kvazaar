@@ -236,7 +236,7 @@ typedef struct kvz_rps_config {
   int8_t delta_ridx;
   uint8_t num_ref_idc;
   uint8_t ref_idc[17];
-  uint16_t delta_poc[16];
+  int16_t delta_poc[16];
   uint8_t is_used[16];
   uint8_t num_negative_pics;
   uint8_t num_positive_pics;

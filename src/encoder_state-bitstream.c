@@ -922,7 +922,7 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
     if (called_from_slice_header) {
       assert(rps_idx == encoder->cfg.num_rps);
 
-      int last_poc = 0;
+      //int last_poc = 0;
       int poc_shift = 0;
       
       for (int j = 0; j < rps->num_negative_pics; j++) {
@@ -950,12 +950,12 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
           } while (!found);
         }
 
-        rps->delta_poc[j] = encoder->cfg.gop_len ? delta_poc : 0;
+        rps->delta_poc[j] = encoder->cfg.gop_len ? -delta_poc : 0;
         rps->is_used[j] = !state->frame->is_irap;
         
-        last_poc = delta_poc;
+        //last_poc = delta_poc;
       }
-      last_poc = 0;
+      //last_poc = 0;
       poc_shift = 0;
       for (int j = 0; j < rps->num_positive_pics; j++) {
         int8_t delta_poc = 0;
@@ -985,7 +985,7 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
         rps->delta_poc[j+rps->num_negative_pics] = encoder->cfg.gop_len ? delta_poc : 0;
         rps->is_used[j+rps->num_negative_pics] = !state->frame->is_irap;
         
-        last_poc = delta_poc;
+        //last_poc = delta_poc;
       }
     }
 
