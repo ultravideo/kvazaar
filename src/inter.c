@@ -1017,14 +1017,9 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   if (is_cur_ref_long_term != is_col_ref_long_term) {
     return false;
   }
-
   
-
   mv_out[0] = colocated->inter.mv[col_list][0];
   mv_out[1] = colocated->inter.mv[col_list][1];
-
-  if (!is_cur_ref_long_term) {
-    apply_mv_scaling_pocs(
 
   if (!is_cur_ref_long_term) {
     apply_mv_scaling_pocs(
