@@ -1626,14 +1626,14 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
   
-  if (cfg->gop_len && (cfg->intra_period || cfg->shared->intra_period) && !cfg->gop_lowdelay &&
-     ( cfg->intra_period > 0 || cfg->shared->intra_period > 0 ) && cfg->max_temporal_layer > 1)
-  {
-    fprintf(stderr,
-            "Input error: intra period (%d > 0) not supported with temporal scalability\n",
-            cfg->intra_period);
-    error = 1;
-  }
+  //if (cfg->gop_len && (cfg->intra_period || cfg->shared->intra_period) && !cfg->gop_lowdelay &&
+  //   ( cfg->intra_period > 0 || cfg->shared->intra_period > 0 ) && cfg->max_temporal_layer > 1)
+  //{
+  //  fprintf(stderr,
+  //          "Input error: intra period (%d > 0) not supported with temporal scalability\n",
+  //          cfg->intra_period);
+  //  error = 1;
+  //}
 
   if ((cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) && cfg->layer == 0) {
     fprintf(stderr, "Input error: --ref out of range [1..%d]\n", MAX_REF_PIC_COUNT - 1);
