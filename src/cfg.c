@@ -1052,8 +1052,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       }
 
       cfg->max_temporal_layer = gop.t;
-      gop.g = (gop.t - 1) == 0 ? 1 : 2 << (gop.t - 1);
-      gop.t = gop.g;
+      gop.g = 1 << (gop.t - 1);
+      gop.t = MAX(1,gop.g);
 
       cfg->gop_lowdelay = true;
       cfg->gop_len = gop.g;

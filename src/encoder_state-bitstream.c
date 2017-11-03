@@ -413,8 +413,8 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
    WRITE_U(stream, state->encoder_control->layer.max_layers-1, 6, "vps_max_layers_minus1" );
   //*********************************************
 
-  WRITE_U(stream, MAX(1,state->encoder_control->cfg.max_temporal_layer-1), 3, "vps_max_sub_layers_minus1");
-  WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
+  WRITE_U(stream, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1), 3, "vps_max_sub_layers_minus1");
+  WRITE_U(stream, state->encoder_control->cfg.max_temporal_layer <= 1 ? 1 : 0 , 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
   encoder_state_write_bitstream_PTL(stream, state);
