@@ -125,6 +125,9 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->optional_key = NULL;
 
+  cfg->level = 62; // hevc level 6.2, the highest
+  cfg->force_level = true;
+
   return 1;
 }
 
@@ -1109,10 +1112,56 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     fclose(f);
   }
-  else if OPT("erp-aqp")
+  else if OPT("erp-aqp") {
     cfg->erp_aqp = (bool)atobool(value);
-  else
+  }
+  else if (OPT("level") || OPT("force-level")) {
+    if OPT("force-level") {
+      cfg->force_level = true;
+    } else {
+      cfg->force_level = false;
+    }
+
+    unsigned int num_first, num_second, level = 0;
+    int matched_amount = sscanf(value, "%u.%u", &num_first, &num_second);
+
+    if (matched_amount == 2) {
+      // of form x.y
+      level = num_first * 10 + num_second;
+    }
+    else if (matched_amount == 1) {
+      // no dot
+      if (num_first < 10) {
+        // of form x
+        level = num_first * 10;
+      }
+      else {
+        // of form xx
+        level = num_first;
+      }
+    }
+
+    // check if the level has a valid value
+    switch (level)
+    {
+    case 10:
+    case 20: case 21:
+    case 30: case 31:
+    case 40: case 41:
+    case 50: case 51: case 52:
+    case 60: case 61: case 62:
+      // a-ok
+      break;
+    default:
+      fprintf(stderr, "invalid level value: \"%s\"", value);
+      return 0;
+    }
+
+    cfg->level = level;
+  }
+  else {
     return 0;
+  }
 #undef OPT
 
   return 1;

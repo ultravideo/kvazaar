@@ -123,6 +123,7 @@ static const struct option long_options[] = {
   { "erp-aqp",                  no_argument, NULL, 0 },
   { "no-erp-aqp",               no_argument, NULL, 0 },
   { "level",              required_argument, NULL, 0 },
+  { "force-level",        required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -235,45 +236,6 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       goto done;
     } else if (!strcmp(name, "loop-input")) {
       opts->loop_input = true;
-    } else if (!strcmp(name, "level")) {
-      unsigned int num_first, num_second, level = 0;
-      int matched_amount = sscanf(optarg, "%u.%u", &num_first, &num_second);
-
-      if (matched_amount == 2) {
-        // of form x.y
-        level = num_first * 10 + num_second;
-      } else if (matched_amount == 1) {
-        // no dot
-        if (num_first < 10) {
-          // of form x
-          level = num_first * 10;
-        } else {
-          // of form xx
-          level = num_first;
-        }
-      }
-
-      // check if the level has a valid value
-      switch (level)
-      {
-      case 10:
-      case 20: case 21:
-      case 30: case 31:
-      case 40: case 41:
-      case 50: case 51: case 52:
-      case 60: case 61: case 62:
-        // a-ok
-        break;
-      default:
-        fprintf(stderr, "invalid level value: \"%s\"", optarg);
-        ok = 0;
-        goto done;
-      }
-
-      // DEBUG
-      fprintf(stderr, "lvl: %u", level);
-
-      opts->level = level;
     } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
