@@ -623,6 +623,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     costs[rdo_mode] += mode_cost;
   }
 
+  // Update order according to new costs
+  sort_modes(modes, costs, modes_to_check);
+
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
   // best mode.
