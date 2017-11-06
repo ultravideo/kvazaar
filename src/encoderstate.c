@@ -1045,22 +1045,18 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   } else {
     target_ref_num = encoder->cfg.ref_frames;
   }
-  //*********************************************
-  //For scalable extension.
-  //Check if an el layer is idr, need to remove normal refs
-  if( state->frame->is_irap ) {
-    target_ref_num = 0;
-  }
-  //Add space for irl to the list
-  target_ref_num += encoder->cfg.ILR_frames;
-  //*********************************************
-
+  
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL ||
       state->frame->pictype == KVZ_NAL_IDR_N_LP)
   {
     target_ref_num = 0;
   }
 
+  //*********************************************
+  //For scalable extension.
+  //Add space for irl to the list
+  target_ref_num += encoder->cfg.ILR_frames;
+  //*********************************************
 
   if (encoder->cfg.gop_len && target_ref_num > 0) {
     // With GOP in use, go through all the existing reference pictures and
@@ -1210,13 +1206,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       cfg->intra_period > 0 &&
       (state->frame->poc % cfg->intra_period) == 0;
   }
-
-  //*********************************************
-  //For scalable extension. TODO: Enable encoding el frames with intra based on intra period?
-  if( cfg->ILR_frames > 0 ){
-    state->frame->is_irap = true;
-  }
-  //*********************************************
+ 
   if (state->frame->is_irap) {
     state->frame->irap_poc = state->frame->poc;
   }
@@ -1241,14 +1231,19 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   encoder_state_remove_refs(state);
   kvz_encoder_create_ref_lists(state);
 
+  //*********************************************
+  //For scalable extension. TODO: Enable encoding el frames with intra based on intra period?
+  
   // Set slicetype.
-  if (state->frame->is_irap) {
+  if (state->frame->is_irap && state->encoder_control->layer.layer_id == 0) {
     state->frame->slicetype = KVZ_SLICE_I;
   } else if (state->frame->ref_LX_size[1] > 0) {
     state->frame->slicetype = KVZ_SLICE_B;
   } else {
     state->frame->slicetype = KVZ_SLICE_P;
   }
+  
+  //*********************************************
 
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
     normalize_lcu_weights(state);

@@ -57,8 +57,43 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
+//*******************************************
+//For scalability extension. TODO: merge with encoder_state_write_bitstream_PTL? Add asserts
+//Handle case when profilePresentFlag is not set
+static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
+  encoder_state_t * const state, const int max_num_sub_layers_minus1)
+{
+  // PTL
+  // Level 6.2 (general_level_idc is 30 * 6.2)
+  WRITE_U(stream, 186, 8, "general_level_idc");
+
+  for (size_t i = 0; i < max_num_sub_layers_minus1; i++) {
+    WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
+    WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
+  }
+
+  if (max_num_sub_layers_minus1 > 0) {
+    for (int i = 1; i < 8; i++) {
+      WRITE_U(stream, 0, 2, "reserved_zero_2bits");
+    }
+  }
+
+  //TODO: Implement properly if sub layer profiles are enabled
+  /*for (size_t i = 0; i < max_num_sub_layers_minus1; i++) {
+    if(sub_layer_profile_present_flag[i]){
+      //Stuff
+    }
+    if(sub_layer_level_idc[i]){
+      WRITE_U(stream, sub_layer_level_idc[i], 8, "sub_layer_level_idc[i]");
+    }
+  }*/
+
+  // end PTL
+}
+
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
-                                              encoder_state_t * const state)
+                                              encoder_state_t * const state,
+                                              const int max_num_sub_layers_minus1)
 {
   // PTL
   // Profile Tier
@@ -84,41 +119,24 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end Profile Tier
 
   // Level 6.2 (general_level_idc is 30 * 6.2)
-  WRITE_U(stream, 186, 8, "general_level_idc");
+  /*WRITE_U(stream, 186, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
 
   for (int i = 1; i < 8; i++) {
     WRITE_U(stream, 0, 2, "reserved_zero_2bits");
-  }
+  }*/
+
+  encoder_state_write_bitstream_PTL_no_profile(stream, state, max_num_sub_layers_minus1);
 
   // end PTL
 }
 
-//*******************************************
-//For scalability extension. TODO: merge with encoder_state_write_bitstream_PTL? Add asserts
-//Handle case when profilePresentFlag is not set
-static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
-  encoder_state_t * const state)
-{
-  // PTL
-  // Level 6.2 (general_level_idc is 30 * 6.2)
-  WRITE_U(stream, 186, 8, "general_level_idc");
-
-  WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
-  WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
-
-  for (int i = 1; i < 8; i++) {
-    WRITE_U(stream, 0, 2, "reserved_zero_2bits");
-  }
-
-  // end PTL
-}
 
 //TODO: Merger with other ptl / use profile function
 static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
-  encoder_state_t * const state)
+  encoder_state_t * const state, const int max_num_sub_layers_minus1)
 {
   // PTL
   // Profile Tier
@@ -161,14 +179,16 @@ static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
   // end Profile Tier
 
   // Level 6.2 (general_level_idc is 30 * 6.2)
-  WRITE_U(stream, 186, 8, "general_level_idc");
+  /*WRITE_U(stream, 186, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
 
   for (int i = 1; i < 8; i++) {
     WRITE_U(stream, 0, 2, "reserved_zero_2bits");
-  }
+  }*/
+
+  encoder_state_write_bitstream_PTL_no_profile(stream, state, max_num_sub_layers_minus1);
 
   // end PTL
 }
@@ -177,7 +197,7 @@ static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
 static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
                                                        encoder_state_t * const state)
 {
-  encoder_state_write_bitstream_PTL_no_profile(stream, state);
+  encoder_state_write_bitstream_PTL_no_profile(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
   
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
@@ -260,7 +280,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   // int i = vps_base_layer_internal_flag ? 2 : 1
   for (int i = 2; i <= vps_num_profile_tier_level_minus1; i++) {
     WRITE_U(stream, 1, 1, "vps_profile_present_flag[i]");
-    encoder_state_write_bitstream_PTL_scalable(stream, state);
+    encoder_state_write_bitstream_PTL_scalable(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
   }
   
   //TODO: Find out proper values? Set in config
@@ -410,19 +430,19 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
-   WRITE_U(stream, state->encoder_control->layer.max_layers-1, 6, "vps_max_layers_minus1" );
+   WRITE_U(stream, MAX(0, state->encoder_control->layer.max_layers-1), 6, "vps_max_layers_minus1" );
   //*********************************************
 
   WRITE_U(stream, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1), 3, "vps_max_sub_layers_minus1");
   WRITE_U(stream, state->encoder_control->cfg.max_temporal_layer <= 1 ? 1 : 0 , 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
-  encoder_state_write_bitstream_PTL(stream, state);
+  encoder_state_write_bitstream_PTL(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  for (int i = 0; i < 1; i++) {
+  for (int i = MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i <= MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i++) {
     //*********************************************
     //For scalable extension. TODO: Why was it previously 1?
     WRITE_UE(stream, state->encoder_control->cfg.ref_frames
@@ -1024,16 +1044,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //For scalability extension. TODO: add asserts.
   //TODO: set sps_max_sub_layers in cfg?
   if (state->encoder_control->layer.layer_id == 0) {
-    WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
+    WRITE_U(stream, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1), 3, "sps_max_sub_layers_minus1");
   } else {
     WRITE_U(stream, encoder->layer.sps_ext_or_max_sub_layers_minus1, 3, "sps_ext_or_max_sub_layers_minus1")
   }
   //TODO: Add sps_ext_of_max_sub_layers_minus1 to cfg?
   
-
   if (!encoder->layer.multi_layer_ext_sps_flag) {
-    WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
-    encoder_state_write_bitstream_PTL(stream, state);
+    WRITE_U(stream, state->encoder_control->cfg.max_temporal_layer <= 1 ? 1 : 0 , 1, "sps_temporal_id_nesting_flag");
+    encoder_state_write_bitstream_PTL(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
   }
 
   // ***********************************************
@@ -1088,15 +1107,18 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   if (!encoder->layer.multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
-    //for each layer. TODO: Do this for each temporal layer when added
-    if (encoder->cfg.gop_lowdelay) {
-      WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.ILR_frames, "sps_max_dec_pic_buffering");
-      WRITE_UE(stream, 0, "sps_num_reorder_pics");
-    } else {
-      WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len + encoder->cfg.ILR_frames, "sps_max_dec_pic_buffering");
-      WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    //for each layer. TODO: Do this properly for each temporal layer when added
+    for (size_t i = MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i <= MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i++) {
+      if (encoder->cfg.gop_lowdelay) {
+        WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.ILR_frames, "sps_max_dec_pic_buffering");
+        WRITE_UE(stream, 0, "sps_num_reorder_pics");
+      }
+      else {
+        WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len + encoder->cfg.ILR_frames, "sps_max_dec_pic_buffering");
+        WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+      }
+      WRITE_UE(stream, 0, "sps_max_latency_increase");
     }
-    WRITE_UE(stream, 0, "sps_max_latency_increase");
     //end for
   }
 
