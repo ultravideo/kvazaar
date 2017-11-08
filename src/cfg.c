@@ -125,7 +125,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->optional_key = NULL;
 
-  cfg->level = 62; // hevc level 6.2, the highest
+  cfg->level = 0; // default, hevc level 6.2 (the highest)
   cfg->force_level = true;
 
   return 1;
@@ -1128,31 +1128,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if (matched_amount == 2) {
       // of form x.y
       level = num_first * 10 + num_second;
-    }
-    else if (matched_amount == 1) {
+    } else if (matched_amount == 1) {
       // no dot
       if (num_first < 10) {
         // of form x
         level = num_first * 10;
-      }
-      else {
+      } else {
         // of form xx
         level = num_first;
       }
-    }
-
-    // check if the level has a valid value
-    switch (level)
-    {
-    case 10:
-    case 20: case 21:
-    case 30: case 31:
-    case 40: case 41:
-    case 50: case 51: case 52:
-    case 60: case 61: case 62:
-      // a-ok
-      break;
-    default:
+    } else {
       fprintf(stderr, "invalid level value: \"%s\"", value);
       return 0;
     }
@@ -1257,6 +1242,8 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   cfg->gop[gop.g - 1].is_ref = 1;
   cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
 }
+
+static int validate_hevc_level(const kvz_config *const cfg);
 
 /**
  * \brief Check that configuration is sensible.
@@ -1456,5 +1443,120 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if (validate_hevc_level(cfg)) {
+    // a level error found and it's not okay
+    error = 1;
+  }
+
   return !error;
+}
+
+static int validate_hevc_level(const kvz_config *const cfg) {
+  int level_error = 0;
+
+  const char* level_err_prefix;
+  if (cfg->force_level) {
+    level_err_prefix = "Level warning";
+  } else {
+    level_err_prefix = "Level error";
+  }
+
+  // we can't calculate input sample rate later if we don't have input frame rate
+  // also on the default case (when level is 0, otherwise same as 62) we don't want any annoying warning print
+  if (cfg->level != 0 && cfg->framerate_num == 0) {
+    fprintf(stderr, "%s: framerate is 0 (did you remember to use the --input-fps parameter?)\n", level_err_prefix);
+    level_error = 1;
+  }
+
+  // max luma sample rate
+  unsigned long max_lsr;
+  // max luma picture size
+  unsigned int max_lps;
+
+  // check if the level is valid
+  switch (cfg->level)
+  {
+  case 10:
+    max_lsr = 552'960;
+    max_lps = 36'864;
+    break;
+
+  case 20:
+    max_lsr = 3'686'400;
+    max_lps = 122'880;
+    break;
+  case 21:
+    max_lsr = 7'372'800;
+    max_lps = 245'760;
+    break;
+
+  case 30:
+    max_lsr = 16'588'800;
+    max_lps = 552'960;
+    break;
+  case 31:
+    max_lsr = 33'177'600;
+    max_lps = 983'040;
+    break;
+
+  case 40:
+    max_lsr = 66'846'720;
+    goto lps4;
+  case 41:
+    max_lsr = 133'693'440;
+  lps4: max_lps = 2'228'224;
+    break;
+
+  case 50:
+    max_lsr = 267'386'880;
+    goto lps5;
+  case 51:
+    max_lsr = 534'773'760;
+    goto lps5;
+  case 52:
+    max_lsr = 1'069'547'520;
+  lps5: max_lps = 8'912'896;
+    break;
+
+  case 60:
+    max_lsr = 1'069'547'520;
+    goto lps6;
+  case 61:
+    max_lsr = 2'139'095'040;
+    goto lps6;
+  case 62:
+  case 0:
+    max_lsr = 4'278'190'080;
+  lps6: max_lps = 35'651'584;
+    break;
+
+  default:
+    fprintf(stderr, "Input error: \"%i\" is an invalid level value", cfg->level);
+    return 1;
+  }
+
+  // check the conformance to the level limits
+  unsigned long cfg_samples = cfg->width * cfg->height;
+
+  double framerate = ((double)cfg->framerate_num) / ((double)cfg->framerate_denom);
+  unsigned long cfg_sample_rate = cfg_samples * (unsigned long) framerate; // rounding problem? TODO
+
+  if (cfg_samples > max_lps) {
+    fprintf(stderr, "%s: picture resolution of %ix%i is too big for this level (it has %ul samples, maximum is %ul samples)\n",
+      level_err_prefix, cfg->width, cfg->height, cfg_samples, max_lps);
+    level_error = 1;
+  }
+
+  if (cfg_sample_rate > max_lsr) {
+    fprintf(stderr, "%s: framerate of %g is too big for this level and picture resolution (it has a sample rate of %ul, the maximum sample rate is %ul)\n",
+      level_err_prefix, framerate, cfg_sample_rate, max_lsr);
+    level_error = 1;
+  }
+
+  if (cfg->force_level) {
+    // we just wanted to print warnings, and to check the level parameter's validity
+    return 0;
+  } else {
+    return level_error;
+  }
 }
