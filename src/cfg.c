@@ -36,7 +36,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->width           = 0;
   cfg->height          = 0;
   cfg->framerate       = 25; // deprecated and will be removed.
-  cfg->framerate_num   = 0;
+  cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
   cfg->intra_period    = 64;
@@ -125,8 +125,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->optional_key = NULL;
 
-  cfg->level = 0; // default, hevc level 6.2 (the highest)
-  cfg->force_level = true;
+  cfg->level = 62; // default hevc level, 6.2 (the highest)
+  cfg->force_level = true; // don't care about level limits by-default
 
   return 1;
 }
@@ -1461,21 +1461,13 @@ static int validate_hevc_level(const kvz_config *const cfg) {
     level_err_prefix = "Level error";
   }
 
-  // we can't calculate input sample rate later if we don't have input frame rate
-  // also on the default case (when level is 0, otherwise same as 62) we don't want any annoying warning print
-  if (cfg->level != 0 && cfg->framerate_num == 0) {
-    fprintf(stderr, "%s: framerate is 0 (did you remember to use the --input-fps parameter?)\n", level_err_prefix);
-    level_error = 1;
-  }
-
   // max luma sample rate
   unsigned long max_lsr;
   // max luma picture size
   unsigned int max_lps;
 
   // check if the level is valid
-  switch (cfg->level)
-  {
+  switch (cfg->level) {
   case 10:
     max_lsr = 552'960;
     max_lps = 36'864;
@@ -1525,13 +1517,12 @@ static int validate_hevc_level(const kvz_config *const cfg) {
     max_lsr = 2'139'095'040;
     goto lps6;
   case 62:
-  case 0:
     max_lsr = 4'278'190'080;
   lps6: max_lps = 35'651'584;
     break;
 
   default:
-    fprintf(stderr, "Input error: \"%i\" is an invalid level value", cfg->level);
+    fprintf(stderr, "Input error: %i is an invalid level value", cfg->level);
     return 1;
   }
 
@@ -1539,7 +1530,7 @@ static int validate_hevc_level(const kvz_config *const cfg) {
   unsigned long cfg_samples = cfg->width * cfg->height;
 
   double framerate = ((double)cfg->framerate_num) / ((double)cfg->framerate_denom);
-  unsigned long cfg_sample_rate = cfg_samples * (unsigned long) framerate; // rounding problem? TODO
+  unsigned long cfg_sample_rate = cfg_samples * (unsigned long) framerate;
 
   if (cfg_samples > max_lps) {
     fprintf(stderr, "%s: picture resolution of %ix%i is too big for this level (it has %ul samples, maximum is %ul samples)\n",
