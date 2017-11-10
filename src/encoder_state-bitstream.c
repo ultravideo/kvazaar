@@ -73,7 +73,7 @@ static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
   }
 
   if (max_num_sub_layers_minus1 > 0) {
-    for (int i = 1; i < 8; i++) {
+    for (int i = max_num_sub_layers_minus1; i < 8; i++) {
       WRITE_U(stream, 0, 2, "reserved_zero_2bits");
     }
   }
