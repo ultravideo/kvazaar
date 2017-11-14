@@ -217,7 +217,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     fprintf(stderr, "Config object must not be null!\n");
     goto init_failed;
   }
-
+  
   for (; cfg != NULL; cfg = cfg->next_cfg ) {
 
     // Make sure that the parameters make sense.
@@ -258,11 +258,22 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->cfg.input_heights = NULL;
     encoder->cfg.next_cfg = NULL;*/
 
-    //Move shared variables
-    encoder->cfg.wpp = cfg->shared->wpp;
-    encoder->cfg.threads = cfg->shared->threads;
-    encoder->cfg.owf = cfg->shared->owf;
-    encoder->cfg.intra_period = cfg->shared->intra_period;
+    if (cfg->shared != NULL) {
+      //Move shared variables
+      encoder->cfg.wpp = cfg->shared->wpp;
+      encoder->cfg.threads = cfg->shared->threads;
+      encoder->cfg.owf = cfg->shared->owf;
+      encoder->cfg.intra_period = cfg->shared->intra_period;
+
+      //Move gop
+      encoder->cfg.max_temporal_layer = cfg->shared->max_temporal_layer;
+      memcpy( encoder->cfg.gop, cfg->shared->gop, sizeof(cfg->shared->gop) );
+      encoder->cfg.gop_len = cfg->shared->gop_len;
+      encoder->cfg.gop_lowdelay = cfg->shared->gop_lowdelay;
+      memcpy(&encoder->cfg.gop_lp_definition, &cfg->shared->gop_lp_definition, sizeof(cfg->gop_lp_definition));
+    }
+
+    
     // ***********************************************
 
 

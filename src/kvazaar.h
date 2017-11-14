@@ -405,6 +405,16 @@ typedef struct kvz_config
     int32_t *input_widths;  
     int32_t *input_heights; 
     
+    //GOP needs to be shared (for now)
+    int8_t max_temporal_layer;
+    int8_t gop_len;
+    int8_t gop_lowdelay;
+    kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];
+    struct {
+      unsigned d;  // depth
+      unsigned t;  // temporal
+    } gop_lp_definition;
+
   } *shared;
 
   //*********************************************

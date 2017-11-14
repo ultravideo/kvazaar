@@ -311,21 +311,26 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   for (int i = 0; i < opts->num_inputs; i++) {
     //Automatically set layer size to match the respective input layer size
     kvz_config *cfg = opts->config;
-    if (opts->config->shared->input_widths[i] == 0 && opts->config->shared->input_heights[i] == 0) {
-      if(!select_input_res_auto(opts->input[i], &opts->config->shared->input_widths[i], &opts->config->shared->input_heights[i])) {
+    if (cfg->shared != NULL && cfg->shared->input_widths[i] == 0 && cfg->shared->input_heights[i] == 0) {
+      if(!select_input_res_auto(opts->input[i], &cfg->shared->input_widths[i], &cfg->shared->input_heights[i])) {
         fprintf(stderr, "Input error: No size found for input layer %d\n", i);
         ok = 0;
       }
+    } else if (cfg->width == 0 && cfg->height == 0) {
+      ok = select_input_res_auto(opts->input[i], &opts->config->width, &opts->config->height);
     }
+
     while( ok && cfg != NULL ) {
-      //Default input_layer to highest input layer
-      if( cfg->input_layer == -1 ) {
-        cfg->input_layer = cfg->shared->max_input_layers - 1;
-      }
-      // If layer width/height not set use selected input layers size
-      if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
-        cfg->width = cfg->shared->input_widths[i];
-        cfg->height = cfg->shared->input_heights[i];
+      if (cfg->shared != NULL) {
+        //Default input_layer to highest input layer
+        if (cfg->input_layer == -1) {
+          cfg->input_layer = cfg->shared->max_input_layers - 1;
+        }
+        // If layer width/height not set use selected input layers size
+        if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
+          cfg->width = cfg->shared->input_widths[i];
+          cfg->height = cfg->shared->input_heights[i];
+        }
       }
       cfg = cfg->next_cfg;
     }

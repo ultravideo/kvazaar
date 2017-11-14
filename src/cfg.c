@@ -164,6 +164,23 @@ static void shared_init(kvz_config *cfg)
   cfg->shared->max_input_layers = 0;
   cfg->shared->input_widths = calloc(1,sizeof(int32_t));
   cfg->shared->input_heights = calloc(1,sizeof(int32_t));
+
+  //Init gop
+  cfg->shared->max_temporal_layer = cfg->max_temporal_layer;
+  memcpy(cfg->shared->gop, cfg->gop, sizeof(cfg->gop));
+  cfg->shared->gop_len = cfg->gop_len;
+  cfg->shared->gop_lowdelay = cfg->gop_lowdelay;
+  memcpy(&cfg->shared->gop_lp_definition, &cfg->gop_lp_definition, sizeof(cfg->gop_lp_definition));
+}
+
+//Free allocated memory for the shared struct
+static void shared_destroy(kvz_config *cfg)
+{
+  FREE_POINTER(cfg->shared->input_widths);
+  FREE_POINTER(cfg->shared->input_heights);
+
+
+  FREE_POINTER(cfg->shared);
 }
 
 int kvz_config_destroy(kvz_config *cfg)
@@ -187,9 +204,7 @@ int kvz_config_destroy(kvz_config *cfg)
       //FREE_POINTER(cfg->max_input_layers);
       //FREE_POINTER(*cfg->input_widths);
       //FREE_POINTER(*cfg->input_heights);
-      FREE_POINTER(cfg->shared->input_widths);
-      FREE_POINTER(cfg->shared->input_heights);
-      FREE_POINTER(cfg->shared)
+      shared_destroy(cfg);
     }
     //*********************************************
   }
@@ -1023,11 +1038,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         return 0;
       }
 
-      cfg->gop_lowdelay = true;
-      cfg->gop_len = gop.g;
-      cfg->gop_lp_definition.d = gop.d;
-      cfg->gop_lp_definition.t = gop.t;
+      //*********************************************
+      //For scalable extension.
+      // Update shared
+      cfg->shared->gop_lowdelay = cfg->gop_lowdelay = true;
+      cfg->shared->gop_len = cfg->gop_len = gop.g;
+      cfg->shared->gop_lp_definition.d = cfg->gop_lp_definition.d = gop.d;
+      cfg->shared->gop_lp_definition.t = cfg->gop_lp_definition.t = gop.t;
 
+      //*********************************************
+      
     } else if (!strncmp(value, "lpt-", 4)){ //Handle temporal version of lp-gop
       struct {
         unsigned g;  // length
@@ -1055,10 +1075,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       gop.g = 1 << (gop.t - 1);
       gop.t = MAX(1,gop.g);
 
-      cfg->gop_lowdelay = true;
-      cfg->gop_len = gop.g;
-      cfg->gop_lp_definition.d = gop.d;
-      cfg->gop_lp_definition.t = gop.t;
+      //*********************************************
+      //For scalable extension.
+      // Update shared
+      cfg->shared->max_temporal_layer = cfg->max_temporal_layer;
+      cfg->shared->gop_lowdelay = cfg->gop_lowdelay = true;
+      cfg->shared->gop_len = cfg->gop_len = gop.g;
+      cfg->shared->gop_lp_definition.d = cfg->gop_lp_definition.d = gop.d;
+      cfg->shared->gop_lp_definition.t = cfg->gop_lp_definition.t = gop.t;
+
+      //*********************************************
 
     } else if (atoi(value) == 8 || strcmp(value, "t8") == 0) {
       bool use_temporal = strcmp(value, "t8") == 0;
@@ -1114,12 +1140,26 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         }
       }
 
+      //*********************************************
+      //For scalable extension.
+      // Update shared
+      cfg->shared->gop_len = cfg->gop_len;
+      cfg->shared->gop_lowdelay = cfg->gop_lowdelay;
+      cfg->shared->max_temporal_layer = cfg->max_temporal_layer;
+      memcpy(cfg->shared->gop, cfg->gop, sizeof(cfg->gop));
+      //*********************************************
+
     } else if (atoi(value) == 0) {
+      //*********************************************
+      //For scalable extension.
+      // Update shared
       //Disable gop
-      cfg->gop_len = 0;
-      cfg->gop_lowdelay = 0;
-      cfg->gop_lp_definition.d = 1;
-      cfg->gop_lp_definition.t = 1;
+      cfg->shared->gop_len = cfg->gop_len = 0;
+      cfg->shared->gop_lowdelay = cfg->gop_lowdelay = 0;
+      cfg->shared->gop_lp_definition.d = cfg->gop_lp_definition.d = 1;
+      cfg->shared->gop_lp_definition.t = cfg->gop_lp_definition.t = 1;
+      //*********************************************
+      
     } else if (atoi(value)) {
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
@@ -1616,8 +1656,10 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   //*********************************************
   //For scalable extension.
-  if (cfg->gop_len && (cfg->intra_period || cfg->shared->intra_period) && !cfg->gop_lowdelay &&
-     ( cfg->intra_period % cfg->gop_len != 0 || cfg->shared->intra_period % cfg->gop_len != 0 ))
+  if (cfg->shared == NULL && (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay && cfg->intra_period % cfg->gop_len != 0 ) ||
+      cfg->shared != NULL && (cfg->shared->gop_len && cfg->shared->intra_period && !cfg->shared->gop_lowdelay &&
+                              cfg->shared->intra_period % cfg->shared->gop_len != 0)
+     )
   {
     fprintf(stderr,
             "Input error: intra period (%d) not a multiple of B-gop length (%d)\n",
@@ -1672,7 +1714,7 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   //*********************************************
   //For scalable extension.
-  if (cfg->shared->owf < -1) {
+  if (cfg->shared == NULL && cfg->owf < -1 || cfg->shared != NULL && cfg->shared->owf < -1) {
     fprintf(stderr, "Input error: --owf must be nonnegative or -1\n");
     error = 1;
   }
@@ -1765,7 +1807,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   }
 //*********************************************
   //For scalable extension.
-  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->shared->wpp) {
+  if ((cfg->slices & KVZ_SLICES_WPP) && (cfg->shared == NULL && !cfg->wpp || cfg->shared != NULL && !cfg->shared->wpp)) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
     error = 1;
   }
