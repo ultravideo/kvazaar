@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 
 kvz_config *kvz_config_alloc(void)
@@ -1527,17 +1528,37 @@ static int validate_hevc_level(const kvz_config *const cfg) {
   }
 
   // check the conformance to the level limits
+
+  // luma samples
   unsigned long cfg_samples = cfg->width * cfg->height;
 
+  // luma sample rate
   double framerate = ((double)cfg->framerate_num) / ((double)cfg->framerate_denom);
   unsigned long cfg_sample_rate = cfg_samples * (unsigned long) framerate;
 
+  // square of the maximum allowed dimension
+  unsigned int max_dimension_squared = 8 * max_lps;
+
+  // check maximum dimensions
+  if (cfg->width * cfg->width > max_dimension_squared) {
+    unsigned int max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture width of %i is too large for this level, maximum is %i\n", level_err_prefix, cfg->width, max_dim);
+    level_error = 1;
+  }
+  if (cfg->height * cfg->height > max_dimension_squared) {
+    unsigned int max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture height of %i is too large for this level, maximum is %i\n", level_err_prefix, cfg->height, max_dim);
+    level_error = 1;
+  }
+
+  // check luma picture size
   if (cfg_samples > max_lps) {
     fprintf(stderr, "%s: picture resolution of %ix%i is too big for this level (it has %ul samples, maximum is %ul samples)\n",
       level_err_prefix, cfg->width, cfg->height, cfg_samples, max_lps);
     level_error = 1;
   }
 
+  // check luma sample rate
   if (cfg_sample_rate > max_lsr) {
     fprintf(stderr, "%s: framerate of %g is too big for this level and picture resolution (it has a sample rate of %ul, the maximum sample rate is %ul)\n",
       level_err_prefix, framerate, cfg_sample_rate, max_lsr);
