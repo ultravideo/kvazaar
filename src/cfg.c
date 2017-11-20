@@ -1453,8 +1453,29 @@ int kvz_config_validate(const kvz_config *const cfg)
 }
 
 static int validate_hevc_level(const kvz_config *const cfg) {
-  int level_error = 0;
+  static const struct { uint32_t lsr; uint32_t lps; } LEVEL_CONSTRAINTS[13] = {
+    { 552'960, 36'864 }, // 1
 
+    { 3'686'400, 122'880 }, // 2
+    { 7'372'800, 245'760 }, // 2.1
+
+    { 16'588'800, 552'960 }, // 3
+    { 33'177'600, 983'040 }, // 3.1
+
+    { 66'846'720, 2'228'224 },  // 4
+    { 133'693'440, 2'228'224 }, // 4.1
+
+    { 267'386'880, 8'912'896 },   // 5
+    { 534'773'760, 8'912'896 },   // 5.1
+    { 1'069'547'520, 8'912'896 }, // 5.2
+
+    { 1'069'547'520, 35'651'584 }, // 6
+    { 2'139'095'040, 35'651'584 }, // 6.1
+    { 4'278'190'080, 35'651'584 }, // 6.2
+  };
+
+  int level_error = 0;
+  
   const char* level_err_prefix;
   if (cfg->force_level) {
     level_err_prefix = "Level warning";
@@ -1462,64 +1483,48 @@ static int validate_hevc_level(const kvz_config *const cfg) {
     level_err_prefix = "Level error";
   }
 
-  // max luma sample rate
-  unsigned long max_lsr;
-  // max luma picture size
-  unsigned int max_lps;
+  char lvl_idx;
 
-  // check if the level is valid
+  // check if the level is valid and get it's lsr and lps values
   switch (cfg->level) {
   case 10:
-    max_lsr = 552'960;
-    max_lps = 36'864;
+    lvl_idx = 0;
     break;
-
   case 20:
-    max_lsr = 3'686'400;
-    max_lps = 122'880;
+    lvl_idx = 1;
     break;
   case 21:
-    max_lsr = 7'372'800;
-    max_lps = 245'760;
+    lvl_idx = 2;
     break;
-
   case 30:
-    max_lsr = 16'588'800;
-    max_lps = 552'960;
+    lvl_idx = 3;
     break;
   case 31:
-    max_lsr = 33'177'600;
-    max_lps = 983'040;
+    lvl_idx = 4;
     break;
-
   case 40:
-    max_lsr = 66'846'720;
-    goto lps4;
+    lvl_idx = 5;
+    break;
   case 41:
-    max_lsr = 133'693'440;
-  lps4: max_lps = 2'228'224;
+    lvl_idx = 6;
     break;
-
   case 50:
-    max_lsr = 267'386'880;
-    goto lps5;
-  case 51:
-    max_lsr = 534'773'760;
-    goto lps5;
-  case 52:
-    max_lsr = 1'069'547'520;
-  lps5: max_lps = 8'912'896;
+    lvl_idx = 7;
     break;
-
+  case 51:
+    lvl_idx = 8;
+    break;
+  case 52:
+    lvl_idx = 9;
+    break;
   case 60:
-    max_lsr = 1'069'547'520;
-    goto lps6;
+    lvl_idx = 10;
+    break;
   case 61:
-    max_lsr = 2'139'095'040;
-    goto lps6;
+    lvl_idx = 11;
+    break;
   case 62:
-    max_lsr = 4'278'190'080;
-  lps6: max_lps = 35'651'584;
+    lvl_idx = 12;
     break;
 
   default:
@@ -1527,41 +1532,52 @@ static int validate_hevc_level(const kvz_config *const cfg) {
     return 1;
   }
 
+  // max luma sample rate
+  uint32_t max_lsr = LEVEL_CONSTRAINTS[lvl_idx].lsr;
+
+  // max luma picture size
+  uint32_t max_lps = LEVEL_CONSTRAINTS[lvl_idx].lps;
+
   // check the conformance to the level limits
 
   // luma samples
-  unsigned long cfg_samples = cfg->width * cfg->height;
+  uint64_t cfg_samples = cfg->width * cfg->height;
 
   // luma sample rate
   double framerate = ((double)cfg->framerate_num) / ((double)cfg->framerate_denom);
-  unsigned long cfg_sample_rate = cfg_samples * (unsigned long) framerate;
+  uint64_t cfg_sample_rate = cfg_samples * (uint64_t) framerate;
 
   // square of the maximum allowed dimension
-  unsigned int max_dimension_squared = 8 * max_lps;
+  uint32_t max_dimension_squared = 8 * max_lps;
+
+  // for nicer error print
+  float lvl = ((float)cfg->level) / 10.0f;
 
   // check maximum dimensions
   if (cfg->width * cfg->width > max_dimension_squared) {
-    unsigned int max_dim = sqrtf(max_dimension_squared);
-    fprintf(stderr, "%s: picture width of %i is too large for this level, maximum is %i\n", level_err_prefix, cfg->width, max_dim);
+    uint32_t max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture width of %i is too large for this level (%g), maximum dimension is %i\n",
+      level_err_prefix, cfg->width, lvl, max_dim);
     level_error = 1;
   }
   if (cfg->height * cfg->height > max_dimension_squared) {
-    unsigned int max_dim = sqrtf(max_dimension_squared);
-    fprintf(stderr, "%s: picture height of %i is too large for this level, maximum is %i\n", level_err_prefix, cfg->height, max_dim);
+    uint32_t max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture height of %i is too large for this level (%g), maximum dimension is %i\n",
+      level_err_prefix, cfg->height, lvl, max_dim);
     level_error = 1;
   }
 
   // check luma picture size
   if (cfg_samples > max_lps) {
-    fprintf(stderr, "%s: picture resolution of %ix%i is too big for this level (it has %ul samples, maximum is %ul samples)\n",
-      level_err_prefix, cfg->width, cfg->height, cfg_samples, max_lps);
+    fprintf(stderr, "%s: picture resolution of %ix%i is too large for this level (%g) (it has %u samples, maximum is %u samples)\n",
+      level_err_prefix, cfg->width, cfg->height, lvl, cfg_samples, max_lps);
     level_error = 1;
   }
 
   // check luma sample rate
   if (cfg_sample_rate > max_lsr) {
-    fprintf(stderr, "%s: framerate of %g is too big for this level and picture resolution (it has a sample rate of %ul, the maximum sample rate is %ul)\n",
-      level_err_prefix, framerate, cfg_sample_rate, max_lsr);
+    fprintf(stderr, "%s: framerate of %g is too big for this level (%g) and picture resolution (it has the sample rate of %u, maximum is %u\n",
+      level_err_prefix, framerate, lvl, cfg_sample_rate, max_lsr);
     level_error = 1;
   }
 
