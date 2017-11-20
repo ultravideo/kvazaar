@@ -356,6 +356,8 @@ typedef struct kvz_config
   uint8_t level;
   /** \brief Whether we ignore and just warn from all of the errors about the output not conforming to the level's requirements. */
   uint8_t force_level;
+  /** \brief Whether we use the high tier bitrates. Requires the level to be 4 or higher. */
+  uint8_t high_tier;
 } kvz_config;
 
 /**

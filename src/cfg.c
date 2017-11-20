@@ -128,6 +128,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->level = 62; // default hevc level, 6.2 (the highest)
   cfg->force_level = true; // don't care about level limits by-default
+  cfg->high_tier = false;
 
   return 1;
 }
@@ -1123,7 +1124,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->force_level = false;
     }
 
-    unsigned int num_first, num_second, level = 0;
+    unsigned int num_first, num_second, level;
     int matched_amount = sscanf(value, "%u.%u", &num_first, &num_second);
 
     if (matched_amount == 2) {
@@ -1139,11 +1140,18 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         level = num_first;
       }
     } else {
-      fprintf(stderr, "invalid level value: \"%s\"", value);
+      fprintf(stderr, "Invalid level value: \"%s\"\n", value);
+      return 0;
+    }
+    if (level < 10 || level > 62) {
+      fprintf(stderr, "Level value of %s is out of bounds\n", value);
       return 0;
     }
 
     cfg->level = level;
+  }
+  else if (OPT("high-tier")) {
+    cfg->high_tier = true;
   }
   else {
     return 0;
@@ -1453,25 +1461,30 @@ int kvz_config_validate(const kvz_config *const cfg)
 }
 
 static int validate_hevc_level(const kvz_config *const cfg) {
-  static const struct { uint32_t lsr; uint32_t lps; } LEVEL_CONSTRAINTS[13] = {
-    { 552'960, 36'864 }, // 1
+  static const struct { uint32_t lsr; uint32_t lps; uint32_t main_bitrate; } LEVEL_CONSTRAINTS[13] = {
+    { 552'960, 36'864, 128 }, // 1
 
-    { 3'686'400, 122'880 }, // 2
-    { 7'372'800, 245'760 }, // 2.1
+    { 3'686'400, 122'880, 1500 }, // 2
+    { 7'372'800, 245'760, 3000 }, // 2.1
 
-    { 16'588'800, 552'960 }, // 3
-    { 33'177'600, 983'040 }, // 3.1
+    { 16'588'800, 552'960, 6000 },   // 3
+    { 33'177'600, 983'040, 10'000 }, // 3.1
 
-    { 66'846'720, 2'228'224 },  // 4
-    { 133'693'440, 2'228'224 }, // 4.1
+    { 66'846'720, 2'228'224, 12'000 },  // 4
+    { 133'693'440, 2'228'224, 20'000 }, // 4.1
 
-    { 267'386'880, 8'912'896 },   // 5
-    { 534'773'760, 8'912'896 },   // 5.1
-    { 1'069'547'520, 8'912'896 }, // 5.2
+    { 267'386'880, 8'912'896, 25'000 },   // 5
+    { 534'773'760, 8'912'896, 40'000 },   // 5.1
+    { 1'069'547'520, 8'912'896, 60'000 }, // 5.2
 
-    { 1'069'547'520, 35'651'584 }, // 6
-    { 2'139'095'040, 35'651'584 }, // 6.1
-    { 4'278'190'080, 35'651'584 }, // 6.2
+    { 1'069'547'520, 35'651'584, 60'000 },  // 6
+    { 2'139'095'040, 35'651'584, 120'000 }, // 6.1
+    { 4'278'190'080, 35'651'584, 240'000 }, // 6.2
+  };
+
+  // bit rates for the high-tiers of the levels from 4 to 6.2
+  static const uint32_t HIGH_TIER_BITRATES[8] = {
+    30'000, 50'000, 100'000, 160'000, 240'000, 240'000, 480'000, 800'000
   };
 
   int level_error = 0;
@@ -1484,6 +1497,9 @@ static int validate_hevc_level(const kvz_config *const cfg) {
   }
 
   char lvl_idx;
+
+  // for nicer error print
+  float lvl = ((float)cfg->level) / 10.0f;
 
   // check if the level is valid and get it's lsr and lps values
   switch (cfg->level) {
@@ -1528,7 +1544,12 @@ static int validate_hevc_level(const kvz_config *const cfg) {
     break;
 
   default:
-    fprintf(stderr, "Input error: %i is an invalid level value", cfg->level);
+    fprintf(stderr, "Input error: %g is an invalid level value\n", lvl);
+    return 1;
+  }
+
+  if (cfg->high_tier && cfg->level < 40) {
+    fprintf(stderr, "Input error: high tier requires at least level 4\n");
     return 1;
   }
 
@@ -1537,6 +1558,20 @@ static int validate_hevc_level(const kvz_config *const cfg) {
 
   // max luma picture size
   uint32_t max_lps = LEVEL_CONSTRAINTS[lvl_idx].lps;
+
+  // max bitrate
+  uint32_t max_bitrate;
+  if (cfg->high_tier) {
+    max_bitrate = HIGH_TIER_BITRATES[lvl_idx - 5] * 1000;
+  } else {
+    max_bitrate = LEVEL_CONSTRAINTS[lvl_idx].main_bitrate * 1000;
+  }
+
+  if (cfg->target_bitrate > max_bitrate) {
+    fprintf(stderr, "%s: target bitrate exceeds %i, which is the maximum %s tier level %g bitrate\n",
+      level_err_prefix, max_bitrate, cfg->high_tier?"high":"main", lvl);
+    level_error = 1;
+  }
 
   // check the conformance to the level limits
 
@@ -1549,9 +1584,6 @@ static int validate_hevc_level(const kvz_config *const cfg) {
 
   // square of the maximum allowed dimension
   uint32_t max_dimension_squared = 8 * max_lps;
-
-  // for nicer error print
-  float lvl = ((float)cfg->level) / 10.0f;
 
   // check maximum dimensions
   if (cfg->width * cfg->width > max_dimension_squared) {
@@ -1569,14 +1601,14 @@ static int validate_hevc_level(const kvz_config *const cfg) {
 
   // check luma picture size
   if (cfg_samples > max_lps) {
-    fprintf(stderr, "%s: picture resolution of %ix%i is too large for this level (%g) (it has %u samples, maximum is %u samples)\n",
+    fprintf(stderr, "%s: picture resolution of %ix%i is too large for this level (%g) (it has %llu samples, maximum is %u samples)\n",
       level_err_prefix, cfg->width, cfg->height, lvl, cfg_samples, max_lps);
     level_error = 1;
   }
 
   // check luma sample rate
   if (cfg_sample_rate > max_lsr) {
-    fprintf(stderr, "%s: framerate of %g is too big for this level (%g) and picture resolution (it has the sample rate of %u, maximum is %u\n",
+    fprintf(stderr, "%s: framerate of %g is too big for this level (%g) and picture resolution (it has the sample rate of %llu, maximum is %u\n",
       level_err_prefix, framerate, lvl, cfg_sample_rate, max_lsr);
     level_error = 1;
   }

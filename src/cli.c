@@ -124,6 +124,7 @@ static const struct option long_options[] = {
   { "no-erp-aqp",               no_argument, NULL, 0 },
   { "level",              required_argument, NULL, 0 },
   { "force-level",        required_argument, NULL, 0 },
+  { "high-tier",                no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
