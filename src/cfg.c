@@ -1252,7 +1252,8 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
 }
 
-static int validate_hevc_level(const kvz_config *const cfg);
+// forward declaration
+static int validate_hevc_level(kvz_config *const cfg);
 
 /**
  * \brief Check that configuration is sensible.
@@ -1460,7 +1461,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   return !error;
 }
 
-static int validate_hevc_level(const kvz_config *const cfg) {
+static int validate_hevc_level(kvz_config *const cfg) {
   static const struct { uint32_t lsr; uint32_t lps; uint32_t main_bitrate; } LEVEL_CONSTRAINTS[13] = {
     { 552'960, 36'864, 128 }, // 1
 
@@ -1559,17 +1560,15 @@ static int validate_hevc_level(const kvz_config *const cfg) {
   // max luma picture size
   uint32_t max_lps = LEVEL_CONSTRAINTS[lvl_idx].lps;
 
-  // max bitrate
-  uint32_t max_bitrate;
   if (cfg->high_tier) {
-    max_bitrate = HIGH_TIER_BITRATES[lvl_idx - 5] * 1000;
+    cfg->max_bitrate = HIGH_TIER_BITRATES[lvl_idx - 5] * 1000;
   } else {
-    max_bitrate = LEVEL_CONSTRAINTS[lvl_idx].main_bitrate * 1000;
+    cfg->max_bitrate = LEVEL_CONSTRAINTS[lvl_idx].main_bitrate * 1000;
   }
 
-  if (cfg->target_bitrate > max_bitrate) {
+  if (cfg->target_bitrate > cfg->max_bitrate) {
     fprintf(stderr, "%s: target bitrate exceeds %i, which is the maximum %s tier level %g bitrate\n",
-      level_err_prefix, max_bitrate, cfg->high_tier?"high":"main", lvl);
+      level_err_prefix, cfg->max_bitrate, cfg->high_tier?"high":"main", lvl);
     level_error = 1;
   }
 
@@ -1614,7 +1613,7 @@ static int validate_hevc_level(const kvz_config *const cfg) {
   }
 
   if (cfg->force_level) {
-    // we just wanted to print warnings, and to check the level parameter's validity
+    // we wanted to print warnings, not get errors
     return 0;
   } else {
     return level_error;

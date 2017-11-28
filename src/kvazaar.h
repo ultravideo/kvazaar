@@ -358,6 +358,8 @@ typedef struct kvz_config
   uint8_t force_level;
   /** \brief Whether we use the high tier bitrates. Requires the level to be 4 or higher. */
   uint8_t high_tier;
+  /** \brief The maximum allowed bitrate for this level and tier. */
+  uint32_t max_bitrate;
 } kvz_config;
 
 /**

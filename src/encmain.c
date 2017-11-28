@@ -431,6 +431,12 @@ int main(int argc, char *argv[])
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
+    // how many bits have been written this second? used for checking if framerate exceeds level's limits
+    uint64_t bits_this_second = 0;
+    // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
+    float frames_this_second = 0;
+    float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
+
     uint8_t padding_x = get_padding(opts->config->width);
     uint8_t padding_y = get_padding(opts->config->height);
 
@@ -527,6 +533,18 @@ int main(int argc, char *argv[])
         fflush(output);
 
         bitstream_length += len_out;
+        
+        // the level's bitrate check
+        bits_this_second += len_out;
+        frames_this_second += 1.0f;
+
+        if (frames_this_second >= framerate) {
+          if (bits_this_second > encoder->cfg.max_bitrate) {
+            fprintf(stderr, "Level warning: This second's bitrate (%llu) reached the maximum bitrate (%u) of %s tier level %g.",
+              bits_this_second, encoder->cfg.max_bitrate, encoder->cfg.high_tier?"high":"main", ((float)encoder->cfg.level) / 10.0f);
+          }
+          frames_this_second -= framerate;
+        }
 
         // Compute and print stats.
 
