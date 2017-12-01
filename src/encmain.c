@@ -434,8 +434,8 @@ int main(int argc, char *argv[])
     // how many bits have been written this second? used for checking if framerate exceeds level's limits
     uint64_t bits_this_second = 0;
     // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
-    float frames_this_second = 0;
-    float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
+    unsigned frames_this_second = 0;
+    const float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
 
     uint8_t padding_x = get_padding(opts->config->width);
     uint8_t padding_y = get_padding(opts->config->height);
@@ -535,15 +535,36 @@ int main(int argc, char *argv[])
         bitstream_length += len_out;
         
         // the level's bitrate check
-        bits_this_second += len_out;
-        frames_this_second += 1.0f;
+        frames_this_second += 1;
 
-        if (frames_this_second >= framerate) {
+        if ((float)frames_this_second >= framerate) {
+          // if framerate <= 1 then we go here always
+
+          // how much of the bits of the last frame belonged to the next second
+          uint64_t leftover_bits = (uint64_t)((double)len_out * ((double)frames_this_second - framerate));
+
+          // the latest frame is counted for the amount that it contributed to this current second
+          bits_this_second += len_out - leftover_bits;
+
           if (bits_this_second > encoder->cfg.max_bitrate) {
-            fprintf(stderr, "Level warning: This second's bitrate (%llu) reached the maximum bitrate (%u) of %s tier level %g.",
-              bits_this_second, encoder->cfg.max_bitrate, encoder->cfg.high_tier?"high":"main", ((float)encoder->cfg.level) / 10.0f);
+            fprintf(stderr, "Level warning: This %s's bitrate (%llu bits/s) reached the maximum bitrate (%u bits/s) of %s tier level %g.",
+              framerate >= 1.0f ? "second" : "frame",
+              bits_this_second,
+              encoder->cfg.max_bitrate,
+              encoder->cfg.high_tier ? "high" : "main",
+              (float)encoder->cfg.level / 10.0f );
           }
-          frames_this_second -= framerate;
+
+          if (framerate > 1.0f) {
+            // leftovers for the next second
+            bits_this_second = leftover_bits;
+          } else {
+            // one or more next seconds are from this frame and their bitrate is the same or less as this frame's
+            bits_this_second = 0;
+          }
+          frames_this_second = 0;
+        } else {
+          bits_this_second += len_out;
         }
 
         // Compute and print stats.
