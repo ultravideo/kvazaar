@@ -18,6 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "global.h"
 #include "threadqueue.h"
 
 #include <errno.h> // ETIMEDOUT
@@ -26,7 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "global.h"
 #include "threads.h"
 
 
