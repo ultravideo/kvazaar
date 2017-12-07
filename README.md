@@ -104,12 +104,15 @@ Video structure:
                                equirectangular projection
       --level <number>       : Use the given HEVC level in the output and give
                                an error if the input doesn't fit to it's
-                               limits. [6.2]
+                               limits [6.2]
                                    Allowed values are 1, 2, 2.1, 3, 3.1, 4, 4.1
                                    5, 5.1, 5.2, 6, 6.1 and 6.2. The dot is
                                    optional.
       --force-level <number> : Same as --level, except instead of errors you
-                               get warnings.
+                               get warnings
+      --high-tier            : Used with --level. Tells the encoder to use
+                               high-tier bitrate limits instead of the
+                               main-tier limits during encoding.
 
 Compression tools:
       --deblock [<beta:tc>]  : Deblocking
@@ -173,14 +176,15 @@ Parallel processing:
       --tiles <int>x<int>    : Split picture into width x height uniform tiles.
       --tiles-width-split <string>|u<int> :
                                Specifies a comma separated list of pixel
-                               positions of tiles columns separation coordinates.
-                               Can also be u followed by and a single int n,
-                               in which case it produces columns of uniform width.
+                               positions of tiles columns separation
+                               coordinates.
+                               Can also be u, followed by a single int n, in
+                               which case it produces columns of uniform width.
       --tiles-height-split <string>|u<int> :
                                Specifies a comma separated list of pixel
                                positions of tiles rows separation coordinates.
-                               Can also be u followed by and a single int n,
-                               in which case it produces rows of uniform height.
+                               Can also be u followed by and a single int n, in
+                               which case it produces rows of uniform height.
       --slices <string>      : Control how slices are used
                                    - tiles: put tiles in independent slices
                                    - wpp: put rows in dependent slices
