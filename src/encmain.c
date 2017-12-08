@@ -551,7 +551,7 @@ int main(int argc, char *argv[])
           if (bits_this_second > encoder->cfg.max_bitrate) {
             fprintf(stderr, "Level warning: This %s's bitrate (%llu bits/s) reached the maximum bitrate (%u bits/s) of %s tier level %g.",
               framerate >= 1.0f ? "second" : "frame",
-              bits_this_second,
+              (unsigned long long) bits_this_second,
               encoder->cfg.max_bitrate,
               encoder->cfg.high_tier ? "high" : "main",
               (float)encoder->cfg.level / 10.0f );
