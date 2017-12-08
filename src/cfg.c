@@ -1468,14 +1468,14 @@ static int validate_hevc_level(kvz_config *const cfg) {
     { 3686400, 122880, 1500 }, // 2
     { 7372800, 245760, 3000 }, // 2.1
 
-    { 16588800, 552960, 6000 },   // 3
+    { 16588800, 552960, 6000 },  // 3
     { 33177600, 983040, 10000 }, // 3.1
 
     { 66846720, 2228224, 12000 },  // 4
     { 133693440, 2228224, 20000 }, // 4.1
 
-    { 267386880, 8912896, 25000 },   // 5
-    { 534773760, 8912896, 40000 },   // 5.1
+    { 267386880, 8912896, 25000 },  // 5
+    { 534773760, 8912896, 40000 },  // 5.1
     { 1069547520, 8912896, 60000 }, // 5.2
 
     { 1069547520, 35651584, 60000 },  // 6
@@ -1497,7 +1497,7 @@ static int validate_hevc_level(kvz_config *const cfg) {
     level_err_prefix = "Level error";
   }
 
-  char lvl_idx;
+  uint8_t lvl_idx;
 
   // for nicer error print
   float lvl = ((float)cfg->level) / 10.0f;
@@ -1601,14 +1601,14 @@ static int validate_hevc_level(kvz_config *const cfg) {
   // check luma picture size
   if (cfg_samples > max_lps) {
     fprintf(stderr, "%s: picture resolution of %ix%i is too large for this level (%g) (it has %llu samples, maximum is %u samples)\n",
-      level_err_prefix, cfg->width, cfg->height, lvl, cfg_samples, max_lps);
+      level_err_prefix, cfg->width, cfg->height, lvl, (unsigned long long) cfg_samples, max_lps);
     level_error = 1;
   }
 
   // check luma sample rate
   if (cfg_sample_rate > max_lsr) {
     fprintf(stderr, "%s: framerate of %g is too big for this level (%g) and picture resolution (it has the sample rate of %llu, maximum is %u\n",
-      level_err_prefix, framerate, lvl, cfg_sample_rate, max_lsr);
+      level_err_prefix, framerate, lvl, (unsigned long long) cfg_sample_rate, max_lsr);
     level_error = 1;
   }
 
