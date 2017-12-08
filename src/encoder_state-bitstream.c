@@ -80,8 +80,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 
   // end Profile Tier
 
-  // Level 6.2 (general_level_idc is 30 * 6.2)
-  WRITE_U(stream, 186, 8, "general_level_idc");
+  uint8_t level = state->encoder_control->cfg.level;
+  WRITE_U(stream, level * 3, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");

@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 
 kvz_config *kvz_config_alloc(void)
@@ -36,7 +37,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->width           = 0;
   cfg->height          = 0;
   cfg->framerate       = 25; // deprecated and will be removed.
-  cfg->framerate_num   = 0;
+  cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
   cfg->intra_period    = 64;
@@ -124,6 +125,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->slices = KVZ_SLICES_NONE;
 
   cfg->optional_key = NULL;
+
+  cfg->level = 62; // default hevc level, 6.2 (the highest)
+  cfg->force_level = true; // don't care about level limits by-default
+  cfg->high_tier = false;
 
   return 1;
 }
@@ -1109,10 +1114,48 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     fclose(f);
   }
-  else if OPT("erp-aqp")
+  else if OPT("erp-aqp") {
     cfg->erp_aqp = (bool)atobool(value);
-  else
+  }
+  else if (OPT("level") || OPT("force-level")) {
+    if OPT("force-level") {
+      cfg->force_level = true;
+    } else {
+      cfg->force_level = false;
+    }
+
+    unsigned int num_first, num_second, level;
+    int matched_amount = sscanf(value, "%u.%u", &num_first, &num_second);
+
+    if (matched_amount == 2) {
+      // of form x.y
+      level = num_first * 10 + num_second;
+    } else if (matched_amount == 1) {
+      // no dot
+      if (num_first < 10) {
+        // of form x
+        level = num_first * 10;
+      } else {
+        // of form xx
+        level = num_first;
+      }
+    } else {
+      fprintf(stderr, "Invalid level value: \"%s\"\n", value);
+      return 0;
+    }
+    if (level < 10 || level > 62) {
+      fprintf(stderr, "Level value of %s is out of bounds\n", value);
+      return 0;
+    }
+
+    cfg->level = level;
+  }
+  else if (OPT("high-tier")) {
+    cfg->high_tier = true;
+  }
+  else {
     return 0;
+  }
 #undef OPT
 
   return 1;
@@ -1208,6 +1251,9 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   cfg->gop[gop.g - 1].is_ref = 1;
   cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
 }
+
+// forward declaration
+static int validate_hevc_level(kvz_config *const cfg);
 
 /**
  * \brief Check that configuration is sensible.
@@ -1407,5 +1453,169 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if (validate_hevc_level(cfg)) {
+    // a level error found and it's not okay
+    error = 1;
+  }
+
   return !error;
+}
+
+static int validate_hevc_level(kvz_config *const cfg) {
+  static const struct { uint32_t lsr; uint32_t lps; uint32_t main_bitrate; } LEVEL_CONSTRAINTS[13] = {
+    { 552'960, 36'864, 128 }, // 1
+
+    { 3'686'400, 122'880, 1500 }, // 2
+    { 7'372'800, 245'760, 3000 }, // 2.1
+
+    { 16'588'800, 552'960, 6000 },   // 3
+    { 33'177'600, 983'040, 10'000 }, // 3.1
+
+    { 66'846'720, 2'228'224, 12'000 },  // 4
+    { 133'693'440, 2'228'224, 20'000 }, // 4.1
+
+    { 267'386'880, 8'912'896, 25'000 },   // 5
+    { 534'773'760, 8'912'896, 40'000 },   // 5.1
+    { 1'069'547'520, 8'912'896, 60'000 }, // 5.2
+
+    { 1'069'547'520, 35'651'584, 60'000 },  // 6
+    { 2'139'095'040, 35'651'584, 120'000 }, // 6.1
+    { 4'278'190'080, 35'651'584, 240'000 }, // 6.2
+  };
+
+  // bit rates for the high-tiers of the levels from 4 to 6.2
+  static const uint32_t HIGH_TIER_BITRATES[8] = {
+    30'000, 50'000, 100'000, 160'000, 240'000, 240'000, 480'000, 800'000
+  };
+
+  int level_error = 0;
+  
+  const char* level_err_prefix;
+  if (cfg->force_level) {
+    level_err_prefix = "Level warning";
+  } else {
+    level_err_prefix = "Level error";
+  }
+
+  char lvl_idx;
+
+  // for nicer error print
+  float lvl = ((float)cfg->level) / 10.0f;
+
+  // check if the level is valid and get it's lsr and lps values
+  switch (cfg->level) {
+  case 10:
+    lvl_idx = 0;
+    break;
+  case 20:
+    lvl_idx = 1;
+    break;
+  case 21:
+    lvl_idx = 2;
+    break;
+  case 30:
+    lvl_idx = 3;
+    break;
+  case 31:
+    lvl_idx = 4;
+    break;
+  case 40:
+    lvl_idx = 5;
+    break;
+  case 41:
+    lvl_idx = 6;
+    break;
+  case 50:
+    lvl_idx = 7;
+    break;
+  case 51:
+    lvl_idx = 8;
+    break;
+  case 52:
+    lvl_idx = 9;
+    break;
+  case 60:
+    lvl_idx = 10;
+    break;
+  case 61:
+    lvl_idx = 11;
+    break;
+  case 62:
+    lvl_idx = 12;
+    break;
+
+  default:
+    fprintf(stderr, "Input error: %g is an invalid level value\n", lvl);
+    return 1;
+  }
+
+  if (cfg->high_tier && cfg->level < 40) {
+    fprintf(stderr, "Input error: high tier requires at least level 4\n");
+    return 1;
+  }
+
+  // max luma sample rate
+  uint32_t max_lsr = LEVEL_CONSTRAINTS[lvl_idx].lsr;
+
+  // max luma picture size
+  uint32_t max_lps = LEVEL_CONSTRAINTS[lvl_idx].lps;
+
+  if (cfg->high_tier) {
+    cfg->max_bitrate = HIGH_TIER_BITRATES[lvl_idx - 5] * 1000;
+  } else {
+    cfg->max_bitrate = LEVEL_CONSTRAINTS[lvl_idx].main_bitrate * 1000;
+  }
+
+  if (cfg->target_bitrate > cfg->max_bitrate) {
+    fprintf(stderr, "%s: target bitrate exceeds %i, which is the maximum %s tier level %g bitrate\n",
+      level_err_prefix, cfg->max_bitrate, cfg->high_tier?"high":"main", lvl);
+    level_error = 1;
+  }
+
+  // check the conformance to the level limits
+
+  // luma samples
+  uint64_t cfg_samples = cfg->width * cfg->height;
+
+  // luma sample rate
+  double framerate = ((double)cfg->framerate_num) / ((double)cfg->framerate_denom);
+  uint64_t cfg_sample_rate = cfg_samples * (uint64_t) framerate;
+
+  // square of the maximum allowed dimension
+  uint32_t max_dimension_squared = 8 * max_lps;
+
+  // check maximum dimensions
+  if (cfg->width * cfg->width > max_dimension_squared) {
+    uint32_t max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture width of %i is too large for this level (%g), maximum dimension is %i\n",
+      level_err_prefix, cfg->width, lvl, max_dim);
+    level_error = 1;
+  }
+  if (cfg->height * cfg->height > max_dimension_squared) {
+    uint32_t max_dim = sqrtf(max_dimension_squared);
+    fprintf(stderr, "%s: picture height of %i is too large for this level (%g), maximum dimension is %i\n",
+      level_err_prefix, cfg->height, lvl, max_dim);
+    level_error = 1;
+  }
+
+  // check luma picture size
+  if (cfg_samples > max_lps) {
+    fprintf(stderr, "%s: picture resolution of %ix%i is too large for this level (%g) (it has %llu samples, maximum is %u samples)\n",
+      level_err_prefix, cfg->width, cfg->height, lvl, cfg_samples, max_lps);
+    level_error = 1;
+  }
+
+  // check luma sample rate
+  if (cfg_sample_rate > max_lsr) {
+    fprintf(stderr, "%s: framerate of %g is too big for this level (%g) and picture resolution (it has the sample rate of %llu, maximum is %u\n",
+      level_err_prefix, framerate, lvl, cfg_sample_rate, max_lsr);
+    level_error = 1;
+  }
+
+  if (cfg->force_level) {
+    // we wanted to print warnings, not get errors
+    return 0;
+  } else {
+    return level_error;
+  }
 }
