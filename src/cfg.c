@@ -349,7 +349,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
 
 int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 {
-  static const char * const me_names[]          = { "hexbs", "tz", "full", "full8", "full16", "full32", "full64", NULL };
+  static const char * const me_names[]          = { "hexbs", "tz", "full", "full8", "full16", "full32", "full64", "dia", NULL };
   static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
 
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };

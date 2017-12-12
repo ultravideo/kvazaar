@@ -679,7 +679,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
-  // Current best index, either to merge_cands, large_hebx or small_hexbs.
+  // Current best index, either to merge_cands, large_hexbs or small_hexbs.
   int best_index = 0;
 
   // Search the initial 7 points of the hexagon.
@@ -717,14 +717,101 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
   }
 
   // Move the center to the best match.
-  mv.x += large_hexbs[best_index].x;
-  mv.y += large_hexbs[best_index].y;
-  best_index = 0;
+  //mv.x += large_hexbs[best_index].x;
+  //mv.y += large_hexbs[best_index].y;
 
   // Do the final step of the search with a small pattern.
   for (int i = 1; i < 5; ++i) {
     check_mv_cost(info, mv.x + small_hexbs[i].x, mv.y + small_hexbs[i].y);
   }
+}
+
+
+static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv)
+{
+  enum diapos {
+    DIA_UP = 0,
+    DIA_RIGHT = 1,
+    DIA_LEFT = 2,
+    DIA_DOWN = 3,
+    DIA_CENTER = 4,
+  };
+
+  // a diamond shape with the center included
+  //   0
+  // 2 4 1
+  //   3
+  static const vector2d_t diamond[5] = {
+    {0, -1}, {1, 0}, {0, 1}, {-1, 0},
+    {0, 0}
+  };
+
+  info->best_cost = UINT32_MAX;
+
+  // Select starting point from among merge candidates. These should
+  // include both mv_cand vectors and (0, 0).
+  select_starting_point(info, extra_mv);
+
+  // Check if we should stop search
+  if (info->state->encoder_control->cfg.me_early_termination &&
+    early_terminate(info))
+  {
+    return;
+  }
+  
+  // current motion vector
+  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
+  // current best index
+  enum diapos best_index = DIA_CENTER;
+
+  // initial search of the points of the diamond
+  for (int i = 0; i < 5; ++i) {
+    if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y)) {
+      best_index = i;
+    }
+  }
+
+  if (best_index == DIA_CENTER) {
+    // the center point was the best in initial check
+    return;
+  }
+
+  // Move the center to the best match.
+  mv.x += diamond[best_index].x;
+  mv.y += diamond[best_index].y;
+
+  // the arrival direction, the index of the diamond member that will be excluded
+  enum diapos from_dir = DIA_CENTER;
+
+  // whether we found a better candidate this iteration
+  uint8_t better_found;
+
+  do {
+    better_found = 0;
+
+    // search the points of the diamond
+    for (int i = 0; i < 4; ++i) {
+      // this is where we came from so it's checked already
+      if (i == from_dir) continue;
+
+      if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y)) {
+        best_index = i;
+        better_found = 1;
+      }
+    }
+
+    if (better_found) {
+      // Move the center to the best match.
+      mv.x += diamond[best_index].x;
+      mv.y += diamond[best_index].y;
+
+      // record where we came from to the next iteration
+      // the xor operation flips the orientation
+      from_dir = best_index ^ 0x3;
+    }
+  } while (better_found);
+  // and we're done
 }
 
 
@@ -1160,6 +1247,10 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
       search_mv_full(info, search_range, mv);
+      break;
+
+    case KVZ_IME_DIA:
+      diamond_search(info, mv);
       break;
 
     default:
