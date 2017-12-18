@@ -92,6 +92,7 @@ enum kvz_ime_algorithm {
   KVZ_IME_FULL16 = 4, //! \since 3.6.0
   KVZ_IME_FULL32 = 5, //! \since 3.6.0
   KVZ_IME_FULL64 = 6, //! \since 3.6.0
+  KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
 };
 
 /**

@@ -136,6 +136,7 @@ Compression tools:
                                    - tz:    Test Zone Search
                                    - full:  Full Search
                                    - full8, full16, full32, full64
+                                   - dia:   Diamond Search
       --subme <integer>      : Set fractional pixel motion estimation level
                                    - 0: only integer motion estimation
                                    - 1: + 1/2-pixel horizontal and vertical

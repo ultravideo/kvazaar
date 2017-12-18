@@ -430,6 +430,7 @@ void print_help(void)
     "                                   - tz:    Test Zone Search\n"
     "                                   - full:  Full Search\n"
     "                                   - full8, full16, full32, full64\n"
+    "                                   - dia:   Diamond Search\n"
     "      --subme <integer>      : Set fractional pixel motion estimation level\n"
     "                                   - 0: only integer motion estimation\n"
     "                                   - 1: + 1/2-pixel horizontal and vertical\n"
