@@ -130,6 +130,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->force_level = true; // don't care about level limits by-default
   cfg->high_tier = false;
 
+  cfg->me_max_steps = (uint32_t)-1;
+
   return 1;
 }
 
@@ -1152,6 +1154,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("high-tier")) {
     cfg->high_tier = true;
+  }
+  else if (OPT("me-steps")) {
+    cfg->me_max_steps = (uint32_t)atoi(value); // fix
   }
   else {
     return 0;

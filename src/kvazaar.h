@@ -361,6 +361,9 @@ typedef struct kvz_config
   uint8_t high_tier;
   /** \brief The maximum allowed bitrate for this level and tier. */
   uint32_t max_bitrate;
+
+  /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
+  uint32_t me_max_steps;
 } kvz_config;
 
 /**
