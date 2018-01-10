@@ -433,7 +433,7 @@ void print_help(void)
     "                                   - full8, full16, full32, full64\n"
     "                                   - dia:   Diamond Search\n"
     "      --me-steps <integer>   : How many search steps does the motion estimation\n"
-    "                               do before cutting off, -1 for no limits [-1]\n"
+    "                               do before cutting off [-1]\n"
     "                                   Has effect only for 'hexbs' and 'dia'\n"
     "      --subme <integer>      : Set fractional pixel motion estimation level\n"
     "                                   - 0: only integer motion estimation\n"

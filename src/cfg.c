@@ -1156,7 +1156,21 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->high_tier = true;
   }
   else if (OPT("me-steps")) {
-    cfg->me_max_steps = (uint32_t)atoi(value); // fix
+    char * tailptr = NULL;
+
+    errno = 0;
+    long steps = strtol(value, &tailptr, 0);
+
+    if (*tailptr != '\0') {
+      fprintf(stderr, "Invalid me-steps value: \"%s\"", value);
+      return 0;
+    }
+    if (steps < -1 || errno == ERANGE || steps > UINT32_MAX) {
+      fprintf(stderr, "me-steps value is out of bounds: \"%s\"", value);
+      return 0;
+    }
+
+    cfg->me_max_steps = (uint32_t)steps;
   }
   else {
     return 0;

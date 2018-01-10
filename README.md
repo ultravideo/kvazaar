@@ -138,7 +138,7 @@ Compression tools:
                                    - full8, full16, full32, full64
                                    - dia:   Diamond Search
       --me-steps <integer>   : How many search steps does the motion estimation
-                               do before cutting off, -1 for no limits [-1]
+                               do before cutting off [-1]
                                    Has effect only for 'hexbs' and 'dia'
       --subme <integer>      : Set fractional pixel motion estimation level
                                    - 0: only integer motion estimation
