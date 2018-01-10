@@ -419,14 +419,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       y + cu_width <= frame->height)
   {
     int cu_width_inter_min = LCU_WIDTH >> ctrl->cfg.pu_depth_inter.max;
-    bool can_use_inter = state->frame->slicetype != KVZ_SLICE_I && (
-      WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max) ||
-      // When the split was forced because the CTU is partially outside the
-      // frame, we permit inter coding even if pu_depth_inter would
-      // otherwise forbid it.
-      (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->width ||
-      (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->height
-    );
+    bool can_use_inter =
+      state->frame->slicetype != KVZ_SLICE_I &&
+      depth <= MAX_DEPTH &&
+      (
+        WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max) ||
+        // When the split was forced because the CTU is partially outside the
+        // frame, we permit inter coding even if pu_depth_inter would
+        // otherwise forbid it.
+        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->width ||
+        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->height
+      );
 
     if (can_use_inter) {
       double mode_cost;
