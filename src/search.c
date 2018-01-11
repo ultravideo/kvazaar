@@ -533,7 +533,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else if (cur_cu->type == CU_INTER) {
       // Reset transform depth because intra messes with them.
       // This will no longer be necessary if the transform depths are not shared.
-      int tr_depth = depth > 0 ? depth : 1;
+      int tr_depth = MAX(1, depth);
+      if (cur_cu->part_size != SIZE_2Nx2N) {
+        tr_depth = depth + 1;
+      }
       kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
       const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
