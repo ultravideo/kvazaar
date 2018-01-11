@@ -460,10 +460,8 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
       LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
     };
 
-    if (luma && depth < MAX_DEPTH) {
+    if (depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
-    }
-    if (chroma && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_U);
       cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_V);
     }
