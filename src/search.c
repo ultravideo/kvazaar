@@ -466,8 +466,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (mode_cost < cost) {
           cost = mode_cost;
           inter_bitcost = mode_bitcost;
-          // TODO: only copy inter prediction info, not pixels
-          work_tree_copy_up(x_local, y_local, depth, work_tree);
+          // Copy inter prediction info to current level.
+          copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
         }
       }
     }
