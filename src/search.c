@@ -463,7 +463,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                           mp_modes[i],
                           &work_tree[depth + 1],
                           &mode_cost, &mode_bitcost);
-        // TODO: take cost of coding part mode into account
         if (mode_cost < cost) {
           cost = mode_cost;
           inter_bitcost = mode_bitcost;
