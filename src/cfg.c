@@ -130,6 +130,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->force_level = true; // don't care about level limits by-default
   cfg->high_tier = false;
 
+  cfg->me_max_steps = (uint32_t)-1;
+
   return 1;
 }
 
@@ -1152,6 +1154,23 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("high-tier")) {
     cfg->high_tier = true;
+  }
+  else if (OPT("me-steps")) {
+    char * tailptr = NULL;
+
+    errno = 0;
+    long steps = strtol(value, &tailptr, 0);
+
+    if (*tailptr != '\0') {
+      fprintf(stderr, "Invalid me-steps value: \"%s\"", value);
+      return 0;
+    }
+    if (steps < -1 || errno == ERANGE || steps > UINT32_MAX) {
+      fprintf(stderr, "me-steps value is out of bounds: \"%s\"", value);
+      return 0;
+    }
+
+    cfg->me_max_steps = (uint32_t)steps;
   }
   else {
     return 0;

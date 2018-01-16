@@ -125,6 +125,7 @@ static const struct option long_options[] = {
   { "level",              required_argument, NULL, 0 },
   { "force-level",        required_argument, NULL, 0 },
   { "high-tier",                no_argument, NULL, 0 },
+  { "me-steps",           required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -431,6 +432,9 @@ void print_help(void)
     "                                   - full:  Full Search\n"
     "                                   - full8, full16, full32, full64\n"
     "                                   - dia:   Diamond Search\n"
+    "      --me-steps <integer>   : How many search steps does the motion estimation\n"
+    "                               do before cutting off [-1]\n"
+    "                                   Has effect only for 'hexbs' and 'dia'\n"
     "      --subme <integer>      : Set fractional pixel motion estimation level\n"
     "                                   - 0: only integer motion estimation\n"
     "                                   - 1: + 1/2-pixel horizontal and vertical\n"

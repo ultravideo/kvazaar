@@ -630,6 +630,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
  *
  * \param info      search info
  * \param extra_mv  extra motion vector to check
+ * \param steps     how many steps are done at maximum before exiting, does not affect the final step
  *
  * Motion vector is searched by first searching iteratively with the large
  * hexagon pattern until the best match is at the center of the hexagon.
@@ -640,7 +641,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
+static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint32_t steps)
 {
   // The start of the hexagonal pattern has been repeated at the end so that
   // the indices between 1-6 can be used as the start of a 3-point list of new
@@ -691,7 +692,10 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   // Iteratively search the 3 new points around the best match, until the best
   // match is in the center.
-  while (best_index != 0) {
+  while (best_index != 0 && steps != 0) {
+    // decrement count if enabled
+    if (steps > 0) steps -= 1;
+
     // Starting point of the 3 offsets to be searched.
     unsigned start;
     if (best_index == 1) {
@@ -726,8 +730,23 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
   }
 }
 
-
-static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv)
+/**
+* \brief Do motion search using the diamond algorithm.
+*
+* \param info      search info
+* \param extra_mv  extra motion vector to check
+* \param steps     how many steps are done at maximum before exiting
+*
+* Motion vector is searched by searching iteratively with a diamond-shaped
+* pattern. We take care of not checking the direction we came from, but
+* further checking for avoiding visits to already visited points is not done.
+*
+* If a non 0,0 predicted motion vector predictor is given as extra_mv,
+* the 0,0 vector is also tried. This is hoped to help in the case where
+* the predicted motion vector is way off. In the future even more additional
+* points like 0,0 might be used, such as vectors from top or left.
+**/
+static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv, uint32_t steps) 
 {
   enum diapos {
     DIA_UP = 0,
@@ -789,6 +808,8 @@ static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   do {
     better_found = 0;
+    // decrement count if enabled
+    if (steps > 0) steps -= 1;
 
     // search the points of the diamond
     for (int i = 0; i < 4; ++i) {
@@ -810,7 +831,7 @@ static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv)
       // the xor operation flips the orientation
       from_dir = best_index ^ 0x3;
     }
-  } while (better_found);
+  } while (better_found && steps != 0);
   // and we're done
 }
 
@@ -1250,11 +1271,11 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       break;
 
     case KVZ_IME_DIA:
-      diamond_search(info, mv);
+      diamond_search(info, mv, info->state->encoder_control->cfg.me_max_steps);
       break;
 
     default:
-      hexagon_search(info, mv);
+      hexagon_search(info, mv, info->state->encoder_control->cfg.me_max_steps);
       break;
   }
 
