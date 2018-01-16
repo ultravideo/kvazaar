@@ -1157,15 +1157,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("me-steps")) {
     char * tailptr = NULL;
-
-    errno = 0;
     long steps = strtol(value, &tailptr, 0);
 
     if (*tailptr != '\0') {
       fprintf(stderr, "Invalid me-steps value: \"%s\"", value);
       return 0;
     }
-    if (steps < -1 || errno == ERANGE || steps > UINT32_MAX) {
+    if (steps < -1 || steps > UINT32_MAX) {
       fprintf(stderr, "me-steps value is out of bounds: \"%s\"", value);
       return 0;
     }
