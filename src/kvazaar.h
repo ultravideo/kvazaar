@@ -92,6 +92,7 @@ enum kvz_ime_algorithm {
   KVZ_IME_FULL16 = 4, //! \since 3.6.0
   KVZ_IME_FULL32 = 5, //! \since 3.6.0
   KVZ_IME_FULL64 = 6, //! \since 3.6.0
+  KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
 };
 
 /**
@@ -378,6 +379,18 @@ typedef struct kvz_config
    * \brief Use adaptive QP for 360 video with equirectangular projection.
    */
   int32_t erp_aqp;
+
+  /** \brief The HEVC level */
+  uint8_t level;
+  /** \brief Whether we ignore and just warn from all of the errors about the output not conforming to the level's requirements. */
+  uint8_t force_level;
+  /** \brief Whether we use the high tier bitrates. Requires the level to be 4 or higher. */
+  uint8_t high_tier;
+  /** \brief The maximum allowed bitrate for this level and tier. */
+  uint32_t max_bitrate;
+
+  /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
+  uint32_t me_max_steps;
 
 //*********************************************
   //For scalable extension. TODO: Move somewhere else?

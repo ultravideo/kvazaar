@@ -262,7 +262,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
+    coeff_bits += kvz_get_coeff_cabac_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -331,8 +331,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cabac_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cabac_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -419,14 +419,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       y + cu_width <= frame->height)
   {
     int cu_width_inter_min = LCU_WIDTH >> ctrl->cfg.pu_depth_inter.max;
-    bool can_use_inter = state->frame->slicetype != KVZ_SLICE_I && (
-      WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max) ||
-      // When the split was forced because the CTU is partially outside the
-      // frame, we permit inter coding even if pu_depth_inter would
-      // otherwise forbid it.
-      (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->width ||
-      (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->height
-    );
+    bool can_use_inter =
+      state->frame->slicetype != KVZ_SLICE_I &&
+      depth <= MAX_DEPTH &&
+      (
+        WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max) ||
+        // When the split was forced because the CTU is partially outside the
+        // frame, we permit inter coding even if pu_depth_inter would
+        // otherwise forbid it.
+        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->width ||
+        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->height
+      );
 
     if (can_use_inter) {
       double mode_cost;

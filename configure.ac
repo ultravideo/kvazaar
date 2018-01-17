@@ -22,8 +22,8 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #   - Increment when making new releases and major or minor was not changed since last release.
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
-ver_major=3
-ver_minor=15
+ver_major=4
+ver_minor=0
 ver_release=0
 
 # Prevents configure from adding a lot of defines to the CFLAGS
@@ -74,7 +74,6 @@ AS_IF([test "x$with_cryptopp" = "xyes"],
 )
 
 AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
-AS_IF([test "x$with_cryptopp" = "xyes"], [cryptopp_LIBS="$cryptopp_LIBS -lstdc++"])
 CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
 LIBS="$LIBS $cryptopp_LIBS"
 

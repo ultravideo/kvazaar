@@ -122,6 +122,10 @@ static const struct option long_options[] = {
   { "roi",                required_argument, NULL, 0 },
   { "erp-aqp",                  no_argument, NULL, 0 },
   { "no-erp-aqp",               no_argument, NULL, 0 },
+  { "level",              required_argument, NULL, 0 },
+  { "force-level",        required_argument, NULL, 0 },
+  { "high-tier",                no_argument, NULL, 0 },
+  { "me-steps",           required_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
   { "layer",                    no_argument, NULL, 0 }, //New layer
@@ -396,7 +400,7 @@ void print_help(void)
     "Usage:\n"
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Required:\n"
     "  -i, --input                : Input file\n"
     "      --input-res <res>      : Input resolution [auto]\n"
@@ -404,18 +408,18 @@ void print_help(void)
     "                               <int>x<int>: width times height\n"
     "  -o, --output               : Output file\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Presets:\n"
     "      --preset=<preset>      : Set options to a preset [medium]\n"
     "                                   - ultrafast, superfast, veryfast, faster,\n"
     "                                     fast, medium, slow, slower, veryslow\n"
     "                                     placebo\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Input:\n"
     "  -n, --frames <integer>     : Number of frames to code [all]\n"
     "      --seek <integer>       : First frame to code [0]\n"
-    "      --input-fps <num>/<denom> : Framerate of the input video [25.0]\n"
+    "      --input-fps <num>[/<denom>] : Framerate of the input video [25.0]\n"
     "      --source-scan-type <string> : Set source scan type [progressive].\n"
     "                                   - progressive: progressive scan\n"
     "                                   - tff: top field first\n"
@@ -424,7 +428,7 @@ void print_help(void)
     "      --input-bitdepth       : 8-16\n"
     "      --loop-input           : Re-read input file forever\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Options:\n"
     "      --help                 : Print this help message and exit\n"
     "      --version              : Print version information and exit\n"
@@ -438,7 +442,7 @@ void print_help(void)
     "      --no-psnr              : Don't calculate PSNR for frames\n"
     "      --no-info              : Don't add encoder info SEI.\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video structure:\n"
     "  -q, --qp <integer>         : Quantization Parameter [32]\n"
     "  -p, --period <integer>     : Period of intra pictures [0]\n"
@@ -473,8 +477,18 @@ void print_help(void)
     "                                   ratio, and will be mapped to LCU's.\n"
     "      --(no-)erp-aqp         : Use adaptive QP for 360 video with\n"
     "                               equirectangular projection\n"
+    "      --level <number>       : Use the given HEVC level in the output and give\n"
+    "                               an error if the input doesn't fit to it's\n"
+    "                               limits [6.2]\n"
+    "                                   Allowed values are 1, 2, 2.1, 3, 3.1, 4, 4.1\n"
+    "                                   5, 5.1, 5.2, 6, 6.1 and 6.2. The dot is\n"
+    "                                   optional.\n"
+    "      --force-level <number> : Same as --level, except instead of errors you\n"
+    "                               get warnings\n"
+    "      --high-tier            : Used with --level. Use high-tier bitrate limits\n"
+    "                               instead of the main-tier limits during encoding.\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"
     "      --deblock [<beta:tc>]  : Deblocking\n"
     "                                     - beta: between -6 and 6\n"
@@ -497,6 +511,10 @@ void print_help(void)
     "                                   - tz:    Test Zone Search\n"
     "                                   - full:  Full Search\n"
     "                                   - full8, full16, full32, full64\n"
+    "                                   - dia:   Diamond Search\n"
+    "      --me-steps <integer>   : How many search steps does the motion estimation\n"
+    "                               do before cutting off [-1]\n"
+    "                                   Has effect only for 'hexbs' and 'dia'\n"
     "      --subme <integer>      : Set fractional pixel motion estimation level\n"
     "                                   - 0: only integer motion estimation\n"
     "                                   - 1: + 1/2-pixel horizontal and vertical\n"
@@ -522,7 +540,7 @@ void print_help(void)
     "      --(no-)tmvp            : Temporal Motion Vector Prediction\n"
     "      --(no-)rdoq-skip       : Skips RDOQ for 4x4 blocks\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Parallel processing:\n"
     "      --threads <integer>    : Number of threads to use [auto]\n"
     "                                   - 0: process everything with main thread\n"
@@ -538,26 +556,27 @@ void print_help(void)
     "      --tiles <int>x<int>    : Split picture into width x height uniform tiles.\n"
     "      --tiles-width-split <string>|u<int> :\n"
     "                               Specifies a comma separated list of pixel\n"
-    "                               positions of tiles columns separation coordinates.\n"
-    "                               Can also be u followed by and a single int n,\n"
-    "                               in which case it produces columns of uniform width.\n"
+    "                               positions of tiles columns separation\n"
+    "                               coordinates.\n"
+    "                               Can also be u, followed by a single int n, in\n"
+    "                               which case it produces columns of uniform width.\n"
     "      --tiles-height-split <string>|u<int> :\n"
     "                               Specifies a comma separated list of pixel\n"
     "                               positions of tiles rows separation coordinates.\n"
-    "                               Can also be u followed by and a single int n,\n"
-    "                               in which case it produces rows of uniform height.\n"
+    "                               Can also be u followed by and a single int n, in\n"
+    "                               which case it produces rows of uniform height.\n"
     "      --slices <string>      : Control how slices are used\n"
     "                                   - tiles: put tiles in independent slices\n"
     "                                   - wpp: put rows in dependent slices\n"
     "                                   - tiles+wpp: do both\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video Usability Information:\n"
     "      --sar <width:height>   : Specify Sample Aspect Ratio\n"
     "      --overscan <string>    : Specify crop overscan setting [undef]\n"
     "                                   - undef, show, crop\n"
     "      --videoformat <string> : Specify video format [undef]\n"
-    "                                   - component, pal, ntsc, secam, mac, undef\n"
+    "                                   - undef, component, pal, ntsc, secam, mac\n"
     "      --range <string>       : Specify color range [tv]\n"
     "                                   - tv, pc\n"
     "      --colorprim <string>   : Specify color primaries [undef]\n"
@@ -573,7 +592,7 @@ void print_help(void)
     "                                     smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
     "      --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
     "\n"
-    /* Word wrap to this width to stay under 80 characters (including ") ************/
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Scalability extension (experimental):\n"
     "      --layer                : Add a new layer (EL). Parameters for this layer\n"
     "                               should be given after this tag. The base layer\n"

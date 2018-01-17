@@ -630,6 +630,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
  *
  * \param info      search info
  * \param extra_mv  extra motion vector to check
+ * \param steps     how many steps are done at maximum before exiting, does not affect the final step
  *
  * Motion vector is searched by first searching iteratively with the large
  * hexagon pattern until the best match is at the center of the hexagon.
@@ -640,7 +641,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
+static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint32_t steps)
 {
   // The start of the hexagonal pattern has been repeated at the end so that
   // the indices between 1-6 can be used as the start of a 3-point list of new
@@ -679,7 +680,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
-  // Current best index, either to merge_cands, large_hebx or small_hexbs.
+  // Current best index, either to merge_cands, large_hexbs or small_hexbs.
   int best_index = 0;
 
   // Search the initial 7 points of the hexagon.
@@ -691,7 +692,10 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   // Iteratively search the 3 new points around the best match, until the best
   // match is in the center.
-  while (best_index != 0) {
+  while (best_index != 0 && steps != 0) {
+    // decrement count if enabled
+    if (steps > 0) steps -= 1;
+
     // Starting point of the 3 offsets to be searched.
     unsigned start;
     if (best_index == 1) {
@@ -717,14 +721,118 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv)
   }
 
   // Move the center to the best match.
-  mv.x += large_hexbs[best_index].x;
-  mv.y += large_hexbs[best_index].y;
-  best_index = 0;
+  //mv.x += large_hexbs[best_index].x;
+  //mv.y += large_hexbs[best_index].y;
 
   // Do the final step of the search with a small pattern.
   for (int i = 1; i < 5; ++i) {
     check_mv_cost(info, mv.x + small_hexbs[i].x, mv.y + small_hexbs[i].y);
   }
+}
+
+/**
+* \brief Do motion search using the diamond algorithm.
+*
+* \param info      search info
+* \param extra_mv  extra motion vector to check
+* \param steps     how many steps are done at maximum before exiting
+*
+* Motion vector is searched by searching iteratively with a diamond-shaped
+* pattern. We take care of not checking the direction we came from, but
+* further checking for avoiding visits to already visited points is not done.
+*
+* If a non 0,0 predicted motion vector predictor is given as extra_mv,
+* the 0,0 vector is also tried. This is hoped to help in the case where
+* the predicted motion vector is way off. In the future even more additional
+* points like 0,0 might be used, such as vectors from top or left.
+**/
+static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv, uint32_t steps) 
+{
+  enum diapos {
+    DIA_UP = 0,
+    DIA_RIGHT = 1,
+    DIA_LEFT = 2,
+    DIA_DOWN = 3,
+    DIA_CENTER = 4,
+  };
+
+  // a diamond shape with the center included
+  //   0
+  // 2 4 1
+  //   3
+  static const vector2d_t diamond[5] = {
+    {0, -1}, {1, 0}, {0, 1}, {-1, 0},
+    {0, 0}
+  };
+
+  info->best_cost = UINT32_MAX;
+
+  // Select starting point from among merge candidates. These should
+  // include both mv_cand vectors and (0, 0).
+  select_starting_point(info, extra_mv);
+
+  // Check if we should stop search
+  if (info->state->encoder_control->cfg.me_early_termination &&
+    early_terminate(info))
+  {
+    return;
+  }
+  
+  // current motion vector
+  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
+  // current best index
+  enum diapos best_index = DIA_CENTER;
+
+  // initial search of the points of the diamond
+  for (int i = 0; i < 5; ++i) {
+    if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y)) {
+      best_index = i;
+    }
+  }
+
+  if (best_index == DIA_CENTER) {
+    // the center point was the best in initial check
+    return;
+  }
+
+  // Move the center to the best match.
+  mv.x += diamond[best_index].x;
+  mv.y += diamond[best_index].y;
+
+  // the arrival direction, the index of the diamond member that will be excluded
+  enum diapos from_dir = DIA_CENTER;
+
+  // whether we found a better candidate this iteration
+  uint8_t better_found;
+
+  do {
+    better_found = 0;
+    // decrement count if enabled
+    if (steps > 0) steps -= 1;
+
+    // search the points of the diamond
+    for (int i = 0; i < 4; ++i) {
+      // this is where we came from so it's checked already
+      if (i == from_dir) continue;
+
+      if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y)) {
+        best_index = i;
+        better_found = 1;
+      }
+    }
+
+    if (better_found) {
+      // Move the center to the best match.
+      mv.x += diamond[best_index].x;
+      mv.y += diamond[best_index].y;
+
+      // record where we came from to the next iteration
+      // the xor operation flips the orientation
+      from_dir = best_index ^ 0x3;
+    }
+  } while (better_found && steps != 0);
+  // and we're done
 }
 
 
@@ -1171,8 +1279,12 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       search_mv_full(info, search_range, mv);
       break;
 
+    case KVZ_IME_DIA:
+      diamond_search(info, mv, info->state->encoder_control->cfg.me_max_steps);
+      break;
+
     default:
-      hexagon_search(info, mv);
+      hexagon_search(info, mv, info->state->encoder_control->cfg.me_max_steps);
       break;
     }
   }

@@ -27,6 +27,9 @@
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
 #define _WIN32_WINNT 0x0500
+
+#include "global.h" // IWYU pragma: keep
+
 #include <fcntl.h>    /* _O_BINARY */
 #include <io.h>       /* _setmode() */
 #endif
@@ -43,7 +46,6 @@
 #include "checkpoint.h"
 #include "cli.h"
 #include "encoder.h"
-#include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 #include "kvazaar_internal.h"
 #include "threads.h"
@@ -526,6 +528,12 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     for (int i = 0; i < opts->num_inputs; i++) {
+      // how many bits have been written this second? used for checking if framerate exceeds level's limits
+      uint64_t bits_this_second = 0;
+      // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
+      unsigned frames_this_second = 0;
+      const float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
+
 
       uint8_t padding_x = get_padding(opts->config->shared != NULL ? opts->config->shared->input_widths[i] : opts->config->width );
       uint8_t padding_y = get_padding(opts->config->shared != NULL ? opts->config->shared->input_heights[i] : opts->config->height );
@@ -636,6 +644,39 @@ int main(int argc, char *argv[])
         fflush(output);
 
         bitstream_length += tot_len_out;
+        
+        // the level's bitrate check
+        frames_this_second += 1;
+
+        if ((float)frames_this_second >= framerate) {
+          // if framerate <= 1 then we go here always
+
+          // how much of the bits of the last frame belonged to the next second
+          uint64_t leftover_bits = (uint64_t)((double)len_out * ((double)frames_this_second - framerate));
+
+          // the latest frame is counted for the amount that it contributed to this current second
+          bits_this_second += len_out - leftover_bits;
+
+          if (bits_this_second > encoder->cfg.max_bitrate) {
+            fprintf(stderr, "Level warning: This %s's bitrate (%llu bits/s) reached the maximum bitrate (%u bits/s) of %s tier level %g.",
+              framerate >= 1.0f ? "second" : "frame",
+              (unsigned long long) bits_this_second,
+              encoder->cfg.max_bitrate,
+              encoder->cfg.high_tier ? "high" : "main",
+              (float)encoder->cfg.level / 10.0f );
+          }
+
+          if (framerate > 1.0f) {
+            // leftovers for the next second
+            bits_this_second = leftover_bits;
+          } else {
+            // one or more next seconds are from this frame and their bitrate is the same or less as this frame's
+            bits_this_second = 0;
+          }
+          frames_this_second = 0;
+        } else {
+          bits_this_second += len_out;
+        }
 
         // ***********************************************
         // Modified for SHVC
