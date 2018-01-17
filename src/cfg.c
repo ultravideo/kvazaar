@@ -1096,8 +1096,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[0].ref_pos_count = 0;
       if (!use_temporal) {
         cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16; //Not compatible with temporal scalability
+      } else {
+        cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[2] = 16;
       }
-      cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[2] = 16;
 
       cfg->gop[1].poc_offset = 4; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.3536; cfg->gop[1].is_ref = 1;
       cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 4; cfg->gop[1].ref_neg[1] = 8;
@@ -1503,12 +1504,12 @@ static void generate_gop_rps(kvz_config *cfg){
     rps->num_positive_pics = gop->ref_pos_count;
 
     //Populate delta_poc and is_used
-    for (int j = 0; j < gop->ref_neg_count; j++){
+    for (int j = 0; j < gop->ref_neg_count; j++){ //negative
       rps->delta_poc[j] = gop->ref_neg[j];
       rps->is_used[j] = 1;
     }
-    for (int j = gop->ref_neg_count; j < gop->ref_neg_count + gop->ref_pos_count; j++){
-      rps->delta_poc[j] = gop->ref_neg[j];
+    for (int j = gop->ref_neg_count; j < gop->ref_neg_count + gop->ref_pos_count; j++){ //positive
+      rps->delta_poc[j] = gop->ref_pos[j-gop->ref_neg_count];
       rps->is_used[j] = 1;
     }
 

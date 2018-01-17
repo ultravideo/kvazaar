@@ -1063,6 +1063,14 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     // remove any picture that is not referenced by the current picture.
 
     for (int ref = state->frame->ref->used_size - 1; ref >= 0; --ref) {
+      //*********************************************
+      //For scalable extension.
+      //If ref is ILR no need to remove. (invalid ILR refs should already be removed)
+      if( state->frame->ref->image_info[ref].layer_id < state->encoder_control->layer.layer_id){
+        continue;
+      }
+      //*********************************************
+
       bool is_referenced = false;
 
       int ref_poc = state->frame->ref->pocs[ref];
