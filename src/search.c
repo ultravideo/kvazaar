@@ -538,47 +538,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
       kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
-      const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-      for (int i = 0; i < num_pu; ++i) {
-        const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
-        const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
-        const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
-        const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
-
-        cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
-
-        if (cur_pu->inter.mv_dir == 3) {
-          const kvz_picture *const refs[2] = {
-            state->frame->ref->images[
-              state->frame->ref_LX[0][
-                cur_pu->inter.mv_ref[0]]],
-            state->frame->ref->images[
-              state->frame->ref_LX[1][
-                cur_pu->inter.mv_ref[1]]],
-          };
-          kvz_inter_recon_lcu_bipred(state,
-                                     refs[0], refs[1],
-                                     pu_x, pu_y,
-                                     pu_w, pu_h,
-                                     cur_pu->inter.mv,
-                                     lcu);
-        } else {
-          const int mv_idx = cur_pu->inter.mv_dir - 1;
-          
-          const kvz_picture *const ref =
-              state->frame->ref->images[
-                state->frame->ref_LX[mv_idx][
-                  cur_pu->inter.mv_ref[mv_idx]]];
-
-          kvz_inter_recon_lcu(state,
-                              ref,
-                              pu_x, pu_y,
-                              pu_w, pu_h,
-                              cur_pu->inter.mv[mv_idx],
-                              lcu,
-                              0);
-        }
-      }
+      kvz_inter_recon_cu(state, lcu, x, y, cu_width);
 
       const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
       kvz_quantize_lcu_residual(state,
