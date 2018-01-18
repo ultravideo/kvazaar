@@ -852,17 +852,15 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   }
 }
 
-/** MVD cost calculation with CABAC
-* \returns int
-* Calculates cost of actual motion vectors using CABAC coding
-*/
+/**
+ * Calculate cost of actual motion vectors using CABAC coding
+ */
 uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
-                                       vector2d_t *mvd,
-                                       const cabac_data_t* real_cabac)
+                                       const cabac_data_t* real_cabac,
+                                       int32_t mvd_hor,
+                                       int32_t mvd_ver)
 {
   uint32_t bitcost = 0;
-  const int32_t mvd_hor = mvd->x;
-  const int32_t mvd_ver = mvd->y;
   const int8_t hor_abs_gr0 = mvd_hor != 0;
   const int8_t ver_abs_gr0 = mvd_ver != 0;
   const uint32_t mvd_hor_abs = abs(mvd_hor);
@@ -919,8 +917,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;
   uint32_t merge_idx;
-  int cand1_cost, cand2_cost;
-  vector2d_t mvd_temp1, mvd_temp2, mvd = { 0, 0 };
+  vector2d_t mvd = { 0, 0 };
   int8_t merged = 0;
   int8_t cur_mv_cand = 0;
 
@@ -952,20 +949,23 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   cabac = &state_cabac_copy;
 
   if (!merged) {
-    mvd_temp1.x = x - mv_cand[0][0];
-    mvd_temp1.y = y - mv_cand[0][1];
-    cand1_cost = kvz_get_mvd_coding_cost_cabac(state, &mvd_temp1, cabac);
-
-    mvd_temp2.x = x - mv_cand[1][0];
-    mvd_temp2.y = y - mv_cand[1][1];
-    cand2_cost = kvz_get_mvd_coding_cost_cabac(state, &mvd_temp2, cabac);
+    vector2d_t mvd1 = {
+      x - mv_cand[0][0],
+      y - mv_cand[0][1],
+    };
+    vector2d_t mvd2 = {
+      x - mv_cand[1][0],
+      y - mv_cand[1][1],
+    };
+    uint32_t cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
+    uint32_t cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
       cur_mv_cand = 1;
-      mvd = mvd_temp2;
+      mvd = mvd2;
     } else {
-      mvd = mvd_temp1;
+      mvd = mvd1;
     }
   }
 
