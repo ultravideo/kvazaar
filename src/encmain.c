@@ -527,13 +527,14 @@ int main(int argc, char *argv[])
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
-    for (int i = 0; i < opts->num_inputs; i++) {
-      // how many bits have been written this second? used for checking if framerate exceeds level's limits
-      uint64_t bits_this_second = 0;
-      // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
-      unsigned frames_this_second = 0;
-      const float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
+    // how many bits have been written this second? used for checking if framerate exceeds level's limits
+    uint64_t bits_this_second = 0;
+    // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
+    unsigned frames_this_second = 0;
+    const float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
 
+
+    for (int i = 0; i < opts->num_inputs; i++) {
 
       uint8_t padding_x = get_padding(opts->config->shared != NULL ? opts->config->shared->input_widths[i] : opts->config->width );
       uint8_t padding_y = get_padding(opts->config->shared != NULL ? opts->config->shared->input_heights[i] : opts->config->height );
@@ -652,10 +653,10 @@ int main(int argc, char *argv[])
           // if framerate <= 1 then we go here always
 
           // how much of the bits of the last frame belonged to the next second
-          uint64_t leftover_bits = (uint64_t)((double)len_out * ((double)frames_this_second - framerate));
+          uint64_t leftover_bits = (uint64_t)((double)tot_len_out * ((double)frames_this_second - framerate));
 
           // the latest frame is counted for the amount that it contributed to this current second
-          bits_this_second += len_out - leftover_bits;
+          bits_this_second += tot_len_out - leftover_bits;
 
           if (bits_this_second > encoder->cfg.max_bitrate) {
             fprintf(stderr, "Level warning: This %s's bitrate (%llu bits/s) reached the maximum bitrate (%u bits/s) of %s tier level %g.",
@@ -675,7 +676,7 @@ int main(int argc, char *argv[])
           }
           frames_this_second = 0;
         } else {
-          bits_this_second += len_out;
+          bits_this_second += tot_len_out;
         }
 
         // ***********************************************

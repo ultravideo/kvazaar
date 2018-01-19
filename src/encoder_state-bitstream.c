@@ -64,8 +64,8 @@ static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
   encoder_state_t * const state, const int max_num_sub_layers_minus1)
 {
   // PTL
-  // Level 6.2 (general_level_idc is 30 * 6.2)
-  WRITE_U(stream, 186, 8, "general_level_idc");
+  uint8_t level = state->encoder_control->cfg.level;
+  WRITE_U(stream, level * 3, 8, "general_level_idc");
 
   for (size_t i = 0; i < max_num_sub_layers_minus1; i++) {
     WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
@@ -117,7 +117,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
 
   // end Profile Tier
-
+  /*
   uint8_t level = state->encoder_control->cfg.level;
   WRITE_U(stream, level * 3, 8, "general_level_idc");
 
