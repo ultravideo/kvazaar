@@ -665,7 +665,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
     // If fractional framerate is set, use that instead of the floating point framerate.
     if (encoder->cfg.framerate_num != 0) {
-      encoder->vui.timing_info_present_flag = 1;
+      encoder->vui.timing_info_present_flag = encoder->cfg.layer > 0 ? 0 : 1;
       encoder->vui.num_units_in_tick = encoder->cfg.framerate_denom;
       encoder->vui.time_scale = encoder->cfg.framerate_num;
       if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
