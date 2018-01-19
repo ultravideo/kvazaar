@@ -777,13 +777,13 @@ int main(int argc, char *argv[])
             opts->config->shared != NULL ? opts->config->shared->max_layers : 1,
             (long long unsigned int)bitstream_length * 8);
     if (encoder->cfg.calc_psnr && frames_done > 0) {
-      // ***********************************************
-      // Modified for SHVC.
+  // ***********************************************
+  // Modified for SHVC.
       fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
               psnr_sum[2] / frames_done);
-      // ***********************************************
+     
     }
     fprintf(stderr, "\n");
     //Print layer stats if more than two layers
@@ -793,7 +793,7 @@ int main(int argc, char *argv[])
           i,
           (long long unsigned int)substream_lengths[i] * 8);
         if (frames_done > 0) {
-          fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+          fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
             layer_psnr_sum[i][0] / frames_done * opts->config->shared->max_layers,
             layer_psnr_sum[i][1] / frames_done * opts->config->shared->max_layers,
             layer_psnr_sum[i][2] / frames_done * opts->config->shared->max_layers );
@@ -801,7 +801,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "\n");
       }
     }
-
+ // ***********************************************
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
     {
