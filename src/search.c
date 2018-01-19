@@ -463,12 +463,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                           mp_modes[i],
                           &work_tree[depth + 1],
                           &mode_cost, &mode_bitcost);
-        // TODO: take cost of coding part mode into account
         if (mode_cost < cost) {
           cost = mode_cost;
           inter_bitcost = mode_bitcost;
-          // TODO: only copy inter prediction info, not pixels
-          work_tree_copy_up(x_local, y_local, depth, work_tree);
+          // Copy inter prediction info to current level.
+          copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
         }
       }
     }
@@ -533,7 +532,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else if (cur_cu->type == CU_INTER) {
       // Reset transform depth because intra messes with them.
       // This will no longer be necessary if the transform depths are not shared.
-      int tr_depth = depth > 0 ? depth : 1;
+      int tr_depth = MAX(1, depth);
+      if (cur_cu->part_size != SIZE_2Nx2N) {
+        tr_depth = depth + 1;
+      }
       kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
       const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];

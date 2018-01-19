@@ -1696,4 +1696,19 @@ void kvz_search_cu_smp(encoder_state_t * const state,
       }
     }
   }
+
+  // Count bits spent for coding the partition mode.
+  int smp_extra_bits = 1; // horizontal or vertical
+  if (state->encoder_control->cfg.amp_enable) {
+    smp_extra_bits += 1; // symmetric or asymmetric
+    if (part_mode != SIZE_2NxN && part_mode != SIZE_Nx2N) {
+      smp_extra_bits += 1; // U,L or D,R
+    }
+  }
+  // The transform is split for SMP and AMP blocks so we need more bits for
+  // coding the CBF.
+  smp_extra_bits += 6;
+
+  *inter_cost += state->lambda_sqrt * smp_extra_bits;
+  *inter_bitcost += smp_extra_bits;
 }
