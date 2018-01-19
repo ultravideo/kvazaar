@@ -42,4 +42,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
                           int8_t scan_mode,
                           int8_t tr_skip);
 
+void kvz_encode_mvd(encoder_state_t * const state,
+                    cabac_data_t *cabac,
+                    int32_t mvd_hor,
+                    int32_t mvd_ver);
+
 #endif // ENCODE_CODING_TREE_H_

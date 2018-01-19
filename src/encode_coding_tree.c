@@ -559,122 +559,76 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       }
     }
   } else {
-    uint32_t ref_list_idx;
-
-    // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-    if (state->frame->slicetype == KVZ_SLICE_B)
-    {
+    if (state->frame->slicetype == KVZ_SLICE_B) {
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir-1;
-      uint8_t ctx = depth;
-      
 
-      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8)
-      {
-        cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
+      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8) {
+        cabac->cur_ctx = &(cabac->ctx.inter_dir[depth]);
         CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
       }
-      if (inter_dir < 2)
-      {
+      if (inter_dir < 2) {
         cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
         CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
       }
     }
 
-    for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
-      if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-
-        // size of the current reference index list (L0/L1)
-        uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
-
-        if (ref_LX_size > 1) {
-          // parseRefFrmIdx
-          int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
-
-          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
-
-          if (ref_frame > 0) {
-            int32_t i;
-            int32_t ref_num = ref_LX_size - 2;
-
-            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
-            ref_frame--;
-
-            for (i = 0; i < ref_num; ++i) {
-              const uint32_t symbol = (i == ref_frame) ? 0 : 1;
-
-              if (i == 0) {
-                CABAC_BIN(cabac, symbol, "ref_idx_lX");
-              } else {
-                CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
-              }
-              if (symbol == 0) break;
-            }
-          }
-        }
-
-        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->frame->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-
-          int16_t mv_cand[2][2];
-          kvz_inter_get_mv_cand_cua(
-              state,
-              x, y, width, height,
-              mv_cand, cur_cu, ref_list_idx);
-
-          uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
-
-          const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
-          const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
-          const int8_t hor_abs_gr0 = mvd_hor != 0;
-          const int8_t ver_abs_gr0 = mvd_ver != 0;
-          const uint32_t mvd_hor_abs = abs(mvd_hor);
-          const uint32_t mvd_ver_abs = abs(mvd_ver);
-
-
-          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
-          CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
-          CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
-
-          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
-
-          if (hor_abs_gr0) {
-            CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
-          }
-
-          if (ver_abs_gr0) {
-            CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
-          }
-
-          if (hor_abs_gr0) {
-            if (mvd_hor_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs-2, 1);
-            }
-            uint32_t mvd_hor_sign = (mvd_hor>0)?0:1;
-            if(!state->cabac.only_count)
-              if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-                mvd_hor_sign = mvd_hor_sign^kvz_crypto_get_key(state->crypto_hdl, 1);
-            CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
-          }
-          if (ver_abs_gr0) {
-            if (mvd_ver_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs-2, 1);
-            }
-            uint32_t mvd_ver_sign = (mvd_ver>0)?0:1;
-            if(!state->cabac.only_count)
-              if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-                mvd_ver_sign = mvd_ver_sign^kvz_crypto_get_key(state->crypto_hdl, 1);
-            CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
-          }
-        }
-
-        // Signal which candidate MV to use
-        kvz_cabac_write_unary_max_symbol(cabac,
-                                         cabac->ctx.mvp_idx_model,
-                                         CU_GET_MV_CAND(cur_cu, ref_list_idx),
-                                         1,
-                                         AMVP_MAX_NUM_CANDS - 1);
+    for (uint32_t ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
+      if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
+        continue;
       }
+
+      // size of the current reference index list (L0/L1)
+      uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
+
+      if (ref_LX_size > 1) {
+        // parseRefFrmIdx
+        int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
+
+        cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+        CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+
+        if (ref_frame > 0) {
+          ref_frame--;
+
+          int32_t ref_num = ref_LX_size - 2;
+
+          for (int32_t i = 0; i < ref_num; ++i) {
+            const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+
+            if (i == 0) {
+              cabac->cur_ctx = &cabac->ctx.cu_ref_pic_model[1];
+              CABAC_BIN(cabac, symbol, "ref_idx_lX");
+            } else {
+              CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+            }
+            if (symbol == 0) break;
+          }
+        }
+      }
+
+      if (state->frame->ref_list != REF_PIC_LIST_1 || cur_cu->inter.mv_dir != 3) {
+
+        int16_t mv_cand[2][2];
+        kvz_inter_get_mv_cand_cua(
+            state,
+            x, y, width, height,
+            mv_cand, cur_cu, ref_list_idx);
+
+        uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
+        const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
+        const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
+
+        kvz_encode_mvd(state, cabac, mvd_hor, mvd_ver);
+      }
+
+      // Signal which candidate MV to use
+      kvz_cabac_write_unary_max_symbol(cabac,
+                                       cabac->ctx.mvp_idx_model,
+                                       CU_GET_MV_CAND(cur_cu, ref_list_idx),
+                                       1,
+                                       AMVP_MAX_NUM_CANDS - 1);
+
     } // for ref_list
   } // if !merge
 }
@@ -1184,5 +1138,54 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // CU type not set. Should not happen.
     assert(0);
     exit(1);
+  }
+}
+
+
+void kvz_encode_mvd(encoder_state_t * const state,
+                    cabac_data_t *cabac,
+                    int32_t mvd_hor,
+                    int32_t mvd_ver)
+{
+  const int8_t hor_abs_gr0 = mvd_hor != 0;
+  const int8_t ver_abs_gr0 = mvd_ver != 0;
+  const uint32_t mvd_hor_abs = abs(mvd_hor);
+  const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+  cabac->cur_ctx = &cabac->ctx.cu_mvd_model[0];
+  CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+  CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+
+  cabac->cur_ctx = &cabac->ctx.cu_mvd_model[1];
+  if (hor_abs_gr0) {
+    CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
+  }
+  if (ver_abs_gr0) {
+    CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
+  }
+
+  if (hor_abs_gr0) {
+    if (mvd_hor_abs > 1) {
+      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+    }
+    uint32_t mvd_hor_sign = (mvd_hor > 0) ? 0 : 1;
+    if (!state->cabac.only_count &&
+        state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
+    {
+      mvd_hor_sign = mvd_hor_sign ^ kvz_crypto_get_key(state->crypto_hdl, 1);
+    }
+    CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
+  }
+  if (ver_abs_gr0) {
+    if (mvd_ver_abs > 1) {
+      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+    }
+    uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
+    if (!state->cabac.only_count &&
+        state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
+    {
+      mvd_ver_sign = mvd_ver_sign^kvz_crypto_get_key(state->crypto_hdl, 1);
+    }
+    CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
   }
 }
