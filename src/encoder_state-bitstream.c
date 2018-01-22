@@ -969,8 +969,11 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
             }
           } while (!found);
         }
+        else {
+          delta_poc = j > 0 ? -rps->delta_poc[j-1] + 1: 1; //If no gop needs to be -last+1 (prev - delta_poc - 1 used later)
+        }
 
-        rps->delta_poc[j] = encoder->cfg.gop_len ? -delta_poc : 0;
+        rps->delta_poc[j] = -delta_poc; 
         rps->is_used[j] = !state->frame->is_irap;
         
         //last_poc = delta_poc;
@@ -1001,8 +1004,11 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
             }
           } while (!found);
         }
+        else {
+          delta_poc = j > 0 ? rps->delta_poc[j - 1] + 1 : 1; //If no gop needs to be 1+last (delta_poc - prev - 1 used later)
+        }
 
-        rps->delta_poc[j+rps->num_negative_pics] = encoder->cfg.gop_len ? delta_poc : 0;
+        rps->delta_poc[j+rps->num_negative_pics] = delta_poc;
         rps->is_used[j+rps->num_negative_pics] = !state->frame->is_irap;
         
         //last_poc = delta_poc;

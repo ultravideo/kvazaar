@@ -183,11 +183,15 @@ static void shared_init(kvz_config *cfg)
 //Free allocated memory for the shared struct
 static void shared_destroy(kvz_config *cfg)
 {
-  FREE_POINTER(cfg->shared->input_widths);
-  FREE_POINTER(cfg->shared->input_heights);
+  if (cfg->shared != NULL) {
+
+    FREE_POINTER(cfg->shared->input_widths);
+    FREE_POINTER(cfg->shared->input_heights);
 
 
-  FREE_POINTER(cfg->shared);
+    FREE_POINTER(cfg->shared);
+
+  }
 }
 
 int kvz_config_destroy(kvz_config *cfg)
