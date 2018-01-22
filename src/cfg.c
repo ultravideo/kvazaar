@@ -1720,9 +1720,9 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   //*********************************************
   //For scalable extension.
-  if (cfg->shared == NULL && (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay && cfg->intra_period % cfg->gop_len != 0 ) ||
-      cfg->shared != NULL && (cfg->shared->gop_len && cfg->shared->intra_period && !cfg->shared->gop_lowdelay &&
-                              cfg->shared->intra_period % cfg->shared->gop_len != 0)
+  if ((cfg->shared == NULL && (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay && cfg->intra_period % cfg->gop_len != 0 )) ||
+      (cfg->shared != NULL && (cfg->shared->gop_len && cfg->shared->intra_period && !cfg->shared->gop_lowdelay &&
+                               cfg->shared->intra_period % cfg->shared->gop_len != 0))
      )
   {
     fprintf(stderr,
@@ -1778,7 +1778,7 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   //*********************************************
   //For scalable extension.
-  if (cfg->shared == NULL && cfg->owf < -1 || cfg->shared != NULL && cfg->shared->owf < -1) {
+  if ((cfg->shared == NULL && cfg->owf < -1) || (cfg->shared != NULL && cfg->shared->owf < -1)) {
     fprintf(stderr, "Input error: --owf must be nonnegative or -1\n");
     error = 1;
   }
@@ -1871,7 +1871,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   }
 //*********************************************
   //For scalable extension.
-  if ((cfg->slices & KVZ_SLICES_WPP) && (cfg->shared == NULL && !cfg->wpp || cfg->shared != NULL && !cfg->shared->wpp)) {
+  if ((cfg->slices & KVZ_SLICES_WPP) && ((cfg->shared == NULL && !cfg->wpp) || (cfg->shared != NULL && !cfg->shared->wpp))) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
     error = 1;
   }
