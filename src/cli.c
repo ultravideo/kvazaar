@@ -179,6 +179,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   int ok = 1;
   cmdline_opts_t *opts = calloc(1, sizeof(cmdline_opts_t));
   if (!opts) {
+    fprintf(stderr, "Memory error: Could not allocate or init opts.\n");
     ok = 0;
     goto done;
   }
@@ -193,6 +194,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
 
   opts->config = api->config_alloc();
   if (!opts->config || !api->config_init(opts->config)) {
+    fprintf(stderr, "Memory error: Could not allocate or init config.\n");
     ok = 0;
     goto done;
   }
@@ -298,6 +300,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
 
   // Check that the required files were defined
   if (opts->input == NULL || opts->output == NULL) {
+    fprintf(stderr, "Input error: Need to specify input and output files.\n");
     ok = 0;
     goto done;
   }
@@ -321,7 +324,10 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
         ok = 0;
       }
     } else if (cfg->width == 0 && cfg->height == 0) {
-      ok = select_input_res_auto(opts->input[i], &opts->config->width, &opts->config->height);
+      if(!select_input_res_auto(opts->input[i], &opts->config->width, &opts->config->height)){
+        fprintf(stderr, "Input error: No size found for input layer %d\n", i);
+        ok = 0;
+      }
     }
 
     while( ok && cfg != NULL ) {
