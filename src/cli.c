@@ -318,14 +318,16 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   for (int i = 0; i < opts->num_inputs; i++) {
     //Automatically set layer size to match the respective input layer size
     kvz_config *cfg = opts->config;
-    if (cfg->shared != NULL && cfg->shared->input_widths[i] == 0 && cfg->shared->input_heights[i] == 0) {
-      if(!select_input_res_auto(opts->input[i], &cfg->shared->input_widths[i], &cfg->shared->input_heights[i])) {
-        fprintf(stderr, "Input error: No size found for input layer %d\n", i);
-        ok = 0;
+    if (cfg->shared != NULL){
+      if (cfg->shared->input_widths[i] == 0 && cfg->shared->input_heights[i] == 0) {
+        if (!select_input_res_auto(opts->input[i], &cfg->shared->input_widths[i], &cfg->shared->input_heights[i])) {
+          fprintf(stderr, "Input error: No size found for input layer %d\n", i);
+          ok = 0;
+        }
       }
     } else if (cfg->width == 0 && cfg->height == 0) {
       if(!select_input_res_auto(opts->input[i], &opts->config->width, &opts->config->height)){
-        fprintf(stderr, "Input error: No size found for input layer %d\n", i);
+        fprintf(stderr, "Input error: No size found for input\n");
         ok = 0;
       }
     }

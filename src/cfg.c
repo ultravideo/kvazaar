@@ -782,8 +782,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     bool success = sscanf(value, "%dx%d", &width, &height) == 2;
     if( success ) {
       int i = cfg->shared->max_input_layers == 0 ? 0 : cfg->shared->max_input_layers - 1;
-      cfg->shared->input_widths[i] = width;
-      cfg->shared->input_heights[i] = height;
+      cfg->shared->input_widths[i] = cfg->width = width;
+      cfg->shared->input_heights[i] = cfg->height = height;
     }
     return (success);
   }
