@@ -945,13 +945,19 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8_t reflist[16], uint8_t length) {
+static void encoder_ref_insertion_sort(const encoder_state_t *const state,
+                                       uint8_t reflist[16],
+                                       uint8_t length,
+                                       bool reverse)
+{
 
   for (uint8_t i = 1; i < length; ++i) {
     const uint8_t cur_idx = reflist[i];
     const int32_t cur_poc = state->frame->ref->pocs[cur_idx];
     int8_t j = i;
-    while (j > 0 && cur_poc > state->frame->ref->pocs[reflist[j - 1]]) {
+    while ((j > 0 && !reverse && cur_poc > state->frame->ref->pocs[reflist[j - 1]]) ||
+           (j > 0 &&  reverse && cur_poc < state->frame->ref->pocs[reflist[j - 1]]))
+    {
       reflist[j] = reflist[j - 1];
       --j;
     }
@@ -966,29 +972,54 @@ static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8
  */
 void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
 {
-  // TODO check possibility to add L0 references to L1 list also
-  
+  const kvz_config *cfg = &state->encoder_control->cfg;
+
   FILL_ARRAY(state->frame->ref_LX_size, 0, 2);
 
-  // List all pocs of lists
-  int j = 0;
-  for (j = 0; j < state->frame->ref->used_size; j++) {
-    if (state->frame->ref->pocs[j] < state->frame->poc) {
-      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = j;
-      state->frame->ref_LX_size[0] += 1;
-    } else {
-      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = j;
+  int num_negative = 0;
+  int num_positive = 0;
+
+  // Add positive references to L1 list
+  for (int i = 0; i < state->frame->ref->used_size; i++) {
+    if (state->frame->ref->pocs[i] > state->frame->poc) {
+      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = i;
       state->frame->ref_LX_size[1] += 1;
+      num_positive++;
     }
   }
 
-  // Fill the rest with -1s.
-  for (; j < 16; j++) {
-    state->frame->ref_LX[0][j] = (uint8_t) -1;
-    state->frame->ref_LX[1][j] = (uint8_t) -1;
+  // Add negative references to L1 list when bipred is enabled and GOP is
+  // either disabled or does not use picture reordering.
+  bool l1_negative_refs =
+    (cfg->bipred && (cfg->gop_len == 0 || cfg->gop_lowdelay));
+
+  // Add negative references to L0 and L1 lists.
+  for (int i = 0; i < state->frame->ref->used_size; i++) {
+    if (state->frame->ref->pocs[i] < state->frame->poc) {
+      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = i;
+      state->frame->ref_LX_size[0] += 1;
+      if (l1_negative_refs) {
+        state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = i;
+        state->frame->ref_LX_size[1] += 1;
+      }
+      num_negative++;
+    }
   }
 
-  encoder_ref_insertion_sort(state, state->frame->ref_LX[0], state->frame->ref_LX_size[0]);
+  // Fill the rest with -1.
+  for (int i = state->frame->ref_LX_size[0]; i < 16; i++) {
+    state->frame->ref_LX[0][i] = 0xff;
+  }
+  for (int i = state->frame->ref_LX_size[1]; i < 16; i++) {
+    state->frame->ref_LX[1][i] = 0xff;
+  }
+
+  // Sort reference lists.
+  encoder_ref_insertion_sort(state, state->frame->ref_LX[0], num_negative, false);
+  encoder_ref_insertion_sort(state, state->frame->ref_LX[1], num_positive, true);
+  if (l1_negative_refs) {
+    encoder_ref_insertion_sort(state, state->frame->ref_LX[1] + num_positive, num_negative, false);
+  }
 }
 
 /**

@@ -777,12 +777,12 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
     }
   }
-    
+
   if (state->frame->slicetype != KVZ_SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
-      WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
+      WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[0]) - 1), "num_ref_idx_l0_active_minus1");
       if (state->frame->slicetype == KVZ_SLICE_B) {
-        WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
+        WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[1]) - 1), "num_ref_idx_l1_active_minus1");
         WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
       }
 

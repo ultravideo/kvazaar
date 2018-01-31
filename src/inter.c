@@ -1059,11 +1059,15 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // in L0 or L1, the primary list for the colocated PU is the inverse of
   // collocated_from_l0_flag. Otherwise it is equal to reflist.
   //
-  // In Kvazaar, the L1 list is only used for future pictures and the slice
-  // type is set to KVZ_SLICE_B if and only if L1 is used. Therefore we can
-  // simply check the slice type here. Kvazaar always sets
-  // collocated_from_l0_flag so the list is L1 for B-slices.
-  int col_list = state->frame->slicetype == KVZ_SLICE_P ? reflist : 1;
+  // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+  // there are future references.
+  int col_list = reflist;
+  for (int i = 0; i < state->frame->ref->used_size; i++) {
+    if (state->frame->ref->pocs[i] > state->frame->poc) {
+      col_list = 1;
+      break;
+    }
+  }
 
   if ((colocated->inter.mv_dir & (col_list + 1)) == 0) {
     // Use the other list if the colocated PU does not have a MV for the
@@ -1096,22 +1100,27 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
   if (!cand) return false;
 
   assert(cand->inter.mv_dir != 0);
-  const int cand_list = cand->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
-  if (scaling) {
-    mv_cand_out[0] = cand->inter.mv[cand_list][0];
-    mv_cand_out[1] = cand->inter.mv[cand_list][1];
-    apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
-    return true;
-  }
+  for (int i = 0; i < 2; i++) {
+    const int cand_list = i == 0 ? reflist : !reflist;
 
-  if (cand->inter.mv_dir & (1 << cand_list) &&
-      state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] == 
-      state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
-  {
-    mv_cand_out[0] = cand->inter.mv[cand_list][0];
-    mv_cand_out[1] = cand->inter.mv[cand_list][1];
-    return true;
+    if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
+
+    if (scaling) {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
+      return true;
+    }
+
+    if (cand->inter.mv_dir & (1 << cand_list) &&
+        state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
+        state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
+    {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      return true;
+    }
   }
 
   return false;
