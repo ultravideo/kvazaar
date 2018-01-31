@@ -306,27 +306,27 @@ static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
 
 
 /**
- * \brief Reconstruct inter block
+ * \brief Reconstruct an inter PU using uniprediction.
  *
  * \param state         encoder state
  * \param ref           picture to copy the data from
- * \param xpos          block x position
- * \param ypos          block y position
- * \param width         block width
- * \param height        block height
+ * \param xpos          PU x position
+ * \param ypos          PU y position
+ * \param width         PU width
+ * \param height        PU height
  * \param mv_param      motion vector
  * \param lcu           destination lcu
- * \param hi_prec_out   destination of high precision output (null if not needed)
+ * \param hi_prec_out   destination of high precision output, or NULL if not needed
 */
-void kvz_inter_recon_lcu(const encoder_state_t * const state,
-                         const kvz_picture * const ref,
-                         int32_t xpos,
-                         int32_t ypos,
-                         int32_t width,
-                         int32_t height,
-                         const int16_t mv_param[2],
-                         lcu_t *lcu,
-                         hi_prec_buf_t *hi_prec_out)
+static void inter_recon_unipred(const encoder_state_t * const state,
+                                const kvz_picture * const ref,
+                                int32_t xpos,
+                                int32_t ypos,
+                                int32_t width,
+                                int32_t height,
+                                const int16_t mv_param[2],
+                                lcu_t *lcu,
+                                hi_prec_buf_t *hi_prec_out)
 {
   const vector2d_t pu_in_tile = { xpos, ypos };
   const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
@@ -428,27 +428,27 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
 }
 
 /**
- * \brief Reconstruct bi-pred inter block
+ * \brief Reconstruct bi-pred inter PU
  *
  * \param state     encoder state
  * \param ref1      reference picture to copy the data from
  * \param ref2      other reference picture to copy the data from
- * \param xpos      block x position
- * \param ypos      block y position
- * \param width     block width
- * \param height    block height
+ * \param xpos      PU x position
+ * \param ypos      PU y position
+ * \param width     PU width
+ * \param height    PU height
  * \param mv_param  motion vectors
  * \param lcu       destination lcu
  */
-void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
-                                const kvz_picture * ref1,
-                                const kvz_picture * ref2,
-                                int32_t xpos,
-                                int32_t ypos,
-                                int32_t width,
-                                int32_t height,
-                                int16_t mv_param[2][2],
-                                lcu_t* lcu)
+void kvz_inter_recon_bipred(const encoder_state_t * const state,
+                            const kvz_picture * ref1,
+                            const kvz_picture * ref2,
+                            int32_t xpos,
+                            int32_t ypos,
+                            int32_t width,
+                            int32_t height,
+                            int16_t mv_param[2][2],
+                            lcu_t* lcu)
 {
   kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
@@ -468,7 +468,7 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
   if (hi_prec_chroma_rec0) high_precision_rec0 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
   if (hi_prec_chroma_rec1) high_precision_rec1 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
   //Reconstruct both predictors
-  kvz_inter_recon_lcu(state, ref1, xpos, ypos, width, height, mv_param[0], lcu, high_precision_rec0);
+  inter_recon_unipred(state, ref1, xpos, ypos, width, height, mv_param[0], lcu, high_precision_rec0);
   if (!hi_prec_luma_rec0){
     memcpy(temp_lcu_y, lcu->rec.y, sizeof(kvz_pixel) * 64 * 64);
   }
@@ -476,7 +476,7 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
     memcpy(temp_lcu_u, lcu->rec.u, sizeof(kvz_pixel) * 32 * 32);
     memcpy(temp_lcu_v, lcu->rec.v, sizeof(kvz_pixel) * 32 * 32);
   }
-  kvz_inter_recon_lcu(state, ref2, xpos, ypos, width, height, mv_param[1], lcu, high_precision_rec1);
+  inter_recon_unipred(state, ref2, xpos, ypos, width, height, mv_param[1], lcu, high_precision_rec1);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
   for (temp_y = 0; temp_y < height; ++temp_y) {
@@ -504,6 +504,69 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
   }
   if (high_precision_rec0 != 0) kvz_hi_prec_buf_t_free(high_precision_rec0);
   if (high_precision_rec1 != 0) kvz_hi_prec_buf_t_free(high_precision_rec1);
+}
+
+
+/**
+ * Reconstruct a single CU.
+ *
+ * The CU may consist of multiple PUs, each of which can use either
+ * uniprediction or biprediction.
+ *
+ * \param state   encoder state
+ * \param lcu     containing LCU
+ * \param x       x-coordinate of the CU in pixels
+ * \param y       y-coordinate of the CU in pixels
+ * \param width   CU width
+ */
+void kvz_inter_recon_cu(const encoder_state_t * const state,
+                        lcu_t *lcu,
+                        int32_t x,
+                        int32_t y,
+                        int32_t width)
+{
+  cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+
+  const int num_pu = kvz_part_mode_num_parts[cu->part_size];
+  for (int i = 0; i < num_pu; ++i) {
+    const int pu_x = PU_GET_X(cu->part_size, width, x, i);
+    const int pu_y = PU_GET_Y(cu->part_size, width, y, i);
+    const int pu_w = PU_GET_W(cu->part_size, width, i);
+    const int pu_h = PU_GET_H(cu->part_size, width, i);
+
+    cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
+
+    if (pu->inter.mv_dir == 3) {
+      const kvz_picture *const refs[2] = {
+        state->frame->ref->images[
+          state->frame->ref_LX[0][
+            pu->inter.mv_ref[0]]],
+        state->frame->ref->images[
+          state->frame->ref_LX[1][
+            pu->inter.mv_ref[1]]],
+      };
+      kvz_inter_recon_bipred(state,
+                             refs[0], refs[1],
+                             pu_x, pu_y,
+                             pu_w, pu_h,
+                             pu->inter.mv,
+                             lcu);
+    } else {
+      const int mv_idx = pu->inter.mv_dir - 1;
+      const kvz_picture *const ref =
+        state->frame->ref->images[
+          state->frame->ref_LX[mv_idx][
+            pu->inter.mv_ref[mv_idx]]];
+
+      inter_recon_unipred(state,
+                          ref,
+                          pu_x, pu_y,
+                          pu_w, pu_h,
+                          pu->inter.mv[mv_idx],
+                          lcu,
+                          NULL);
+    }
+  }
 }
 
 /**

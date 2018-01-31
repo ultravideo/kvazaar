@@ -392,6 +392,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   const videoframe_t * const frame = state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;
+  double inter_zero_coeff_cost = MAX_INT;
   uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
@@ -518,7 +519,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        if (state->encoder_control->cfg.rdo == 3) {
+        if (ctrl->cfg.rdo == 3) {
           cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu);
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
@@ -538,46 +539,30 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
       kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
-      const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-      for (int i = 0; i < num_pu; ++i) {
-        const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
-        const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
-        const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
-        const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
+      kvz_inter_recon_cu(state, lcu, x, y, cu_width);
 
-        cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
+      if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
+        const int luma_index   = y_local * LCU_WIDTH + x_local;
+        const int chroma_index = (y_local / 2) * LCU_WIDTH_C + (x_local / 2);
 
-        if (cur_pu->inter.mv_dir == 3) {
-          const kvz_picture *const refs[2] = {
-            state->frame->ref->images[
-              state->frame->ref_LX[0][
-                cur_pu->inter.mv_ref[0]]],
-            state->frame->ref->images[
-              state->frame->ref_LX[1][
-                cur_pu->inter.mv_ref[1]]],
-          };
-          kvz_inter_recon_lcu_bipred(state,
-                                     refs[0], refs[1],
-                                     pu_x, pu_y,
-                                     pu_w, pu_h,
-                                     cur_pu->inter.mv,
-                                     lcu);
-        } else {
-          const int mv_idx = cur_pu->inter.mv_dir - 1;
-          
-          const kvz_picture *const ref =
-              state->frame->ref->images[
-                state->frame->ref_LX[mv_idx][
-                  cur_pu->inter.mv_ref[mv_idx]]];
+        double ssd = 0.0;
+        ssd += LUMA_MULT * kvz_pixels_calc_ssd(
+          &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
+          LCU_WIDTH, LCU_WIDTH, cu_width
+        );
+        ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+          &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
+          LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
+        );
+        ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+          &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
+          LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
+        );
 
-          kvz_inter_recon_lcu(state,
-                              ref,
-                              pu_x, pu_y,
-                              pu_w, pu_h,
-                              cur_pu->inter.mv[mv_idx],
-                              lcu,
-                              0);
-        }
+        inter_zero_coeff_cost = ssd + inter_bitcost * state->lambda;
+
+        // Save the pixels at a lower level of the working tree.
+        copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1]);
       }
 
       const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
@@ -589,7 +574,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
-      if(cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
+      if (cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         // Selecting skip reduces bits needed to code the CU
@@ -615,6 +600,28 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     }
 
     cost += mode_bits * state->lambda;
+
+    if (inter_zero_coeff_cost <= cost) {
+      cost = inter_zero_coeff_cost;
+
+      // Restore saved pixels from lower level of the working tree.
+      copy_cu_pixels(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
+
+      if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
+        cur_cu->merged = 0;
+        cur_cu->skipped = 1;
+        lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+      }
+
+      if (cur_cu->tr_depth != depth) {
+        // Reset transform depth since there are no coefficients. This
+        // ensures that CBF is cleared for the whole area of the CU.
+        kvz_lcu_set_trdepth(lcu, x, y, depth, depth);
+      }
+
+      cur_cu->cbf = 0;
+      lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
+    }
   }
 
   bool can_split_cu =

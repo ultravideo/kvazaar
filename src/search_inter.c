@@ -1514,18 +1514,18 @@ static void search_pu_inter(encoder_state_t * const state,
             continue;
           }
 
-          kvz_inter_recon_lcu_bipred(state,
-                                     state->frame->ref->images[
-                                       state->frame->ref_LX[0][merge_cand[i].ref[0]]
-                                     ],
-                                     state->frame->ref->images[
-                                       state->frame->ref_LX[1][merge_cand[j].ref[1]]
-                                     ],
-                                     x, y,
-                                     width,
-                                     height,
-                                     mv,
-                                     templcu);
+          kvz_inter_recon_bipred(state,
+                                 state->frame->ref->images[
+                                   state->frame->ref_LX[0][merge_cand[i].ref[0]]
+                                 ],
+                                 state->frame->ref->images[
+                                   state->frame->ref_LX[1][merge_cand[j].ref[1]]
+                                 ],
+                                 x, y,
+                                 width,
+                                 height,
+                                 mv,
+                                 templcu);
 
           for (int ypos = 0; ypos < height; ++ypos) {
             int dst_y = ypos * width;
