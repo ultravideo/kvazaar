@@ -151,7 +151,7 @@ typedef struct {
 
    // ***********************************************
    // Modified for SHVC
-   const int input_layer;
+   int input_layer;
    // ***********************************************
 
 } input_handler_args;
@@ -544,13 +544,16 @@ int main(int argc, char *argv[])
       kvz_sem_init(available_input_slots[i], 0);
       kvz_sem_init(filled_input_slots[i],    0);
 
+      //Set input layer
+      in_args[i].input_layer = i;
+
       in_args[i].available_input_slots = available_input_slots[i];
       in_args[i].filled_input_slots = filled_input_slots[i];
 
       in_args[i].input = input[i];
       in_args[i].api = api;
       in_args[i].opts = opts;
-      in_args[i].encoder = encoder;
+      in_args[i].encoder = encoder; //TODO: Handle different encoders.
       in_args[i].padding_x = padding_x;
       in_args[i].padding_y = padding_y;
       

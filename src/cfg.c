@@ -767,6 +767,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     cfg->shared->input_heights = tmp;
 
+    //Need to set new input width values to zero
+    cfg->shared->input_widths[cfg->shared->max_input_layers - 1] = 0;
+    cfg->shared->input_heights[cfg->shared->max_input_layers - 1] = 0;
+
     //If cur layers input layer has not been set, set the newest layer as the input layer set
     //Associates the first input in the layer with the input layer
     if( cfg->input_layer == -1 ) {
