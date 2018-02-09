@@ -1490,10 +1490,11 @@ static void add_irl_frames(encoder_state_t *state)
                            GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
     cu_array_t* scaled_cu = NULL;
       
-    if (encoder->cfg.threads > 0 && 0) {
+    if (encoder->cfg.threads > 0 ) {
       //TODO: fix dependencies etc. so that waitfor does not need to be called here
-      scaled_cu = deferred_cu_array_upsampling( state, mv_scale, pos_scale);
-      kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
+      //scaled_cu = deferred_cu_array_upsampling( state, mv_scale, pos_scale);
+      scaled_cu = kvz_cu_array_copy_ref(ILR_state->tile->frame->cu_array);
+      //kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
     } else{
       scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
         state->tile->frame->width_in_lcu,
