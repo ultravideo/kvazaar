@@ -817,12 +817,25 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         //*********************************************
         //For scalable extension.
         //Add dependency to ilr recon upscaling
-        if(state->tqj_ilr_rec_scaling_done != NULL){
-          kvz_threadqueue_job_dep_add(job[0], state->tqj_ilr_rec_scaling_done);
+
+        //Add a direct dependecy from ilr states wf_job to this (only for SNR)
+        if( state->ILR_state != NULL && state->ILR_state->tile->wf_jobs[lcu->id] != NULL){
+          kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[lcu->id]);
         }
-        //Add dependency to ilr cua upsampling
-        if(state->tqj_ilr_cua_upsampling_done != NULL){
-          kvz_threadqueue_job_dep_add(job[0], state->tqj_ilr_cua_upsampling_done);
+
+        //should be enough to add it to the first only?
+        if (i == 0) {
+          encoder_state_t* parent = NULL;
+          for (parent = state->parent; parent->parent != NULL; parent = parent->parent);
+
+          if (parent->tqj_ilr_rec_scaling_done != NULL) {
+            kvz_threadqueue_job_dep_add(job[0], parent->tqj_ilr_rec_scaling_done);
+          }
+          //Add dependency to ilr cua upsampling
+          if (parent->tqj_ilr_cua_upsampling_done != NULL) {
+            kvz_threadqueue_job_dep_add(job[0], parent->tqj_ilr_cua_upsampling_done);
+          }
+
         }
         //*********************************************
 
@@ -1357,20 +1370,31 @@ static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t 
 
 
 // Scale image by adding a scaling worker job to the job queue
-static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state )
+static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same )
 {
   if(pic_in == NULL) {
     return NULL;
   }
 
-  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
-                                         param->trgt_width + param->trgt_padding_x,
-                                         param->trgt_height + param->trgt_padding_y);
+  kvz_pic_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_pic_scaling_parameters));
+  kvz_picture* pic_out = NULL;
+
+  //If no scaling needs to be done, just return pic_in
+  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->src_width) {
+    scaling_param->skip = 1;
+    scaling_param->pic_out = NULL;
+    pic_out = kvz_image_copy_ref(pic_in);
+  }
+  else {
+    pic_out = kvz_image_alloc(pic_in->chroma_format,
+      param->trgt_width + param->trgt_padding_x,
+      param->trgt_height + param->trgt_padding_y);
+    scaling_param->pic_out = kvz_image_copy_ref(pic_out);
+    scaling_param->skip = 0;
+  }
 
   //Allocate scaling parameters to give to the worker. Worker should handle freeing.
-  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
   scaling_param->pic_in = kvz_image_copy_ref(pic_in);
-  scaling_param->pic_out = kvz_image_copy_ref(pic_out);
   scaling_param->param = param;
 
   //Make new job and free previous
@@ -1442,12 +1466,12 @@ static void add_irl_frames(encoder_state_t *state)
     const encoder_state_t *ILR_state = state->ILR_state;
     kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
     kvz_picture *scaled_pic = NULL;
-    if (encoder->cfg.threads > 0 ){
+    if (encoder->cfg.threads > 0 && 0 ){
       //TODO: fix dependencies etc. so that waitfor does not need to be called here
-      scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state);
+      scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
       kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
     } else {
-      scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling);
+      scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling, 1);
     }
     if (ilr_rec == NULL || scaled_pic == NULL) {
       return; //TODO: Add error etc?
@@ -1466,7 +1490,7 @@ static void add_irl_frames(encoder_state_t *state)
                            GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
     cu_array_t* scaled_cu = NULL;
       
-    if (encoder->cfg.threads > 0) {
+    if (encoder->cfg.threads > 0 && 0) {
       //TODO: fix dependencies etc. so that waitfor does not need to be called here
       scaled_cu = deferred_cu_array_upsampling( state, mv_scale, pos_scale);
       kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);

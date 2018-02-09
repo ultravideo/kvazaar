@@ -392,7 +392,7 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
-    cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling);
+    cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling, 1);
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
       kvz_image_free(cur_pic_in);

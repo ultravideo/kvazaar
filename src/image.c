@@ -628,6 +628,13 @@ void kvz_picture_scaler_worker( void *opaque_param)
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
 
+  if( in_param->skip ){
+    kvz_image_free(pic_in);
+    kvz_image_free(pic_out);
+    free(in_param);
+    return;
+  }
+
   yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v,
                                                         param->src_width + param->src_padding_x,
                                                         param->src_height + param->src_padding_y,
@@ -691,21 +698,29 @@ void kvz_picture_scaler_worker( void *opaque_param)
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
 //Create a new kvz picture based on pic_in with size given by width and height
-kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param)
+kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, uint8_t skip_same)
 {
 
   if(pic_in == NULL) {
     return NULL;
   }
 
-  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
-                                         param->trgt_width + param->trgt_padding_x,
-                                         param->trgt_height + param->trgt_padding_y);
+  //If no scaling needs to be done, just return pic_in
+  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->src_width) {
+    return kvz_image_copy_ref(pic_in);
+  }
 
+  kvz_pic_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_pic_scaling_parameters));
+
+  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
+                                          param->trgt_width + param->trgt_padding_x,
+                                          param->trgt_height + param->trgt_padding_y);
+
+  
   //Allocate scaling parameters to give to the worker. Worker should handle freeing.
-  kvz_pic_scaling_parameters *scaling_param = calloc(1,sizeof(kvz_pic_scaling_parameters));
   scaling_param->pic_in = kvz_image_copy_ref(pic_in);
   scaling_param->pic_out = kvz_image_copy_ref(pic_out);
+  scaling_param->skip = 0;
   scaling_param->param = param;
 
   //Do scaling
