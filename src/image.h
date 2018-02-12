@@ -108,7 +108,6 @@ void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
 typedef struct {
   kvz_picture *pic_in;
   kvz_picture *pic_out;
-  uint8_t skip; //Skip buffer copying when no scaling is done and just return ref of pic_in
 
   const scaling_parameter_t *param;
 } kvz_pic_scaling_parameters;

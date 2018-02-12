@@ -628,12 +628,6 @@ void kvz_picture_scaler_worker( void *opaque_param)
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
 
-  if( in_param->skip ){
-    kvz_image_free(pic_in);
-    kvz_image_free(pic_out);
-    free(in_param);
-    return;
-  }
 
   yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v,
                                                         param->src_width + param->src_padding_x,
@@ -720,7 +714,6 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   //Allocate scaling parameters to give to the worker. Worker should handle freeing.
   scaling_param->pic_in = kvz_image_copy_ref(pic_in);
   scaling_param->pic_out = kvz_image_copy_ref(pic_out);
-  scaling_param->skip = 0;
   scaling_param->param = param;
 
   //Do scaling

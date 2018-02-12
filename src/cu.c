@@ -349,6 +349,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
 
 cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init)
 {
+  
   //Allocate the new cua. Use cu_pos_scale to calculate the new size
   uint32_t n_width = nw_in_lcu * LCU_WIDTH;
   uint32_t n_height = nh_in_lcu * LCU_WIDTH;
