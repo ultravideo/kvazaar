@@ -1455,7 +1455,7 @@ static void search_pu_inter(encoder_state_t * const state,
     && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
 
   if (can_use_bipred) {
-    lcu_t *templcu = MALLOC(lcu_t, 1);
+    lcu_t templcu;
     unsigned cu_width = LCU_WIDTH >> depth;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -1506,12 +1506,12 @@ static void search_pu_inter(encoder_state_t * const state,
                                  width,
                                  height,
                                  mv,
-                                 templcu);
+                                 &templcu);
 
           for (int ypos = 0; ypos < height; ++ypos) {
             int dst_y = ypos * width;
             for (int xpos = 0; xpos < width; ++xpos) {
-              tmp_block[dst_y + xpos] = templcu->rec.y[
+              tmp_block[dst_y + xpos] = templcu.rec.y[
                 SUB_SCU(y + ypos) * LCU_WIDTH + SUB_SCU(x + xpos)];
               tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
             }
@@ -1587,7 +1587,6 @@ static void search_pu_inter(encoder_state_t * const state,
         }
       }
     }
-    FREE_POINTER(templcu);
   }
 
   if (*inter_cost < INT_MAX && cur_cu->inter.mv_dir == 1) {
