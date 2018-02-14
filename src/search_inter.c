@@ -1405,118 +1405,107 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     if (i >= info->num_merge_cand || j >= info->num_merge_cand) break;
 
     // Find one L0 and L1 candidate according to the priority list
-    if ((merge_cand[i].dir & 0x1) && (merge_cand[j].dir & 0x2)) {
-      if (ref_LX[0][merge_cand[i].ref[0]] !=
-          ref_LX[1][merge_cand[j].ref[1]] ||
+    if (!(merge_cand[i].dir & 0x1) || !(merge_cand[j].dir & 0x2)) continue;
 
-          merge_cand[i].mv[0][0] != merge_cand[j].mv[1][0] ||
-          merge_cand[i].mv[0][1] != merge_cand[j].mv[1][1])
-      {
-        uint32_t bitcost[2];
-        uint32_t cost = 0;
-        int16_t mv[2][2];
-        kvz_pixel tmp_block[64 * 64];
-        kvz_pixel tmp_pic[64 * 64];
+    if (ref_LX[0][merge_cand[i].ref[0]] == ref_LX[1][merge_cand[j].ref[1]] &&
+        merge_cand[i].mv[0][0] == merge_cand[j].mv[1][0] &&
+        merge_cand[i].mv[0][1] == merge_cand[j].mv[1][1])
+    {
+      continue;
+    }
 
-        mv[0][0] = merge_cand[i].mv[0][0];
-        mv[0][1] = merge_cand[i].mv[0][1];
-        mv[1][0] = merge_cand[j].mv[1][0];
-        mv[1][1] = merge_cand[j].mv[1][1];
+    int16_t mv[2][2];
+    mv[0][0] = merge_cand[i].mv[0][0];
+    mv[0][1] = merge_cand[i].mv[0][1];
+    mv[1][0] = merge_cand[j].mv[1][0];
+    mv[1][1] = merge_cand[j].mv[1][1];
 
-        // Don't try merge candidates that don't satisfy mv constraints.
-        if (!fracmv_within_tile(info, mv[0][0], mv[0][1]) ||
-            !fracmv_within_tile(info, mv[1][0], mv[1][1]))
+    // Don't try merge candidates that don't satisfy mv constraints.
+    if (!fracmv_within_tile(info, mv[0][0], mv[0][1]) ||
+        !fracmv_within_tile(info, mv[1][0], mv[1][1]))
+    {
+      continue;
+    }
+
+    kvz_inter_recon_bipred(info->state,
+                           ref->images[ref_LX[0][merge_cand[i].ref[0]]],
+                           ref->images[ref_LX[1][merge_cand[j].ref[1]]],
+                           x, y,
+                           width,
+                           height,
+                           mv,
+                           lcu);
+
+    const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
+    const kvz_pixel *src = &frame->source->y[x + y * frame->source->width];
+    uint32_t cost =
+      kvz_satd_any_size(cu_width, cu_width, rec, LCU_WIDTH, src, frame->source->width);
+
+    uint32_t bitcost[2] = { 0, 0 };
+
+    cost += info->mvd_cost_func(info->state,
+                               merge_cand[i].mv[0][0],
+                               merge_cand[i].mv[0][1],
+                               0,
+                               info->mv_cand,
+                               NULL, 0, 0,
+                               &bitcost[0]);
+    cost += info->mvd_cost_func(info->state,
+                               merge_cand[i].mv[1][0],
+                               merge_cand[i].mv[1][1],
+                               0,
+                               info->mv_cand,
+                               NULL, 0, 0,
+                               &bitcost[1]);
+
+    const uint8_t mv_ref_coded[2] = {
+      merge_cand[i].ref[0],
+      merge_cand[j].ref[1]
+    };
+    const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
+    cost += info->state->lambda_sqrt * extra_bits + 0.5;
+
+    if (cost < *inter_cost) {
+      cur_cu->inter.mv_dir = 3;
+
+      cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
+      cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
+
+      cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
+      cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];
+      cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
+      cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
+      cur_cu->merged = 0;
+
+      // Check every candidate to find a match
+      for (int merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
+        if (merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
+            merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
+            merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
+            merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
+            merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
+            merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1])
         {
-          continue;
-        }
-
-        lcu_t templcu;
-        kvz_inter_recon_bipred(info->state,
-                               ref->images[ref_LX[0][merge_cand[i].ref[0]]],
-                               ref->images[ref_LX[1][merge_cand[j].ref[1]]],
-                               x, y,
-                               width,
-                               height,
-                               mv,
-                               &templcu);
-
-        for (int ypos = 0; ypos < height; ++ypos) {
-          int dst_y = ypos * width;
-          for (int xpos = 0; xpos < width; ++xpos) {
-            tmp_block[dst_y + xpos] = templcu.rec.y[
-              SUB_SCU(y + ypos) * LCU_WIDTH + SUB_SCU(x + xpos)];
-            tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
-          }
-        }
-
-        cost = kvz_satd_any_size(cu_width, cu_width, tmp_pic, cu_width, tmp_block, cu_width);
-
-        cost += info->mvd_cost_func(info->state,
-                                   merge_cand[i].mv[0][0],
-                                   merge_cand[i].mv[0][1],
-                                   0,
-                                   info->mv_cand,
-                                   NULL, 0, 0,
-                                   &bitcost[0]);
-        cost += info->mvd_cost_func(info->state,
-                                   merge_cand[i].mv[1][0],
-                                   merge_cand[i].mv[1][1],
-                                   0,
-                                   info->mv_cand,
-                                   NULL, 0, 0,
-                                   &bitcost[1]);
-
-        const uint8_t mv_ref_coded[2] = {
-          merge_cand[i].ref[0],
-          merge_cand[j].ref[1]
-        };
-        const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
-        cost += info->state->lambda_sqrt * extra_bits + 0.5;
-
-
-        if (cost < *inter_cost) {
-          cur_cu->inter.mv_dir = 3;
-
-          cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
-          cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
-
-          cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
-          cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];
-          cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
-          cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
-          cur_cu->merged = 0;
-
-          // Check every candidate to find a match
-          for (int merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
-            if (merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
-                merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
-                merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
-                merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
-                merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
-                merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1])
-            {
-              cur_cu->merged = 1;
-              cur_cu->merge_idx = merge_idx;
-              break;
-            }
-          }
-
-          // Each motion vector has its own candidate
-          for (int reflist = 0; reflist < 2; reflist++) {
-            kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, cur_cu, lcu, reflist);
-            int cu_mv_cand = select_mv_cand(
-                info->state,
-                info->mv_cand,
-                cur_cu->inter.mv[reflist][0],
-                cur_cu->inter.mv[reflist][1],
-                NULL);
-            CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
-          }
-
-          *inter_cost = cost;
-          *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
+          cur_cu->merged = 1;
+          cur_cu->merge_idx = merge_idx;
+          break;
         }
       }
+
+      // Each motion vector has its own candidate
+      for (int reflist = 0; reflist < 2; reflist++) {
+        kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, cur_cu, lcu, reflist);
+        int cu_mv_cand = select_mv_cand(
+            info->state,
+            info->mv_cand,
+            cur_cu->inter.mv[reflist][0],
+            cur_cu->inter.mv[reflist][1],
+            NULL);
+        CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
+      }
+
+      *inter_cost = cost;
+      *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
     }
   }
 }
