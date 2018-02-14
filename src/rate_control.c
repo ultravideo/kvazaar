@@ -241,9 +241,13 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     const int gop_len = ctrl->cfg.gop_len;
 
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + gop->qp_offset);
+      double qp = ctrl->cfg.qp;
+      qp += gop->qp_offset;
+      qp += CLIP(0.0, 3.0, qp * gop->qp_model_scale + gop->qp_model_offset);
+      state->frame->QP = CLIP_TO_QP((int)(qp + 0.5));
+
     } else {
-      state->frame->QP = ctrl->cfg.qp;
+      state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + ctrl->cfg.intra_qp_offset);
     }
 
     state->frame->lambda = qp_to_lambda(state, state->frame->QP);

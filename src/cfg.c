@@ -41,6 +41,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
+  cfg->intra_qp_offset = -3;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
