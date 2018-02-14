@@ -943,6 +943,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_len = sizeof(kvz_gop_ra8) / sizeof(kvz_gop_ra8[0]);
       memcpy(cfg->gop, kvz_gop_ra8, sizeof(kvz_gop_ra8));
 
+    } else if (atoi(value) == 16) {
+      cfg->gop_lowdelay = 0;
+      cfg->gop_len = sizeof(kvz_gop_ra16) / sizeof(kvz_gop_ra16[0]);
+      memcpy(cfg->gop, kvz_gop_ra16, sizeof(kvz_gop_ra16));
+
     } else if (atoi(value) == 0) {
       //Disable gop
       cfg->gop_len = 0;
