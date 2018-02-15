@@ -383,13 +383,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   //for each layer
   if (encoder->cfg.gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, 0, "sps_num_reorder_pics");
+    const int dpb = encoder->cfg.ref_frames;
+    WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
   } else {
-    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    const int dpb = MIN(16, encoder->cfg.gop_len);
+    WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, encoder->cfg.gop_len - 1, "sps_max_num_reorder_pics");
   }
-  WRITE_UE(stream, 0, "sps_max_latency_increase");
+  WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
   WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
