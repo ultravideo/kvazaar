@@ -28,6 +28,7 @@
 
 #include "cfg.h"
 #include "strategyselector.h"
+#include "kvz_math.h"
 
 
 /**
@@ -236,6 +237,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       kvz_config_process_lp_gop(&encoder->cfg);
     }
   }
+
+  encoder->poc_lsb_bits = MAX(4, kvz_math_ceil_log2(encoder->cfg.gop_len * 2 + 1));
 
   encoder->max_inter_ref_lcu.right = 1;
   encoder->max_inter_ref_lcu.down  = 1;
