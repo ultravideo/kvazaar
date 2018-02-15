@@ -335,7 +335,9 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   }
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
 
-  if (!encoder_control_init_gop_layer_weights(encoder)) {
+  if (encoder->cfg.target_bitrate > 0 &&
+      !encoder_control_init_gop_layer_weights(encoder))
+  {
     goto init_failed;
   }
 
