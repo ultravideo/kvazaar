@@ -27,6 +27,7 @@
 #include <stdlib.h>
 
 #include "cfg.h"
+#include "gop.h"
 #include "strategyselector.h"
 #include "kvz_math.h"
 
@@ -234,7 +235,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 
   if (encoder->cfg.gop_len > 0) {
     if (encoder->cfg.gop_lowdelay) {
-      kvz_config_process_lp_gop(&encoder->cfg);
+      if (encoder->cfg.gop_len == 4 && encoder->cfg.ref_frames == 4) {
+        memcpy(encoder->cfg.gop, kvz_gop_lowdelay4, sizeof(kvz_gop_lowdelay4));
+      } else {
+        kvz_config_process_lp_gop(&encoder->cfg);
+      }
     }
   }
 

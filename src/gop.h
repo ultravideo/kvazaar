@@ -23,6 +23,62 @@
 #include <kvazaar.h>
 
 
+static const kvz_gop_config kvz_gop_lowdelay4[4] = {
+  {
+    .poc_offset = 1,
+    .layer      = 1,
+    .qp_offset  = 5,
+    .qp_factor  = 1.0,
+    .qp_model_offset = -6.5,
+    .qp_model_scale  = 0.2590,
+    .is_ref     = 1,
+    .ref_neg_count = 4,
+    .ref_neg = { 1, 5, 9, 13 },
+    .ref_pos_count = 0,
+    .ref_pos = { 0 },
+  },
+  {
+    .poc_offset = 2,
+    .layer      = 1,
+    .qp_offset  = 4,
+    .qp_factor  = 1.0,
+    .qp_model_offset = -6.5,
+    .qp_model_scale  = 0.2590,
+    .is_ref     = 1,
+    .ref_neg_count = 3,
+    .ref_neg = { 1, 2, 6, 10 },
+    .ref_pos_count = 0,
+    .ref_pos = { 0 },
+  },
+  {
+    .poc_offset = 3,
+    .layer      = 1,
+    .qp_offset  = 5,
+    .qp_factor  = 1.0,
+    .qp_model_offset = -6.5,
+    .qp_model_scale  = 0.2590,
+    .is_ref     = 1,
+    .ref_neg_count = 3,
+    .ref_neg = { 1, 3, 7, 11 },
+    .ref_pos_count = 0,
+    .ref_pos = { 0 },
+  },
+  {
+    .poc_offset = 4,
+    .layer      = 1,
+    .qp_offset  = 1,
+    .qp_factor  = 1.0,
+    .qp_model_offset = 0.0,
+    .qp_model_scale  = 0.0,
+    .is_ref     = 1,
+    .ref_neg_count = 3,
+    .ref_neg = { 1, 4, 8, 12 },
+    .ref_pos_count = 0,
+    .ref_pos = { 0 },
+  },
+};
+
+
 static const kvz_gop_config kvz_gop_ra8[8] = {
   {
     .poc_offset = 8,
