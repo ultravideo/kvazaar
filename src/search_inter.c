@@ -30,6 +30,7 @@
 #include "inter.h"
 #include "kvazaar.h"
 #include "rdo.h"
+#include "search.h"
 #include "strategies/strategies-ipol.h"
 #include "strategies/strategies-picture.h"
 #include "videoframe.h"
@@ -1600,6 +1601,46 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 }
 
+/**
+* \brief Calculate inter coding cost for luma and chroma CBs (--rd=2 accuracy).
+*
+* Calculate inter coding cost of each CB. This should match the intra coding cost
+* calculation that is used on this RDO accuracy, since CU type decision is based
+* on this.
+*
+* The cost includes SSD distortion, transform unit tree bits and motion vector bits
+* for both luma and chroma if enabled.
+*
+* \param state       encoder state
+* \param x           x-coordinate of the CU
+* \param y           y-coordinate of the CU
+* \param depth       depth of the CU in the quadtree
+* \param lcu         containing LCU
+*
+* \param inter_cost    Return inter cost
+* \param inter_bitcost Return inter bitcost
+*/
+void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
+  int x, int y, int depth,
+  lcu_t *lcu,
+  double   *inter_cost,
+  uint32_t *inter_bitcost){
+
+  cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  int tr_depth = MAX(1, depth);
+  if (cur_cu->part_size != SIZE_2Nx2N) {
+    tr_depth = depth + 1;
+  }
+  kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
+  kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth));
+  *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+  }
+
+  *inter_cost += *inter_bitcost * state->lambda;
+}
+
 
 /**
  * \brief Update CU to have best modes at this depth.
@@ -1627,6 +1668,15 @@ void kvz_search_cu_inter(encoder_state_t * const state,
                   lcu,
                   inter_cost,
                   inter_bitcost);
+
+  // Calculate more accurate cost when needed
+  if (state->encoder_control->cfg.rdo >= 2) {
+    kvz_cu_cost_inter_rd2(state,
+      x, y, depth,
+      lcu,
+      inter_cost,
+      inter_bitcost);
+  }
 }
 
 
@@ -1696,6 +1746,15 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     }
   }
 
+  // Calculate more accurate cost when needed
+  if (state->encoder_control->cfg.rdo >= 2) {
+    kvz_cu_cost_inter_rd2(state,
+      x, y, depth,
+      lcu,
+      inter_cost,
+      inter_bitcost);
+  }
+
   // Count bits spent for coding the partition mode.
   int smp_extra_bits = 1; // horizontal or vertical
   if (state->encoder_control->cfg.amp_enable) {
@@ -1708,6 +1767,6 @@ void kvz_search_cu_smp(encoder_state_t * const state,
   // coding the CBF.
   smp_extra_bits += 6;
 
-  *inter_cost += state->lambda_sqrt * smp_extra_bits;
+  *inter_cost += (state->encoder_control->cfg.rdo >= 2 ? state->lambda : state->lambda_sqrt) * smp_extra_bits;
   *inter_bitcost += smp_extra_bits;
 }

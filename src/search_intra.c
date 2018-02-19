@@ -845,7 +845,6 @@ void kvz_search_cu_intra(encoder_state_t * const state,
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
-  double best_rough_cost = costs[select_best_mode_index(modes, costs, number_of_modes)];
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {
@@ -872,5 +871,5 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
 
   *mode_out = modes[best_mode_i];
-  *cost_out = skip_rough_search ? costs[best_mode_i]:best_rough_cost;
+  *cost_out = costs[best_mode_i];
 }
