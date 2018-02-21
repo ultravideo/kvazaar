@@ -478,6 +478,7 @@ static bool early_terminate(inter_search_info_t *info)
 void kvz_tz_pattern_search(inter_search_info_t *info,
                            unsigned pattern_type,
                            const int iDist,
+                           vector2d_t mv,
                            int *best_dist)
 {
   assert(pattern_type < 4);
@@ -573,8 +574,6 @@ void kvz_tz_pattern_search(inter_search_info_t *info,
     };
   }
 
-  const vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
-
   // Compute SAD values for all chosen points.
   int best_index = -1;
   for (int i = 0; i < n_points; i++) {
@@ -632,9 +631,11 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     return;
   }
 
+  vector2d_t start = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+
   //step 2, grid search
   for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
-    kvz_tz_pattern_search(info, step2_type, iDist, &best_dist);
+    kvz_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
   }
 
   //step 3, raster scan
@@ -648,14 +649,19 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   //raster refinement
   if (bRasterRefinementEnable && best_dist > 0) {
     for (int iDist = best_dist >> 1; iDist > 0; iDist >>= 1) {
-      kvz_tz_pattern_search(info, step4_type, iDist, &best_dist);
+      start.x = info->best_mv.x >> 2;
+      start.y = info->best_mv.y >> 2;
+      kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
   }
 
   //star refinement (repeat step 2 for the current starting point)
-  if (bStarRefinementEnable && best_dist > 0) {
+  while (bStarRefinementEnable && best_dist > 0) {
+    best_dist = 0;
+    start.x = info->best_mv.x >> 2;
+    start.y = info->best_mv.y >> 2;
     for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
-      kvz_tz_pattern_search(info, step4_type, iDist, &best_dist);
+      kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
   }
 }
