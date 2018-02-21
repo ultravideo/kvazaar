@@ -614,8 +614,8 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   const int iRaster = 5;  // search distance limit and downsampling factor for step 3
   const unsigned step2_type = 0;  // search patterns for steps 2 and 4
   const unsigned step4_type = 0;
-  const bool bRasterRefinementEnable = true;  // enable step 4 mode 1
-  const bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
+  const bool bRasterRefinementEnable = false;  // enable step 4 mode 1
+  const bool bStarRefinementEnable = true;   // enable step 4 mode 2 (only one mode will be executed)
 
   int best_dist = 0;
   info->best_cost = UINT32_MAX;
