@@ -614,8 +614,9 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   const int iRaster = 5;  // search distance limit and downsampling factor for step 3
   const unsigned step2_type = 0;  // search patterns for steps 2 and 4
   const unsigned step4_type = 0;
-  const bool bRasterRefinementEnable = false;  // enable step 4 mode 1
-  const bool bStarRefinementEnable = true;   // enable step 4 mode 2 (only one mode will be executed)
+  const bool use_raster_scan = false;  // enable step 3
+  const bool use_raster_refinement = false;  // enable step 4 mode 1
+  const bool use_star_refinement = true;   // enable step 4 mode 2 (only one mode will be executed)
 
   int best_dist = 0;
   info->best_cost = UINT32_MAX;
@@ -657,7 +658,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   }
 
   //step 3, raster scan
-  if (best_dist > iRaster) {
+  if (use_raster_scan && best_dist > iRaster) {
     best_dist = iRaster;
     kvz_tz_raster_search(info, iSearchRange, iRaster);
   }
@@ -665,7 +666,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   //step 4
 
   //raster refinement
-  if (bRasterRefinementEnable && best_dist > 0) {
+  if (use_raster_refinement && best_dist > 0) {
     for (int iDist = best_dist >> 1; iDist > 0; iDist >>= 1) {
       start.x = info->best_mv.x >> 2;
       start.y = info->best_mv.y >> 2;
@@ -674,7 +675,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   }
 
   //star refinement (repeat step 2 for the current starting point)
-  while (bStarRefinementEnable && best_dist > 0) {
+  while (use_star_refinement && best_dist > 0) {
     best_dist = 0;
     start.x = info->best_mv.x >> 2;
     start.y = info->best_mv.y >> 2;
