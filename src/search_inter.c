@@ -262,8 +262,8 @@ static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
   for (int i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
     const vector2d_t merge_mv = {
-      info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2,
-      info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2
+      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> 2,
+      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> 2
     };
     if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
       return true;
@@ -297,8 +297,8 @@ static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv
   for (unsigned i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
 
-    int x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2;
-    int y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2;
+    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> 2;
+    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> 2;
 
     if (x == 0 && y == 0) continue;
 
