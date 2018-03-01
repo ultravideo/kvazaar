@@ -633,7 +633,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
 
   vector2d_t start = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
-  //step 2, grid search
+  // step 2, grid search
   int rounds_without_improvement = 0;
   for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
     kvz_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
@@ -641,6 +641,19 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     // Break the loop if the last three rounds didn't produce a better MV.
     if (best_dist != iDist) rounds_without_improvement++;
     if (rounds_without_improvement >= 3) break;
+  }
+
+  if (start.x != 0 || start.y != 0) {
+    // repeat step 2 starting from the zero MV
+    start.x = 0;
+    start.y = 0;
+    rounds_without_improvement = 0;
+    for (int iDist = 1; iDist <= iSearchRange/2; iDist *= 2) {
+      kvz_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
+
+      if (best_dist != iDist) rounds_without_improvement++;
+      if (rounds_without_improvement >= 3) break;
+    }
   }
 
   //step 3, raster scan
