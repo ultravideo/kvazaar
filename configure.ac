@@ -68,7 +68,10 @@ AS_IF([test "x$with_cryptopp" = "xyes"],
         [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
         [PKG_CHECK_MODULES([cryptopp], [libcrypto++],
             [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
-            [AC_MSG_ERROR([neither cryptopp nor libcrypto++ found with pkg-config])]
+            [PKG_CHECK_MODULES([cryptopp], [libcryptopp],
+                [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
+                [AC_MSG_ERROR([neither cryptopp, libcrypto++ nor libcryptopp found with pkg-config])]
+            )]
         )]
     )]
 )
