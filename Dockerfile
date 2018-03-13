@@ -14,8 +14,8 @@
 #     ffmpeg -i input.avi -an -f rawvideo -pix_fmt yuv420p - | docker run -i -a STDIN -a STDOUT kvazaar -i - --wpp --threads=8 --input-res=$RESOLUTION --preset=ultrafast -o - > output.265
 #
 
-# Use Ubuntu 15.10 as a base for now, it's around 136MB
-FROM ubuntu:15.10
+# Use Ubuntu 18.04 as a base for now, it's around 88MB
+FROM ubuntu:18.04
 
 MAINTAINER Marko Viitanen <fador@iki.fi>
 
