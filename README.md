@@ -11,6 +11,28 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 - Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 - Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
+## Table of Contents
+
+- [Using Kvazaar](#using-kvazaar)
+  - [Example:](#example)
+  - [Parameters](#parameters)
+  - [LP-GOP syntax](#lp-gop-syntax)
+- [Presets](#presets)
+- [Kvazaar library](#kvazaar-library)
+- [Compiling Kvazaar](#compiling-kvazaar)
+  - [Required libraries](#required-libraries)
+  - [Autotools](#autotools)
+  - [OS X](#os-x)
+  - [Visual Studio](#visual-studio)
+  - [Docker](#docker)
+  - [Visualization (Windows only)](#visualization-windows-only)
+- [Contributing to Kvazaar](#contributing-to-kvazaar)
+  - [Code documentation](#code-documentation)
+  - [For version control we try to follow these conventions:](#for-version-control-we-try-to-follow-these-conventions)
+  - [Testing](#testing)
+  - [Unit tests](#unit-tests)
+  - [Code style](#code-style)
+
 ## Using Kvazaar
 
 ### Example:
