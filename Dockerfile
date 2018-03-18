@@ -22,12 +22,12 @@ MAINTAINER Marko Viitanen <fador@iki.fi>
 # List of needed packages to be able to build kvazaar with autotools
 ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git yasm pkgconf
 
+ADD . kvazaar
 # Run all the commands in one RUN so we don't have any extra history
 # data in the image.
 RUN apt-get update \
     && apt-get install -y $REQUIRED_PACKAGES \
     && apt-get clean \
-    && git clone --depth=1 git://github.com/ultravideo/kvazaar.git \
     && cd kvazaar \
     && ./autogen.sh \
     && ./configure --disable-shared \
