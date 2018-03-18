@@ -27,16 +27,16 @@ MAINTAINER Marko Viitanen <fador@iki.fi>
     RUN apt-get update \
     && apt-get install -y $REQUIRED_PACKAGES \
     && apt-get clean \
-    && git clone --depth=1 git://github.com/ultravideo/kvazaar.git; \
-        cd kvazaar; \
-        ./autogen.sh; \
-        ./configure --disable-shared;\
-        make;\
-        make install; \
-    AUTOINSTALLED_PACKAGES=`apt-mark showauto`; \
-    apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES; \
-        apt-get clean autoclean; \
-        apt-get autoremove -y; \
-        rm -rf /var/lib/{apt,dpkg,cache,log}/
+    && git clone --depth=1 git://github.com/ultravideo/kvazaar.git \
+    && cd kvazaar \
+    && ./autogen.sh \
+    && ./configure --disable-shared \
+    && make\
+    && make install \
+    && AUTOINSTALLED_PACKAGES=`apt-mark showauto` \
+    && apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES \
+    && apt-get clean autoclean \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/{apt,dpkg,cache,log}/
 ENTRYPOINT ["kvazaar"]
 CMD ["--help"]
