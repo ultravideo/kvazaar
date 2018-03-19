@@ -372,7 +372,7 @@ static void encode_transform_unit(encoder_state_t * const state,
                          width,
                          0,
                          scan_idx,
-                         cur_pu->intra.tr_skip);
+                         cur_pu->tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1) {

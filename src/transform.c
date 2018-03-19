@@ -369,19 +369,22 @@ static void quantize_tr_residual(encoder_state_t * const state,
     }
 
   } else if (can_use_trskip) {
+    int8_t tr_skip = 0;
+
     // Try quantization with trskip and use it if it's better.
     has_coeffs = kvz_quantize_residual_trskip(state,
                                               cur_pu,
                                               tr_width,
                                               color,
                                               scan_idx,
-                                              &cur_pu->intra.tr_skip,
+                                              &tr_skip,
                                               lcu_width,
                                               lcu_width,
                                               ref,
                                               pred,
                                               pred,
                                               coeff);
+    cur_pu->tr_skip = tr_skip;
   } else {
     has_coeffs = kvz_quantize_residual(state,
                                        cur_pu,
