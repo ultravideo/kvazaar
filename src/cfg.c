@@ -86,13 +86,13 @@ int kvz_config_init(kvz_config *cfg)
   cfg->tiles_height_count = 1;
   cfg->tiles_width_split  = NULL;
   cfg->tiles_height_split = NULL;
-  
+
   cfg->wpp = 1;
   cfg->owf = -1;
   cfg->slice_count = 1;
   cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
   cfg->slice_addresses_in_ts[0] = 0;
-  
+
   cfg->threads = -1;
   cfg->cpuid = 1;
 
@@ -185,14 +185,14 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   const char* current_arg = NULL;
   int32_t current_value;
   int32_t values[MAX_TILES_PER_DIM];
-  
+
   int i;
-  
+
   //Free pointer in any case
   if (*array) {
     FREE_POINTER(*array);
   }
-  
+
   //If the arg starts with u, we want an uniform split
   if (arg[0]=='u') {
     *ntiles = atoi(arg + 1);
@@ -203,7 +203,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     //Done with parsing
     return 1;
   }
-  
+
   //We have a comma-separated list of int for the split...
   current_arg = arg;
   *ntiles = 1;
@@ -220,27 +220,27 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     ++(*ntiles);
     if (MAX_TILES_PER_DIM <= *ntiles) break;
   } while (current_arg);
-  
+
   if (MAX_TILES_PER_DIM <= *ntiles || 1 >= *ntiles) {
     fprintf(stderr, "Invalid number of tiles (1 <= %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles, MAX_TILES_PER_DIM);
     return 0;
   }
-  
+
   *array = MALLOC(int32_t, *ntiles - 1);
   if (!*array) {
     fprintf(stderr, "Could not allocate array for tiles\n");
     return 0;
   }
-  
+
   //TODO: memcpy?
   for (i = 0; i < *ntiles - 1; ++i) {
     (*array)[i] = values[i];
   }
-  
+
   return 1;
 }
 
-static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)                               
+static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
 {
   char *tail;
   int d = strtol(numstr, &tail, 10);
@@ -292,14 +292,14 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   const char* current_arg = NULL;
   int32_t current_value;
   int32_t values[MAX_SLICES];
-  
+
   int i;
-  
+
   //Free pointer in any case
   if (*array) {
     FREE_POINTER(*array);
   }
-  
+
   //If the arg starts with u, we want an uniform split
   if (arg[0]=='u') {
     *nslices = atoi(arg+1);
@@ -310,7 +310,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
     //Done with parsing
     return 1;
   }
-  
+
   //We have a comma-separated list of int for the split...
   current_arg = arg;
   //We always have a slice starting at 0
@@ -329,23 +329,23 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
     ++(*nslices);
     if (MAX_SLICES <= *nslices) break;
   } while (current_arg);
-  
+
   if (MAX_SLICES <= *nslices || 0 >= *nslices) {
     fprintf(stderr, "Invalid number of slices (0 < %d <= %d = MAX_SLICES)!\n", *nslices, MAX_SLICES);
     return 0;
   }
-  
+
   *array = MALLOC(int32_t, *nslices);
   if (!*array) {
     fprintf(stderr, "Could not allocate array for slices\n");
     return 0;
   }
-  
+
   //TODO: memcpy?
   for (i = 0; i < *nslices; ++i) {
     (*array)[i] = values[i];
   }
-  
+
   return 1;
 }
 
@@ -375,221 +375,232 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
-  static const char * const preset_values[11][20*2] = {
-      { 
-        "ultrafast", 
+  static const char * const preset_values[11][21*2] = {
+      {
+        "ultrafast",
+        "rd", "0",
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "2-3",
-        "rd", "0",
         "me", "hexbs",
+        "gop", "lp-g4d4t1",
         "ref", "1",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
-        "subme", "0",
+        "subme", "2",
         "sao", "off",
         "rdoq", "0",
-        "rdoq-skip", "1",
-        "transform-skip", "0", 
-        "full-intra-search", "0",
+        "rdoq-skip", "0",
+        "transform-skip", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
-        "gop", "lp-g4d3t1",
-        NULL 
+        NULL
       },
-      { 
+      {
         "superfast",
+        "rd", "0",
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "2-3",
-        "rd", "0",
         "me", "hexbs",
+        "gop", "lp-g4d4t1",
         "ref", "1",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
-        "subme", "0",
+        "subme", "2",
         "sao", "full",
         "rdoq", "0",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
-        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "veryfast",
-        "pu-depth-intra", "2-3",
-        "pu-depth-inter", "2-3",
         "rd", "0",
+        "pu-depth-intra", "2-3",
+        "pu-depth-inter", "1-3",
         "me", "hexbs",
+        "gop", "lp-g4d4t1",
         "ref", "1",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
         "subme", "2",
         "sao", "full",
         "rdoq", "0",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
-        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "faster",
+        "rd", "0",
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "1-3",
-        "rd", "1",
         "me", "hexbs",
+        "gop", "lp-g4d4t1",
         "ref", "1",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
-        "subme", "2",
+        "subme", "4",
         "sao", "full",
         "rdoq", "0",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
-        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "fast",
-        "pu-depth-intra", "2-3",
+        "rd", "0",
+        "pu-depth-intra", "1-3",
         "pu-depth-inter", "1-3",
-        "rd", "1",
         "me", "hexbs",
-        "ref", "1",
+        "gop", "lp-g4d4t1",
+        "ref", "2",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
         "subme", "4",
         "sao", "full",
         "rdoq", "0",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
-        "me-early-termination", "on",
-        "gop", "lp-g4d3t1",
+        "me-early-termination", "sensitive",
         NULL
       },
       {
         "medium",
-        "pu-depth-intra", "1-3",
-        "pu-depth-inter", "1-3",
-        "rd", "1",
+        "rd", "0",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
         "me", "hexbs",
-        "ref", "1",
+        "gop", "8",
+        "ref", "4",
+        "bipred", "0",
         "deblock", "0:0",
         "signhide", "0",
         "subme", "4",
         "sao", "full",
         "rdoq", "1",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
-        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "slow",
-        "pu-depth-intra", "1-3",
-        "pu-depth-inter", "1-3",
-        "rd", "1",
+        "rd", "0",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
         "me", "hexbs",
-        "ref", "2",
+        "gop", "8",
+        "ref", "4",
+        "bipred", "1",
         "deblock", "0:0",
-        "signhide", "1",
+        "signhide", "0",
         "subme", "4",
         "sao", "full",
         "rdoq", "1",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
-        "gop", "lp-g4d2t1",
         NULL
       },
       {
         "slower",
-        "pu-depth-intra", "1-3",
+        "rd", "2",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
-        "rd", "1",
         "me", "hexbs",
-        "ref", "2",
+        "gop", "8",
+        "ref", "4",
+        "bipred", "1",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
         "sao", "full",
         "rdoq", "1",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
+        "full-intra-search", "0",
         "smp", "0",
         "amp", "0",
         "cu-split-termination", "zero",
-        "me-early-termination", "on",
-        "gop", "lp-g4d2t1",
+        "me-early-termination", "off",
         NULL
       },
       {
         "veryslow",
+        "rd", "2",
         "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
-        "rd", "1",
         "me", "hexbs",
-        "ref", "3",
+        "gop", "8",
+        "ref", "4",
+        "bipred", "1",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
         "sao", "full",
         "rdoq", "1",
-        "rdoq-skip", "1",
+        "rdoq-skip", "0",
         "transform-skip", "0",
-        "full-intra-search", "0",
         "mv-rdo", "0",
-        "smp", "0",
+        "full-intra-search", "0",
+        "smp", "1",
         "amp", "0",
         "cu-split-termination", "zero",
-        "me-early-termination", "on",
-        "gop", "lp-g4d2t1",
+        "me-early-termination", "off",
         NULL
       },
       {
         "placebo",
+        "rd", "2",
         "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
-        "rd", "1",
         "me", "tz",
+        "gop", "8",
         "ref", "4",
+        "bipred", "1",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
@@ -597,13 +608,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "rdoq-skip", "0",
         "transform-skip", "1",
-        "full-intra-search", "0",
         "mv-rdo", "1",
+        "full-intra-search", "0",
         "smp", "1",
         "amp", "1",
         "cu-split-termination", "off",
         "me-early-termination", "off",
-        "gop", "lp-g4d2t1",
         NULL
       },
       { NULL }
@@ -727,7 +737,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
-    
+
     if (cfg->tiles_width_count > 1 && cfg->tmvp_enable) {
       cfg->tmvp_enable = false;
       fprintf(stderr, "Disabling TMVP because tiles are used.\n");
@@ -742,7 +752,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("tiles-height-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
-    
+
     if (cfg->tiles_height_count > 1 && cfg->tmvp_enable) {
       cfg->tmvp_enable = false;
       fprintf(stderr, "Disabling TMVP because tiles are used.\n");
@@ -1391,7 +1401,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   }
 
   if (!WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX) ||
-      !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX)) 
+      !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX))
   {
     fprintf(stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)\n",
             cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
@@ -1506,7 +1516,7 @@ static int validate_hevc_level(kvz_config *const cfg) {
   };
 
   int level_error = 0;
-  
+
   const char* level_err_prefix;
   if (cfg->force_level) {
     level_err_prefix = "Level warning";
