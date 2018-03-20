@@ -1,5 +1,4 @@
 #!/bin/sh
 
-git submodule init
-git submodule update
+git submodule update --init --depth 1
 autoreconf -if
