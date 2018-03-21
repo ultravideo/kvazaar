@@ -88,6 +88,10 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
 
   im->interlacing = KVZ_INTERLACING_NONE;
 
+  im->roi.roi_array = NULL;
+  im->roi.width = 0;
+  im->roi.height = 0;
+
   return im;
 }
 
@@ -114,6 +118,7 @@ void kvz_image_free(kvz_picture *const im)
     kvz_image_free(im->base_image);
   } else {
     free(im->fulldata_buf);
+    if (im->roi.roi_array) FREE_POINTER(im->roi.roi_array);
   }
 
   // Make sure freed data won't be used.
@@ -173,6 +178,8 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
 
   im->pts = 0;
   im->dts = 0;
+
+  im->roi = orig_image->roi;
 
   return im;
 }

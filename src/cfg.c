@@ -123,6 +123,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->roi.height = 0;
   cfg->roi.dqps = NULL;
   cfg->set_qp_in_cu = false;
+  
+  cfg->roi_file = NULL;
 
   cfg->erp_aqp = false;
 
@@ -150,6 +152,7 @@ int kvz_config_destroy(kvz_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
+    FREE_POINTER(cfg->roi_file);
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
@@ -1194,6 +1197,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("set-qp-in-cu") {
     cfg->set_qp_in_cu = (bool)atobool(value);
+  }
+  else if OPT("roi-file")
+  {
+    char* roifile = strdup(value);
+    if (!roifile) {
+      fprintf(stderr, "Failed to allocate memory for roi file name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->roi_file);
+    cfg->roi_file = roifile;
   }
   else if OPT("erp-aqp") {
     cfg->erp_aqp = (bool)atobool(value);

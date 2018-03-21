@@ -279,8 +279,23 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
                                vector2d_t pos)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
+  if (state->tile->frame->source->roi.roi_array) {
+    vector2d_t lcu = {
+      pos.x + state->tile->lcu_offset_x,
+      pos.y + state->tile->lcu_offset_y
+    };
+    vector2d_t roi = {
+      lcu.x * state->tile->frame->source->roi.width / ctrl->in.width_in_lcu,
+      lcu.y * state->tile->frame->source->roi.height / ctrl->in.height_in_lcu
+    };
+    int roi_index = roi.x + roi.y * state->tile->frame->source->roi.width;
+    int dqp = state->tile->frame->source->roi.roi_array[roi_index];
 
-  if (ctrl->cfg.roi.dqps != NULL) {
+    state->qp = CLIP_TO_QP(state->frame->QP + dqp);
+    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda_sqrt = sqrt(state->frame->lambda);
+  }
+  else if (ctrl->cfg.roi.dqps != NULL) {
     vector2d_t lcu = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
@@ -291,6 +306,9 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     };
     int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
     int dqp = ctrl->cfg.roi.dqps[roi_index];
+    if (dqp != 0) {
+      pos.x = 0;
+    }
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
