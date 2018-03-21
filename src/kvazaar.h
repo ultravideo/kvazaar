@@ -393,6 +393,8 @@ typedef struct kvz_config
     int8_t *dqps;
   } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
 
+  char *roi_file;
+
   unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
 
   /**
@@ -510,6 +512,14 @@ typedef struct kvz_picture {
   enum kvz_chroma_format chroma_format;
 
   int32_t ref_pocs[16];
+
+  struct
+  {
+    int width;
+    int height;
+    int8_t *roi_array;
+  } roi;
+
 } kvz_picture;
 
 /**

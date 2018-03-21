@@ -147,6 +147,7 @@ typedef struct {
 
   // Parameters passed from main thread to input thread.
   FILE* input;
+  FILE* roi_file;
   const kvz_api *api;
   const cmdline_opts_t *opts;
   const encoder_control_t *encoder;
@@ -243,6 +244,21 @@ static void* input_read_thread(void* in_args)
         }
       } else {
         fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+        retval = RETVAL_FAILURE;
+        goto done;
+      }
+    }
+
+    if(args->roi_file) {
+      if (fread(&frame_in->roi, 4, 2, args->roi_file) != 2) {
+        fprintf(stderr, "Failed to read roi matrix size for frame: %d. Shutting down.\n", frames_read);
+        retval = RETVAL_FAILURE;
+        goto done;
+      }
+      const size_t roi_size = frame_in->roi.height*frame_in->roi.width;
+      frame_in->roi.roi_array = malloc(roi_size);
+      if(fread(frame_in->roi.roi_array, 1, roi_size, args->roi_file) != roi_size) {
+        fprintf(stderr, "Failed to read roi matrix for frame: %d. Shutting down.\n", frames_read);
         retval = RETVAL_FAILURE;
         goto done;
       }
@@ -427,6 +443,7 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
+  FILE *roifile = NULL;
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   KVZ_CLOCK_T encoding_start_real_time;
@@ -491,6 +508,14 @@ int main(int argc, char *argv[])
   if (output == NULL) {
     fprintf(stderr, "Could not open output file, shutting down!\n");
     goto exit_failure;
+  }
+
+  if(opts->config->roi_file) {
+    roifile = fopen(opts->config->roi_file, "rb");
+    if(roifile == NULL) {
+      fprintf(stderr, "Could not open roi file although it was required. Shutting down!\n");
+      goto exit_failure;
+    }
   }
 
 #ifdef _WIN32
@@ -566,9 +591,10 @@ int main(int argc, char *argv[])
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
       .available_input_slots = available_input_slots,
-      .filled_input_slots    = filled_input_slots,
+      .filled_input_slots = filled_input_slots,
 
       .input = input,
+      .roi_file = roifile,
       .api = api,
       .opts = opts,
       .encoder = encoder,
@@ -805,6 +831,7 @@ done:
   if (input)  fclose(input);
   if (output) fclose(output);
   if (recout) fclose(recout);
+  if (roifile) fclose(roifile);
 
   CHECKPOINTS_FINALIZE();
 

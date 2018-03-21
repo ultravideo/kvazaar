@@ -141,6 +141,7 @@ static const struct option long_options[] = {
   { "force-level",        required_argument, NULL, 0 },
   { "high-tier",                no_argument, NULL, 0 },
   { "me-steps",           required_argument, NULL, 0 },
+  { "roi-file",           required_argument, NULL, 0 },
   { "fast-residual-cost", required_argument, NULL, 0 },
   { "set-qp-in-cu",             no_argument, NULL, 0 },
   { "open-gop",                 no_argument, NULL, 0 },
