@@ -822,7 +822,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
   }
   else if OPT("cpuid")
-    cfg->cpuid = atoi(value);
+    cfg->cpuid = atobool(value);
   else if OPT("pu-depth-inter")
     return sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max) == 2;
   else if OPT("pu-depth-intra")
