@@ -112,10 +112,10 @@ How often the video parameter set is re\-sent [0]
     \- N: Send VPS with every Nth intra frame.
 .TP
 \fB\-r\fR, \fB\-\-ref <integer>       
-Number of reference frames, in range 1..15 [1]
+Number of reference frames, in range 1..15 [4]
 .TP
 \fB\-\-gop <string>        
-GOP structure [lp\-g4d3t1]
+GOP structure [8]
     \- 0: Disabled
     \- 8: B\-frame pyramid of length 8
     \- lp\-<string>: Low\-delay P\-frame GOP
@@ -181,7 +181,7 @@ Sample Adaptive Offset [full]
 Rate\-distortion optimized quantization [enabled]
 .TP
 \fB\-\-(no\-)rdoq\-skip      
-Skip RDOQ for 4x4 blocks. [enabled]
+Skip RDOQ for 4x4 blocks. [disabled]
 .TP
 \fB\-\-(no\-)signhide       
 Sign hiding [disabled]
@@ -193,7 +193,7 @@ Symmetric motion partition [disabled]
 Asymmetric motion partition [disabled]
 .TP
 \fB\-\-rd <integer>        
-Intra mode search complexity [1]
+Intra mode search complexity [0]
     \- 0: Skip intra if inter is good enough.
     \- 1: Rough intra mode search with SATD.
     \- 2: Refine intra mode search with SSE.
@@ -232,11 +232,11 @@ Fractional pixel motion estimation level [4]
     \- 4: + 1/4\-pixel diagonal
 .TP
 \fB\-\-pu\-depth\-inter <int>\-<int>
-Inter prediction units sizes [1\-3]
+Inter prediction units sizes [0\-3]
     \- 0, 1, 2, 3: from 64x64 to 8x8
 .TP
 \fB\-\-pu\-depth\-intra <int>\-<int>
-Intra prediction units sizes [1\-3]
+Intra prediction units sizes [1\-4]
     \- 0, 1, 2, 3, 4: from 64x64 to 4x4
 .TP
 \fB\-\-tr\-depth\-intra <int>
