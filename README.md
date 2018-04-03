@@ -111,8 +111,8 @@ Video structure:
       --vps-period <integer> : How often the video parameter set is re-sent [0]
                                    - 0: Only send VPS with the first frame.
                                    - N: Send VPS with every Nth intra frame.
-  -r, --ref <integer>        : Number of reference frames, in range 1..15 [1]
-      --gop <string>         : GOP structure [lp-g4d3t1]
+  -r, --ref <integer>        : Number of reference frames, in range 1..15 [4]
+      --gop <string>         : GOP structure [8]
                                    - 0: Disabled
                                    - 8: B-frame pyramid of length 8
                                    - lp-<string>: Low-delay P-frame GOP
@@ -152,11 +152,11 @@ Compression tools:
                                    - edge: Edge offset only
                                    - full: Full SAO
       --(no-)rdoq            : Rate-distortion optimized quantization [enabled]
-      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [enabled]
+      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]
       --(no-)signhide        : Sign hiding [disabled]
       --(no-)smp             : Symmetric motion partition [disabled]
       --(no-)amp             : Asymmetric motion partition [disabled]
-      --rd <integer>         : Intra mode search complexity [1]
+      --rd <integer>         : Intra mode search complexity [0]
                                    - 0: Skip intra if inter is good enough.
                                    - 1: Rough intra mode search with SATD.
                                    - 2: Refine intra mode search with SSE.
@@ -181,9 +181,9 @@ Compression tools:
                                    - 2: + 1/2-pixel diagonal
                                    - 3: + 1/4-pixel horizontal and vertical
                                    - 4: + 1/4-pixel diagonal
-      --pu-depth-inter <int>-<int> : Inter prediction units sizes [1-3]
+      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]
                                    - 0, 1, 2, 3: from 64x64 to 8x8
-      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-3]
+      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]
                                    - 0, 1, 2, 3, 4: from 64x64 to 4x4
       --tr-depth-intra <int> : Transform split depth for intra blocks [0]
       --(no-)bipred          : Bi-prediction [disabled]
@@ -278,24 +278,26 @@ where the names have been abbreviated to fit the layout in GitHub.
 
 |                      | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p   |
 | -------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| rd                   | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
-| pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 1-4   | 1-4   |
-| pu-depth-inter       | 2-3   | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   |
+| rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 2     | 2     | 2     |
+| pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 1-4   |
+| pu-depth-inter       | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    |
-| ref                  | 1     | 1     | 1     | 1     | 1     | 1     | 2     | 2     | 3     | 4     |
+| gop                  | g4d4t1| g4d4t1| g4d4t1| g4d4t1| g4d4t1| 8     | 8     | 8     | 8     | 8     |
+| ref                  | 1     | 1     | 1     | 1     | 2     | 4     | 4     | 4     | 4     | 4     |
+| bipred               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     |
 | deblock              | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
-| signhide             | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     |
-| subme                | 0     | 0     | 2     | 2     | 4     | 4     | 4     | 4     | 4     | 4     |
-| sao                  | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
+| signhide             | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     |
+| subme                | 2     | 2     | 2     | 4     | 4     | 4     | 4     | 4     | 4     | 4     |
+| sao                  | off   | full  | full  | full  | full  | full  | full  | full  | full  | full  |
 | rdoq                 | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     |
-| rdoq-skip            | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 0     |
+| rdoq-skip            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | transform-skip       | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | mv-rdo               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | full-intra-search    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-| smp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
+| smp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
 | amp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
-| me-early-termination | sens. | sens. | sens. | sens. | on    | on    | on    | on    | on    | off   |
+| me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 
 
 ## Kvazaar library
