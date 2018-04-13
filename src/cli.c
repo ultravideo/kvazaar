@@ -110,6 +110,8 @@ static const struct option long_options[] = {
   { "crypto",             required_argument, NULL, 0 },
   { "key",                required_argument, NULL, 0 },
   { "me-early-termination",required_argument, NULL, 0 },
+  { "intra-rdo-et",             no_argument, NULL, 0 },
+  { "no-intra-rdo-et",          no_argument, NULL, 0 },
   { "lossless",                 no_argument, NULL, 0 },
   { "no-lossless",              no_argument, NULL, 0 },
   { "tmvp",                     no_argument, NULL, 0 },
@@ -469,6 +471,8 @@ void print_help(void)
     "                                   - off: Don't terminate early.\n"
     "                                   - on: Terminate early.\n"
     "                                   - sensitive: Terminate even earlier.\n"
+    "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
+    "                               a zero coefficient CU is found. [disabled]\n"
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"

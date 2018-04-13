@@ -109,6 +109,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->crypto_features = KVZ_CRYPTO_OFF;
 
   cfg->me_early_termination = 1;
+  cfg->intra_rdo_et         = 0;
 
   cfg->input_format = KVZ_FORMAT_P420;
   cfg->input_bitdepth = 8;
@@ -375,7 +376,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
-  static const char * const preset_values[11][21*2] = {
+  static const char * const preset_values[11][22*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -398,6 +399,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -422,6 +424,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -446,6 +449,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -470,6 +474,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -494,6 +499,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -518,6 +524,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -542,6 +549,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -566,6 +574,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "off",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -590,6 +599,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "off",
+        "intra-rdo-et", "0",
         NULL
       },
       {
@@ -614,6 +624,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "1",
         "cu-split-termination", "off",
         "me-early-termination", "off",
+        "intra-rdo-et", "0",
         NULL
       },
       { NULL }
@@ -1032,6 +1043,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->me_early_termination = mode;
     return result;
   }
+  else if OPT("intra-rdo-et")
+    cfg->intra_rdo_et = (bool)atobool(value);
   else if OPT("lossless")
     cfg->lossless = (bool)atobool(value);
   else if OPT("tmvp") {

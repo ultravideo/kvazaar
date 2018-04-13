@@ -621,6 +621,12 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
+
+    // Early termination if no coefficients has to be coded
+    if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
+      modes_to_check = rdo_mode + 1;
+      break;
+    }
   }
 
   // Update order according to new costs
