@@ -535,6 +535,60 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
   return ssd >> (2*(KVZ_BIT_DEPTH-8));
 }
 
+static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
+	const int hi_prec_luma_rec1,
+	const int hi_prec_chroma_rec0,
+	const int hi_prec_chroma_rec1,
+	int height,
+	int width,
+	int ypos,
+	int xpos,
+	const hi_prec_buf_t*high_precision_rec0,
+	const hi_prec_buf_t*high_precision_rec1,
+	lcu_t* lcu) {
+
+	kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
+	kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
+	kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
+
+	int temp_x, temp_y;
+	int shift = 15 - KVZ_BIT_DEPTH;
+	int offset = 1 << (shift - 1);
+	int y_in_lcu1;
+	int y_in_lcu2;
+
+
+	//After reconstruction, merge the predictors by taking an average of each pixel
+	for (temp_y = 0; temp_y < height; ++temp_y) {
+		y_in_lcu1 = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+
+		for (temp_x = 0; temp_x < width; ++temp_x) {
+
+			int x_in_lcu1 = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+
+			int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu1 * LCU_WIDTH + x_in_lcu1] : (temp_lcu_y[y_in_lcu1 * LCU_WIDTH + x_in_lcu1] << (14 - KVZ_BIT_DEPTH)));
+			int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu1 * LCU_WIDTH + x_in_lcu1] : (lcu->rec.y[y_in_lcu1 * LCU_WIDTH + x_in_lcu1] << (14 - KVZ_BIT_DEPTH)));
+			lcu->rec.y[y_in_lcu1 * LCU_WIDTH + x_in_lcu1] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+
+			if (temp_x < width >> 1 && temp_y < height >> 1) {
+
+				y_in_lcu2 = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
+				int x_in_lcu2 = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+
+				int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] : (temp_lcu_u[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] << (14 - KVZ_BIT_DEPTH)));
+				int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] : (lcu->rec.u[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] << (14 - KVZ_BIT_DEPTH)));
+				lcu->rec.u[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
+
+				int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] : (temp_lcu_v[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] << (14 - KVZ_BIT_DEPTH)));
+				int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] : (lcu->rec.v[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] << (14 - KVZ_BIT_DEPTH)));
+				lcu->rec.v[y_in_lcu2 * LCU_WIDTH_C + x_in_lcu2] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
+			}
+		}
+
+	}
+}
+
+
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -569,6 +623,8 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
 
   success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
+  success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "generic", 0, &inter_recon_bipred_generic);
+
 
   return success;
 }
