@@ -873,6 +873,106 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
   }
 }
 
+//Do the resampling in one pass using 2D-convolution. TODO: Allow doing the resampling on the specified sub-blocks of the target (the input should be a pointer to the full image buffer and a target buffer also pointing to the full target image).
+static void block_resampling( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int block_x, const int block_y, const int block_width, const int block_height )
+{
+  //TODO: Add cropping etc.
+
+  //Choose best filter to use when downsampling
+  //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+  int ver_filter = 0;
+  int hor_filter = 0;
+
+  int src_width = param->src_width + param->src_padding_x;
+  int src_height = param->src_height + param->src_padding_y;
+  int trgt_width = param->rnd_trgt_width;
+  int trgt_height = param->rnd_trgt_height;
+
+  if (!is_upscaling) {
+    int crop_width = src_width - param->right_offset; //- param->left_offset;
+    int crop_height = src_height - param->bottom_offset; //- param->top_offset;
+
+    if (4 * crop_height > 15 * trgt_height)
+      ver_filter = 7;
+    else if (7 * crop_height > 20 * trgt_height)
+      ver_filter = 6;
+    else if (2 * crop_height > 5 * trgt_height)
+      ver_filter = 5;
+    else if (1 * crop_height > 2 * trgt_height)
+      ver_filter = 4;
+    else if (3 * crop_height > 5 * trgt_height)
+      ver_filter = 3;
+    else if (4 * crop_height > 5 * trgt_height)
+      ver_filter = 2;
+    else if (19 * crop_height > 20 * trgt_height)
+      ver_filter = 1;
+
+    if (4 * crop_width > 15 * trgt_width)
+      hor_filter = 7;
+    else if (7 * crop_width > 20 * trgt_width)
+      hor_filter = 6;
+    else if (2 * crop_width > 5 * trgt_width)
+      hor_filter = 5;
+    else if (1 * crop_width > 2 * trgt_width)
+      hor_filter = 4;
+    else if (3 * crop_width > 5 * trgt_width)
+      hor_filter = 3;
+    else if (4 * crop_width > 5 * trgt_width)
+      hor_filter = 2;
+    else if (19 * crop_width > 20 * trgt_width)
+      hor_filter = 1;
+  }
+
+  int shift_x = param->shift_x - 4;
+  int shift_y = param->shift_y - 4;
+
+  //Get the pointer to the target and source data.
+  pic_data_t *src = src_buffer->data;
+  pic_data_t *trgt = trgt_buffer->data; //&trgt_buffer->data[block_x + block_y*trgt_buffer->width];
+  
+  //Loop over every pixel in the target block and calculate the 2D-convolution to get the resampled value for the given pixel
+  for( int y = block_y; y < (block_y + block_height); y++ ){
+    for( int x = block_x; x < (block_x + block_width); x++ ){
+      
+      //Calculate reference position in src pic
+      int ref_pos_x_16 = (int)((unsigned int)(x * param->scale_x + param->add_x) >> shift_x) - param->delta_x;
+      int ref_pos_y_16 = (int)((unsigned int)(y * param->scale_y + param->add_y) >> shift_y) - param->delta_y;
+
+      int phase_x = ref_pos_x_16 & 15;
+      int phase_y = ref_pos_y_16 & 15;      
+
+      int ref_pos_x = ref_pos_x_16 >> 4;
+      int ref_pos_y = ref_pos_y_16 >> 4;
+
+      //Choose filter
+      const int *filter_x;
+      const int *filter_y;
+      const int size_x = getFilter(&filter_x, is_upscaling, is_luma, phase_x, hor_filter);
+      const int size_y = getFilter(&filter_y, is_upscaling, is_luma, phase_y, ver_filter);
+
+      pic_data_t new_val = 0; //Accumulate the new pixel value here
+
+      //Convolution kernel, where (x,y)<=>(0,0)
+      //Size of kernel depends on the filter size
+      for( int j = 0; j < size_y; j++ ){
+        //Calculate src sample position for kernel element (i,j)
+        int m_y = clip(ref_pos_y + j - (size_y >> 1) + 1, 0, src_height - 1);
+
+        for (int i = 0; i < size_x; i++) {
+          //Calculate src sample position for kernel element (i,j)
+          int m_x = clip( ref_pos_x + i - (size_x >> 1) + 1, 0, src_width - 1);
+
+          //Calculate filter value in the 2D-filter for pos (i,j) and apply to sample (m_x,m_y)
+          new_val += filter_x[i]*filter_y[j] * src[m_x + m_y*src_buffer->width];
+        }
+      }
+
+      //Scale and clip values and save to trgt buffer.
+      trgt[x + y*trgt_buffer->width] = clip(is_upscaling ? (new_val + 2048) >> 12 : (new_val + 8192) >> 14, 0, 255); //TODO: account for different bit dept / different filters etc
+    }  
+  }
+}
+
 //Calculate scaling parameters and update param. Factor determines if certain values are 
 // divided eg. with chroma. 0 for no factor and -1 for halving stuff and 1 for doubling etc.
 //Calculations from SHM
