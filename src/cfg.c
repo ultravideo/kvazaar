@@ -1098,6 +1098,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     if (width > 10000 || height > 10000) {
       fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
+      fclose(f);
       return 0;
     }
 
