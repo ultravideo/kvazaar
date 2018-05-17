@@ -700,7 +700,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   }
 
   //If no scaling needs to be done, just return pic_in
-  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->src_width) {
+  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->trgt_width) {
     return kvz_image_copy_ref(pic_in);
   }
 
