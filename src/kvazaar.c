@@ -96,7 +96,60 @@ static void kvazaar_close(kvz_encoder *encoder)
   // ***********************************************
 }
 
+// ***********************************************
+// Modified for SHVC.
 
+static void print_encoderstate_hierarchy( encoder_state_t* state, int indent )
+{
+  //Formatting definitions
+  static const char *ind_str = "  "; //String used for indentation
+  static const char *hor_con = "|"; //Horisontal connector
+  static const char *ver_con = "-"; //Vertical connector
+
+  //Print cur state
+  for (int i = indent; i > 0; i--) {
+    fputs(ind_str, stderr);
+    //fputs(hor_con, stderr);
+    if( i == 1 ){
+      fputs(hor_con, stderr);
+      fputs(ver_con, stderr);
+    }
+  }
+
+  switch( state->type ){
+  
+  case ENCODER_STATE_TYPE_INVALID:
+    fputs("ENCODER_STATE_TYPE_INVLID\n", stderr);
+    break;
+
+  case ENCODER_STATE_TYPE_MAIN:
+    fputs("ENCODER_STATE_TYPE_MAIN\n", stderr);
+    break;
+
+  case ENCODER_STATE_TYPE_SLICE:
+    fputs("ENCODER_STATE_TYPE_SLICE\n", stderr);
+    break;
+
+  case ENCODER_STATE_TYPE_TILE:
+    fputs("ENCODER_STATE_TYPE_TILE\n", stderr);
+    break;
+
+  case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
+    fputs("ENCODER_STATE_TYPE_WAVEFRONT_ROW\n", stderr);
+    break;
+
+  default:
+    //Nothing to do
+    break;
+  }
+
+  //Print hierarchy tree in a depth first manner
+  for (int i = 0; state->children[i].encoder_control; i++) {
+    print_encoderstate_hierarchy(&state->children[i], indent + 1);
+  }
+
+}
+// ***********************************************
 
 static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 {
@@ -178,10 +231,18 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
     cur_enc->states[cur_enc->cur_state_num].frame->num = -1;
     
+    //Print encoder state hierarchy for debugging purposes.
+    //TODO: Add flag to cfg to toggle the behaviour
+    fprintf(stderr, "Layer %d encoder state hierarchy:\n", cfg->layer);
+    print_encoderstate_hierarchy(&cur_enc->states[cur_enc->cur_state_num], 0);
+
     //Prepare for the next loop
     prev_enc = cur_enc;
     cfg = cfg->next_cfg;
+
   }
+
+
   // ***********************************************
   return encoder;
 
