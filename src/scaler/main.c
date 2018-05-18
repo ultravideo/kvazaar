@@ -5,6 +5,7 @@
 
 #include "scaler.h"
 #include <math.h>
+#include <memory.h>
 
 #define IN_Y_W 8
 #define IN_Y_H 4
@@ -22,7 +23,7 @@
 #endif
 #endif
 
-void printPicBuffer(pic_buffer_t* buffer)
+static void printPicBuffer(pic_buffer_t* buffer)
 {
   for (int i = 0; i < buffer->height; i++) {
     for (int j = 0; j < buffer->width; j++) {
@@ -32,7 +33,7 @@ void printPicBuffer(pic_buffer_t* buffer)
   }
 }
 
-void printout(yuv_buffer_t* buffer)
+static void printout(yuv_buffer_t* buffer)
 {
   printf("Y:\n");
   printPicBuffer(buffer->y);
@@ -43,14 +44,14 @@ void printout(yuv_buffer_t* buffer)
 }
 
 //Copy data to a output array
-void copyBack(pic_data_t* dst, uint8_t* src, int size)
+static void copyBack(pic_data_t* dst, uint8_t* src, int size)
 {
   for (int i = 0; i < size; i++) {
     dst[i] = (pic_data_t)src[i];
   }
 }
 
-void copyFrom(uint8_t* dst, pic_data_t* src, int size)
+static void copyFrom(uint8_t* dst, pic_data_t* src, int size)
 {
   for (int i = 0; i < size; i++) {
     dst[i] = (uint8_t)src[i];
@@ -70,7 +71,7 @@ void copyFrom(uint8_t* dst, pic_data_t* src, int size)
 *
 * \return              1 on success, 0 on failure
 */
-int yuv_io_read(FILE* file,
+static int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
                 yuv_buffer_t* img_out)
 {
@@ -115,7 +116,7 @@ int yuv_io_read(FILE* file,
 *
 * \return              1 on success, 0 on failure
 */
-int yuv_io_write(FILE* file,
+static int yuv_io_write(FILE* file,
                  const yuv_buffer_t* img,
                  unsigned output_width, unsigned output_height)
 {
@@ -181,7 +182,7 @@ int yuv_io_write(FILE* file,
 /**
 * \brief Use sizes in kvz_picture for scaling. Can handle up and downscaling
 */
-void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
+static void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
@@ -196,7 +197,35 @@ void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   *out = kvz_yuvScaling(in, &param, *out);
 }
 
-void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
+static void kvzBlockScaling(yuv_buffer_t* in, yuv_buffer_t** out)
+{
+  //Create picture buffers based on given kvz_pictures
+  int32_t in_y_width = in->y->width;
+  int32_t in_y_height = in->y->height;
+  int32_t out_y_width = (*out)->y->width;
+  int32_t out_y_height = (*out)->y->height;
+  int part = 1;
+
+  //assumes 420
+  //int is_420 = in->y->width != in->u->width ? 1 : 0;
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+
+
+  int block_width = out_y_width >> part;
+  int block_height = out_y_height >> part;
+
+  for (size_t y = 0; y < (1<<part); y++) {
+    for (size_t x = 0; x < (1<<part); x++) {
+      int block_x = block_width * x;
+      int block_y = block_height * y;
+
+      kvz_yuvBlockScaling(in, &param, *out, block_x, block_y,
+        block_width, block_height);
+    }
+  }
+}
+
+static void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
@@ -244,7 +273,7 @@ static void compute_psnr(const yuv_buffer_t *const src,
   }
 }
 
-pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
+static pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
 {
   int width = pic1->width;
   int height = pic1->height;
@@ -261,7 +290,7 @@ pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
   return res;
 }
 
-yuv_buffer_t* yuvDiff(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
+static yuv_buffer_t* yuvDiff(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
 {
   yuv_buffer_t* res = kvz_newYuvBuffer(yuv1->y->width, yuv1->y->height, yuv1->format, 0);
 
@@ -272,7 +301,7 @@ yuv_buffer_t* yuvDiff(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
   return res;
 }
 
-double meanColorComponent(pic_buffer_t* pic)
+static double meanColorComponent(pic_buffer_t* pic)
 {
   int size = pic->width*pic->height;
   long int sum = 0;
@@ -283,14 +312,14 @@ double meanColorComponent(pic_buffer_t* pic)
   return (double)sum/(double)size;
 }
 
-void printMeanColor(yuv_buffer_t* yuv)
+static void printMeanColor(yuv_buffer_t* yuv)
 {
   printf("Y avg color: %f\n",meanColorComponent(yuv->y));
   printf("U avg color: %f\n",meanColorComponent(yuv->u));
   printf("V avg color: %f\n",meanColorComponent(yuv->v));
 }
 
-double sumComponent(pic_buffer_t* pic)
+static double sumComponent(pic_buffer_t* pic)
 {
   int size = pic->width*pic->height;
   long int sum = 0;
@@ -301,12 +330,12 @@ double sumComponent(pic_buffer_t* pic)
   return (double)sum;
 }
 
-int isZero(yuv_buffer_t* yuv)
+static int isZero(yuv_buffer_t* yuv)
 {
   return sumComponent(yuv->y) != 0 ? 0 : (sumComponent(yuv->u) != 0 ? 0 : (sumComponent(yuv->v) != 0 ? 0 : 1));
 }
 
-int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
+static int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
 {
   yuv_buffer_t* result = yuvDiff(yuv1, yuv2);
   
@@ -403,7 +432,7 @@ int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
   fclose(file);
 }*/
 
-void test3()
+static void test3()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
@@ -448,7 +477,7 @@ void test3()
 }
 
 //Compare "rounded" and "unrounded" scaling
-void test4()
+static void test4()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
@@ -508,7 +537,7 @@ void test4()
 }
 
 //Check different widths and heights to make sure the tested methods produce the same result
-void test5()
+static void test5()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
@@ -579,7 +608,7 @@ void test5()
 }
 
 //Scale videos
-void vscaling()
+static void vscaling()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
@@ -623,9 +652,69 @@ void vscaling()
   fclose(out_file);
 }
 
+static void validate_test()
+{
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = in_width << 1;//264;
+  int32_t out_height = in_height << 1;//130;
+  int32_t out_chroma_width = out_width >> 1;
+  int32_t out_chroma_height = out_height >> 1;
+  int framerate = 24;
+  int frames = 10;
+
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  char out_file_name1[BUFF_SIZE];
+  char out_file_name2[BUFF_SIZE];
+  sprintf(out_file_name1, "Kimono1_%ix%i_%i_ref.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name2, "Kimono1_%ix%i_%i_block.yuv", out_width, out_height, framerate);
+
+  FILE* out_file1 = fopen(out_file_name1, "wb");
+  FILE* out_file2 = fopen(out_file_name2, "wb");
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL || out_file1 == NULL || out_file2 == NULL) {
+    perror("File open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* out2 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  int i = 0;
+
+  while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
+
+    kvzScaling(data, &out1);
+    kvzBlockScaling(data, &out2);
+
+    if( memcmp(out1->y->data, out2->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out2->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out2->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 ){
+      printf("Frame %i differs\n", i+1);
+    }
+
+    yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
+    yuv_io_write(out_file2, out2, out2->y->width, out2->y->height);
+
+    printf("Frame number %i\r", ++i);
+  }
+  printf("Wrote %i frames.\n", i);
+
+  kvz_deallocateYuvBuffer(data);
+  kvz_deallocateYuvBuffer(out1);
+  kvz_deallocateYuvBuffer(out2);
+  fclose(file);
+  fclose(out_file1);
+  fclose(out_file2);
+
+}
+
 int main()
 {
-  vscaling();
+  //vscaling();
+  validate_test();
 
   system("Pause");
   return EXIT_SUCCESS;

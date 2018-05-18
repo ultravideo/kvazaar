@@ -176,5 +176,11 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
 */
 yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 
+/**
+* \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
+*        Result given in dst buffer.
+*/
+int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height);
+
 /*=============================================================*/
 #endif
