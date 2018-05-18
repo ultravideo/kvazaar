@@ -1020,13 +1020,21 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
     WRITE_UE(stream, rps->num_positive_pics, "num_positive_pics");
     int prev = 0;
     for(int j = 0; j < rps->num_negative_pics; j++){
-      WRITE_UE(stream, prev - rps->delta_poc[j] - 1, "delta_poc_s0_minus1");
+      const int delta_poc_s0_minus1 = prev - rps->delta_poc[j] - 1;
+      // The value of delta_poc_s0_minus1 shall be
+      // in the range of 0 to 2^15 -1, inclusive
+      assert(delta_poc_s0_minus1 >= 0 && delta_poc_s0_minus1 < 32768);
+      WRITE_UE(stream, delta_poc_s0_minus1, "delta_poc_s0_minus1");
       prev = rps->delta_poc[j];
       WRITE_U(stream, rps->is_used[j], 1, "used_by_curr_pic_s0_flag");
     }
     prev = 0;
     for(int j = rps->num_negative_pics; j < rps->num_negative_pics + rps->num_positive_pics; j++){
-      WRITE_UE(stream, rps->delta_poc[j] - prev - 1, "delta_poc_s1_minus1");
+      const int delta_poc_s1_minus1 = rps->delta_poc[j] - prev - 1;
+      // The value of delta_poc_s1_minus1 shall be
+      // in the range of 0 to 2^15 -1, inclusive
+      assert(delta_poc_s1_minus1 >= 0 && delta_poc_s1_minus1 < 32768);
+      WRITE_UE(stream, delta_poc_s1_minus1, "delta_poc_s1_minus1");
       prev = rps->delta_poc[j];
       WRITE_U(stream, rps->is_used[j], 1, "used_by_curr_pic_s1_flag");
     }
