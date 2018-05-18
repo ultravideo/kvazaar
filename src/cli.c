@@ -132,6 +132,7 @@ static const struct option long_options[] = {
   { "layer-res",          required_argument, NULL, 0 }, //Set resolution of layer
   { "input-layer",        required_argument, NULL, 0 }, //Manualy set the input layer the current layer uses
   { "ilr",                required_argument, NULL, 0 }, //Number of ILR
+  { "print-es-hierarchy",       no_argument, NULL, 0 }, //Print encoder state hierarchy
   //*********************************************
   {0, 0, 0, 0}
 };

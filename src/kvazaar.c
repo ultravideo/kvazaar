@@ -232,9 +232,10 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     cur_enc->states[cur_enc->cur_state_num].frame->num = -1;
     
     //Print encoder state hierarchy for debugging purposes.
-    //TODO: Add flag to cfg to toggle the behaviour
-    fprintf(stderr, "Layer %d encoder state hierarchy:\n", cfg->layer);
-    print_encoderstate_hierarchy(&cur_enc->states[cur_enc->cur_state_num], 0);
+    if (cfg->shared != NULL && cfg->shared->print_es_hierarchy) {
+      fprintf(stderr, "Layer %d encoder state hierarchy:\n", cfg->layer);
+      print_encoderstate_hierarchy(&cur_enc->states[cur_enc->cur_state_num], 0);
+    }
 
     //Prepare for the next loop
     prev_enc = cur_enc;

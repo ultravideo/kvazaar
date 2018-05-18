@@ -428,6 +428,8 @@ typedef struct kvz_config
       unsigned t;  // temporal
     } gop_lp_definition;
 
+    uint8_t print_es_hierarchy; //Toggle encoder state hierarchy printing
+
   } *shared;
 
   //*********************************************

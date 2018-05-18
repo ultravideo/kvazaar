@@ -154,6 +154,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->next_cfg = NULL;
 
   cfg->num_rps = 0;
+
   //*********************************************
 
   return 1;
@@ -178,6 +179,8 @@ static void shared_init(kvz_config *cfg)
   cfg->shared->gop_len = cfg->gop_len;
   cfg->shared->gop_lowdelay = cfg->gop_lowdelay;
   memcpy(&cfg->shared->gop_lp_definition, &cfg->gop_lp_definition, sizeof(cfg->gop_lp_definition));
+
+  cfg->shared->print_es_hierarchy = 0;
 }
 
 //Free allocated memory for the shared struct
@@ -790,6 +793,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->shared->input_heights[i] = cfg->height = height;
     }
     return (success);
+  }
+  else if OPT("print-es-hierarchy"){
+    cfg->shared->print_es_hierarchy = atobool(value);
   }
   //*********************************************
   else if OPT("input-fps") {
