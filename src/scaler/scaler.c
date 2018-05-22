@@ -1505,3 +1505,31 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
 
   return 1;
 }
+
+static void blockScalingSrcRange( int range[2], const int scale, const int add, const int shift, const int delta, const int block_low, const int block_high, int is_upsampling )
+{
+  //Get filter size
+  int size = is_upsampling ? sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]) : sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]);
+
+  //Calculate lower bound
+  range[0] = ((int)((unsigned int)((block_low * scale + add) >> (shift - 4)) - delta) >> 4) - (size >> 1) + 1;
+
+  //Calculate upper bound
+  range[1] = ((int)((unsigned int)((block_high * scale + add) >> (shift - 4)) - delta) >> 4) - (size >> 1) + size;
+}
+
+void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width, int is_upsampling)
+{
+  //Calculate parameters
+  calculateParameters(base_param, 0, 0, 0);
+
+  blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, is_upsampling);
+}
+
+void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height, int is_upsampling)
+{
+  //Calculate parameters
+  calculateParameters(base_param, 0, 0, 0);
+
+  blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, is_upsampling);
+}

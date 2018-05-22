@@ -183,4 +183,19 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
 int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height);
 
 /*=============================================================*/
+
+/*================Block scaling helper functions========================*/
+/**
+* \brief Function for calculating the src pixel range used for block scaling when using the given parameters.
+*        Result put in the range array.
+*/
+void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t* const base_param, const int block_x, const int block_width, int is_upsampling);
+
+/**
+* \brief Function for calculating the src pixel range used for block scaling when using the given parameters.
+*        Result put in the range array.
+*/
+void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t* const base_param, const int block_y, const int block_height, int is_upsampling);
+/*======================================================================*/
+
 #endif
