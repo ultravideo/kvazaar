@@ -288,6 +288,7 @@ typedef struct encoder_state_t {
   threadqueue_job_t *tqj_ilr_cua_upsampling_done; //ilr cua upsampling done
 
   const struct encoder_state_t *ILR_state;
+  int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
   // ***********************************************
 } encoder_state_t;
 

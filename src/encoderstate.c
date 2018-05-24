@@ -56,17 +56,46 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
     // Modified for SHVC.
 int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 {
-  if (state->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either 
+  if (state->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either
+
+  //Check that matched states have matching type, might be proplematic if not.
+  for (int i = 0; i < state->num_ILR_states; i++) {
+    assert(state->type == state->ILR_state[i].type);
+  }
 
   for(int i = 0; state->children[i].encoder_control; ++i) {
-    //TODO: Match children properly if spatial resolutions don't match
-    state->children[i].ILR_state = &state->ILR_state->children[i];
-    kvz_encoder_state_match_ILR_states_of_children(&state->children[i]);
+    //TODO: Add to childrens' ILR state from each ILR state of state (i.e. do switch for num_ILR_states
+    //Handle each type of state type
+    switch ( state->children[i].type ){
 
-    if( state->ILR_state->children[i+1].encoder_control == NULL){
+    case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
+    {
+      //Need to add each row in block scaling source height range as an ILR state
+      //Use current child ind to figure out the cur block pos in pixel space (just i*LCU_WIDTH?)
+      int range[2]; //Range of blocks needed for scaling
+      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, i*LCU_WIDTH, LCU_WIDTH, 0);
+
+      //Map the pixel range to LCU pos
+      range[0] = range[0] / LCU_CU_WIDTH; //First LCU that is needed
+      range[1] = (range[1] + LCU_CU_WIDTH - 1) / LCU_CU_WIDTH; //Last LCU that is needed
+
+      state->children[i].ILR_state = &state->ILR_state->children[range[0]];
+      state->children[i].num_ILR_states = range[1] - range[0] + 1;
+    }
+
+    default: //Assumes 1-to-1 correspondence of states
+    {
+      state->children[i].ILR_state = &state->ILR_state->children[i];
+      state->children[i].num_ILR_states = 1;
+      
       break;
     }
+
+    }//END SWITCH
+
+    kvz_encoder_state_match_ILR_states_of_children(&state->children[i]);
   }
+
   return 1;
 }
 // ***********************************************

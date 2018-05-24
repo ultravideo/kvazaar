@@ -320,6 +320,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->tqj_ilr_rec_scaling_done = NULL;
   child_state->tqj_ilr_cua_upsampling_done = NULL;
   child_state->ILR_state = NULL; //Set later
+  child_state->num_ILR_states = 0;
   // ***********************************************
 
   if (!parent_state) {
