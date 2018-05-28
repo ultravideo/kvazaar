@@ -187,7 +187,25 @@ typedef struct encoder_state_config_tile_t {
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
 
+  
+
 } encoder_state_config_tile_t;
+
+// ***********************************************
+// Modified for SHVC.
+
+typedef struct encoder_state_config_layer_t {
+
+  //Jobs for scaling each LCU
+  threadqueue_job_t **scaling_jobs;
+  
+
+  const struct encoder_state_t *ILR_state;
+  int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
+  
+} encoder_state_config_layer_t;
+// ***********************************************
+
 
 typedef struct encoder_state_config_slice_t {
   int32_t id;
@@ -242,6 +260,11 @@ typedef struct encoder_state_t {
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;
 
+  // ***********************************************
+  // Modified for SHVC.
+  encoder_state_config_layer_t *layer;
+  // ***********************************************
+
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element_t *lcu_order;
   uint32_t lcu_order_count;
@@ -281,15 +304,15 @@ typedef struct encoder_state_t {
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
-
+   
   // ***********************************************
-    // Modified for SHVC. TODO: Account for a more complex reference structure?
+  // Modified for SHVC.
+  //TODO: Account for a more complex reference structure?
+  //TODO: Unnecessary?
   threadqueue_job_t *tqj_ilr_rec_scaling_done; //ilr recon scaling done
   threadqueue_job_t *tqj_ilr_cua_upsampling_done; //ilr cua upsampling done
+  //***********************************************
 
-  const struct encoder_state_t *ILR_state;
-  int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
-  // ***********************************************
 } encoder_state_t;
 
 void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);

@@ -112,13 +112,14 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   if (encoder->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
-    for (int i = 0; i < num_jobs; ++i) {
-      state->tile->wf_jobs[i] = NULL;
-    }
     if (!state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;
     }
+    for (int i = 0; i < num_jobs; ++i) {
+      state->tile->wf_jobs[i] = NULL;
+    }
+    
   } else {
     state->tile->wf_jobs = NULL;
   }
@@ -173,6 +174,43 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
   state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
 }
+
+// ***********************************************
+// Modified for SHVC.
+static int encoder_state_config_layer_init(encoder_state_t * const state, int width_in_lcu, const int height_in_lcu)
+{
+  state->layer->ILR_state = NULL; //Set later.
+  state->layer->num_ILR_states = 0;
+
+  if(state->encoder_control->cfg.wpp){
+    int num_jobs = width_in_lcu * height_in_lcu;
+    state->layer->scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    if( state->layer->scaling_jobs == NULL){
+      printf("Error allocating scaling_jobs array!\n");
+      return 0;
+    }
+  } else {
+    state->layer->scaling_jobs = NULL;
+  }
+
+  return 1;
+}
+
+static int encoder_state_config_layer_finalize(encoder_state_t * const state)
+{
+  if (state->encoder_control->cfg.wpp) {
+    int num_jobs = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
+    for (int i = 0; i < num_jobs; ++i) {
+      kvz_threadqueue_free_job(&state->layer->scaling_jobs[i]);
+    }
+  }
+
+  FREE_POINTER(state->layer->scaling_jobs);
+  //state->layer->ILR_state stuff should be deallocated else where
+
+  return 1;
+}
+// ***********************************************
 
 #ifdef KVZ_DEBUG_PRINT_THREADING_INFO
 static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
@@ -319,8 +357,8 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     // Modified for SHVC.
   child_state->tqj_ilr_rec_scaling_done = NULL;
   child_state->tqj_ilr_cua_upsampling_done = NULL;
-  child_state->ILR_state = NULL; //Set later
-  child_state->num_ILR_states = 0;
+  //child_state->ILR_state = NULL; //Set later
+  //child_state->num_ILR_states = 0;
   // ***********************************************
 
   if (!parent_state) {
@@ -348,12 +386,25 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
       return 0;
     }
+
+    // ***********************************************
+    // Modified for SHVC.
+    child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
+    if (!child_state->layer || !encoder_state_config_layer_init(child_state, encoder->in.width_in_lcu, encoder->in.height_in_lcu)){
+      fprintf(stderr, "Could not initialize encoder_state->layer!\n");
+      return 0;
+    }
+    // ***********************************************
   } else {
     child_state->encoder_control = parent_state->encoder_control;
     if (!child_state->frame) child_state->frame = parent_state->frame;
     if (!child_state->tile) child_state->tile = parent_state->tile;
     if (!child_state->slice) child_state->slice = parent_state->slice;
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
+    // ***********************************************
+    // Modified for SHVC.
+    if (!child_state->layer) child_state->layer = parent_state->layer;
+    // ***********************************************
   }
   
   kvz_bitstream_init(&child_state->stream);
@@ -712,7 +763,13 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     encoder_state_config_frame_finalize(state);
     FREE_POINTER(state->frame);
   }
-
+  // ***********************************************
+  // Modified for SHVC
+  if( !state->parent || (state->parent->layer != state->layer)){
+    encoder_state_config_layer_finalize(state);
+    FREE_POINTER(state->layer);
+  }
+  // ***********************************************
   kvz_bitstream_finalize(&state->stream);
 
   kvz_threadqueue_free_job(&state->tqj_recon_done);

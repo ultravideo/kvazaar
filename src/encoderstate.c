@@ -56,11 +56,11 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
     // Modified for SHVC.
 int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 {
-  if (state->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either
+  if (state->layer->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either
 
   //Check that matched states have matching type, might be proplematic if not.
-  for (int i = 0; i < state->num_ILR_states; i++) {
-    assert(state->type == state->ILR_state[i].type);
+  for (int i = 0; i < state->layer->num_ILR_states; i++) {
+    assert(state->type == state->layer->ILR_state[i].type);
   }
 
   for(int i = 0; state->children[i].encoder_control; ++i) {
@@ -79,14 +79,14 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
       range[0] = range[0] / LCU_CU_WIDTH; //First LCU that is needed
       range[1] = (range[1] + LCU_CU_WIDTH - 1) / LCU_CU_WIDTH; //Last LCU that is needed
 
-      state->children[i].ILR_state = &state->ILR_state->children[range[0]];
-      state->children[i].num_ILR_states = range[1] - range[0] + 1;
+      state->children[i].layer->ILR_state = &state->layer->ILR_state->children[range[0]];
+      state->children[i].layer->num_ILR_states = range[1] - range[0] + 1;
     }
 
     default: //Assumes 1-to-1 correspondence of states
     {
-      state->children[i].ILR_state = &state->ILR_state->children[i];
-      state->children[i].num_ILR_states = 1;
+      state->children[i].layer->ILR_state = &state->layer->ILR_state->children[i];
+      state->children[i].layer->num_ILR_states = 1;
       
       break;
     }
@@ -851,13 +851,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         //For scalable extension.
         //Add dependency to ilr recon upscaling
 
-        if (state->ILR_state != NULL) {
+        if (state->layer->ILR_state != NULL) {
 
           //Add a direct dependecy from ilr states wf_job to this (only for SNR)
-          if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
-            state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
-            state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
-            kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[lcu->id]);
+          if (state->encoder_control->cfg.width == state->layer->ILR_state->encoder_control->cfg.width &&
+            state->encoder_control->cfg.width == state->layer->ILR_state->encoder_control->cfg.width &&
+            state->layer->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
+            kvz_threadqueue_job_dep_add(job[0], state->layer->ILR_state->tile->wf_jobs[lcu->id]);
           }
         }
 
@@ -1359,8 +1359,8 @@ static void scalability_prepare(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   
-  if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
-    const encoder_state_t *ILR_state = state->ILR_state;
+  if (encoder->cfg.ILR_frames > 0 && state->layer->ILR_state != NULL && state->layer->ILR_state->tile->frame->rec != NULL) {
+    const encoder_state_t *ILR_state = state->layer->ILR_state;
     // Store current ilr frames list of POCs for use in TMVP derivation
     memcpy(ILR_state->tile->frame->rec->ref_pocs, ILR_state->frame->ref->pocs, sizeof(int32_t) * ILR_state->frame->ref->used_size);
     // Also store image info
@@ -1442,7 +1442,7 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_picture_scaler_worker, scaling_param);
 
   //Figure out dependency. ILR recon needs to be completed before scaling can be done.
-  add_dep_from_children(state->tqj_ilr_rec_scaling_done, state->ILR_state);
+  add_dep_from_children(state->tqj_ilr_rec_scaling_done, state->layer->ILR_state);
 
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
@@ -1457,11 +1457,11 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
 // Scale cu_array by adding a scaling worker job to the job queue
 static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same )
 {
-  if( skip_same && state->tile->frame->width_in_lcu == state->ILR_state->tile->frame->width_in_lcu &&
-                   state->tile->frame->height_in_lcu == state->ILR_state->tile->frame->height_in_lcu ){
+  if( skip_same && state->tile->frame->width_in_lcu == state->layer->ILR_state->tile->frame->width_in_lcu &&
+                   state->tile->frame->height_in_lcu == state->layer->ILR_state->tile->frame->height_in_lcu ){
     kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);
     state->tqj_ilr_cua_upsampling_done = NULL;
-    return kvz_cu_array_copy_ref(state->ILR_state->tile->frame->cu_array);
+    return kvz_cu_array_copy_ref(state->layer->ILR_state->tile->frame->cu_array);
   }
  
   //Allocate the new cua.
@@ -1471,7 +1471,7 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
 
   //Allocate scaling parameters to give to the worker. Worker should handle freeing.
   kvz_cua_upsampling_parameters *param = calloc(1, sizeof(kvz_cua_upsampling_parameters));
-  param->base_cua = state->ILR_state->tile->frame->cu_array;
+  param->base_cua = state->layer->ILR_state->tile->frame->cu_array;
   param->cu_pos_scale = pos_scale;
   param->mv_scale = mv_scale;
   param->nh_in_lcu = state->tile->frame->height_in_lcu;
@@ -1484,7 +1484,7 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
   state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, param);
 
   //Figure out dependency. ILR recon needs to be completed before scaling can be done.
-  add_dep_from_children(state->tqj_ilr_cua_upsampling_done, state->ILR_state);
+  add_dep_from_children(state->tqj_ilr_cua_upsampling_done, state->layer->ILR_state);
 
   //Submit job and set it to encoder state
   kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
@@ -1507,9 +1507,9 @@ static void add_irl_frames(encoder_state_t *state)
   const encoder_control_t * const encoder = state->encoder_control;
   // For SHVC.
   //TODO: Account for adding several ILR frames. Should ilr rec ever bee NULL?
-  if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
+  if (encoder->cfg.ILR_frames > 0 && state->layer->ILR_state != NULL && state->layer->ILR_state->tile->frame->rec != NULL) {
     //Also add base layer to the reference list.
-    const encoder_state_t *ILR_state = state->ILR_state;
+    const encoder_state_t *ILR_state = state->layer->ILR_state;
     kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
     kvz_picture *scaled_pic = NULL;
     if (encoder->cfg.threads > 0 ){
