@@ -141,6 +141,7 @@ Video structure:
       --force-level <number> : Same as --level but warnings instead of errors.
       --high-tier            : Used with --level. Use high tier bitrate limits
                                instead of the main tier limits during encoding.
+							   High tier requires level 4 or higher.
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]

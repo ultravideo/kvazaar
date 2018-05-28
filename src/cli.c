@@ -417,6 +417,7 @@ void print_help(void)
     "      --force-level <number> : Same as --level but warnings instead of errors.\n"
     "      --high-tier            : Used with --level. Use high tier bitrate limits\n"
     "                               instead of the main tier limits during encoding.\n"
+    "                               High tier requires level 4 or higher.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"
