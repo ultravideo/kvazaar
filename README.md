@@ -364,11 +364,11 @@ For other examples, see [Dockerfile](./Dockerfile)
 
 
 ### Visualization (Windows only)
-Branch `visualizer` has a visual studio project, which can be compiled to enable visualization feature in Kvazaar.
+Compiling `kvazaar_cli` project in the `visualizer` branch results in a Kvazaar executable with visualization enabled.
 
 Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SDL2-ttf`](https://www.libsdl.org/projects/SDL_ttf/).
 
-Directory `visualizer_extras` is expected to be found from the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
+Directory `visualizer_extras` has to be added into the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
 
 `SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`) and the dll folder inside the pthreads folder (see `Required libraries`).
 
