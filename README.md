@@ -209,7 +209,9 @@ Parallel processing:
       --(no-)wpp             : Wavefront parallel processing.
                                Enabling tiles automatically disables WPP. To
                                enable WPP with tiles, re-enable it after
-                               enabling tiles. [enabled]
+                               enabling tiles. Enabling wpp with tiles is,
+                               however, an experimental feature since it is
+                               not supported in any HEVC profile. [enabled]
       --tiles <int>x<int>    : Split picture into width x height uniform tiles.
       --tiles-width-split <string>|u<int> :
                                    - <string>: A comma-separated list of tile
