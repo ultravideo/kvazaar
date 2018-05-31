@@ -109,8 +109,13 @@ typedef struct {
   kvz_picture *pic_in;
   kvz_picture *pic_out;
 
+  int block_x;
+  int block_y;
+  int block_width;
+  int block_height;
+
   const scaling_parameter_t *param;
-} kvz_pic_scaling_parameters;
+} kvz_scaling_parameters;
 
 // Worker will free the parameter struct after execution. pic_in and pic_out are also freed (ref count decreased)
 void kvz_picture_scaler_worker( void *opaque_param);

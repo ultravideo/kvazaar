@@ -76,8 +76,8 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
       kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, i*LCU_WIDTH, LCU_WIDTH, 0);
 
       //Map the pixel range to LCU pos
-      range[0] = range[0] / LCU_CU_WIDTH; //First LCU that is needed
-      range[1] = (range[1] + LCU_CU_WIDTH - 1) / LCU_CU_WIDTH; //Last LCU that is needed
+      range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
+      range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is needed
 
       state->children[i].layer->ILR_state = &state->layer->ILR_state->children[range[0]];
       state->children[i].layer->num_ILR_states = range[1] - range[0] + 1;
@@ -1412,7 +1412,7 @@ static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t 
 }
 
 //Start the per wpp scaling jobs recursively
-static void start_scaling_jobs(encoder_state_t *state)
+static void start_scaling_jobs(encoder_state_t *state, kvz_scaling_parameters *base_param)
 {
   //Go deeper until a leaf state is reached
   if( state->is_leaf ){
@@ -1422,27 +1422,36 @@ static void start_scaling_jobs(encoder_state_t *state)
       //Start a job for each ctu on the wavefront row
       for( int i = 0; i < state->lcu_order_count; ++i){
         const lcu_order_element_t * const lcu = &state->lcu_order[i];
-
-        //Set scaling param and other stats. TODO: Move somewhere else?
-        state->layer->job_param.param = &state->encoder_control->layer.upscaling;
-
+        
+        //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charche of deallocation.
+        kvz_scaling_parameters *param = calloc( 1, sizeof(kvz_scaling_parameters) );
+        memcpy(param, base_param, sizeof(kvz_scaling_parameters));
+        param->block_x = state->tile->offset_x + lcu->position.x;
+        param->block_y = state->tile->offset_y + lcu->position.y;
+        param->block_width = lcu->size.x;
+        param->block_height = lcu->size.y;
+        
         kvz_threadqueue_free_job(&state->layer->scaling_jobs[lcu->id]);
-        state->layer->scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_scaler_worker, (void*)&state->layer->job_param);
+        state->layer->scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_scaler_worker, (void*)param);
 
         //Calculate vertical range of block scaling
         int range[2]; //Range of blocks needed for scaling
         kvz_blockScalingSrcWidthRange(range, &state->encoder_control->layer.upscaling, i*LCU_WIDTH, LCU_WIDTH, 0); //TODO: Need to get block pos etc. from lcu?
 
         //Map the pixel range to LCU pos
-        range[0] = range[0] / LCU_CU_WIDTH; //First LCU that is needed
-        range[1] = (range[1] + LCU_CU_WIDTH - 1) / LCU_CU_WIDTH; //Last LCU that is needed
+        range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
+        range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is needed
 
         //Add dependencies to ilr states
         for( int j = 0; j < state->layer->num_ILR_states; j++){
           for( int k = range[0]; k <= range[1]; k++){
-            kvz_threadqueue_job_dep_add(state->layer->scaling_jobs[lcu->id], state->layer->ILR_state[j].tile->wf_jobs[state->layer->ILR_state[j].lcu_order[k].id]);
+            const lcu_order_element_t * const ilr_lcu = &state->layer->ILR_state[j].lcu_order[k];
+            kvz_threadqueue_job_dep_add(state->layer->scaling_jobs[lcu->id], state->layer->ILR_state[j].tile->wf_jobs[ilr_lcu->id]);
           }
         }
+
+        //Dependencies added so submit the job
+        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->scaling_jobs[lcu->id]);
       }
     }
     default:
@@ -1453,7 +1462,7 @@ static void start_scaling_jobs(encoder_state_t *state)
     }//END switch
   } else {
     for (int i = 0; state->children[i].encoder_control; ++i){
-      start_scaling_jobs(&state->children[i]);
+      start_scaling_jobs(&state->children[i], base_param);
     }
   }
 
@@ -1477,7 +1486,7 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   }
 
   //Allocate scaling parameters to give to the worker. Worker should handle freeing.
-  kvz_pic_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_pic_scaling_parameters));
+  kvz_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_scaling_parameters));
   kvz_picture* pic_out = NULL;
   
   pic_out = kvz_image_alloc(pic_in->chroma_format,

@@ -199,7 +199,7 @@ typedef struct encoder_state_config_layer_t {
   //Jobs for scaling each LCU
   threadqueue_job_t **scaling_jobs;
   
-  kvz_pic_scaling_parameters job_param; //Hold parameters given to scaling jobs
+  kvz_scaling_parameters job_param; //Hold parameters given to scaling jobs
 
   const struct encoder_state_t *ILR_state;
   int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
