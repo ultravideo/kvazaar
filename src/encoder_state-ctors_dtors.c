@@ -196,6 +196,10 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, int wi
   state->layer->job_param.param = NULL;
   state->layer->job_param.pic_in = NULL;
   state->layer->job_param.pic_out = NULL;
+  state->layer->job_param.block_height = 0;
+  state->layer->job_param.block_width = 0;
+  state->layer->job_param.block_x = 0;
+  state->layer->job_param.block_y = 0;
 
   return 1;
 }

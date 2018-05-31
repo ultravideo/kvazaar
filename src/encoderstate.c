@@ -1412,7 +1412,7 @@ static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t 
 }
 
 //Start the per wpp scaling jobs recursively
-static void start_scaling_jobs(encoder_state_t *state, kvz_scaling_parameters *base_param)
+static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_parameters *base_param)
 {
   //Go deeper until a leaf state is reached
   if( state->is_leaf ){
@@ -1425,7 +1425,9 @@ static void start_scaling_jobs(encoder_state_t *state, kvz_scaling_parameters *b
         
         //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charche of deallocation.
         kvz_scaling_parameters *param = calloc( 1, sizeof(kvz_scaling_parameters) );
-        memcpy(param, base_param, sizeof(kvz_scaling_parameters));
+        param->param = base_param->param;
+        param->pic_in = kvz_image_copy_ref(base_param->pic_in);
+        param->pic_out = kvz_image_copy_ref(base_param->pic_out);
         param->block_x = state->tile->offset_x + lcu->position.x;
         param->block_y = state->tile->offset_y + lcu->position.y;
         param->block_width = lcu->size.x;
@@ -1466,6 +1468,43 @@ static void start_scaling_jobs(encoder_state_t *state, kvz_scaling_parameters *b
     }
   }
 
+}
+
+// Scale image by adding a scaling worker job to the job queue
+static kvz_picture* deferred_block_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
+{
+  if (pic_in == NULL) {
+    return NULL;
+  }
+
+  //If no scaling needs to be done, just return pic_in
+  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->trgt_width) {
+    //scaling_param->skip = 1;
+    //scaling_param->pic_out = NULL;
+    //kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done);
+    state->tqj_ilr_rec_scaling_done = NULL;
+    //pic_out = kvz_image_copy_ref(pic_in);
+    return kvz_image_copy_ref(pic_in);
+  }
+
+  //Prepare job_param.
+  state->layer->job_param.param = param;
+  kvz_image_free(state->layer->job_param.pic_in); //Free prev pic
+  state->layer->job_param.pic_in = kvz_image_copy_ref(pic_in);
+
+  kvz_image_free(state->layer->job_param.pic_out); //Free prev pic
+  state->layer->job_param.pic_out = kvz_image_alloc(pic_in->chroma_format,
+    param->trgt_width + param->trgt_padding_x,
+    param->trgt_height + param->trgt_padding_y);
+
+  //Start jobs
+  start_block_scaling_jobs(state, &state->layer->job_param);
+
+  //Propagate tqj_ilr_rec_scaling_done to child states in order to set it as a dependency
+  //TODO: disable for now, until the need for a waitfor after this function is fixed
+  //propagate_tqj_ilr_rec_scaling_done_to_children(state);
+
+  return kvz_image_copy_ref(state->layer->job_param.pic_out);
 }
 
 // Scale image by adding a scaling worker job to the job queue

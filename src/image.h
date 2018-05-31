@@ -106,7 +106,7 @@ void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
 // ***********************************************
 // Modified for SHVC
 typedef struct {
-  kvz_picture *pic_in;
+  const kvz_picture *pic_in;
   kvz_picture *pic_out;
 
   int block_x;

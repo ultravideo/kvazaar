@@ -1471,7 +1471,7 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   //both dimensions need to be either up- or downscaled
   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
     (is_downscaled_height && !is_downscaled_width && !is_equal_width)) {
-    fprintf(stderr, "Both demensions need to be either upscaled or downscaled");
+    fprintf(stderr, "Both dimensions need to be either upscaled or downscaled");
     return 0;
   }
   if (is_equal_height && is_equal_width) {

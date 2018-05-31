@@ -623,7 +623,7 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
 //Deallocates the given parameters
 void kvz_picture_scaler_worker( void *opaque_param)
 {
-  kvz_pic_scaling_parameters *in_param = opaque_param;
+  kvz_scaling_parameters *in_param = opaque_param;
   kvz_picture *pic_in = in_param->pic_in;
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
@@ -656,7 +656,7 @@ void kvz_picture_scaler_worker( void *opaque_param)
     assert(sizeof(kvz_pixel) == sizeof(char)); //Image copy (memset) only works if the pixels are the same size as char 
 
     //Loop over components
-    for (int comp = 0, i = 0; comp < 3; comp++) {
+    for (int comp = 0, i = 0; comp < sizeof(comp_list); comp++) {
       int comp_size = height_list[comp] * stride_list[comp];
       int pic_out_stride = pic_out->stride >> (comp < 1 ? 0 : chroma_shift);
       for (int src_ind = 0; src_ind < comp_size; i++, src_ind++) {
@@ -687,6 +687,64 @@ void kvz_picture_scaler_worker( void *opaque_param)
   free(in_param);
 }
 
+void kvz_block_scaler_worker(void * opaque_param)
+{
+  kvz_scaling_parameters *in_param = opaque_param;
+  const kvz_picture * const pic_in = in_param->pic_in;
+  kvz_picture *pic_out = in_param->pic_out;
+  const scaling_parameter_t *const param = in_param->param;
+
+
+  yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v,
+    param->src_width + param->src_padding_x,
+    param->src_height + param->src_padding_y,
+    pic_in->stride, param->chroma, 0);
+  //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
+
+  yuv_buffer_t* trgt_pic = kvz_newYuvBuffer(in_param->block_width, in_param->block_height, param->chroma, 0);
+    
+  if( !kvz_yuvBlockScaling(src_pic, param, trgt_pic, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height) )
+  {
+    //TODO: Do error stuff?
+    return;
+  }
+
+  if (trgt_pic != NULL) {
+    
+    //Copy other information
+    pic_out->dts = pic_in->dts;
+    pic_out->pts = pic_in->pts;
+    pic_out->interlacing = pic_in->interlacing;
+
+    int chroma_shift = param->chroma == CHROMA_444 ? 0 : 1;
+    pic_buffer_t* comp_list[] = { trgt_pic->y, trgt_pic->u, trgt_pic->v };
+    
+    //Loop over components
+    for (int c = 0, i = 0; c < sizeof(comp_list); c++) {
+      int pic_out_stride = pic_out->stride >> (c < 1 ? 0 : chroma_shift);
+      int pic_out_offset_x = in_param->block_x >> (c < 1 ? 0 : chroma_shift);
+      int pic_out_offset_y = in_param->block_y >> (c < 1 ? 0 : chroma_shift);
+      
+      //Copy block back to pic_out
+      for( int y = 0; y < comp_list[c]->height; y++)
+      {
+        for( int x = 0; x < comp_list[c]->width; x++)
+        {
+          pic_out->data[c][(pic_out_offset_x + x) + (pic_out_offset_y + y) * pic_out_stride] = comp_list[c]->data[x + y * comp_list[c]->width];
+        }
+      }
+    }
+  }
+
+  //Do deallocation
+  kvz_deallocateYuvBuffer(src_pic);
+  kvz_deallocateYuvBuffer(trgt_pic);
+  kvz_image_free(pic_in);
+  kvz_image_free(pic_out);
+  free(in_param);
+
+}
+
 
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
@@ -704,7 +762,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
     return kvz_image_copy_ref(pic_in);
   }
 
-  kvz_pic_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_pic_scaling_parameters));
+  kvz_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_scaling_parameters));
 
   kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
                                           param->trgt_width + param->trgt_padding_x,
