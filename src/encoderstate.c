@@ -1464,7 +1464,7 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_paramet
     }//END switch
   } else {
     for (int i = 0; state->children[i].encoder_control; ++i){
-      start_scaling_jobs(&state->children[i], base_param);
+      start_block_scaling_jobs(&state->children[i], base_param);
     }
   }
 

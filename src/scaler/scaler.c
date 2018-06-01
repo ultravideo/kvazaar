@@ -423,16 +423,16 @@ static void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t*
 * \brief Copies data from one buffer to the other.
 * \param src is the source buffer
 * \param dst is the destination buffer
-* \param block_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
-* \param block_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
 * \param block_width is the width for the sub-block (needs to be valid for both buffers).
 * \param block_height is the height for the sub-block (needs to be valid for both buffers).
 */
-static void copyPictureBufferBlock(const pic_buffer_t* const src, const pic_buffer_t* const dst, const int block_x, const int block_y, const int block_width, const int block_height )
+static void copyPictureBufferBlock(const pic_buffer_t* const src, const pic_buffer_t* const dst, const int src_x, const int src_y, const int dst_x, const int dst_y, const int block_width, const int block_height )
 {
-  for( int row = block_y; row < block_height; row++ ){
-    for( int col = block_x; col < block_width; col++ ){
-      dst->data[col + row*dst->width] = src->data[col + row*src->width];
+  for( int sy = src_y, dy = dst_y; sy < block_height && dy < block_height; sy++, dy++ ){
+    for(int sx = src_x, dx = dst_x; sx < block_height && dx < block_height; sx++, dx++){
+      dst->data[dx + dy*dst->width] = src->data[sx + sy*src->width];
     }
   }
 }
@@ -455,18 +455,18 @@ static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* con
 * \brief Copies data from a sub-block from one buffer to the other.
 * \param src is the source buffer
 * \param dst is the destination buffer
-* \param block_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
-* \param block_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
 * \param block_width is the width for the sub-block (needs to be valid for both buffers).
 * \param block_height is the height for the sub-block (needs to be valid for both buffers).
 * \param w_factor is how much chroma sizes are scaled (width).
 * \param h_factor is how much chroma sizes are scaled (heigth).
 */
-static void copyYuvBufferBlock(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, const int block_x, const int block_y, const int block_width, const int block_height, const int w_factor, const int h_factor)
+static void copyYuvBufferBlock(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, const int src_x, const int src_y, const int dst_x, const int dst_y, const int block_width, const int block_height, const int w_factor, const int h_factor)
 {
-  copyPictureBufferBlock(src->y, dst->y, block_x, block_y, block_width, block_height);
-  copyPictureBufferBlock(src->u, dst->u, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
-  copyPictureBufferBlock(src->v, dst->v, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
+  copyPictureBufferBlock(src->y, dst->y, src_x, src_y, dst_x, dst_y, block_width, block_height);
+  copyPictureBufferBlock(src->u, dst->u, SHIFT(src_x, w_factor), SHIFT(src_y, h_factor), SHIFT(dst_x, w_factor), SHIFT(dst_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
+  copyPictureBufferBlock(src->v, dst->v, SHIFT(src_x, w_factor), SHIFT(src_y, h_factor), SHIFT(dst_x, w_factor), SHIFT(dst_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
 }
 
 // ======================= newYuvBuffer_ ==================================
@@ -909,8 +909,8 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
   }
 }
 
-//Do the resampling in one pass using 2D-convolution. TODO: Allow doing the resampling on the specified sub-blocks of the target (the input should be a pointer to the full image buffer and a target buffer also pointing to the full target image).
-static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int block_x, const int block_y, const int block_width, const int block_height )
+//Do the resampling in one pass using 2D-convolution.
+static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height )
 {
   //TODO: Add cropping etc.
 
@@ -923,6 +923,7 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
   int src_height = param->src_height + param->src_padding_y;
   int trgt_width = param->rnd_trgt_width;
   int trgt_height = param->rnd_trgt_height;
+  int trgt_stride = trgt_buffer->width;
 
   if (!is_upscaling) {
     int crop_width = src_width - param->right_offset; //- param->left_offset;
@@ -1004,7 +1005,8 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
       }
 
       //Scale and clip values and save to trgt buffer.
-      trgt[x + y*trgt_buffer->width] = clip(is_upscaling ? (new_val + 2048) >> 12 : (new_val + 8192) >> 14, 0, 255); //TODO: account for different bit dept / different filters etc
+      //trgt offset is used to reposition the block in trgt in case buffer size is not target image size
+      trgt[x + y*trgt_stride + trgt_offset] = clip(is_upscaling ? (new_val + 2048) >> 12 : (new_val + 8192) >> 14, 0, 255); //TODO: account for different bit dept / different filters etc
     }  
   }
 }
@@ -1452,12 +1454,27 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
     return 0;
   }
  
+  //Calculate a dst offset depending on wheather dst is the whole image or just the block
+  // if dst is smaller than the specified trgt size, the scaled block is written starting from (0,0)
+  // if dst is the size of the specified trgt, the scaled block is written starting from (block_x,block_y)
+  int dst_offset_luma = 0;
+  int dst_offset_chroma = 0;
   if (dst == NULL || dst->y->width < param.trgt_width || dst->y->height < param.trgt_height
     || dst->u->width < SHIFT(param.trgt_width, w_factor) || dst->u->height < SHIFT(param.trgt_height, h_factor)
     || dst->v->width < SHIFT(param.trgt_width, w_factor) || dst->v->height < SHIFT(param.trgt_height, h_factor)) {
 
-    fprintf(stderr, "Destination buffer smaller than specified in the scaling parameters,\n");
-    return 0;
+    //Check that dst is large enough to hold the block
+    if (dst == NULL || dst->y->width < block_width || dst->y->height < block_height
+      || dst->u->width < SHIFT(block_width, w_factor) || dst->u->height < SHIFT(block_height, h_factor)
+      || dst->v->width < SHIFT(block_width, w_factor) || dst->v->height < SHIFT(block_height, h_factor)) {
+      fprintf(stderr, "Destination buffer not large enough to hold block\n");
+      return 0;
+    }
+  } else {
+
+    //Set dst offset so that the block is written to the correct pos
+    dst_offset_luma = block_x + block_y * dst->y->width;
+    dst_offset_chroma = SHIFT(block_x, w_factor) + SHIFT(block_y, h_factor) * dst->u->width;
   }
 
   //Calculate if we are upscaling or downscaling
@@ -1476,7 +1493,7 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   }
   if (is_equal_height && is_equal_width) {
     //If equal just copy block from src
-    copyYuvBufferBlock(yuv, dst, block_x, block_y, block_width, block_height, w_factor, h_factor);
+    copyYuvBufferBlock(yuv, dst, block_x, block_y, dst_offset_luma != 0 ? 0 : block_x, dst_offset_luma != 0 ? 0 : block_y, block_width, block_height, w_factor, h_factor);
     return 1;
   }
   if (is_downscaled_width || is_downscaled_height) {
@@ -1486,8 +1503,9 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   /*=================================*/
 
   /*==========Start Resampling=============*/
+
   //Resample y
-  resampleBlock(yuv->y, &param, is_upscaling, 1, dst->y, block_x, block_y, block_width, block_height);
+  resampleBlock(yuv->y, &param, is_upscaling, 1, dst->y, -dst_offset_luma, block_x, block_y, block_width, block_height);
 
   //Skip chroma if CHROMA_400
   if (param.chroma != CHROMA_400) {
@@ -1497,10 +1515,10 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
     }
 
     //Resample u
-    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
 
     //Resample v
-    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
   }
 
   return 1;
