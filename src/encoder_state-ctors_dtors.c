@@ -510,6 +510,13 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         new_child->tile  = child_state->tile;
         new_child->wfrow = child_state->wfrow;
         new_child->slice = MALLOC(encoder_state_config_slice_t, 1);
+
+        // ***********************************************
+        // Modified for SHVC.
+        new_child->layer = child_state->layer;
+
+        // ***********************************************
+
         if (!new_child->slice || !encoder_state_config_slice_init(new_child, range_start, range_end_slice)) {
           fprintf(stderr, "Could not initialize encoder_state->slice!\n");
           return 0;
@@ -536,6 +543,12 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         new_child->tile  = MALLOC(encoder_state_config_tile_t, 1);
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;
+
+        // ***********************************************
+        // Modified for SHVC.
+        new_child->layer = child_state->layer;
+
+        // ***********************************************
         
         if (!new_child->tile || !encoder_state_config_tile_init(new_child, lcu_offset_x, lcu_offset_y, width, height, width_in_lcu, height_in_lcu)) {
           fprintf(stderr, "Could not initialize encoder_state->tile!\n");
@@ -626,6 +639,12 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           return 0;
         }
         
+        // ***********************************************
+        // Modified for SHVC.
+        new_child->layer = child_state->layer;
+
+        // ***********************************************
+
         if (!kvz_encoder_state_init(new_child, child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
