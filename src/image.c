@@ -690,7 +690,7 @@ void kvz_picture_scaler_worker( void *opaque_param)
 void kvz_block_scaler_worker(void * opaque_param)
 {
   kvz_scaling_parameters *in_param = opaque_param;
-  const kvz_picture * const pic_in = in_param->pic_in;
+  kvz_picture * const pic_in = in_param->pic_in;
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
 
@@ -725,7 +725,7 @@ void kvz_block_scaler_worker(void * opaque_param)
     pic_buffer_t* comp_list[] = { trgt_pic->y, trgt_pic->u, trgt_pic->v };
     
     //Loop over components
-    for (int c = 0, i = 0; c < sizeof(comp_list); c++) {
+    for (int c = 0; c < sizeof(comp_list); c++) {
       int pic_out_stride = pic_out->stride >> (c < 1 ? 0 : chroma_shift);
       int pic_out_offset_x = in_param->block_x >> (c < 1 ? 0 : chroma_shift);
       int pic_out_offset_y = in_param->block_y >> (c < 1 ? 0 : chroma_shift);
