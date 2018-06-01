@@ -706,6 +706,11 @@ void kvz_block_scaler_worker(void * opaque_param)
   if( !kvz_yuvBlockScaling(src_pic, param, trgt_pic, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height) )
   {
     //TODO: Do error stuff?
+    kvz_deallocateYuvBuffer(src_pic);
+    kvz_deallocateYuvBuffer(trgt_pic);
+    kvz_image_free(pic_in);
+    kvz_image_free(pic_out);
+    free(in_param);
     return;
   }
 
