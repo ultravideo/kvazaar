@@ -1613,7 +1613,7 @@ static void add_irl_frames(encoder_state_t *state)
     kvz_picture *scaled_pic = NULL;
     if (encoder->cfg.threads > 0 ){
       //TODO: fix dependencies etc. so that waitfor does not need to be called here
-      scaled_pic = deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
+      scaled_pic = deferred_block_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);//deferred_image_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
       if (state->tqj_ilr_rec_scaling_done != NULL) {
         kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
       }
