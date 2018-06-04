@@ -75,14 +75,14 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
       //Need to add each row in block scaling source height range as an ILR state
       
       int range[2]; //Range of blocks needed for scaling
-      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, state->children[i].tile->offset_y + state->children[i].lcu_order->position.y, state->children[i].lcu_order->size.y);
+      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, state->children[i].tile->offset_y + state->children[i].lcu_order->position_px.y, state->children[i].lcu_order->size.y);
 
       //Map the pixel range to LCU pos
       range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
-      range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is needed
+      range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //First LCU that is not needed
 
       state->children[i].layer->ILR_state = &state->layer->ILR_state->children[range[0]];
-      state->children[i].layer->num_ILR_states = range[1] - range[0] + 1;
+      state->children[i].layer->num_ILR_states = range[1] - range[0];
 
       break;
     }
@@ -1432,8 +1432,8 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_paramet
         param->param = base_param->param;
         param->pic_in = kvz_image_copy_ref(base_param->pic_in);
         param->pic_out = kvz_image_copy_ref(base_param->pic_out);
-        param->block_x = state->tile->offset_x + lcu->position.x;
-        param->block_y = state->tile->offset_y + lcu->position.y;
+        param->block_x = state->tile->offset_x + lcu->position_px.x;
+        param->block_y = state->tile->offset_y + lcu->position_px.y;
         param->block_width = lcu->size.x;
         param->block_height = lcu->size.y;
         
@@ -1446,11 +1446,11 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_paramet
 
         //Map the pixel range to LCU pos
         range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
-        range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is needed
+        range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
 
         //Add dependencies to ilr states
         for( int j = 0; j < state->layer->num_ILR_states; j++){
-          for( int k = range[0]; k <= range[1]; k++){
+          for( int k = range[0]; k < range[1]; k++){
             const lcu_order_element_t * const ilr_lcu = &state->layer->ILR_state[j].lcu_order[k];
             kvz_threadqueue_job_dep_add(state->layer->scaling_jobs[lcu->id], state->layer->ILR_state[j].tile->wf_jobs[ilr_lcu->id]);
           }
