@@ -56,12 +56,14 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
     // Modified for SHVC.
 int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 {
-  if (state->layer->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either
+  if (state->layer->ILR_state == NULL) return 0; //State has no ILR_state so children can't have one either
 
   //Check that matched states have matching type, might be proplematic if not.
   for (int i = 0; i < state->layer->num_ILR_states; i++) {
     assert(state->type == state->layer->ILR_state[i].type);
   }
+
+  int retval = 1;
 
   for(int i = 0; state->children[i].encoder_control; ++i) {
     //TODO: Add to childrens' ILR state from each ILR state of state (i.e. do switch for num_ILR_states
@@ -71,9 +73,9 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
     case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
     {
       //Need to add each row in block scaling source height range as an ILR state
-      //Use current child ind to figure out the cur block pos in pixel space (just i*LCU_WIDTH?)
+      
       int range[2]; //Range of blocks needed for scaling
-      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, i*LCU_WIDTH, LCU_WIDTH, 0);
+      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, state->children[i].tile->offset_y + state->children[i].lcu_order->position.y, state->children[i].lcu_order->size.y);
 
       //Map the pixel range to LCU pos
       range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
@@ -81,6 +83,8 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 
       state->children[i].layer->ILR_state = &state->layer->ILR_state->children[range[0]];
       state->children[i].layer->num_ILR_states = range[1] - range[0] + 1;
+
+      break;
     }
 
     default: //Assumes 1-to-1 correspondence of states
@@ -93,10 +97,10 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 
     }//END SWITCH
 
-    kvz_encoder_state_match_ILR_states_of_children(&state->children[i]);
+    retval &= kvz_encoder_state_match_ILR_states_of_children(&state->children[i]);
   }
 
-  return 1;
+  return retval;
 }
 // ***********************************************
 
@@ -1438,7 +1442,7 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_paramet
 
         //Calculate vertical range of block scaling
         int range[2]; //Range of blocks needed for scaling
-        kvz_blockScalingSrcWidthRange(range, &state->encoder_control->layer.upscaling, i*LCU_WIDTH, LCU_WIDTH, 0); //TODO: Need to get block pos etc. from lcu?
+        kvz_blockScalingSrcWidthRange(range, &state->encoder_control->layer.upscaling, param->block_x, param->block_width);
 
         //Map the pixel range to LCU pos
         range[0] = range[0] / LCU_WIDTH; //First LCU that is needed

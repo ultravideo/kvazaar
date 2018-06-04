@@ -221,10 +221,12 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     }
 
     //Set ILR states for the current encoder's states. TODO: Account for a more complex ref structure
+    //TODO: error checking
     if (prev_enc != NULL) {
       for (int i = 0; i < cur_enc->num_encoder_states; ++i) {
         //Should give the state that encodes the ILR frame
         cur_enc->states[i].layer->ILR_state = &prev_enc->states[i];
+        cur_enc->states[i].layer->num_ILR_states = 1;
         kvz_encoder_state_match_ILR_states_of_children(&cur_enc->states[i]);
       }
     }

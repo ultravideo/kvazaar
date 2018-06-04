@@ -25,10 +25,13 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-#define MAX(x,y) (((x) > (y)) ? (x) : (y))
+#define SCALER_MIN(x,y) (((x) < (y)) ? (x) : (y))
+#define SCALER_MAX(x,y) (((x) > (y)) ? (x) : (y))
 
-#define SHIFT(x,y) (((y) < 0) ? ((x)>>(-(y))) : ((x)<<(y)))
+#define SCALER_SHIFT(x,y) (((y) < 0) ? ((x)>>(-(y))) : ((x)<<(y)))
+
+#define SCALER_SHIFT_CONST 16 //TODO: Make dependant on stuff?
+#define SCALER_UNITY_SCALE_CONST (1<<SCALER_SHIFT_CONST)
 
 //Define filters for scaling operations
 //Values from SHM
@@ -252,7 +255,7 @@ pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
   //Initialize tmp_row or set as NULL
   if (has_tmp_row) {
     //Use max dim for size
-    int max_dim = MAX(width, height);
+    int max_dim = SCALER_MAX(width, height);
     buffer->tmp_row = (pic_data_t*)malloc(sizeof(pic_data_t) * max_dim);
   }
   else {
@@ -392,8 +395,8 @@ static void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t*
   //TODO: add checks. Check if fill is necessary
   //max_dim_* is chosen so that no over indexing happenes (src/dst)
   //min_dim_* is chosen so that no over indexing happenes (src), but all inds in dst get a value
-  int max_dim_x = fill ? dst->width : MIN(src->width, dst->width);
-  int max_dim_y = fill ? dst->height : MIN(src->height, dst->height);
+  int max_dim_x = fill ? dst->width : SCALER_MIN(src->width, dst->width);
+  int max_dim_y = fill ? dst->height : SCALER_MIN(src->height, dst->height);
   int min_dim_x = fill ? src->width : max_dim_x;
   int min_dim_y = fill ? src->height : max_dim_y;
 
@@ -465,8 +468,8 @@ static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* con
 static void copyYuvBufferBlock(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, const int src_x, const int src_y, const int dst_x, const int dst_y, const int block_width, const int block_height, const int w_factor, const int h_factor)
 {
   copyPictureBufferBlock(src->y, dst->y, src_x, src_y, dst_x, dst_y, block_width, block_height);
-  copyPictureBufferBlock(src->u, dst->u, SHIFT(src_x, w_factor), SHIFT(src_y, h_factor), SHIFT(dst_x, w_factor), SHIFT(dst_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
-  copyPictureBufferBlock(src->v, dst->v, SHIFT(src_x, w_factor), SHIFT(src_y, h_factor), SHIFT(dst_x, w_factor), SHIFT(dst_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor));
+  copyPictureBufferBlock(src->u, dst->u, SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
+  copyPictureBufferBlock(src->v, dst->v, SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
 }
 
 // ======================= newYuvBuffer_ ==================================
@@ -624,7 +627,7 @@ static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
   memcpy(ret->data, pic->data, size * sizeof(pic_data_t));
 
   if (pic->tmp_row) {
-    int tmp_size = MAX(pic->width, pic->height);
+    int tmp_size = SCALER_MAX(pic->width, pic->height);
     ret->tmp_row = malloc(sizeof(pic_buffer_t) * tmp_size);
     if (ret->tmp_row == NULL) {
       deallocatePictureBuffer(ret);
@@ -1017,22 +1020,22 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
 static void calculateParameters(scaling_parameter_t* const param, const int w_factor, const int h_factor, const int is_chroma)
 {
   //First shift widths/height by an appropriate factor
-  param->src_width = SHIFT(param->src_width, w_factor);
-  param->src_height = SHIFT(param->src_height, h_factor);
-  param->trgt_width = SHIFT(param->trgt_width, w_factor);
-  param->trgt_height = SHIFT(param->trgt_height, h_factor);
-  param->scaled_src_width = SHIFT(param->scaled_src_width, w_factor);
-  param->scaled_src_height = SHIFT(param->scaled_src_height, h_factor);
-  param->rnd_trgt_width = SHIFT(param->rnd_trgt_width, w_factor);
-  param->rnd_trgt_height = SHIFT(param->rnd_trgt_height, h_factor);
+  param->src_width = SCALER_SHIFT(param->src_width, w_factor);
+  param->src_height = SCALER_SHIFT(param->src_height, h_factor);
+  param->trgt_width = SCALER_SHIFT(param->trgt_width, w_factor);
+  param->trgt_height = SCALER_SHIFT(param->trgt_height, h_factor);
+  param->scaled_src_width = SCALER_SHIFT(param->scaled_src_width, w_factor);
+  param->scaled_src_height = SCALER_SHIFT(param->scaled_src_height, h_factor);
+  param->rnd_trgt_width = SCALER_SHIFT(param->rnd_trgt_width, w_factor);
+  param->rnd_trgt_height = SCALER_SHIFT(param->rnd_trgt_height, h_factor);
 
   //Calculate sample positional parameters
   param->right_offset = param->src_width - param->scaled_src_width; //- left_offset
   param->bottom_offset = param->src_height - param->scaled_src_height; //- top_offset
 
   //TODO: Make dependant on width/height?
-  param->shift_x = 16;
-  param->shift_y = 16;
+  param->shift_x = SCALER_SHIFT_CONST;
+  param->shift_y = SCALER_SHIFT_CONST;
 
   param->scale_x = (((unsigned int)param->scaled_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
   param->scale_y = (((unsigned int)param->scaled_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
@@ -1081,9 +1084,9 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
   param.rnd_trgt_height = ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
-  //TODO: Why MAX? Try using src
-  int scaled_src_width = param.src_width;//MAX(param.src_width, param.trgt_width); //Min/max of source/target values
-  int scaled_src_height = param.src_height;//MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  //TODO: Why SCALER_MAX? Try using src
+  int scaled_src_width = param.src_width;//SCALER_MAX(param.src_width, param.trgt_width); //Min/max of source/target values
+  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_height); //Min/max of source/target values
   param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
@@ -1112,9 +1115,9 @@ scaling_parameter_t kvz_newScalingParameters_(int src_width, int src_height, int
   param.rnd_trgt_height = param.trgt_height;//((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
-  //TODO: Why MAX? Try using src
-  int scaled_src_width = param.src_width;//MAX(param.src_width, param.trgt_width); //Min/max of source/target values
-  int scaled_src_height = param.src_height;//MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  //TODO: Why SCALER_MAX? Try using src
+  int scaled_src_width = param.src_width;//SCALER_MAX(param.src_width, param.trgt_width); //Min/max of source/target values
+  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_height); //Min/max of source/target values
   param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
@@ -1191,8 +1194,8 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
   //Make sure the sizes match
   if (dst == NULL || dst->y->width != param.trgt_width || dst->y->height != param.trgt_height
-    || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
-    || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
+    || dst->u->width != SCALER_SHIFT(param.trgt_width, w_factor) || dst->u->height != SCALER_SHIFT(param.trgt_height, h_factor)
+    || dst->v->width != SCALER_SHIFT(param.trgt_width, w_factor) || dst->v->height != SCALER_SHIFT(param.trgt_height, h_factor)) {
 
     kvz_deallocateYuvBuffer(dst); //Free old buffer if it exists
 
@@ -1225,10 +1228,10 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
 
   //Allocate a pic_buffer to hold the component data while the downscaling is done
   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
-  int max_width = MAX(param.src_width+param.src_padding_x, param.trgt_width);
-  int max_height = MAX(param.src_height+param.src_padding_y, param.trgt_height);
-  int min_width = MIN(param.src_width, param.trgt_width);
-  int min_height = MIN(param.src_height, param.trgt_height);
+  int max_width = SCALER_MAX(param.src_width+param.src_padding_x, param.trgt_width);
+  int max_height = SCALER_MAX(param.src_height+param.src_padding_y, param.trgt_height);
+  int min_width = SCALER_MIN(param.src_width, param.trgt_width);
+  int min_height = SCALER_MIN(param.src_height, param.trgt_height);
   int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
@@ -1316,8 +1319,8 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
   //Make sure the sizes match
   if (dst == NULL || dst->y->width != param.trgt_width || dst->y->height != param.trgt_height
-    || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
-    || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
+    || dst->u->width != SCALER_SHIFT(param.trgt_width, w_factor) || dst->u->height != SCALER_SHIFT(param.trgt_height, h_factor)
+    || dst->v->width != SCALER_SHIFT(param.trgt_width, w_factor) || dst->v->height != SCALER_SHIFT(param.trgt_height, h_factor)) {
 
     kvz_deallocateYuvBuffer(dst); //Free old buffer if it exists
 
@@ -1350,10 +1353,10 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
 
   //Allocate a pic_buffer to hold the component data while the downscaling is done
   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
-  /*int max_width = MAX(param.src_width, param.trgt_width);
-  int max_height = MAX(param.src_height, param.trgt_height);
-  int min_width = MIN(param.src_width, param.trgt_width);
-  int min_height = MIN(param.src_height, param.trgt_height);
+  /*int max_width = SCALER_MAX(param.src_width, param.trgt_width);
+  int max_height = SCALER_MAX(param.src_height, param.trgt_height);
+  int min_width = SCALER_MIN(param.src_width, param.trgt_width);
+  int min_height = SCALER_MIN(param.src_height, param.trgt_height);
   int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
@@ -1364,13 +1367,13 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   //param.rnd_trgt_width = param.trgt_width;
   yuv_buffer_t* buffer = is_upscaling ? dst : yuv;//malloc(sizeof(pic_buffer_t)); //Choose bigger buffer
   if (buffer->y->tmp_row == NULL) {
-    buffer->y->tmp_row = malloc(sizeof(pic_data_t) * (MAX(buffer->y->width, buffer->y->height)));
+    buffer->y->tmp_row = malloc(sizeof(pic_data_t) * (SCALER_MAX(buffer->y->width, buffer->y->height)));
   }
   if (buffer->u->tmp_row == NULL) {
-    buffer->u->tmp_row = malloc(sizeof(pic_data_t) * (MAX(buffer->u->width, buffer->u->height)));
+    buffer->u->tmp_row = malloc(sizeof(pic_data_t) * (SCALER_MAX(buffer->u->width, buffer->u->height)));
   }
   if (buffer->v->tmp_row == NULL) {
-    buffer->v->tmp_row = malloc(sizeof(pic_data_t) * (MAX(buffer->v->width, buffer->v->height)));
+    buffer->v->tmp_row = malloc(sizeof(pic_data_t) * (SCALER_MAX(buffer->v->width, buffer->v->height)));
   }
 
   /*==========Start Resampling=============*/
@@ -1449,7 +1452,7 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   }
 
   //Check if the buffers are large enough for the given parameters and destination is set.
-  if (yuv == NULL || yuv->y->width < param.src_width + param.src_padding_x || yuv->y->height < param.src_height + param.src_padding_y || yuv->u->width < SHIFT(param.src_width + param.src_padding_x, w_factor) || yuv->u->height < SHIFT(param.src_height + param.src_padding_y, w_factor) || yuv->v->width < SHIFT(param.src_width + param.src_padding_x, w_factor) || yuv->v->height < SHIFT(param.src_height + param.src_padding_y, w_factor)) {
+  if (yuv == NULL || yuv->y->width < param.src_width + param.src_padding_x || yuv->y->height < param.src_height + param.src_padding_y || yuv->u->width < SCALER_SHIFT(param.src_width + param.src_padding_x, w_factor) || yuv->u->height < SCALER_SHIFT(param.src_height + param.src_padding_y, w_factor) || yuv->v->width < SCALER_SHIFT(param.src_width + param.src_padding_x, w_factor) || yuv->v->height < SCALER_SHIFT(param.src_height + param.src_padding_y, w_factor)) {
     fprintf(stderr, "Source buffer smaller than specified in the scaling parameters.\n");
     return 0;
   }
@@ -1460,13 +1463,13 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   int dst_offset_luma = 0;
   int dst_offset_chroma = 0;
   if (dst == NULL || dst->y->width < param.trgt_width || dst->y->height < param.trgt_height
-    || dst->u->width < SHIFT(param.trgt_width, w_factor) || dst->u->height < SHIFT(param.trgt_height, h_factor)
-    || dst->v->width < SHIFT(param.trgt_width, w_factor) || dst->v->height < SHIFT(param.trgt_height, h_factor)) {
+    || dst->u->width < SCALER_SHIFT(param.trgt_width, w_factor) || dst->u->height < SCALER_SHIFT(param.trgt_height, h_factor)
+    || dst->v->width < SCALER_SHIFT(param.trgt_width, w_factor) || dst->v->height < SCALER_SHIFT(param.trgt_height, h_factor)) {
 
     //Check that dst is large enough to hold the block
     if (dst == NULL || dst->y->width < block_width || dst->y->height < block_height
-      || dst->u->width < SHIFT(block_width, w_factor) || dst->u->height < SHIFT(block_height, h_factor)
-      || dst->v->width < SHIFT(block_width, w_factor) || dst->v->height < SHIFT(block_height, h_factor)) {
+      || dst->u->width < SCALER_SHIFT(block_width, w_factor) || dst->u->height < SCALER_SHIFT(block_height, h_factor)
+      || dst->v->width < SCALER_SHIFT(block_width, w_factor) || dst->v->height < SCALER_SHIFT(block_height, h_factor)) {
       fprintf(stderr, "Destination buffer not large enough to hold block\n");
       return 0;
     }
@@ -1474,7 +1477,7 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
 
     //Set dst offset so that the block is written to the correct pos
     dst_offset_luma = block_x + block_y * dst->y->width;
-    dst_offset_chroma = SHIFT(block_x, w_factor) + SHIFT(block_y, h_factor) * dst->u->width;
+    dst_offset_chroma = SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(block_y, h_factor) * dst->u->width;
   }
 
   //Calculate if we are upscaling or downscaling
@@ -1515,19 +1518,26 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
     }
 
     //Resample u
-    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor) );
 
     //Resample v
-    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SHIFT(block_x, w_factor), SHIFT(block_y, h_factor), SHIFT(block_width, w_factor), SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor) );
   }
 
   return 1;
 }
 
-static void blockScalingSrcRange( int range[2], const int scale, const int add, const int shift, const int delta, const int block_low, const int block_high, const int src_size, const int is_upsampling )
+static void blockScalingSrcRange( int range[2], const int scale, const int add, const int shift, const int delta, const int block_low, const int block_high, const int src_size )
 {
+  //Check if equal size
+  if(scale == SCALER_UNITY_SCALE_CONST){
+    range[0] = block_low;
+    range[1] = block_high;
+    return;
+  }
+
   //Get filter size
-  int size = is_upsampling ? sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]) : sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]);
+  int size = scale < SCALER_UNITY_SCALE_CONST ? sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]) : sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]);
 
   //Calculate lower bound
   range[0] = ((int)((unsigned int)((block_low * scale + add) >> (shift - 4)) - delta) >> 4) - (size >> 1) + 1;
@@ -1541,18 +1551,18 @@ static void blockScalingSrcRange( int range[2], const int scale, const int add, 
 
 }
 
-void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width, int is_upsampling)
+void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width)
 {
   //Calculate parameters
   calculateParameters(base_param, 0, 0, 0);
 
-  blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, base_param->src_width + base_param->src_padding_x, is_upsampling);
+  blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, base_param->src_width + base_param->src_padding_x);
 }
 
-void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height, int is_upsampling)
+void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height)
 {
   //Calculate parameters
   calculateParameters(base_param, 0, 0, 0);
 
-  blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, base_param->src_height + base_param->src_padding_y, is_upsampling);
+  blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, base_param->src_height + base_param->src_padding_y);
 }
