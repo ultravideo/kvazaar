@@ -186,6 +186,9 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, int wi
       printf("Error allocating scaling_jobs array!\n");
       return 0;
     }
+    for(int i = 0; i < num_jobs; i++){
+      state->layer->scaling_jobs[i] = NULL;
+    }
   } else {
     state->layer->scaling_jobs = NULL;
   }
@@ -211,7 +214,6 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
   }
 
   FREE_POINTER(state->layer->scaling_jobs);
-  //state->layer->ILR_state stuff should be deallocated else where
 
   kvz_image_free(state->layer->job_param.pic_in);
   kvz_image_free(state->layer->job_param.pic_out);
