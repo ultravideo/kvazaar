@@ -1459,10 +1459,12 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_scaling_paramet
         //Dependencies added so submit the job
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->scaling_jobs[lcu->id]);
       }
+      break;
     }
+
     default:
     {
-      //TODO: Handle other types
+      //TODO: Handle other types?
       break;
     }
     }//END switch
