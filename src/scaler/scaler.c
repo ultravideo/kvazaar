@@ -1473,8 +1473,6 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
       fprintf(stderr, "Destination buffer not large enough to hold block\n");
       return 0;
     }
-  } else {
-
     //Set dst offset so that the block is written to the correct pos
     dst_offset_luma = block_x + block_y * dst->y->width;
     dst_offset_chroma = SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(block_y, h_factor) * dst->u->width;
