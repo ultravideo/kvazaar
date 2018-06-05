@@ -179,9 +179,6 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
 // Modified for SHVC.
 static int encoder_state_config_layer_init(encoder_state_t * const state, int width_in_lcu, const int height_in_lcu)
 {
-  state->layer->ILR_state = NULL; //Set later.
-  state->layer->num_ILR_states = 0;
-
   if(state->encoder_control->cfg.wpp){
     int num_jobs = width_in_lcu * height_in_lcu;
     state->layer->scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
@@ -368,8 +365,8 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     // Modified for SHVC.
   child_state->tqj_ilr_rec_scaling_done = NULL;
   child_state->tqj_ilr_cua_upsampling_done = NULL;
-  //child_state->ILR_state = NULL; //Set later
-  //child_state->num_ILR_states = 0;
+  child_state->ILR_state = NULL; //Set later
+  child_state->num_ILR_states = 0;
   // ***********************************************
 
   if (!parent_state) {

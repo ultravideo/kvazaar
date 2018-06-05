@@ -200,9 +200,6 @@ typedef struct encoder_state_config_layer_t {
   threadqueue_job_t **scaling_jobs;
   
   kvz_scaling_parameters job_param; //Hold parameters given to scaling jobs
-
-  const struct encoder_state_t *ILR_state;
-  int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
   
 } encoder_state_config_layer_t;
 // ***********************************************
@@ -264,6 +261,9 @@ typedef struct encoder_state_t {
   // ***********************************************
   // Modified for SHVC.
   encoder_state_config_layer_t *layer;
+
+  const struct encoder_state_t *ILR_state;
+  int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
   // ***********************************************
 
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
