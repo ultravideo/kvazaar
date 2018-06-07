@@ -1582,7 +1582,8 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
   param->nh_in_lcu = state->tile->frame->height_in_lcu;
   param->nw_in_lcu = state->tile->frame->width_in_lcu;
   param->only_init = !state->encoder_control->cfg.tmvp_enable;
-  param->out_cua = cua;      
+  param->out_cua = cua;
+  param->lcu_ind = -1;
 
   //Make new job and free previous
   kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);

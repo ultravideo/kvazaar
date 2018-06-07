@@ -218,6 +218,10 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 // ***********************************************
 // Modified for SHVC.
 // Adapted from shm. Dealocates given parameters
+
+#define IND2X(ind,step,stride) (((ind) * (step)) % (stride))
+#define IND2Y(ind,step,stride) (((ind) / (stride)) * (step))
+
 void kvz_cu_array_upsampling_worker(void *opaque_param)
 {
   kvz_cua_upsampling_parameters *param = opaque_param;
@@ -228,6 +232,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
   int32_t *cu_pos_scale = param->cu_pos_scale;
   uint8_t only_init = param->only_init;
   cu_array_t *cua = param->out_cua;
+  int32_t lcu_ind = param->lcu_ind;
 
   //Define a few basic things
   //TODO: Just use MAX_DEPTH or MAX_PU_DEPTH?    v----log2_min_luma_transform_block_size
@@ -248,13 +253,12 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
 //#define LCUIND2X(ind,stride) (((ind) * LCU_WIDTH) % (stride))
 //#define LCUIND2Y(ind,lcu_stride) (((ind) * LCU_WIDTH) / (lcu_stride))
 
-#define IND2X(ind,step,stride) (((ind) * (step)) % (stride))
-#define IND2Y(ind,step,stride) (((ind) / (stride)) * (step))
 
   //Loop over LCUs/CTUs
   //uint32_t frame_lcu_stride = nw_in_lcu;
-  uint32_t num_lcu_in_frame = nw_in_lcu * nh_in_lcu;
-  for ( uint32_t lcu_ind = 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
+  //If lcu ind is -1 then go through all lcu, else just do one lcu
+  uint32_t num_lcu_in_frame = lcu_ind > -1 ? 1 : nw_in_lcu * nh_in_lcu;
+  for ( uint32_t lcu_ind = lcu_ind > -1 ? lcu_ind : 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
     uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,n_width);//(lcu_ind * LCU_WIDTH) % cua->width;
     uint32_t lcu_y = IND2Y(lcu_ind,LCU_WIDTH,nw_in_lcu);//(lcu_ind * LCU_WIDTH) / frame_lcu_stride; 
 
@@ -339,10 +343,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
       }
     }
   }
-
-#undef IND2X
-#undef IND2Y
-
+  
   free(param);
 }
 
@@ -363,9 +364,33 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
   param->nw_in_lcu = nw_in_lcu;
   param->only_init = only_init;
   param->out_cua = cua;
+  param->lcu_ind = -1;
   
   kvz_cu_array_upsampling_worker(param);
 
   return cua;
 }
+
+void kvz_cu_array_upsampling_src_range( int32_t range[2], uint32_t lcu_low, uint32_t lcu_high, uint32_t src_size, int32_t cu_pos_scale ){
+  
+  if( cu_pos_scale == POS_SCALE_FAC_1X ){
+    //If no scaling range is same as high low
+    range[0] = lcu_low;
+    range[1] = lcu_high;
+    return;
+  }
+  
+  uint8_t block_size = 16;
+
+  //Need to round here for some reason acording to shm.
+  range[0] = ((SCALE_POS_COORD(lcu_low + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
+  range[1] = ((SCALE_POS_COORD(lcu_high + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
+
+  range[0] = CLIP(0, src_size - 1, range[0]);
+  range[1] = CLIP(0, src_size - 1, range[1]);
+
+}
+
+#undef IND2X
+#undef IND2Y
 // ***********************************************

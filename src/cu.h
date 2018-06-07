@@ -217,6 +217,8 @@ typedef struct {
   int32_t *cu_pos_scale;
   uint8_t only_init;
 
+  int32_t lcu_ind; //-1 for all lcu, else just the lcu given lcu_ind
+
 } kvz_cua_upsampling_parameters;
 
 /**
