@@ -226,7 +226,7 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
 {
   //Check if layer is allocated
   if(state->layer == NULL){
-    return;
+    return 1;
   }
 
   if (state->encoder_control->cfg.wpp) {
