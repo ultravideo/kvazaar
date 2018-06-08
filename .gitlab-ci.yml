@@ -5,15 +5,27 @@ image: ubuntu:18.04
 # Install needed tools
 before_script:
   - apt-get update
-  - apt-get install -y autoconf build-essential libtool yasm wget git libtool-bin libc6-dbg valgrind
+  - apt-get install -y autoconf build-essential libtool yasm wget git libtool-bin valgrind
 
-# Build kvazaar and run tests  
-build-and-test:
+# Build kvazaar and run tests
+build-kvazaar:
   stage: build
   script:
     - ./autogen.sh
     - ./configure --enable-werror
-    - make --jobs=2 V=1
-    - bash .travis-install.bash    
+    - make --jobs=2 V=1    
+  artifacts:
+    paths:
+    - src/kvazaar
+    - src/.libs
+    
+run-tests:
+  stage: test
+  script:
+    - bash .travis-install.bash  
+    - ./autogen.sh
+    - ./configure  
     - PATH="${HOME}/bin:${PATH}" KVAZAAR_OVERRIDE_angular_pred=generic KVAZAAR_OVERRIDE_sao_band_ddistortion=generic KVAZAAR_OVERRIDE_sao_edge_ddistortion=generic KVAZAAR_OVERRIDE_calc_sao_edge_dir=generic make check
+    
+    
     
