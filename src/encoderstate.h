@@ -197,9 +197,11 @@ typedef struct encoder_state_config_tile_t {
 typedef struct encoder_state_config_layer_t {
 
   //Jobs for scaling each LCU
-  threadqueue_job_t **scaling_jobs;
+  threadqueue_job_t **image_scaling_jobs;
+  threadqueue_job_t **cua_scaling_jobs;
   
-  kvz_scaling_parameters job_param; //Hold parameters given to scaling jobs
+  kvz_image_scaling_parameter_t img_job_param; //Hold parameters given to scaling jobs
+  kvz_cua_upsampling_parameter_t cua_job_param; //Hold parameters passed to cua upsampling jobs
   
 } encoder_state_config_layer_t;
 // ***********************************************

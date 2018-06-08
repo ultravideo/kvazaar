@@ -224,7 +224,7 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 
 void kvz_cu_array_upsampling_worker(void *opaque_param)
 {
-  kvz_cua_upsampling_parameters *param = opaque_param;
+  kvz_cua_upsampling_parameter_t *param = opaque_param;
   cu_array_t *base_cua = param->base_cua;
   int32_t nw_in_lcu = param->nw_in_lcu;
   int32_t nh_in_lcu = param->nh_in_lcu;
@@ -258,7 +258,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
   //uint32_t frame_lcu_stride = nw_in_lcu;
   //If lcu ind is -1 then go through all lcu, else just do one lcu
   uint32_t num_lcu_in_frame = lcu_ind > -1 ? 1 : nw_in_lcu * nh_in_lcu;
-  for ( uint32_t lcu_ind = lcu_ind > -1 ? lcu_ind : 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
+  for ( lcu_ind = lcu_ind > -1 ? lcu_ind : 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
     uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,n_width);//(lcu_ind * LCU_WIDTH) % cua->width;
     uint32_t lcu_y = IND2Y(lcu_ind,LCU_WIDTH,nw_in_lcu);//(lcu_ind * LCU_WIDTH) / frame_lcu_stride; 
 
@@ -344,6 +344,8 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
     }
   }
   
+  kvz_cu_array_free(&base_cua);
+  kvz_cu_array_free(&cua);
   free(param);
 }
 
@@ -356,10 +358,12 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
   uint32_t n_height = nh_in_lcu * LCU_WIDTH;
   cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
 
-  kvz_cua_upsampling_parameters *param = calloc(1, sizeof(kvz_cua_upsampling_parameters));
+  kvz_cua_upsampling_parameter_t *param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
   param->base_cua = base_cua;
-  param->cu_pos_scale = cu_pos_scale;
-  param->mv_scale = mv_scale;
+  param->cu_pos_scale[0] = cu_pos_scale[0];
+  param->cu_pos_scale[1] = cu_pos_scale[1];
+  param->mv_scale[0] = mv_scale[0];
+  param->mv_scale[1] = mv_scale[1];
   param->nh_in_lcu = nh_in_lcu;
   param->nw_in_lcu = nw_in_lcu;
   param->only_init = only_init;

@@ -621,9 +621,9 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
 // ***********************************************
   // Modified for SHVC
 //Deallocates the given parameters
-void kvz_picture_scaler_worker( void *opaque_param)
+void kvz_image_scaler_worker( void *opaque_param)
 {
-  kvz_scaling_parameters *in_param = opaque_param;
+  kvz_image_scaling_parameter_t *in_param = opaque_param;
   kvz_picture *pic_in = in_param->pic_in;
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
@@ -689,7 +689,7 @@ void kvz_picture_scaler_worker( void *opaque_param)
 
 void kvz_block_scaler_worker(void * opaque_param)
 {
-  kvz_scaling_parameters *in_param = opaque_param;
+  kvz_image_scaling_parameter_t *in_param = opaque_param;
   kvz_picture * const pic_in = in_param->pic_in;
   kvz_picture *pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
@@ -767,7 +767,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
     return kvz_image_copy_ref(pic_in);
   }
 
-  kvz_scaling_parameters *scaling_param = calloc(1, sizeof(kvz_scaling_parameters));
+  kvz_image_scaling_parameter_t *scaling_param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
 
   kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,
                                           param->trgt_width + param->trgt_padding_x,
@@ -780,7 +780,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   scaling_param->param = param;
 
   //Do scaling
-  kvz_picture_scaler_worker(scaling_param);
+  kvz_image_scaler_worker(scaling_param);
 
   //Pic out should now contain the scaled image
   return pic_out;

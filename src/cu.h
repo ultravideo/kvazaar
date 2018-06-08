@@ -213,13 +213,13 @@ typedef struct {
 
   int32_t nw_in_lcu;
   int32_t nh_in_lcu;
-  int32_t *mv_scale;
-  int32_t *cu_pos_scale;
+  int32_t mv_scale[2];
+  int32_t cu_pos_scale[2];
   uint8_t only_init;
 
   int32_t lcu_ind; //-1 for all lcu, else just the lcu given lcu_ind
 
-} kvz_cua_upsampling_parameters;
+} kvz_cua_upsampling_parameter_t;
 
 /**
  * \brief Return a cu array that has been upsampled from base_cua.
@@ -237,6 +237,9 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua,
                                     int32_t * mv_scale,
                                     int32_t * cu_pos_scale,
                                     uint8_t only_init);
+
+//Return the pixel range that the upsampling function uses in the source
+void kvz_cu_array_upsampling_src_range(int32_t range[2], uint32_t lcu_low, uint32_t lcu_high, uint32_t src_size, int32_t cu_pos_scale);
 // ***********************************************
     
 

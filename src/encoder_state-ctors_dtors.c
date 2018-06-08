@@ -181,25 +181,43 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, int wi
 {
   if(state->encoder_control->cfg.wpp){
     int num_jobs = width_in_lcu * height_in_lcu;
-    state->layer->scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
-    if( state->layer->scaling_jobs == NULL){
-      printf("Error allocating scaling_jobs array!\n");
+    state->layer->image_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    state->layer->cua_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    if( state->layer->image_scaling_jobs == NULL){
+      printf("Error allocating image_scaling_jobs array!\n");
+      return 0;
+    }
+    if( state->layer->cua_scaling_jobs == NULL){
+      printf("Error allocating cua_scaling_jobs array!\n");
       return 0;
     }
     for(int i = 0; i < num_jobs; i++){
-      state->layer->scaling_jobs[i] = NULL;
+      state->layer->image_scaling_jobs[i] = NULL;
+      state->layer->cua_scaling_jobs[i] = NULL;
     }
   } else {
-    state->layer->scaling_jobs = NULL;
+    state->layer->image_scaling_jobs = NULL;
+    state->layer->cua_scaling_jobs = NULL;
   }
 
-  state->layer->job_param.param = NULL;
-  state->layer->job_param.pic_in = NULL;
-  state->layer->job_param.pic_out = NULL;
-  state->layer->job_param.block_height = 0;
-  state->layer->job_param.block_width = 0;
-  state->layer->job_param.block_x = 0;
-  state->layer->job_param.block_y = 0;
+  state->layer->img_job_param.param = NULL;
+  state->layer->img_job_param.pic_in = NULL;
+  state->layer->img_job_param.pic_out = NULL;
+  state->layer->img_job_param.block_height = 0;
+  state->layer->img_job_param.block_width = 0;
+  state->layer->img_job_param.block_x = 0;
+  state->layer->img_job_param.block_y = 0;
+
+  state->layer->cua_job_param.out_cua = NULL;
+  state->layer->cua_job_param.base_cua = NULL;
+  state->layer->cua_job_param.cu_pos_scale[0] = 0;
+  state->layer->cua_job_param.cu_pos_scale[1] = 0;
+  state->layer->cua_job_param.mv_scale[0] = 0;
+  state->layer->cua_job_param.mv_scale[1] = 0;
+  state->layer->cua_job_param.nh_in_lcu = 0;
+  state->layer->cua_job_param.nw_in_lcu = 0;
+  state->layer->cua_job_param.only_init = 0;
+  state->layer->cua_job_param.lcu_ind = -1;
 
   return 1;
 }
@@ -209,14 +227,19 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
   if (state->encoder_control->cfg.wpp) {
     int num_jobs = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
     for (int i = 0; i < num_jobs; ++i) {
-      kvz_threadqueue_free_job(&state->layer->scaling_jobs[i]);
+      kvz_threadqueue_free_job(&state->layer->image_scaling_jobs[i]);
+      kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[i]);
     }
   }
 
-  FREE_POINTER(state->layer->scaling_jobs);
+  FREE_POINTER(state->layer->image_scaling_jobs);
+  FREE_POINTER(state->layer->cua_scaling_jobs);
 
-  kvz_image_free(state->layer->job_param.pic_in);
-  kvz_image_free(state->layer->job_param.pic_out);
+  kvz_image_free(state->layer->img_job_param.pic_in);
+  kvz_image_free(state->layer->img_job_param.pic_out);
+
+  kvz_cu_array_free(&state->layer->cua_job_param.base_cua);
+  kvz_cu_array_free(&state->layer->cua_job_param.out_cua);
 
   return 1;
 }
@@ -399,11 +422,16 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
 
     // ***********************************************
     // Modified for SHVC.
-    child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
-    if (!child_state->layer || !encoder_state_config_layer_init(child_state, encoder->in.width_in_lcu, encoder->in.height_in_lcu)){
-      fprintf(stderr, "Could not initialize encoder_state->layer!\n");
-      return 0;
+    if (encoder->layer.layer_id > 0) {
+      child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
+      if (!child_state->layer || !encoder_state_config_layer_init(child_state, encoder->in.width_in_lcu, encoder->in.height_in_lcu)) {
+        fprintf(stderr, "Could not initialize encoder_state->layer!\n");
+        return 0;
+      }
+    } else {
+      child_state->layer = NULL;
     }
+
     // ***********************************************
   } else {
     child_state->encoder_control = parent_state->encoder_control;
