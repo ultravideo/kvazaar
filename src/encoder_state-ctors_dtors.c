@@ -224,6 +224,11 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, int wi
 
 static int encoder_state_config_layer_finalize(encoder_state_t * const state)
 {
+  //Check if layer is allocated
+  if(state->layer == NULL){
+    return;
+  }
+
   if (state->encoder_control->cfg.wpp) {
     int num_jobs = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
     for (int i = 0; i < num_jobs; ++i) {
