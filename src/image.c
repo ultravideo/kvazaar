@@ -656,7 +656,7 @@ void kvz_image_scaler_worker( void *opaque_param)
     assert(sizeof(kvz_pixel) == sizeof(char)); //Image copy (memset) only works if the pixels are the same size as char 
 
     //Loop over components
-    for (int comp = 0, i = 0; comp < sizeof(comp_list); comp++) {
+    for (int comp = 0, i = 0; comp < sizeof(comp_list) / sizeof(*comp_list); comp++) {
       int comp_size = height_list[comp] * stride_list[comp];
       int pic_out_stride = pic_out->stride >> (comp < 1 ? 0 : chroma_shift);
       for (int src_ind = 0; src_ind < comp_size; i++, src_ind++) {

@@ -287,6 +287,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->max_inter_ref_lcu.right = 1;
     encoder->max_inter_ref_lcu.down  = 1;
 
+    // ***********************************************
+    // Modified for SHVC.
+    // Share the thread queue if prev encoder has been set
+    // Use paralellism parameters from the highest level
+
     int max_threads = encoder->cfg.threads;
     if (max_threads < 0) {
       max_threads = cfg_num_threads();
@@ -316,13 +321,23 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       // Add two frames so that we have frames ready to be coded when one is
       // completed.
       encoder->cfg.owf += 2;
-
-      fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
+      if( encoder->cfg.layer == 0)
+        fprintf(stderr, "Layer 0:\n");
+      else
+        fprintf(stderr, "Layer %d (supersedes previous parameters):\n", encoder->cfg.layer);
+      fprintf(stderr, "  --owf=auto value set to %d.\n", encoder->cfg.owf);
     }
 
     if (encoder->cfg.threads < 0) {
       encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
-      fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
+
+      if ( cfg->shared != NULL && cfg->shared->owf >= 0) {
+        if (encoder->cfg.layer == 0)
+          fprintf(stderr, "Layer 0:\n");
+        else
+          fprintf(stderr, "Layer %d (supersedes previous parameters):\n", encoder->cfg.layer);
+      }
+      fprintf(stderr, "  --threads=auto value set to %d.\n", encoder->cfg.threads);
     }
 
     if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
@@ -332,20 +347,19 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
         encoder->cfg.owf += 1;
       }
     }
+        
+    encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
+    if (!encoder->threadqueue) {
+      fprintf(stderr, "Could not initialize threadqueue.\n");
+      goto init_failed;
+    }
 
-
-    // ***********************************************
-    // Modified for SHVC.
-    // Share the thread queue if prev encoder has been set
-    
-    if ( prev_enc == NULL || prev_enc->threadqueue == NULL ) {
-      encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
-      if (!encoder->threadqueue) {
-        fprintf(stderr, "Could not initialize threadqueue.\n");
-        goto init_failed;
-      }
-    } else {
-      encoder->threadqueue = prev_enc->threadqueue;
+    //Propagate to prev enc. TODO: handle more complex ref structure
+    if( prev_enc != NULL ){
+      kvz_threadqueue_free(prev_enc->threadqueue);
+      prev_enc->threadqueue = encoder->threadqueue;
+      prev_enc->cfg.threads = encoder->cfg.threads;
+      prev_enc->cfg.owf = encoder->cfg.owf;
     }
     
     // ***********************************************
