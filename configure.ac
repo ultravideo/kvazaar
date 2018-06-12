@@ -53,7 +53,7 @@ AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
-KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
+KVZ_CFLAGS="-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])

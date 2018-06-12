@@ -329,7 +329,7 @@ SUITE(sad_tests)
 
   setup_tests();
 
-  for (unsigned i = 0; i < strategies.count; ++i) {
+  for (volatile unsigned i = 0; i < strategies.count; ++i) {
     if (strcmp(strategies.strategies[i].type, "reg_sad") != 0) {
       continue;
     }
