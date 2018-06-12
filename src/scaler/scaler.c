@@ -912,6 +912,92 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
   }
 }
 
+//Do only the vertical/horizontal resampling step in the given block
+static void resampleStepBlock(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height,  const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int normilize){
+  //TODO: Add cropping etc.
+
+  //Choose best filter to use when downsampling
+  //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+  int ver_filter = 0;
+  int hor_filter = 0;
+
+  int src_width = param->src_width + param->src_padding_x;
+  int src_height = param->src_height + param->src_padding_y;
+  int trgt_width = param->rnd_trgt_width;
+  int trgt_height = param->rnd_trgt_height;
+
+  if (!is_upscaling) {
+    int crop_width = src_width - param->right_offset; //- param->left_offset;
+    int crop_height = src_height - param->bottom_offset; //- param->top_offset;
+
+    if (4 * crop_height > 15 * trgt_height)
+      ver_filter = 7;
+    else if (7 * crop_height > 20 * trgt_height)
+      ver_filter = 6;
+    else if (2 * crop_height > 5 * trgt_height)
+      ver_filter = 5;
+    else if (1 * crop_height > 2 * trgt_height)
+      ver_filter = 4;
+    else if (3 * crop_height > 5 * trgt_height)
+      ver_filter = 3;
+    else if (4 * crop_height > 5 * trgt_height)
+      ver_filter = 2;
+    else if (19 * crop_height > 20 * trgt_height)
+      ver_filter = 1;
+
+    if (4 * crop_width > 15 * trgt_width)
+      hor_filter = 7;
+    else if (7 * crop_width > 20 * trgt_width)
+      hor_filter = 6;
+    else if (2 * crop_width > 5 * trgt_width)
+      hor_filter = 5;
+    else if (1 * crop_width > 2 * trgt_width)
+      hor_filter = 4;
+    else if (3 * crop_width > 5 * trgt_width)
+      hor_filter = 3;
+    else if (4 * crop_width > 5 * trgt_width)
+      hor_filter = 2;
+    else if (19 * crop_width > 20 * trgt_width)
+      hor_filter = 1;
+  }
+
+  int shift = param->shift_x - 4;
+
+  //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
+  for (int y = block_y; y < (block_y + block_height); y++) {
+
+    pic_data_t* src_row = &src_buffer->data[y * src_buffer->width];
+    pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width];
+
+    for (int x = block_x; x < (block_x + block_width); x++) {
+      //Calculate reference position in src pic
+      int ref_pos_16 = (int)((unsigned int)(x * param->scale_x + param->add_x) >> shift) - param->delta_x;
+      int phase = ref_pos_16 & 15;
+      int ref_pos = ref_pos_16 >> 4;
+
+      //Choose filter
+      const int *filter;
+      const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+
+      //Apply filter
+      pic_data_t val = 0;
+      for (int k = 0; k < f_size; k++) {
+        int m = clip(ref_pos + k - (f_size >> 1) + 1, 0, src_width - 1);
+        val += filter[k] * src_row[m];
+      }
+
+      //Set val to trgt buffer
+      if (normilize) {
+        trgt_row[x + trgt_offset] = clip(is_upscaling ? (val + 2048) >> 12 : (val + 8192) >> 14, 0, 255);
+      } else {
+        trgt_row[x + trgt_offset] = val;
+      }
+
+    }
+  }
+
+}
+
 //Do the resampling in one pass using 2D-convolution.
 static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height )
 {
