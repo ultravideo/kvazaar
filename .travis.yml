@@ -24,6 +24,9 @@ matrix:
     - compiler: clang
       env: CFLAGS='-fsanitize=thread'
 
+    - compiler: clang
+      env: CFLAGS='-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
+
     - compiler: gcc-4.8
       env: KVZ_TEST_VALGRIND=1
 
