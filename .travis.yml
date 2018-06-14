@@ -36,7 +36,7 @@ matrix:
       install: true
       script:
         - ./autogen.sh
-        - ./configure --enable-werror
+        - ./configure --enable-werror || (cat config.log && false)
         - make --jobs=2 V=1
         - make check TESTS=kvazaar_tests
 
@@ -44,7 +44,7 @@ install: bash .travis-install.bash
 
 script:
   - ./autogen.sh
-  - ./configure --enable-werror
+  - ./configure --enable-werror || (cat config.log && false)
   - make --jobs=2 V=1
   - make check VERBOSE=1
 
