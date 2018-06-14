@@ -19,7 +19,16 @@ matrix:
 
   include:
     - compiler: clang
+      env: KVZ_TEST_VALGRIND=1
+
+    - compiler: clang
+      env: CFLAGS='-fsanitize=thread'
+
+    - compiler: clang
+      env: CFLAGS='-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
+
     - compiler: gcc-4.8
+      env: CFLAGS='-fsanitize=address'
 
     # We have some Mac specific code and Mac sometimes has odd build issues.
     - os: osx
@@ -27,14 +36,15 @@ matrix:
       install: true
       script:
         - ./autogen.sh
-        - ./configure --enable-werror
+        - ./configure --enable-werror || (cat config.log && false)
         - make --jobs=2 V=1
+        - make check TESTS=kvazaar_tests
 
 install: bash .travis-install.bash
 
 script:
   - ./autogen.sh
-  - ./configure --enable-werror
+  - ./configure --enable-werror || (cat config.log && false)
   - make --jobs=2 V=1
   - make check VERBOSE=1
 
