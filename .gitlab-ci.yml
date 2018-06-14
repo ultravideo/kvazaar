@@ -7,8 +7,8 @@ build-kvazaar:
   stage: build
   script:
     - ./autogen.sh
-    - ./configure --enable-werror
-    - make --jobs=2 V=1
+    - ./configure --enable-werror || (cat config.log && false)
+    - make --jobs=8 V=1
   artifacts:
     paths:
     - src/kvazaar
