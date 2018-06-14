@@ -8,19 +8,21 @@ build-kvazaar:
   script:
     - ./autogen.sh
     - ./configure --enable-werror
-    - make --jobs=2 V=1    
+    - make --jobs=2 V=1
   artifacts:
     paths:
     - src/kvazaar
     - src/.libs
     expire_in: 1 week
-    
+
 run-tests:
   stage: test
   script:
     - ./autogen.sh
-    - ./configure  
-    - PATH="${HOME}/bin:${PATH}" KVAZAAR_OVERRIDE_angular_pred=generic KVAZAAR_OVERRIDE_sao_band_ddistortion=generic KVAZAAR_OVERRIDE_sao_edge_ddistortion=generic KVAZAAR_OVERRIDE_calc_sao_edge_dir=generic make check
-    
-    
-    
+    - ./configure
+    - export PATH="${HOME}/bin:${PATH}"
+    - export KVAZAAR_OVERRIDE_angular_pred=generic
+    - export KVAZAAR_OVERRIDE_sao_band_ddistortion=generic
+    - export KVAZAAR_OVERRIDE_sao_edge_ddistortion=generic
+    - export KVAZAAR_OVERRIDE_calc_sao_edge_dir=generic
+    - make check VERBOSE=1
