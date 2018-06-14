@@ -60,7 +60,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // PTL
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
-  WRITE_U(stream, 0, 1, "general_tier_flag");
+  WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
   WRITE_U(stream, (state->encoder_control->bitdepth == 8)?1:2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc

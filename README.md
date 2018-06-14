@@ -141,6 +141,7 @@ Video structure:
       --force-level <number> : Same as --level but warnings instead of errors.
       --high-tier            : Used with --level. Use high tier bitrate limits
                                instead of the main tier limits during encoding.
+                               High tier requires level 4 or higher.
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -208,12 +209,12 @@ Parallel processing:
       --owf <integer>        : Frame-level parallelism [auto]
                                    - N: Process N-1 frames at a time.
                                    - auto: Select automatically.
-      --(no-)wpp             : Wavefront parallel processing.
-                               Enabling tiles automatically disables WPP. To
-                               enable WPP with tiles, re-enable it after
+      --(no-)wpp             : Wavefront parallel processing. [enabled]
+                               Enabling tiles automatically disables WPP.
+                               To enable WPP with tiles, re-enable it after
                                enabling tiles. Enabling wpp with tiles is,
                                however, an experimental feature since it is
-                               not supported in any HEVC profile. [enabled]
+                               not supported in any HEVC profile.
       --tiles <int>x<int>    : Split picture into width x height uniform tiles.
       --tiles-width-split <string>|u<int> :
                                    - <string>: A comma-separated list of tile
