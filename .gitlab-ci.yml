@@ -1,9 +1,8 @@
 # Use Kvazaar CI base image which includes the build tools and ffmpeg + hmdec in ${HOME}/bin
 image: ultravideo/kvazaar_ci_base:latest
 
-
-# Build kvazaar and run tests
-build-kvazaar:
+# Build kvazaar
+build-kvazaar: &build-template
   stage: build
   script:
     - ./autogen.sh
@@ -15,14 +14,54 @@ build-kvazaar:
     - src/.libs
     expire_in: 1 week
 
-run-tests:
+build-asan:
+  <<: *build-template
+  variables:
+    CFLAGS: '-fsanitize=address'
+    # LeakSanitizer doesn't work inside the container because it requires
+    # ptrace so we disable it.
+    ASAN_OPTIONS: 'detect_leaks=0'
+
+build-tsan:
+  <<: *build-template
+  variables:
+    CFLAGS: '-fsanitize=thread'
+
+build-ubsan:
+  <<: *build-template
+  variables:
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
+
+.test-template: &test-template
   stage: test
   script:
-    - ./autogen.sh
-    - ./configure
     - export PATH="${HOME}/bin:${PATH}"
-    - export KVAZAAR_OVERRIDE_angular_pred=generic
-    - export KVAZAAR_OVERRIDE_sao_band_ddistortion=generic
-    - export KVAZAAR_OVERRIDE_sao_edge_ddistortion=generic
-    - export KVAZAAR_OVERRIDE_calc_sao_edge_dir=generic
-    - make check VERBOSE=1
+    - ./autogen.sh
+    - ./configure --enable-werror
+    - make check --jobs=8 VERBOSE=1
+
+test-valgrind:
+  <<: *test-template
+  dependencies:
+    - build-kvazaar
+  variables:
+    KVAZAAR_OVERRIDE_angular_pred: generic
+    KVAZAAR_OVERRIDE_sao_band_ddistortion: generic
+    KVAZAAR_OVERRIDE_sao_edge_ddistortion: generic
+    KVAZAAR_OVERRIDE_calc_sao_edge_dir: generic
+    KVZ_TEST_VALGRIND: 1
+
+test-asan:
+  <<: *test-template
+  dependencies:
+    - build-asan
+
+test-tsan:
+  <<: *test-template
+  dependencies:
+    - build-tsan
+
+test-ubsan:
+  <<: *test-template
+  dependencies:
+    - build-ubsan
