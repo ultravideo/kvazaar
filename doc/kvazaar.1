@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "March 2018" "kvazaar v1.2.0" "User Commands"
+.TH KVAZAAR "1" "June 2018" "kvazaar v1.2.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -162,6 +162,7 @@ Same as \-\-level but warnings instead of errors.
 \fB\-\-high\-tier           
 Used with \-\-level. Use high tier bitrate limits
 instead of the main tier limits during encoding.
+High tier requires level 4 or higher.
 
 .SS "Compression tools:"
 .TP
@@ -256,6 +257,10 @@ Motion estimation termination [on]
     \- on: Terminate early.
     \- sensitive: Terminate even earlier.
 .TP
+\fB\-\-(no\-)intra\-rdo\-et   
+Check intra modes in rdo stage only until
+a zero coefficient CU is found. [disabled]
+.TP
 \fB\-\-(no\-)implicit\-rdpcm 
 Implicit residual DPCM. Currently only supported
 with lossless coding. [disabled]
@@ -277,10 +282,12 @@ Frame\-level parallelism [auto]
     \- auto: Select automatically.
 .TP
 \fB\-\-(no\-)wpp            
-Wavefront parallel processing.
-Enabling tiles automatically disables WPP. To
-enable WPP with tiles, re\-enable it after
-enabling tiles. [enabled]
+Wavefront parallel processing. [enabled]
+Enabling tiles automatically disables WPP.
+To enable WPP with tiles, re\-enable it after
+enabling tiles. Enabling wpp with tiles is,
+however, an experimental feature since it is
+not supported in any HEVC profile.
 .TP
 \fB\-\-tiles <int>x<int>   
 Split picture into width x height uniform tiles.
