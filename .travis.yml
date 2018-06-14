@@ -28,7 +28,7 @@ matrix:
       env: CFLAGS='-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
 
     - compiler: gcc-4.8
-      env: KVZ_TEST_VALGRIND=1
+      env: CFLAGS='-fsanitize=address'
 
     # We have some Mac specific code and Mac sometimes has odd build issues.
     - os: osx
