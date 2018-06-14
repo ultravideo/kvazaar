@@ -36,7 +36,7 @@ script:
   - ./autogen.sh
   - ./configure --enable-werror
   - make --jobs=2 V=1
-  - make check VERBOSE=1
+  - make check KVZ_TEST_VALGRIND=1 VERBOSE=1
 
 after_script:
   # Disable errors to work around Travis not knowing how to fix their stuff.
