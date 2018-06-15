@@ -407,7 +407,7 @@ static void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t*
   for (int i = 0; i < max_dim_y; i++) {
     if (i < min_dim_y) {
       for (int j = 0; j < max_dim_x; j++) {
-        //If outside min x, copy adjacent value.
+        //If outside min o_ind, copy adjacent value.
         dst->data[dst_row + j] = (j < min_dim_x) ? src->data[src_row + j] : dst->data[dst_row + j - 1];
       }
     }
@@ -426,7 +426,7 @@ static void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t*
 * \brief Copies data from one buffer to the other.
 * \param src is the source buffer
 * \param dst is the destination buffer
-* \param src/dst_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_x is the o_ind-coordinate for the sub-block (needs to be valid for both buffers).
 * \param src/dst_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
 * \param block_width is the width for the sub-block (needs to be valid for both buffers).
 * \param block_height is the height for the sub-block (needs to be valid for both buffers).
@@ -458,7 +458,7 @@ static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* con
 * \brief Copies data from a sub-block from one buffer to the other.
 * \param src is the source buffer
 * \param dst is the destination buffer
-* \param src/dst_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_x is the o_ind-coordinate for the sub-block (needs to be valid for both buffers).
 * \param src/dst_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
 * \param block_width is the width for the sub-block (needs to be valid for both buffers).
 * \param block_height is the height for the sub-block (needs to be valid for both buffers).
@@ -880,7 +880,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
 
   pic_data_t* tmp_col = tmp_row; //rename for clarity
 
-  // Vertical resampling
+  // Vertical resampling. TODO: Why this order? should loop over rows not cols?
   for (int i = 0; i < trgt_width; i++) {
     pic_data_t* src_col = &buffer->data[i];
     for (int j = 0; j < trgt_height; j++) {
@@ -913,86 +913,93 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
 }
 
 //Do only the vertical/horizontal resampling step in the given block
-static void resampleStepBlock(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height,  const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int normilize){
+static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height,  const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical){
   //TODO: Add cropping etc.
 
   //Choose best filter to use when downsampling
   //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
-  int ver_filter = 0;
-  int hor_filter = 0;
+  int filter_phase = 0;
 
-  int src_width = param->src_width + param->src_padding_x;
-  int src_height = param->src_height + param->src_padding_y;
-  int trgt_width = param->rnd_trgt_width;
-  int trgt_height = param->rnd_trgt_height;
+  const int src_size = is_vertical ? param->src_height + param->src_padding_y : param->src_width + param->src_padding_x;
+  const int trgt_size = is_vertical ? param->rnd_trgt_height : param->rnd_trgt_width;
 
   if (!is_upscaling) {
-    int crop_width = src_width - param->right_offset; //- param->left_offset;
-    int crop_height = src_height - param->bottom_offset; //- param->top_offset;
-
-    if (4 * crop_height > 15 * trgt_height)
-      ver_filter = 7;
-    else if (7 * crop_height > 20 * trgt_height)
-      ver_filter = 6;
-    else if (2 * crop_height > 5 * trgt_height)
-      ver_filter = 5;
-    else if (1 * crop_height > 2 * trgt_height)
-      ver_filter = 4;
-    else if (3 * crop_height > 5 * trgt_height)
-      ver_filter = 3;
-    else if (4 * crop_height > 5 * trgt_height)
-      ver_filter = 2;
-    else if (19 * crop_height > 20 * trgt_height)
-      ver_filter = 1;
-
-    if (4 * crop_width > 15 * trgt_width)
-      hor_filter = 7;
-    else if (7 * crop_width > 20 * trgt_width)
-      hor_filter = 6;
-    else if (2 * crop_width > 5 * trgt_width)
-      hor_filter = 5;
-    else if (1 * crop_width > 2 * trgt_width)
-      hor_filter = 4;
-    else if (3 * crop_width > 5 * trgt_width)
-      hor_filter = 3;
-    else if (4 * crop_width > 5 * trgt_width)
-      hor_filter = 2;
-    else if (19 * crop_width > 20 * trgt_width)
-      hor_filter = 1;
+    int crop_size = src_size - ( is_vertical ? param->bottom_offset : param->right_offset); //- param->left_offset/top_offset;
+    if (4 * crop_size > 15 * trgt_size)
+      filter_phase = 7;
+    else if (7 * crop_size > 20 * trgt_size)
+      filter_phase = 6;
+    else if (2 * crop_size > 5 * trgt_size)
+      filter_phase = 5;
+    else if (1 * crop_size > 2 * trgt_size)
+      filter_phase = 4;
+    else if (3 * crop_size > 5 * trgt_size)
+      filter_phase = 3;
+    else if (4 * crop_size > 5 * trgt_size)
+      filter_phase = 2;
+    else if (19 * crop_size > 20 * trgt_size)
+      filter_phase = 1;
   }
 
-  int shift = param->shift_x - 4;
+  const int shift = (is_vertical ? param->shift_y : param->shift_x) - 4;
+  const int scale = is_vertical ? param->scale_y : param->scale_x;
+  const int add = is_vertical ? param->add_y : param->add_x;
+  const int delta = is_vertical ? param->delta_y : param->delta_x;
+
+  //Set loop parameters based on the resampling dir
+  const int *filt;
+  const int filter_size = getFilter(&filt, is_upscaling, is_luma, 0, 0);
+  const int outer_init = is_vertical ? 0 : block_x;
+  const int outer_bound = is_vertical ? filter_size : block_x + block_width;
+  const int inner_init = is_vertical ? block_x : 0;
+  const int inner_bound = is_vertical ? block_x + block_width : filter_size;
+  const int s_stride = is_vertical ? src_buffer->width : 1; //Multiplier to s_ind
 
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < (block_y + block_height); y++) {
 
-    pic_data_t* src_row = &src_buffer->data[y * src_buffer->width];
+    pic_data_t* src = is_vertical ? src_buffer->data : &src_buffer->data[y * src_buffer->width];
     pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width];
 
-    for (int x = block_x; x < (block_x + block_width); x++) {
-      //Calculate reference position in src pic
-      int ref_pos_16 = (int)((unsigned int)(x * param->scale_x + param->add_x) >> shift) - param->delta_x;
-      int phase = ref_pos_16 & 15;
-      int ref_pos = ref_pos_16 >> 4;
+    //Outer loop:
+    //  if is_vertical -> loop over k (filter inds)
+    //  if !is_vertical -> loop over x (block width)
+    for (int o_ind = outer_init; o_ind < outer_bound; o_ind++) {
+      
+      const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
 
-      //Choose filter
-      const int *filter;
-      const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+      //Inner loop:
+      //  if is_vertical -> loop over x (block width)
+      //  if !is_vertical -> loop over k (filter inds)-
+      for (int i_ind = inner_init; i_ind < inner_bound; i_ind++) {
 
-      //Apply filter
-      pic_data_t val = 0;
-      for (int k = 0; k < f_size; k++) {
-        int m = clip(ref_pos + k - (f_size >> 1) + 1, 0, src_width - 1);
-        val += filter[k] * src_row[m];
+        const int f_ind = is_vertical ? o_ind : i_ind; //Filter index
+
+        //Calculate reference position in src pic
+        int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
+        int phase = ref_pos_16 & 15;
+        int ref_pos = ref_pos_16 >> 4;
+
+        //Choose filter
+        const int *filter;
+        const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
+
+        //Set trgt buffer val to zero on first loop over filter
+        if( f_ind == 0 ){
+          trgt_row[t_ind + trgt_offset] = 0;
+        }
+
+        const int s_ind = clip(ref_pos + f_ind - (f_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
+
+        //Move src pointer to correct position (correct column in vertical resampling)
+        src += is_vertical ? i_ind : 0;
+        trgt_row[t_ind + trgt_offset] += filter[f_ind] * src[s_ind * s_stride + src_offset];
+
+        //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
+        if (is_vertical && o_ind == outer_bound - 1) {
+          trgt_row[t_ind + trgt_offset] = clip(is_upscaling ? (trgt_row[t_ind + trgt_offset] + 2048) >> 12 : (trgt_row[t_ind + trgt_offset] + 8192) >> 14, 0, 255);
+        }
       }
-
-      //Set val to trgt buffer
-      if (normilize) {
-        trgt_row[x + trgt_offset] = clip(is_upscaling ? (val + 2048) >> 12 : (val + 8192) >> 14, 0, 255);
-      } else {
-        trgt_row[x + trgt_offset] = val;
-      }
-
     }
   }
 
@@ -1078,7 +1085,7 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
 
       pic_data_t new_val = 0; //Accumulate the new pixel value here
 
-      //Convolution kernel, where (x,y)<=>(0,0)
+      //Convolution kernel, where (o_ind,y)<=>(0,0)
       //Size of kernel depends on the filter size
       for( int j = 0; j < size_y; j++ ){
         //Calculate src sample position for kernel element (i,j)
@@ -1172,7 +1179,7 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
   //Round to multiple of 2
   //TODO: Why SCALER_MAX? Try using src
   int scaled_src_width = param.src_width;//SCALER_MAX(param.src_width, param.trgt_width); //Min/max of source/target values
-  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_size); //Min/max of source/target values
   param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
@@ -1198,12 +1205,12 @@ scaling_parameter_t kvz_newScalingParameters_(int src_width, int src_height, int
   int ver_div = param.trgt_height << 1;
 
   param.rnd_trgt_width = param.trgt_width;//((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
-  param.rnd_trgt_height = param.trgt_height;//((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+  param.rnd_trgt_height = param.trgt_height;//((param.trgt_size + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
   //TODO: Why SCALER_MAX? Try using src
   int scaled_src_width = param.src_width;//SCALER_MAX(param.src_width, param.trgt_width); //Min/max of source/target values
-  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  int scaled_src_height = param.src_height;//SCALER_MAX(param.src_height, param.trgt_size); //Min/max of source/target values
   param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
@@ -1440,16 +1447,16 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   //Allocate a pic_buffer to hold the component data while the downscaling is done
   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
   /*int max_width = SCALER_MAX(param.src_width, param.trgt_width);
-  int max_height = SCALER_MAX(param.src_height, param.trgt_height);
+  int max_height = SCALER_MAX(param.src_height, param.trgt_size);
   int min_width = SCALER_MIN(param.src_width, param.trgt_width);
-  int min_height = SCALER_MIN(param.src_height, param.trgt_height);
+  int min_height = SCALER_MIN(param.src_height, param.trgt_size);
   int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
   pic_buffer_t* buffer = kvz_newPictureBuffer(buffer_width, buffer_height, 1);*/
   //TODO: Clean up this part and implement properly
-  //param.rnd_trgt_height = param.trgt_height;
+  //param.rnd_trgt_height = param.trgt_size;
   //param.rnd_trgt_width = param.trgt_width;
   yuv_buffer_t* buffer = is_upscaling ? dst : yuv;//malloc(sizeof(pic_buffer_t)); //Choose bigger buffer
   if (buffer->y->tmp_row == NULL) {

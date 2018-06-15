@@ -101,7 +101,7 @@ scaling_parameter_t kvz_newScalingParameters_(int src_width, int src_height, int
 
 
 /*===============Buffer datastructure definitions=============*/
-typedef int pic_data_t; //Use some other type?
+typedef unsigned int pic_data_t; //Use some other type?
 
 /**
  * \brief Picture buffer type for operating on image data.
