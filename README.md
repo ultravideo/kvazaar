@@ -207,7 +207,7 @@ Parallel processing:
                                    - N: Use N threads for encoding.
                                    - auto: Select automatically.
       --owf <integer>        : Frame-level parallelism [auto]
-                                   - N: Process N-1 frames at a time.
+                                   - N: Process N+1 frames at a time.
                                    - auto: Select automatically.
       --(no-)wpp             : Wavefront parallel processing. [enabled]
                                Enabling tiles automatically disables WPP.

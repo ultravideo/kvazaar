@@ -485,7 +485,7 @@ void print_help(void)
     "                                   - N: Use N threads for encoding.\n"
     "                                   - auto: Select automatically.\n"
     "      --owf <integer>        : Frame-level parallelism [auto]\n"
-    "                                   - N: Process N-1 frames at a time.\n"
+    "                                   - N: Process N+1 frames at a time.\n"
     "                                   - auto: Select automatically.\n"
     "      --(no-)wpp             : Wavefront parallel processing. [enabled]\n"
     "                               Enabling tiles automatically disables WPP.\n"
