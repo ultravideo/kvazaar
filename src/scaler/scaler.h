@@ -183,6 +183,13 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
 */
 int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height);
 
+/**
+* \brief Function for scaling an image, given in a yuv buffer, in either the vertical or horizontal direction (can handle down- and upscaling).
+* \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
+*        Result given in dst buffer.
+*/
+int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
+
 /*=============================================================*/
 
 /*================Block scaling helper functions========================*/
