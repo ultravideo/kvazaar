@@ -1354,7 +1354,9 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay &&
+  if (cfg->gop_len &&
+      cfg->intra_period > 1 &&
+      !cfg->gop_lowdelay &&
       cfg->intra_period % cfg->gop_len != 0)
   {
     fprintf(stderr,
