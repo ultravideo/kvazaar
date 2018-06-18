@@ -286,8 +286,8 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
 
   // Pointers to the top-left pixel of the LCU in the buffers.
   kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
-  kvz_pixel *const sao_buf_u = &sao_buf_u_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
-  kvz_pixel *const sao_buf_v = &sao_buf_v_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
+  kvz_pixel *const sao_buf_u = &sao_buf_u_array[((SAO_DELAY_PX >> SHIFT) + 1) * ((SAO_BUF_WIDTH >> SHIFT) + 1)];
+  kvz_pixel *const sao_buf_v = &sao_buf_v_array[((SAO_DELAY_PX >> SHIFT) + 1) * ((SAO_BUF_WIDTH >> SHIFT) + 1)];
 
   const int x_offsets[3] = {
     // If there is an lcu to the left, we need to filter its rightmost
@@ -318,8 +318,8 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   // Index of the pixel at the intersection of the top and left borders.
   const int border_index = (x_offsets[0] - border_left) +
                            (y_offsets[0] - border_above) * SAO_BUF_WIDTH;
-  const int border_index_c = (x_offsets[0]/2 - border_left) +
-                             (y_offsets[0]/2 - border_above) * SAO_BUF_WIDTH_C;
+  const int border_index_c = ((x_offsets[0] >> SHIFT) - border_left) +
+                             ((y_offsets[0] >> SHIFT) - border_above) * (SAO_BUF_WIDTH >> SHIFT);
   // Width and height of the whole area to filter.
   const int width  = x_offsets[2] - x_offsets[0];
   const int height = y_offsets[2] - y_offsets[0];
@@ -335,20 +335,20 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                     frame->width,
                     SAO_BUF_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 - border_left +
-                               (lcu->position.y - 1) * frame->width/2;
+      const int from_index_c = ((lcu->position_px.x + x_offsets[0]) >> SHIFT) -
+                                border_left + (lcu->position.y - 1) * (frame->width >> SHIFT);
       kvz_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
                       &sao_buf_u[border_index_c],
-                      width/2 + border_left + border_right,
+                      (width >> SHIFT) + border_left + border_right,
                       1,
-                      frame->width/2,
-                      SAO_BUF_WIDTH_C);
+                      frame->width >> SHIFT,
+                      SAO_BUF_WIDTH >> SHIFT);
       kvz_pixels_blit(&state->tile->hor_buf_before_sao->v[from_index_c],
                       &sao_buf_v[border_index_c],
-                      width/2 + border_left + border_right,
+                      (width >> SHIFT) + border_left + border_right,
                       1,
-                      frame->width/2,
-                      SAO_BUF_WIDTH_C);
+                      frame->width >> SHIFT,
+                      SAO_BUF_WIDTH >> SHIFT);
     }
   }
   if (lcu->left) {
@@ -361,20 +361,20 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                     1,
                     SAO_BUF_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      const int from_index_c = (lcu->position.x - 1) * frame->height/2 +
-                               (lcu->position_px.y + y_offsets[0])/2 - border_above;
+      const int from_index_c = (lcu->position.x - 1) * (frame->height >> SHIFT) +
+                               ((lcu->position_px.y + y_offsets[0]) >> SHIFT) - border_above;
       kvz_pixels_blit(&state->tile->ver_buf_before_sao->u[from_index_c],
                       &sao_buf_u[border_index_c],
                       1,
-                      height/2 + border_above + border_below,
+                      (height >> SHIFT) + border_above + border_below,
                       1,
-                      SAO_BUF_WIDTH_C);
+                      SAO_BUF_WIDTH >> SHIFT);
       kvz_pixels_blit(&state->tile->ver_buf_before_sao->v[from_index_c],
                       &sao_buf_v[border_index_c],
                       1,
-                      height/2 + border_above + border_below,
+                      (height >> SHIFT) + border_above + border_below,
                       1,
-                      SAO_BUF_WIDTH_C);
+                      SAO_BUF_WIDTH >> SHIFT);
     }
   }
   // Copy pixels that will be filtered and bordering pixels from right and
@@ -389,21 +389,22 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                   frame->rec->stride,
                   SAO_BUF_WIDTH);
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 +
-                             (lcu->position_px.y + y_offsets[0])/2 * frame->rec->stride/2;
-    const int to_index_c = x_offsets[0]/2 + y_offsets[0]/2 * SAO_BUF_WIDTH_C;
+    const int from_index_c = ((lcu->position_px.x + x_offsets[0]) >> SHIFT) +
+                             ((lcu->position_px.y + y_offsets[0]) >> SHIFT) *
+                             (frame->rec->stride >> SHIFT);
+    const int to_index_c = (x_offsets[0] >> SHIFT) + (y_offsets[0] >> SHIFT) * (SAO_BUF_WIDTH >> SHIFT);
     kvz_pixels_blit(&frame->rec->u[from_index_c],
                     &sao_buf_u[to_index_c],
-                    width/2 + border_right,
-                    height/2 + border_below,
-                    frame->rec->stride/2,
-                    SAO_BUF_WIDTH_C);
+                    (width >> SHIFT) + border_right,
+                    (height >> SHIFT) + border_below,
+                    frame->rec->stride >> SHIFT,
+                    SAO_BUF_WIDTH >> SHIFT);
     kvz_pixels_blit(&frame->rec->v[from_index_c],
                     &sao_buf_v[to_index_c],
-                    width/2 + border_right,
-                    height/2 + border_below,
-                    frame->rec->stride/2,
-                    SAO_BUF_WIDTH_C);
+                    (width >> SHIFT) + border_right,
+                    (height >> SHIFT) + border_below,
+                    frame->rec->stride >> SHIFT,
+                    SAO_BUF_WIDTH >> SHIFT);
   }
 
   // We filter the pixels in four parts:
@@ -438,25 +439,25 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
 
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         // Coordinates in chroma pixels.
-        int x_c = x >> 1;
-        int y_c = y >> 1;
+        int x_c = x >> SHIFT;
+        int y_c = y >> SHIFT;
 
         kvz_sao_reconstruct(state,
-                            &sao_buf_u[x_c + y_c * SAO_BUF_WIDTH_C],
-                            SAO_BUF_WIDTH_C,
-                            lcu->position_px.x / 2 + x_c,
-                            lcu->position_px.y / 2 + y_c,
-                            width / 2,
-                            height / 2,
+                            &sao_buf_u[x_c + y_c * (SAO_BUF_WIDTH >> SHIFT)],
+                            SAO_BUF_WIDTH >> SHIFT,
+                            (lcu->position_px.x >> SHIFT) + x_c,
+                            (lcu->position_px.y >> SHIFT) + y_c,
+                            width >> SHIFT,
+                            height >> SHIFT,
                             sao_chroma,
                             COLOR_U);
         kvz_sao_reconstruct(state,
-                            &sao_buf_v[x_c + y_c * SAO_BUF_WIDTH_C],
-                            SAO_BUF_WIDTH_C,
-                            lcu->position_px.x / 2 + x_c,
-                            lcu->position_px.y / 2 + y_c,
-                            width / 2,
-                            height / 2,
+                            &sao_buf_v[x_c + y_c * (SAO_BUF_WIDTH >> SHIFT)],
+                            SAO_BUF_WIDTH >> SHIFT,
+                            (lcu->position_px.x >> SHIFT) + x_c,
+                            (lcu->position_px.y >> SHIFT) + y_c,
+                            width >> SHIFT,
+                            height >> SHIFT,
                             sao_chroma,
                             COLOR_V);
       }

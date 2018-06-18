@@ -118,6 +118,7 @@ static void compute_psnr(const kvz_picture *const src,
                          const kvz_picture *const rec,
                          double psnr[3])
 {
+  // TODO: other formats
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 
@@ -128,7 +129,7 @@ static void compute_psnr(const kvz_picture *const src,
   for (int32_t c = 0; c < colors; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
-      num_pixels >>= 2;
+      num_pixels >>= 2; 
     }
     for (int32_t i = 0; i < num_pixels; ++i) {
       const int32_t error = src->data[c][i] - rec->data[c][i];

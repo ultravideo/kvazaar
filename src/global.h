@@ -153,6 +153,13 @@ typedef int16_t coeff_t;
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
 #define LCU_WIDTH_C (LCU_WIDTH / 2)
+// TODO: other formats
+
+//! global var to define chroma ratio to luma
+//!   chroma_size = luma_size >> chroma_shift
+//!   but use as chroma_size = luma_size >> SHIFT;
+unsigned chroma_shift;
+#define SHIFT chroma_shift
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5

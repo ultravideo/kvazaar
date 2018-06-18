@@ -249,7 +249,6 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (src_out) *src_out = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
-
   if (!state->frame->prepared) {
     kvz_encoder_prepare(state);
   }
@@ -265,6 +264,8 @@ static int kvazaar_encode(kvz_encoder *enc,
   );
   if (frame) {
     assert(state->frame->num == enc->frames_started);
+    // We have a frame, set the project-global var to correct value
+    chroma_shift = frame->chroma_format == 0 || frame->chroma_format == 3? 0 : 1;
     // Start encoding.
     kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;
@@ -322,6 +323,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   }
 
   // For interlaced, make two fields out of the input frame and call encode on them separately.
+  // NOTE: color mode changes not done to interlaced
   encoder_state_t *state = &enc->states[enc->cur_state_num];
   kvz_picture *first_field = NULL, *second_field = NULL;
   struct {
