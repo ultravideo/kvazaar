@@ -147,13 +147,19 @@ typedef int16_t coeff_t;
 
 /* END OF CONFIG VARIABLES */
 
+//! global var to define chroma ratio to luma
+//!   chroma_size = luma_size >> chroma_shift
+//!   but use as chroma_size = luma_size >> SHIFT;
+unsigned chroma_shift;
+#define SHIFT chroma_shift
+
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
 //! spec: CtbSizeY
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
-#define LCU_WIDTH_C (LCU_WIDTH / 2)
-// TODO: other formats
+#define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
+// TODO: ?LCU_HEIGHT_C? and fix LCU_CHROMA_SIZE
 
 //! global var to define chroma ratio to luma
 //!   chroma_size = luma_size >> chroma_shift

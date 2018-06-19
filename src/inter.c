@@ -555,6 +555,11 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
                      pu_x, pu_y, pu_w, pu_h,
                      im_flags_L0, im_flags_L1,
                      predict_luma, predict_chroma);
+
+  // Free the allocated memory
+  free(temp_lcu_y);
+  free(temp_lcu_u);
+  free(temp_lcu_v);
 }
 
 
