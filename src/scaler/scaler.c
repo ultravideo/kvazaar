@@ -1659,7 +1659,7 @@ void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * co
 }
 
 // Do block scaling in one direction. yuv buffer should not be modified.
-int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
+int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
 {
   /*========== Basic Initialization ==============*/
 
@@ -1708,23 +1708,27 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_paramet
   // if src is the size of the specified src, the src buffer is accessed in the area specified by kvz_blockScaling*Range.
   int src_offset_luma = 0;
   int src_offset_chroma = 0;
-  if (src == NULL || src->y->width < param.src_width + param.src_padding_x || src->y->height < param.src_height + param.src_padding_y || src->u->width < SCALER_SHIFT(param.src_width + param.src_padding_x, w_factor) || src->u->height < SCALER_SHIFT(param.src_height + param.src_padding_y, w_factor) || src->v->width < SCALER_SHIFT(param.src_width + param.src_padding_x, w_factor) || src->v->height < SCALER_SHIFT(param.src_height + param.src_padding_y, w_factor)) {
+  int width_bound = is_vertical ? param.trgt_width : param.src_width + param.src_padding_x;
+  int height_bound = param.src_height + param.src_padding_y;
+  if (src == NULL || src->y->width < width_bound || src->y->height < height_bound || src->u->width < SCALER_SHIFT(width_bound, w_factor) || src->u->height < SCALER_SHIFT(height_bound, w_factor) || src->v->width < SCALER_SHIFT(width_bound, w_factor) || src->v->height < SCALER_SHIFT(height_bound, w_factor)) {
     
     //Get src range needed for scaling
     int range[4];
     kvz_blockScalingSrcWidthRange(range, base_param, block_x, block_width);
     kvz_blockScalingSrcHeightRange(range+2, base_param, block_y, block_height);
+    width_bound = is_vertical ? block_width : range[1] - range[0];
+    height_bound = is_vertical ? range[3] - range[2] : block_height;
 
     //Check that src is large enough to hold the block
-    if (src == NULL || src->y->width < range[1] - range[0] || src->y->height < range[3] - range[2]
-      || src->u->width < SCALER_SHIFT(range[1] - range[0], w_factor) || src->u->height < SCALER_SHIFT(range[3] - range[2], h_factor)
-      || src->v->width < SCALER_SHIFT(range[1] - range[0], w_factor) || src->v->height < SCALER_SHIFT(range[3] - range[2], h_factor)) {
+    if (src == NULL || src->y->width < width_bound || src->y->height < height_bound
+      || src->u->width < SCALER_SHIFT(width_bound, w_factor) || src->u->height < SCALER_SHIFT(height_bound, h_factor)
+      || src->v->width < SCALER_SHIFT(width_bound, w_factor) || src->v->height < SCALER_SHIFT(height_bound, h_factor)) {
       fprintf(stderr, "Source buffer smaller than specified in the scaling parameters.\n");
       return 0;
     }
     //Set src offset so that the block is written to the correct pos
-    src_offset_luma = range[0] + range[2] * src->y->width;
-    src_offset_chroma = SCALER_SHIFT(range[0], w_factor) + SCALER_SHIFT(range[2], h_factor) * src->u->width;
+    src_offset_luma = is_vertical ? block_x + range[2] * src->y->width : range[0] + block_y * src->y->width;
+    src_offset_chroma = is_vertical ? SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(range[2], h_factor) * src->u->width : SCALER_SHIFT(range[0], w_factor) + SCALER_SHIFT(block_y, h_factor) * src->u->width;
   }
 
   //Calculate a dst offset depending on wheather dst is the whole image or just the block
@@ -1732,9 +1736,11 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_paramet
   // if dst is the size of the specified trgt, the scaled block is written starting from (block_x,block_y)
   int dst_offset_luma = 0;
   int dst_offset_chroma = 0;
-  if (dst == NULL || dst->y->width < param.trgt_width || dst->y->height < param.trgt_height
-    || dst->u->width < SCALER_SHIFT(param.trgt_width, w_factor) || dst->u->height < SCALER_SHIFT(param.trgt_height, h_factor)
-    || dst->v->width < SCALER_SHIFT(param.trgt_width, w_factor) || dst->v->height < SCALER_SHIFT(param.trgt_height, h_factor)) {
+  width_bound = param.trgt_width;
+  height_bound = is_vertical ? param.trgt_height : param.src_height + param.src_padding_y;
+  if (dst == NULL || dst->y->width < width_bound || dst->y->height < height_bound
+    || dst->u->width < SCALER_SHIFT(width_bound, w_factor) || dst->u->height < SCALER_SHIFT(height_bound, h_factor)
+    || dst->v->width < SCALER_SHIFT(width_bound, w_factor) || dst->v->height < SCALER_SHIFT(height_bound, h_factor)) {
 
     //Check that dst is large enough to hold the block
     if (dst == NULL || dst->y->width < block_width || dst->y->height < block_height
@@ -1786,10 +1792,10 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_paramet
     }
 
     //Resample u
-    resampleBlock(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
 
     //Resample v
-    resampleBlock(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
   }
 
   return 1;

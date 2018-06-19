@@ -188,7 +188,7 @@ int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t
 * \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
 *        Result given in dst buffer.
 */
-int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
+int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
 
 /*=============================================================*/
 
