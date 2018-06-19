@@ -378,7 +378,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   int v_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
   // See luma for why the second condition
   if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
-    // NOTE: 444: depth - 1 modified to depth - SHIFT. 
+    // 444: depth - 1 modified to depth - SHIFT. 
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
