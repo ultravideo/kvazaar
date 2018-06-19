@@ -974,6 +974,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
       for (int i_ind = inner_init; i_ind < inner_bound; i_ind++) {
 
         const int f_ind = is_vertical ? o_ind : i_ind; //Filter index
+        const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
 
         //Calculate reference position in src pic
         int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
@@ -986,18 +987,18 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
         //Set trgt buffer val to zero on first loop over filter
         if( f_ind == 0 ){
-          trgt_row[t_ind + trgt_offset] = 0;
+          trgt_row[t_col + trgt_offset] = 0;
         }
 
         const int s_ind = clip(ref_pos + f_ind - (f_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
 
         //Move src pointer to correct position (correct column in vertical resampling)
-        src += is_vertical ? i_ind : 0;
-        trgt_row[t_ind + trgt_offset] += filter[f_ind] * src[s_ind * s_stride + src_offset];
+        pic_data_t *src_col = src + (is_vertical ? i_ind : 0);
+        trgt_row[t_col + trgt_offset] += filter[f_ind] * src_col[s_ind * s_stride + src_offset];
 
         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
         if (is_vertical && o_ind == outer_bound - 1) {
-          trgt_row[t_ind + trgt_offset] = clip(is_upscaling ? (trgt_row[t_ind + trgt_offset] + 2048) >> 12 : (trgt_row[t_ind + trgt_offset] + 8192) >> 14, 0, 255);
+          trgt_row[t_col + trgt_offset] = clip(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
         }
       }
     }
