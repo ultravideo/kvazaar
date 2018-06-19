@@ -608,10 +608,10 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
   int block_height = (LCU_WIDTH >> SHIFT);
   const kvz_pixel *orig_list[2];
   const kvz_pixel *rec_list[2];
-
+#if 0
   kvz_pixel orig[2][LCU_CHROMA_SIZE];
   kvz_pixel rec[2][LCU_CHROMA_SIZE];
-#if 0 
+#else
   // 2D-arrays. 
   kvz_pixel **orig = malloc(2 * sizeof(kvz_pixel*));
   kvz_pixel **rec = malloc(2 * sizeof(kvz_pixel*));
@@ -646,7 +646,7 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
 
   // Calculate
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
-#if 0
+#if 1
   // Free the allocated arrays
   // NOTE: hope they're not used anywhere
   for (int i = 0; i < 2; ++i) {
