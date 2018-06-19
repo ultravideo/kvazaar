@@ -129,6 +129,7 @@ static const struct option long_options[] = {
   { "force-level",        required_argument, NULL, 0 },
   { "high-tier",                no_argument, NULL, 0 },
   { "me-steps",           required_argument, NULL, 0 },
+  { "fast-residual-cost", required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -472,6 +473,8 @@ void print_help(void)
     "                                   - off: Don't terminate early.\n"
     "                                   - on: Terminate early.\n"
     "                                   - sensitive: Terminate even earlier.\n"
+    "      --fast-residual-cost <int> : Skip CABAC cost for residual coefficients\n"
+    "                                   when QP is below the limit. [0]\n"
     "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
     "                               a zero coefficient CU is found. [disabled]\n"
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"

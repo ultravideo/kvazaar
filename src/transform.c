@@ -248,14 +248,14 @@ int kvz_quantize_residual_trskip(
       0, in_stride, 4,
       ref_in, pred_in, noskip.rec, noskip.coeff);
   noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  noskip.cost += kvz_get_coeff_cabac_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
+  noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, 4,
     ref_in, pred_in, skip.rec, skip.coeff);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-  skip.cost += kvz_get_coeff_cabac_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
+  skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
   if (noskip.cost <= skip.cost) {
     *trskip_out = 0;

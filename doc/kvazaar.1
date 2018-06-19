@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "June 2018" "kvazaar v1.2.0" "User Commands"
+.TH KVAZAAR "1" "July 2018" "kvazaar v1.2.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -256,6 +256,10 @@ Motion estimation termination [on]
     \- off: Don't terminate early.
     \- on: Terminate early.
     \- sensitive: Terminate even earlier.
+.TP
+\fB\-\-fast\-residual\-cost <int>
+Skip CABAC cost for residual coefficients
+    when QP is below the limit. [0]
 .TP
 \fB\-\-(no\-)intra\-rdo\-et   
 Check intra modes in rdo stage only until

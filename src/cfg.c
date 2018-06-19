@@ -79,6 +79,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->lossless        = false;
   cfg->tmvp_enable     = true;
   cfg->implicit_rdpcm  = false;
+  cfg->fast_residual_cost_limit = 0;
 
   cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
 
@@ -1194,6 +1195,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     cfg->me_max_steps = (uint32_t)steps;
   }
+  else if (OPT("fast-residual-cost"))
+    cfg->fast_residual_cost_limit = atoi(value);
   else {
     return 0;
   }
