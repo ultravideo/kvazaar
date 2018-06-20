@@ -1122,6 +1122,10 @@ static void calculateParameters(scaling_parameter_t* const param, const int w_fa
   param->scaled_src_height = SCALER_SHIFT(param->scaled_src_height, h_factor);
   param->rnd_trgt_width = SCALER_SHIFT(param->rnd_trgt_width, w_factor);
   param->rnd_trgt_height = SCALER_SHIFT(param->rnd_trgt_height, h_factor);
+  param->src_padding_x = SCALER_SHIFT(param->src_padding_x, w_factor);
+  param->src_padding_y = SCALER_SHIFT(param->src_padding_y, h_factor);
+  param->trgt_padding_x = SCALER_SHIFT(param->trgt_padding_x, w_factor);
+  param->trgt_padding_y = SCALER_SHIFT(param->trgt_padding_y, h_factor);
 
   //Calculate sample positional parameters
   param->right_offset = param->src_width - param->scaled_src_width; //- left_offset
@@ -1609,11 +1613,15 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
+    //In order to scale blocks not divisible by 2 correctly, need to do some tricks
+    int chroma_block_width = w_factor < 0 ? SCALER_SHIFT(block_width + (1 << (-w_factor)) - 1, w_factor) : SCALER_SHIFT(block_width, w_factor);
+    int chroma_block_height = h_factor < 0 ? SCALER_SHIFT(block_height + (1 << (-h_factor)) - 1, h_factor) : SCALER_SHIFT(block_height, h_factor);
+
     //Resample u
-    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height );
 
     //Resample v
-    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor) );
+    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height );
   }
 
   return 1;
@@ -1665,7 +1673,9 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, co
   /*========== Basic Initialization ==============*/
 
   //Check that block parameters are valid
-  if (block_x < 0 || block_y < 0 || block_x + block_width > base_param->trgt_width || block_y + block_height > base_param->trgt_height) {
+  int width_bound = base_param->trgt_width;
+  int height_bound = is_vertical ? base_param->trgt_height : base_param->src_height + base_param->src_padding_y;
+  if (block_x < 0 || block_y < 0 || block_x + block_width > width_bound || block_y + block_height > height_bound) {
     fprintf(stderr, "Specified block outside given target picture size.");
     return 0;
   }
@@ -1709,8 +1719,8 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, co
   // if src is the size of the specified src, the src buffer is accessed in the area specified by kvz_blockScaling*Range.
   int src_offset_luma = 0;
   int src_offset_chroma = 0;
-  int width_bound = is_vertical ? param.trgt_width : param.src_width + param.src_padding_x;
-  int height_bound = param.src_height + param.src_padding_y;
+  width_bound = is_vertical ? param.trgt_width : param.src_width + param.src_padding_x;
+  height_bound = param.src_height + param.src_padding_y;
   if (src == NULL || src->y->width < width_bound || src->y->height < height_bound || src->u->width < SCALER_SHIFT(width_bound, w_factor) || src->u->height < SCALER_SHIFT(height_bound, w_factor) || src->v->width < SCALER_SHIFT(width_bound, w_factor) || src->v->height < SCALER_SHIFT(height_bound, w_factor)) {
     
     //Get src range needed for scaling
@@ -1792,11 +1802,15 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, co
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
+    //In order to scale blocks not divisible by 2 correctly, need to do some tricks
+    int chroma_block_width = w_factor < 0 ? SCALER_SHIFT(block_width+(1 << (-w_factor)) - 1, w_factor) : SCALER_SHIFT(block_width, w_factor);
+    int chroma_block_height = h_factor < 0 ? SCALER_SHIFT(block_height + (1 << (-h_factor)) - 1, h_factor) : SCALER_SHIFT(block_height, h_factor);
+
     //Resample u
-    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height, &param, is_upscaling, 0, is_vertical);
 
     //Resample v
-    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height, &param, is_upscaling, 0, is_vertical);
   }
 
   return 1;
