@@ -61,8 +61,6 @@
 static const int INTRA_THRESHOLD = 8;
 
 
-// TODO: this file contains macros_C
-
 static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
   for   (int y = y_local; y < y_local + width; y += SCU_WIDTH) {
@@ -75,15 +73,15 @@ static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from
 static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = (x_local >> SHIFT) + (y_local >> SHIFT) * (LCU_WIDTH >> SHIFT);
+  const int chroma_index = (x_local >> SHIFT) + (y_local >> SHIFT) * (LCU_WIDTH_C);
 
   kvz_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
                   width, width, LCU_WIDTH, LCU_WIDTH);
   if (from->rec.chroma_format != KVZ_CSP_400) {
     kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
-                    width >> SHIFT, width >> SHIFT, LCU_WIDTH >> SHIFT, LCU_WIDTH >> SHIFT);
+                    width >> SHIFT, width >> SHIFT, LCU_WIDTH_C, LCU_WIDTH_C);
     kvz_pixels_blit(&from->rec.v[chroma_index], &to->rec.v[chroma_index],
-                    width >> SHIFT, width >> SHIFT, LCU_WIDTH >> SHIFT, LCU_WIDTH >> SHIFT);
+                    width >> SHIFT, width >> SHIFT, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
 
@@ -406,7 +404,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   // Chroma SSD
   int ssd = 0;
   if (!state->encoder_control->cfg.lossless) {
-    int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+    int index = lcu_px.y * (LCU_WIDTH_C) + lcu_px.x;
     int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                     LCU_WIDTH_C,         LCU_WIDTH_C,
                                     width);
@@ -1149,7 +1147,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int luma_offset = OFFSET_VER_BUF(x, y, frame, y_min_in_lcu - 1);
       int chroma_offset = OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1);
       int luma_bytes = (LCU_WIDTH + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
-      int chroma_bytes = (LCU_WIDTH / 2 + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
+      int chroma_bytes = ((LCU_WIDTH_C) + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
@@ -1165,18 +1163,18 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
     int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
 
-    int x_c = x / 2;
-    int y_c = y / 2;
-    int x_max_c = x_max / 2;
-    int y_max_c = y_max / 2;
+    int x_c = x >> SHIFT;
+    int y_c = y >> SHIFT;
+    int x_max_c = x_max >> SHIFT;
+    int y_max_c = y_max >> SHIFT;
 
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride / 2], lcu->ref.u,
-                      x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
-      kvz_pixels_blit(&frame->source->v[x_c + y_c * frame->source->stride / 2], lcu->ref.v,
-                      x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
+      kvz_pixels_blit(&frame->source->u[x_c + y_c * (frame->source->stride >> SHIFT)], lcu->ref.u,
+                      x_max_c, y_max_c, frame->source->stride >> SHIFT, LCU_WIDTH_C);
+      kvz_pixels_blit(&frame->source->v[x_c + y_c * (frame->source->stride >> SHIFT)], lcu->ref.v,
+                      x_max_c, y_max_c, frame->source->stride >> SHIFT, LCU_WIDTH_C);
     }
   }
 }
@@ -1201,10 +1199,10 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
                         x_max, y_max, LCU_WIDTH, pic->rec->stride);
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
-                      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
-      kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
-                      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
+      kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px >> SHIFT) + (y_px >> SHIFT) * (pic->rec->stride >> SHIFT)],
+                      x_max >> SHIFT, y_max >> SHIFT, LCU_WIDTH_C, pic->rec->stride >> SHIFT);
+      kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px >> SHIFT) + (y_px >> SHIFT) * (pic->rec->stride >> SHIFT)],
+                      x_max >> SHIFT, y_max >> SHIFT, LCU_WIDTH_C, pic->rec->stride >> SHIFT);
     }
   }
 }

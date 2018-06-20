@@ -576,7 +576,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 
   // For each subpart
   {
-    int32_t stride = frame->rec->stride >> 1;
+    int32_t stride = frame->rec->stride >> SHIFT;
     int32_t tc_offset_div2 = encoder->cfg.deblock_tc;
     // TODO: support 10+bits
     kvz_pixel *src[] = {
@@ -585,7 +585,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     };
     int8_t strength = 2;
 
-    const int32_t luma_qp  = get_qp_y_pred(state, x << 1, y << 1, dir);
+    const int32_t luma_qp  = get_qp_y_pred(state, x << SHIFT, y << SHIFT, dir);
     int32_t QP             = kvz_g_chroma_scale[luma_qp];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
@@ -602,14 +602,14 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       cu_info_t *cu_p;
       cu_info_t *cu_q;
       if (dir == EDGE_VER) {
-        int32_t y_coord = (y + 4 * blk_idx) << 1;
-        cu_p = kvz_cu_array_at(frame->cu_array, (x - 1) << 1, y_coord);
-        cu_q = kvz_cu_array_at(frame->cu_array,  x      << 1, y_coord);
+        int32_t y_coord = (y + 4 * blk_idx) << SHIFT;
+        cu_p = kvz_cu_array_at(frame->cu_array, (x - 1) << SHIFT, y_coord);
+        cu_q = kvz_cu_array_at(frame->cu_array,  x      << SHIFT, y_coord);
 
       } else {
-        int32_t x_coord = (x + 4 * blk_idx) << 1;
-        cu_p = kvz_cu_array_at(frame->cu_array, x_coord, (y - 1) << 1);
-        cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << 1);
+        int32_t x_coord = (x + 4 * blk_idx) << SHIFT;
+        cu_p = kvz_cu_array_at(frame->cu_array, x_coord, (y - 1) << SHIFT);
+        cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << SHIFT);
       }
 
       // Only filter when strenght == 2 (one of the blocks is intra coded)
@@ -661,22 +661,22 @@ static void filter_deblock_unit(encoder_state_t * const state,
     if (rightmost_4px_of_lcu && !rightmost_4px_of_frame) {
       // The last 4 pixels will be deblocked when processing the next LCU.
       length   = width - 4;
-      length_c = (width >> 1) - 4;
+      length_c = (width >> SHIFT) - 4;
 
     } else {
       length   = width;
-      length_c = width >> 1;
+      length_c = width >> SHIFT;
     }
   } else {
     length   = height;
-    length_c = height >> 1;
+    length_c = height >> SHIFT;
   }
 
   filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
 
   // Chroma pixel coordinates.
-  const int32_t x_c = x >> 1;
-  const int32_t y_c = y >> 1;
+  const int32_t x_c = x >> SHIFT;
+  const int32_t y_c = y >> SHIFT;
   if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x_c, y_c, dir)) {
     filter_deblock_edge_chroma(state, x_c, y_c, length_c, dir, tu_boundary);
   }
@@ -739,14 +739,14 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
 
   // Chroma
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    const int x_px_c = x_px >> 1;
-    const int y_px_c = y_px >> 1;
+    const int x_px_c = x_px >> SHIFT;
+    const int y_px_c = y_px >> SHIFT;
     const int x_c = x_px_c - 4;
-    const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
+    const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> SHIFT);
     for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
       // The top edge of the whole frame is not filtered.
-      bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-      bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
+      bool tu_boundary = is_tu_boundary(state, x_c << SHIFT, y_c << SHIFT, EDGE_HOR);
+      bool pu_boundary = is_pu_boundary(state, x_c << SHIFT, y_c << SHIFT, EDGE_HOR);
       if (y_c > 0 && (tu_boundary || pu_boundary)) {
         filter_deblock_edge_chroma(state, x_c, y_c, 4, EDGE_HOR, tu_boundary);
       }

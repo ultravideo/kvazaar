@@ -136,8 +136,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   
   // hor_buf_search and ver_buf_search store single row/col from each LCU row/col.
   // Because these lines are independent, the chroma subsampling only matters in one
-  // of the directions, .
-  // TODO: check if this file is good to go
+  // of the directions.
   unsigned luma_size = LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   unsigned chroma_sizes_hor[] = { 0, luma_size / 2, luma_size / 2, luma_size };
   unsigned chroma_sizes_ver[] = { 0, luma_size / 2, luma_size, luma_size };
