@@ -728,13 +728,6 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
       dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(((kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y][x], hor_stride) >> shift2) + wp_offset1) >> wp_shift1);
     }
   }
-#if 1 
-  // free the array allocated memory (just remove if the data is still used somewhere afterwards)
-  for (int i = 0; i < (LCU_WIDTH_C + 1 + FILTER_SIZE_C); ++i) {
-    free(flipped_hor_filtered[i]);
-  }
-  free(flipped_hor_filtered);
-#endif
 }
 
 void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
@@ -773,13 +766,6 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
       dst[y * dst_stride + x] = kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y][x], hor_stride) >> shift2;
     }
   }
-#if 1
-  // Free allocated memory. 
-  for (int i = 0; i < (LCU_WIDTH_C + 1 + FILTER_SIZE_C); ++i) {
-    free(flipped_hor_filtered[i]);
-  }
-  free(flipped_hor_filtered);
-#endif
 }
 
 

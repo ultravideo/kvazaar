@@ -274,15 +274,10 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   videoframe_t *const frame = state->tile->frame;
 
   // Temporary buffers for SAO input pixels.
-#if 0
   kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
-  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH / 2 * SAO_BUF_WIDTH / 2];
-  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH / 2 * SAO_BUF_WIDTH / 2];
-#else
-  kvz_pixel *sao_buf_y_array = malloc(SAO_BUF_WIDTH * SAO_BUF_WIDTH * sizeof(kvz_pixel));
-  kvz_pixel *sao_buf_u_array = malloc((SAO_BUF_WIDTH_C) * (SAO_BUF_WIDTH_C) * sizeof(kvz_pixel));
-  kvz_pixel *sao_buf_v_array = malloc((SAO_BUF_WIDTH_C) * (SAO_BUF_WIDTH_C) * sizeof(kvz_pixel));
-#endif
+  // Allocate "too big" arrays: depending on the chroma subsampling format, only some of the space is in use.
+  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
+  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
 
   // Temporary buffers for SAO input pixels. The buffers cover the pixels
   // inside the LCU (LCU_WIDTH x LCU_WIDTH), SAO_DELAY_PX wide bands to the
@@ -475,13 +470,6 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
       }
     }
   }
-#if 1
-  // Free the allocated memory
-  // NOTE: prehaps not needed?
-  free(sao_buf_y_array);
-  free(sao_buf_u_array);
-  free(sao_buf_v_array);
-#endif
 }
 
 static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
