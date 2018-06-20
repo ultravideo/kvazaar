@@ -265,7 +265,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (frame) {
     assert(state->frame->num == enc->frames_started);
     // We have a frame, set the project-global var to correct value
-    chroma_shift = frame->chroma_format == 0 || frame->chroma_format == 3? 0 : 1;
+    kvz_chroma_shift = frame->chroma_format == 0 || frame->chroma_format == 3? 0 : 1;
     // Start encoding.
     kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;
