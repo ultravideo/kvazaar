@@ -28,7 +28,8 @@
 #define SCALER_MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define SCALER_MAX(x,y) (((x) > (y)) ? (x) : (y))
 
-#define SCALER_SHIFT(x,y) (((y) < 0) ? ((x)>>(-(y))) : ((x)<<(y)))
+#define SCALER_SHIFT(val,shift) (((shift) < 0) ? ((val)>>(-(shift))) : ((val)<<(shift)))
+#define SCALER_ROUND_SHIFT(val,shift) (((shift) < 0) ? SCALER_SHIFT((val)+(1<<(-(shift)))-1,shift) : SCALER_SHIFT(val, shift))
 
 #define SCALER_SHIFT_CONST 16 //TODO: Make dependant on stuff?
 #define SCALER_UNITY_SCALE_CONST (1<<SCALER_SHIFT_CONST)
@@ -472,6 +473,43 @@ static void copyYuvBufferBlock(const yuv_buffer_t* const src, const yuv_buffer_t
   copyPictureBufferBlock(src->v, dst->v, SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
 }
 
+//Copy memory blocks between different types
+static void copyMemBlock( void * const dst, const void * const src, const int dst_sizeof, const int src_sizeof, const int dst_stride, const int src_stride, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height)
+{
+  //Cast to char pointers to allow indexing
+  char * dst_char = &((char *)dst)[(dst_x + dst_y * dst_stride) * dst_sizeof];
+  const char * src_char = &((const char *)src)[(src_x + src_y * src_stride) * src_sizeof];
+
+  assert(sizeof(char)==1); //May not work if char is not one byte
+
+  //Loop over rows
+  for(int y = 0; y < block_height; y++){
+    //Copy row
+    for(int x = 0; x < block_width; x++){
+      memcpy(&dst_char[x*dst_sizeof], &src_char[x*src_sizeof], SCALER_MIN(dst_sizeof,src_sizeof));
+    }
+    
+    //Move to next row
+    dst_char += dst_stride * dst_sizeof;
+    src_char += src_stride * src_sizeof;
+  }
+}
+
+void kvz_copy_uint8_block_to_YuvBuffer(const yuv_buffer_t* dst, const uint8_t* const y, const uint8_t* const u, const uint8_t* const v, const int luma_stride, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor){
+  //TODO: Sanity checks
+
+  copyMemBlock(dst->y->data, y, sizeof(pic_data_t), sizeof(uint8_t), dst->y->width, luma_stride, dst_x, dst_y, src_x, src_y, block_width, block_height);
+  copyMemBlock(dst->u->data, u, sizeof(pic_data_t), sizeof(uint8_t), dst->u->width, SCALER_SHIFT(luma_stride, w_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
+  copyMemBlock(dst->v->data, v, sizeof(pic_data_t), sizeof(uint8_t), dst->v->width, SCALER_SHIFT(luma_stride, w_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
+}
+
+
+void kvz_copy_YuvBuffer_block_to_uint8(uint8_t* const y, uint8_t* const u, uint8_t* const v, const int luma_stride, const yuv_buffer_t * const src, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor){
+  //TODO: Sanity checks
+  copyMemBlock(y, src->y->data, sizeof(uint8_t), sizeof(pic_data_t), luma_stride, src->y->width, dst_x, dst_y, src_x, src_y, block_width, block_height);
+  copyMemBlock(u, src->u->data, sizeof(uint8_t), sizeof(pic_data_t), SCALER_SHIFT(luma_stride, w_factor), src->u->width, SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
+  copyMemBlock(v, src->v->data, sizeof(uint8_t), sizeof(pic_data_t), SCALER_SHIFT(luma_stride, w_factor), src->v->width, SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
+}
 // ======================= newYuvBuffer_ ==================================
 //static yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
 //{
@@ -1614,14 +1652,11 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
     }
 
     //In order to scale blocks not divisible by 2 correctly, need to do some tricks
-    int chroma_block_width = w_factor < 0 ? SCALER_SHIFT(block_width + (1 << (-w_factor)) - 1, w_factor) : SCALER_SHIFT(block_width, w_factor);
-    int chroma_block_height = h_factor < 0 ? SCALER_SHIFT(block_height + (1 << (-h_factor)) - 1, h_factor) : SCALER_SHIFT(block_height, h_factor);
-
     //Resample u
-    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height );
+    resampleBlock(yuv->u, &param, is_upscaling, 0, dst->u, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
 
     //Resample v
-    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height );
+    resampleBlock(yuv->v, &param, is_upscaling, 0, dst->v, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor));
   }
 
   return 1;
@@ -1668,7 +1703,7 @@ void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * co
 }
 
 // Do block scaling in one direction. yuv buffer should not be modified.
-int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
+int kvz_yuvBlockStepScaling(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
 {
   /*========== Basic Initialization ==============*/
 
@@ -1803,14 +1838,11 @@ int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, co
     }
 
     //In order to scale blocks not divisible by 2 correctly, need to do some tricks
-    int chroma_block_width = w_factor < 0 ? SCALER_SHIFT(block_width+(1 << (-w_factor)) - 1, w_factor) : SCALER_SHIFT(block_width, w_factor);
-    int chroma_block_height = h_factor < 0 ? SCALER_SHIFT(block_height + (1 << (-h_factor)) - 1, h_factor) : SCALER_SHIFT(block_height, h_factor);
-
     //Resample u
-    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height, &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
 
     //Resample v
-    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), chroma_block_width, chroma_block_height, &param, is_upscaling, 0, is_vertical);
+    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
   }
 
   return 1;

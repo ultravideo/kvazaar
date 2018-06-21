@@ -158,6 +158,15 @@ yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv);
 */
 void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv);
 
+
+/**
+* \brief Copy a block from a uint8 src to a yuv buffer.
+*/
+void kvz_copy_uint8_block_to_YuvBuffer(const yuv_buffer_t* dst, const uint8_t* const y, const uint8_t* const u, const uint8_t* const v, const int luma_stride, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor);
+/**
+* \brief Copy a block from a yuv buffer to a uint8 dst.
+*/
+void kvz_copy_YuvBuffer_block_to_uint8(uint8_t* const y, uint8_t* const u, uint8_t* const v, const int luma_stride, const yuv_buffer_t * const src, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor);
 /*=======================================================*/
 
 
@@ -188,7 +197,7 @@ int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t
 * \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
 *        Result given in dst buffer.
 */
-int kvz_yuvBlockStepScaling(const yuv_buffer_t* const src, yuv_buffer_t* dst, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
+int kvz_yuvBlockStepScaling( yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
 
 /*=============================================================*/
 
