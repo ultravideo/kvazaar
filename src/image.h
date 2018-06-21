@@ -109,6 +109,10 @@ typedef struct {
   kvz_picture *pic_in;
   kvz_picture *pic_out;
 
+  yuv_buffer_t *src_buffer;
+  yuv_buffer_t *ver_tmp_buffer;
+  yuv_buffer_t *trgt_buffer;
+
   int block_x;
   int block_y;
   int block_width;

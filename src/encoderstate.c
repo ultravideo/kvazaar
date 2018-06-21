@@ -863,8 +863,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
             kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[lcu->id]);
           } else {
-            if (state->layer->image_scaling_jobs[lcu->id] != NULL) {
-              kvz_threadqueue_job_dep_add(job[0], state->layer->image_scaling_jobs[lcu->id]);
+            if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
+              kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
             }
             if (state->layer->cua_scaling_jobs[lcu->id] != NULL) {
               kvz_threadqueue_job_dep_add(job[0], state->layer->cua_scaling_jobs[lcu->id]);
@@ -1440,8 +1440,8 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_image_scaling_p
         param->block_width = lcu->size.x;
         param->block_height = lcu->size.y;
         
-        kvz_threadqueue_free_job(&state->layer->image_scaling_jobs[lcu->id]);
-        state->layer->image_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_scaler_worker, (void*)param);
+        kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
+        state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_scaler_worker, (void*)param);
 
         //Calculate vertical range of block scaling
         int range[2]; //Range of blocks needed for scaling
@@ -1455,12 +1455,12 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_image_scaling_p
         for( int j = 0; j < state->num_ILR_states; j++){
           for( int k = range[0]; k < range[1]; k++){
             const lcu_order_element_t * const ilr_lcu = &state->ILR_state[j].lcu_order[k];
-            kvz_threadqueue_job_dep_add(state->layer->image_scaling_jobs[lcu->id], state->ILR_state[j].tile->wf_jobs[ilr_lcu->id]);
+            kvz_threadqueue_job_dep_add(state->layer->image_ver_scaling_jobs[lcu->id], state->ILR_state[j].tile->wf_jobs[ilr_lcu->id]);
           }
         }
 
         //Dependencies added so submit the job
-        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_scaling_jobs[lcu->id]);
+        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_ver_scaling_jobs[lcu->id]);
       }
       break;
     }

@@ -177,13 +177,19 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
 
 // ***********************************************
 // Modified for SHVC.
-static int encoder_state_config_layer_init(encoder_state_t * const state, int width_in_lcu, const int height_in_lcu)
+static int encoder_state_config_layer_init(encoder_state_t * const state)
 {
-  if(state->encoder_control->cfg.wpp){
-    int num_jobs = width_in_lcu * height_in_lcu;
-    state->layer->image_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
-    state->layer->cua_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs);
-    if( state->layer->image_scaling_jobs == NULL){
+  const encoder_control_t * const ctrl = state->encoder_control;
+  if(ctrl->cfg.wpp){
+    //Allocate array for jobs. Each LCU has its own scaling job. Scaling is split into horizontal and vertical steps.
+    int ilr_height_in_lcu = ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y;
+    ilr_height_in_lcu = (ilr_height_in_lcu + LCU_WIDTH - 1) / LCU_WIDTH;
+    int num_jobs_hor = ctrl->in.width_in_lcu * ilr_height_in_lcu;
+    int num_jobs_ver = ctrl->in.width_in_lcu * ctrl->in.height_in_lcu;
+    state->layer->image_hor_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_hor);
+    state->layer->image_ver_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_ver);
+    state->layer->cua_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_ver);
+    if( state->layer->image_ver_scaling_jobs == NULL || state->layer->image_hor_scaling_jobs == NULL){
       printf("Error allocating image_scaling_jobs array!\n");
       return 0;
     }
@@ -191,13 +197,26 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, int wi
       printf("Error allocating cua_scaling_jobs array!\n");
       return 0;
     }
-    for(int i = 0; i < num_jobs; i++){
-      state->layer->image_scaling_jobs[i] = NULL;
+    for (int i = 0; i < num_jobs_hor; i++) {
+      state->layer->image_hor_scaling_jobs[i] = NULL;
+    }
+    for(int i = 0; i < num_jobs_ver; i++){
+      state->layer->image_ver_scaling_jobs[i] = NULL;
       state->layer->cua_scaling_jobs[i] = NULL;
     }
+
+    //Allocate buffers for holding the intermediate results of scaling etc.
+    state->layer->img_job_param.src_buffer = kvz_newYuvBuffer(ctrl->layer.upscaling.src_width + ctrl->layer.upscaling.src_padding_x, ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y, ctrl->chroma_format, 0);
+    state->layer->img_job_param.ver_tmp_buffer = kvz_newYuvBuffer(ctrl->in.width, ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y, ctrl->chroma_format, 0);
+    state->layer->img_job_param.trgt_buffer = kvz_newYuvBuffer(ctrl->in.width, ctrl->in.height, ctrl->chroma_format, 0);
+
   } else {
-    state->layer->image_scaling_jobs = NULL;
+    state->layer->image_ver_scaling_jobs = NULL;
+    state->layer->image_hor_scaling_jobs = NULL;
     state->layer->cua_scaling_jobs = NULL;
+    state->layer->img_job_param.src_buffer = NULL;
+    state->layer->img_job_param.ver_tmp_buffer = NULL;
+    state->layer->img_job_param.trgt_buffer = NULL;
   }
 
   state->layer->img_job_param.param = NULL;
@@ -229,15 +248,27 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
     return 1;
   }
 
+  const encoder_control_t * const ctrl = state->encoder_control;
+
   if (state->encoder_control->cfg.wpp) {
-    int num_jobs = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
-    for (int i = 0; i < num_jobs; ++i) {
-      kvz_threadqueue_free_job(&state->layer->image_scaling_jobs[i]);
+    int ilr_height_in_lcu = ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y;
+    ilr_height_in_lcu = (ilr_height_in_lcu + LCU_WIDTH - 1) / LCU_WIDTH;
+    int num_jobs_hor = ctrl->in.width_in_lcu * ilr_height_in_lcu;
+    int num_jobs_ver = ctrl->in.width_in_lcu * ctrl->in.height_in_lcu;
+    for (int i = 0; i < num_jobs_hor; ++i) {
+      kvz_threadqueue_free_job(&state->layer->image_hor_scaling_jobs[i]);
+    }
+    for (int i = 0; i < num_jobs_ver; ++i) {
+      kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[i]);
       kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[i]);
     }
+    kvz_deallocateYuvBuffer(state->layer->img_job_param.src_buffer);
+    kvz_deallocateYuvBuffer(state->layer->img_job_param.ver_tmp_buffer);
+    kvz_deallocateYuvBuffer(state->layer->img_job_param.trgt_buffer);
   }
 
-  FREE_POINTER(state->layer->image_scaling_jobs);
+  FREE_POINTER(state->layer->image_ver_scaling_jobs);
+  FREE_POINTER(state->layer->image_hor_scaling_jobs);
   FREE_POINTER(state->layer->cua_scaling_jobs);
 
   kvz_image_free(state->layer->img_job_param.pic_in);
@@ -429,7 +460,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     // Modified for SHVC.
     if (encoder->layer.layer_id > 0) {
       child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
-      if (!child_state->layer || !encoder_state_config_layer_init(child_state, encoder->in.width_in_lcu, encoder->in.height_in_lcu)) {
+      if (!child_state->layer || !encoder_state_config_layer_init(child_state)) {
         fprintf(stderr, "Could not initialize encoder_state->layer!\n");
         return 0;
       }
