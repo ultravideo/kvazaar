@@ -301,7 +301,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                  bool early_skip)
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
-  const int32_t shift      = color == COLOR_Y ? 0 : 1;
+  const int32_t shift      = color == COLOR_Y ? 0 : SHIFT;
   const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift };
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
@@ -322,7 +322,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
   if (color == COLOR_Y) {
     tr_width = LCU_WIDTH >> depth;
   } else {
-    const int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
+    // 444: from depth - 1 to this: think through if correct?
+    const int chroma_depth = (depth == MAX_PU_DEPTH ? (depth - SHIFT) : depth);
     tr_width = LCU_WIDTH_C >> chroma_depth;
   }
   const int32_t lcu_width = LCU_WIDTH >> shift;
