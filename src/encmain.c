@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
   for ( int i = 0; i < opts->num_inputs; i++) {
     fprintf(stderr, "Input layer %d:\n", i);
     fprintf(stderr, "  Input: %s, output: %s\n", opts->input[i], opts->output);
-    fprintf(stderr, "    Video input size: %dx%d\n",
+    fprintf(stderr, "  Video input size: %dx%d\n",
       opts->config->shared != NULL ? opts->config->shared->input_widths[i] : opts->config->width,
       opts->config->shared != NULL ? opts->config->shared->input_heights[i] : opts->config->height);
 
@@ -484,8 +484,10 @@ int main(int argc, char *argv[])
   }
   for( const encoder_control_t* ctrl = encoder; ctrl != NULL ; ctrl = ctrl->next_enc_ctrl) {
     fprintf(stderr, "Layer %d:\n", ctrl->layer.layer_id);
-    fprintf(stderr, "  Input layer: %d\n", ctrl->layer.input_layer);
-    fprintf(stderr, "    Video size: %dx%d (input=%dx%d)\n",
+    fprintf(stderr, "  Input layer: %d (size=%dx%d)\n", ctrl->layer.input_layer,
+      opts->config->shared != NULL ? opts->config->shared->input_widths[ctrl->layer.input_layer] : opts->config->width,
+      opts->config->shared != NULL ? opts->config->shared->input_heights[ctrl->layer.input_layer] : opts->config->height);
+    fprintf(stderr, "  Layer size: %dx%d (input=%dx%d)\n",
       ctrl->in.width, ctrl->in.height,
       ctrl->in.real_width, ctrl->in.real_height);
     if( ctrl->layer.layer_id < opts->num_debugs ){
