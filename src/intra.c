@@ -317,7 +317,7 @@ void kvz_intra_build_reference_any(
   kvz_pixel *out_top_ref = &refs->ref.top[0];
 
   const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1);
-  const int is_chroma = color != COLOR_Y ? 1 : 0;
+  const int shift = color != COLOR_Y ? SHIFT : 0;
   const int_fast8_t width = 1 << log2_width;
 
   // Convert luma coordinates to chroma coordinates for chroma.
@@ -326,8 +326,8 @@ void kvz_intra_build_reference_any(
     luma_px->y % LCU_WIDTH
   };
   const vector2d_t px = {
-    lcu_px.x >> is_chroma,
-    lcu_px.y >> is_chroma,
+    lcu_px.x >> shift,
+    lcu_px.y >> shift,
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
@@ -338,7 +338,7 @@ void kvz_intra_build_reference_any(
   // Init top borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel *top_border;
   if (px.y) {
-    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> is_chroma)];
+    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> shift)];
   } else {
     top_border = &top_ref[px.x];
   }
@@ -347,8 +347,8 @@ void kvz_intra_build_reference_any(
   const kvz_pixel *left_border;
   int left_stride; // Distance between reference samples.
   if (px.x) {
-    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> is_chroma)];
-    left_stride = LCU_WIDTH >> is_chroma;
+    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> shift)];
+    left_stride = LCU_WIDTH >> shift;
   } else {
     left_border = &left_ref[px.y];
     left_stride = 1;
@@ -357,12 +357,12 @@ void kvz_intra_build_reference_any(
   // Generate left reference.
   if (luma_px->x > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> shift;
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
     px_available_left = MIN(px_available_left, width * 2);
-    px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
+    px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> shift);
 
     // Copy pixels from coded CUs.
     for (int i = 0; i < px_available_left; ++i) {
@@ -401,12 +401,12 @@ void kvz_intra_build_reference_any(
   // Generate top reference.
   if (luma_px->y > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> shift;
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
     px_available_top = MIN(px_available_top, width * 2);
-    px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
+    px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> shift);
 
     // Copy all the pixels we can.
     for (int i = 0; i < px_available_top; ++i) {
@@ -440,7 +440,7 @@ void kvz_intra_build_reference_inner(
   kvz_pixel * __restrict out_left_ref = &refs->ref.left[0];
   kvz_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
-  const int is_chroma = color != COLOR_Y ? 1 : 0;
+  const int shift = color != COLOR_Y ? SHIFT : 0;
   const int_fast8_t width = 1 << log2_width;
 
   // Convert luma coordinates to chroma coordinates for chroma.
@@ -449,8 +449,8 @@ void kvz_intra_build_reference_inner(
     luma_px->y % LCU_WIDTH
   };
   const vector2d_t px = {
-    lcu_px.x >> is_chroma,
-    lcu_px.y >> is_chroma,
+    lcu_px.x >> shift,
+    lcu_px.y >> shift,
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
@@ -461,7 +461,7 @@ void kvz_intra_build_reference_inner(
   // Init top borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel * __restrict top_border;
   if (px.y) {
-    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> is_chroma)];
+    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> shift)];
   } else {
     top_border = &top_ref[px.x];
 
@@ -475,8 +475,8 @@ void kvz_intra_build_reference_inner(
   // If the block is at an LCU border, the top-left must be copied from
   // the border that points to the LCUs 1D reference buffer.
   if (px.x) {
-    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> is_chroma)];
-    left_stride = LCU_WIDTH >> is_chroma;
+    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> shift)];
+    left_stride = LCU_WIDTH >> shift;
     out_left_ref[0] = top_border[-1];
     out_top_ref[0] = top_border[-1];
   } else {
@@ -489,12 +489,12 @@ void kvz_intra_build_reference_inner(
   // Generate left reference.
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> shift;
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
   px_available_left = MIN(px_available_left, width * 2);
-  px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
+  px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> shift);
 
   // Copy pixels from coded CUs.
   int i = 0;
@@ -518,12 +518,12 @@ void kvz_intra_build_reference_inner(
   // Generate top reference.
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> shift;
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
   px_available_top = MIN(px_available_top, width * 2);
-  px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
+  px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> shift);
 
   // Copy all the pixels we can.
   i = 0;
@@ -568,7 +568,7 @@ static void intra_recon_tb_leaf(
   color_t color)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
-  const int shift = color == COLOR_Y ? 0 : 1;
+  const int shift = color == COLOR_Y ? 0 : SHIFT;
 
   int log2width = LOG2_LCU_WIDTH - depth;
   if (color != COLOR_Y && depth < MAX_PU_DEPTH) {
