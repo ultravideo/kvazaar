@@ -184,8 +184,8 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
 
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   if (orig_image->chroma_format != KVZ_CSP_400) {
-    im->u = im->data[COLOR_U] = &orig_image->u[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
-    im->v = im->data[COLOR_V] = &orig_image->v[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
+    im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> SHIFT) + (y_offset >> SHIFT) * (orig_image->stride >> SHIFT)];
+    im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> SHIFT) + (y_offset >> SHIFT) * (orig_image->stride >> SHIFT)];
   }
 
   im->pts = 0;
@@ -229,10 +229,20 @@ static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, co
                                   const int32_t width, const int32_t height, const uint32_t stride1,
                                   const uint32_t stride2, optimized_sad_func_ptr_t optimized_sad)
 {
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
+  yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (int16_t *)malloc(luma_size >> SHIFT * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc(luma_size >> SHIFT * sizeof(*yuv->v));
+  yuv->size = luma_size;
+
   if (optimized_sad != NULL)
     return optimized_sad(data1, data2, height, stride1, stride2);
   else
     return kvz_reg_sad(data1, data2, width, height, stride1, stride2);
+
+  return yuv;
 }
 
 /**

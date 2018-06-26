@@ -184,7 +184,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
   const int width = LCU_WIDTH >> depth;
-  const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
+  const int width_c = width > TR_MIN_WIDTH ? width >> SHIFT : width;
 
   const int offset = width / 2;
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
@@ -325,7 +325,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   assert(!(x_px & 4 || y_px & 4));
 
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
-  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + 1), 2);
+  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + SHIFT), 1 << SHIFT);
 
   for (int i = 0; i < 5; ++i) {
     costs[i] = 0;
@@ -776,7 +776,8 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
   if (num_modes != 1 && num_modes != 5) {
-    const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+    // MAX(LOG2_LCU_WIDTH - (depth + 1), 2) to work as LOG2_LCU_WIDTH - depth
+    const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + SHIFT), 1 << SHIFT);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };
 
@@ -786,7 +787,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     kvz_intra_references refs_v;
     kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v);
 
-    vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
+    vector2d_t lcu_cpx = { lcu_px.x >> SHIFT, lcu_px.y >> SHIFT };
     kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
     kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
