@@ -129,7 +129,7 @@ static void compute_psnr(const kvz_picture *const src,
   for (int32_t c = 0; c < colors; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
-      num_pixels >>= 2; 
+      num_pixels >>= (SHIFT * 2); 
     }
     for (int32_t i = 0; i < num_pixels; ++i) {
       const int32_t error = src->data[c][i] - rec->data[c][i];

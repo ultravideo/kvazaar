@@ -777,7 +777,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
   if (num_modes != 1 && num_modes != 5) {
-    // NOTE: modified MAX(LOG2_LCU_WIDTH - (depth + 1), 2) to work as LOG2_LCU_WIDTH - depth
+    // 444: modified MAX(LOG2_LCU_WIDTH - (depth + 1), 2) to work as LOG2_LCU_WIDTH - depth
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + SHIFT), 1 << SHIFT);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };
