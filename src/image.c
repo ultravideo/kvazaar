@@ -233,8 +233,8 @@ static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, co
   // automatic buffer overrun checks.
   hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
   yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (int16_t *)malloc(luma_size >> SHIFT * sizeof(*yuv->u));
-  yuv->v = (int16_t *)malloc(luma_size >> SHIFT * sizeof(*yuv->v));
+  yuv->u = (int16_t *)malloc((luma_size >> SHIFT) * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc((luma_size >> SHIFT) * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   if (optimized_sad != NULL)
