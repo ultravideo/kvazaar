@@ -1567,7 +1567,7 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
         set_job_row = set_job_row / LCU_WIDTH;
         ver_range[1] = (ver_range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
 
-        //Create hor job for each row that does not exist
+        //Create hor job for each row that does not have one yet and add dep
         int id_offset = (lcu->id % state->lcu_order_count) * state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
         for( int row = ver_range[0]; row < ver_range[1]; row++){
           int hor_ind = row + id_offset;
@@ -1585,19 +1585,21 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
             range_hor[0] = range_hor[0] / LCU_WIDTH; //First LCU that is needed
             range_hor[1] = (range_hor[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
 
-            //Add dependencies to ilr states
-
+            //Add ilr state dependencies to hor job
             for (int k = range_hor[0]; k < range_hor[1]; k++) {
               const lcu_order_element_t * const ilr_lcu = &state->ILR_state[row - ver_range[0]].lcu_order[k];
               kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], state->ILR_state[row - ver_range[0]].tile->wf_jobs[ilr_lcu->id]);
             }
+
+            //Submit hor job
+            kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_hor_scaling_jobs[hor_ind]);
           }
 
-          //Add dependencies to hor step
+          //Add hor step dependency to ver step
           kvz_threadqueue_job_dep_add(state->layer->image_ver_scaling_jobs[lcu->id], state->layer->image_hor_scaling_jobs[hor_ind]);
         }
                 
-        //Dependencies added so submit the job
+        //Dependencies added so submit the ver job
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_ver_scaling_jobs[lcu->id]);
       }
       break;
