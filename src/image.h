@@ -43,11 +43,12 @@
 #include "kvazaar.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
 
-
+ // NOTE: u & v were originally sized with LCU_CHROMA_SIZE, so memory waste is made if chroma is 
+ // subsampled.
 typedef struct {
   kvz_pixel y[LCU_LUMA_SIZE];
-  kvz_pixel u[LCU_CHROMA_SIZE];
-  kvz_pixel v[LCU_CHROMA_SIZE];
+  kvz_pixel u[LCU_LUMA_SIZE];
+  kvz_pixel v[LCU_LUMA_SIZE];
   enum kvz_chroma_format chroma_format;
 } lcu_yuv_t;
 

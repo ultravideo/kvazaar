@@ -151,6 +151,7 @@ typedef int16_t coeff_t;
 //!   chroma_size = luma_size >> chroma_shift
 //!   but use as chroma_size = luma_size >> SHIFT;
 unsigned kvz_chroma_shift;
+//! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
 #define SHIFT kvz_chroma_shift
 
 //! pow(2, MIN_SIZE)
@@ -159,7 +160,7 @@ unsigned kvz_chroma_shift;
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
 #define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
-// TODO: ?LCU_HEIGHT_C? and fix LCU_CHROMA_SIZE
+// TODO: ?LCU_HEIGHT_C?
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5
@@ -173,7 +174,19 @@ unsigned kvz_chroma_shift;
 #endif
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
-#define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
+// LCU_CHROMA_SIZE is not used anywhere as it can't be used to allocate arrays.
+// TODO: remove
+#define LCU_CHROMA_SIZE (LCU_WIDTH_C * LCU_WIDTH_C) 
+
+//! Size of luma filter used in inter searches 
+#define FILTER_SIZE 8
+//! SIze of chroma filter used in inter searches
+#define FILTER_SIZE_C (FILTER_SIZE >> SHIFT)
+//! Luma filter offset in inter searches
+#define FILTER_OFFSET 3
+//! Chroma filter offset in inter searches
+#define FILTER_OFFSET_C (FILTER_OFFSET >> SHIFT)
+
 
 /**
  * \brief Number of pixels to delay deblocking.
