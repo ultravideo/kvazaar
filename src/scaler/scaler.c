@@ -484,6 +484,8 @@ static void copyMemBlock( void * const dst, const void * const src, const int ds
 
   //Loop over rows
   for(int y = 0; y < block_height; y++){
+    //Init dst to zero
+    memset(dst_char, 0, block_width * dst_sizeof);
     //Copy row
     for(int x = 0; x < block_width; x++){
       memcpy(&dst_char[x*dst_sizeof], &src_char[x*src_sizeof], SCALER_MIN(dst_sizeof,src_sizeof));

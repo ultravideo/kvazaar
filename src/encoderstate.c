@@ -1551,7 +1551,7 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
         //  Create horizontal scaling jobs that the ver job depends on
         int ver_range[2];
         kvz_blockScalingSrcHeightRange(ver_range, base_param->param, param_ver->block_y, param_ver->block_height);
-        int set_job_row = ver_range[0]; //row of the first job not yet set
+        int set_job_row = 0; //row of the first job not yet set
         
         //Check previous block range to avoid re-creating jobs
         if( lcu->above != NULL ){
@@ -1559,18 +1559,18 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
           int tmp_block_height = lcu->above->size.y;
           int tmp_range[2];
           kvz_blockScalingSrcHeightRange(tmp_range, base_param->param, tmp_block_y, tmp_block_height);       
-          set_job_row = tmp_range[1];
+          set_job_row = (tmp_range[1] + LCU_WIDTH - 1) / LCU_WIDTH;
         }
 
         //Map the pixel range to LCU row
         ver_range[0] = ver_range[0] / LCU_WIDTH; //First LCU that is needed
-        set_job_row = set_job_row / LCU_WIDTH;
         ver_range[1] = (ver_range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
 
         //Create hor job for each row that does not have one yet and add dep
-        int id_offset = (lcu->id % state->lcu_order_count) * state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
+        //int id_offset = (lcu->id % state->lcu_order_count) * state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
+        int id_offset = lcu->index; //* state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
         for( int row = ver_range[0]; row < ver_range[1]; row++){
-          int hor_ind = row + id_offset;
+          int hor_ind = row * state->encoder_control->in.width_in_lcu + id_offset;
           
           if (row >= set_job_row) {
             kvz_threadqueue_free_job(&state->layer->image_hor_scaling_jobs[hor_ind]);
@@ -1587,8 +1587,8 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
 
             //Add ilr state dependencies to hor job
             for (int k = range_hor[0]; k < range_hor[1]; k++) {
-              const lcu_order_element_t * const ilr_lcu = &state->ILR_state[row - ver_range[0]].lcu_order[k];
-              kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], state->ILR_state[row - ver_range[0]].tile->wf_jobs[ilr_lcu->id]);
+              const encoder_state_t * const ilr_state = &state->ILR_state[row - ver_range[0]];
+              kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
             }
 
             //Submit hor job
