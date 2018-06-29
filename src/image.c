@@ -769,22 +769,39 @@ void kvz_block_step_scaler_worker(void * opaque_param)
   //Hor Scaling
   if( pic_in != NULL ){
     //Get range that needs to be copied from pic_in
-    int range[2];
-    kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
-    
-    int block_x = range[0];
-    int block_y = in_param->block_y;
-    int block_width = range[1] - range[0];
-    int block_height = in_param->block_height;
+    //range[0:1] is prev blocks range and range[2:3] is the new block range
+    //Only copy pixels not in range[0:1] (already copied by previous workers).
+    //Getting the correct block_x of the previous block does not matter as only range[1] is used
+    int range[4];
+    if (in_param->block_x - in_param->block_width < 0){
+      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
+      range[1] = range[2] - 1;
+    } else {
+      kvz_blockScalingSrcWidthRange(range, param, in_param->block_x - in_param->block_width, in_param->block_width);
+      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
+    }
+
+    int cp_block_x = range[1] + 1;
+    int cp_block_y = in_param->block_y;
+    int cp_block_width = range[3] - range[2] + 1;
+    int cp_block_height = in_param->block_height;
 
     if(pic_out != NULL ){
+      if (in_param->block_y - in_param->block_height < 0) {
+        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_x, in_param->block_width);
+        range[1] = range[2] - 1;
+      }
+      else {
+        kvz_blockScalingSrcHeightRange(range, param, in_param->block_x - in_param->block_width, in_param->block_width);
+        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_x, in_param->block_width);
+      }
       kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
-      block_y = range[0];
-      block_height = range[1] - range[0];
+      cp_block_y = range[1] + 1;
+      cp_block_height = range[3] - range[2] + 1;
     }
 
     //Copy from in_pic to the src buffer
-    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, block_x, block_y, block_x, block_y, block_width, block_height, w_factor, h_factor);
+    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_block_x, cp_block_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
 
     if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 0)) {
       //TODO: Do error stuff?

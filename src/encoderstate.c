@@ -1592,6 +1592,11 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
               kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
             }
 
+            //Add dependency to left lcu so that copying to src_buffer is not an issue
+            if( lcu->left != NULL ){
+              kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], state->layer->image_hor_scaling_jobs[hor_ind-1]);
+            }
+
             //Submit hor job
             kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_hor_scaling_jobs[hor_ind]);
           }
