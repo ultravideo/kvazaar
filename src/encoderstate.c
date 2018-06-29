@@ -74,15 +74,16 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
     {
       //Need to add each row in block scaling source height range as an ILR state
       
-      int range[2]; //Range of blocks needed for scaling
-      kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, state->children[i].tile->offset_y + state->children[i].lcu_order->position_px.y, state->children[i].lcu_order->size.y);
+      //int range[2]; //Range of blocks needed for scaling
+      //kvz_blockScalingSrcHeightRange(range, &state->encoder_control->layer.upscaling, state->children[i].tile->offset_y + state->children[i].lcu_order->position_px.y, state->children[i].lcu_order->size.y);
 
-      //Map the pixel range to LCU pos
-      range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
-      range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //First LCU that is not needed
+      ////Map the pixel range to LCU pos
+      //range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
+      //range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //First LCU that is not needed
 
-      state->children[i].ILR_state = &state->ILR_state->children[range[0]];
-      state->children[i].num_ILR_states = range[1] - range[0];
+      //Just set ILR_state to the first state of children. The correct child is calculatet later anyway
+      state->children[i].ILR_state = state->ILR_state->children;//&state->ILR_state->children[range[0]];
+      state->children[i].num_ILR_states = 1; //range[1] - range[0];
 
       break;
     }
@@ -1587,7 +1588,7 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
 
             //Add ilr state dependencies to hor job
             for (int k = range_hor[0]; k < range_hor[1]; k++) {
-              const encoder_state_t * const ilr_state = &state->ILR_state[row - ver_range[0]];
+              const encoder_state_t * const ilr_state = &state->ILR_state[row];
               kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
             }
 
@@ -1778,7 +1779,7 @@ static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsamplin
         kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[lcu->id]);
         state->layer->cua_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, (void*)param);
 
-        //Calculate (vertical) range of scaling
+        //Calculate (vertical/horizontal) range of scaling
         int range[4]; //Range of blocks needed for scaling
         kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, block_width, param->cu_pos_scale[0]); //Width  
         kvz_cu_array_upsampling_src_range(range+2, block_y, block_y + block_height, block_height, param->cu_pos_scale[1]); //Height
@@ -1790,14 +1791,10 @@ static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsamplin
         range[3] = (range[3] + LCU_WIDTH - 1) /LCU_WIDTH;
 
         //Add dependencies to ilr states
-        for (int j = 0; j < state->num_ILR_states; j++) {
-          const lcu_order_element_t * const ilr_lcu = &state->ILR_state[j].lcu_order[0];
-          //If current ILR state is not in upsampling range skip row
-          if(ilr_lcu->position.y < range[2] || ilr_lcu->position.x >= range[3]){
-            continue;
-          }
+        for (int j = range[2]; j < range[3]; j++) {
+          const encoder_state_t * const ilr_state = &state->ILR_state[j];
           for (int k = range[0]; k < range[1]; k++) {
-            kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], state->ILR_state[j].tile->wf_jobs[ilr_lcu[k].id]);
+            kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
           }
         }
 
