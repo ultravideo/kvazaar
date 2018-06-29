@@ -1231,8 +1231,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->rdoq_skip = atobool(value);
   }
   else if OPT("input-format") {
-    static enum kvz_input_format const formats[] = { KVZ_FORMAT_P400, KVZ_FORMAT_P420 };
-    static const char * const format_names[] = { "P400", "P420", NULL };
+    static enum kvz_input_format const formats[] = { KVZ_FORMAT_P400, KVZ_FORMAT_P420 , KVZ_FORMAT_P444};
+    static const char * const format_names[] = { "P400", "P420", "P444", NULL };
 
     int8_t format = 0;
     if (!parse_enum(value, format_names, &format)) {

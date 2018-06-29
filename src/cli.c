@@ -434,7 +434,7 @@ void print_help(void)
     "                                   - progressive: Progressive scan\n"
     "                                   - tff: Top field first\n"
     "                                   - bff: Bottom field first\n"
-    "      --input-format <string> : P420 or P400 [P420]\n"
+    "      --input-format <string> : P420, P444 or P400 [P420]\n"
     "      --input-bitdepth <int> : 8-16 [8]\n"
     "      --loop-input           : Re-read input file forever.\n"
     "      --input-file-format <string> : Input file format [auto]\n"
