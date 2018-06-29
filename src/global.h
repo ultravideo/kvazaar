@@ -160,7 +160,7 @@ unsigned kvz_chroma_shift;
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
 #define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
-// TODO: ?LCU_HEIGHT_C?
+// TODO: if 422 is wanted, should make LCU_HEIGTH_C
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5

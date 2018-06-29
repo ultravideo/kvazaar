@@ -118,7 +118,6 @@ static void compute_psnr(const kvz_picture *const src,
                          const kvz_picture *const rec,
                          double psnr[3])
 {
-  // TODO: other formats
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 

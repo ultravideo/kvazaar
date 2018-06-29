@@ -219,16 +219,16 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
   }
 
   //Chroma
-  for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
-    kvz_pixel *row_out = field_out->u + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+  for (int i = 0; i < field_out->height >> SHIFT; ++i){
+    kvz_pixel *row_in = frame_in->u + MIN((frame_in->height >> SHIFT) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT);
+    kvz_pixel *row_out = field_out->u + i * (field_out->stride >> SHIFT);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT));
   }
 
-  for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
-    kvz_pixel *row_out = field_out->v + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+  for (int i = 0; i < field_out->height >> SHIFT; ++i){
+    kvz_pixel *row_in = frame_in->v + MIN((frame_in->height >> SHIFT) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT);
+    kvz_pixel *row_out = field_out->v + i * (field_out->stride >> SHIFT);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT));
   }
 
   return 1;
@@ -323,7 +323,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   }
 
   // For interlaced, make two fields out of the input frame and call encode on them separately.
-  // NOTE: color mode changes not done to interlaced
+  // NOTE: color mode changes not tested for interlaced
   encoder_state_t *state = &enc->states[enc->cur_state_num];
   kvz_picture *first_field = NULL, *second_field = NULL;
   struct {
