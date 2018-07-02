@@ -1853,7 +1853,7 @@ static cu_array_t* deferred_cua_lcu_upsampling(encoder_state_t *state, int32_t m
   param->nh_in_lcu = state->tile->frame->height_in_lcu;
   param->nw_in_lcu = state->tile->frame->width_in_lcu;
   param->only_init = !state->encoder_control->cfg.tmvp_enable;
-  kvz_cu_array_free( &param->out_cua ); //Free prev job
+  kvz_cu_array_free( &param->out_cua ); //Free prev
   param->out_cua = kvz_cu_array_copy_ref(cua);
   param->lcu_ind = -1; //Set correct ind later
 
@@ -1911,11 +1911,11 @@ static void add_irl_frames(encoder_state_t *state)
       if (state->tqj_ilr_cua_upsampling_done != NULL) {
         kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
       }
-    } else{
+    } else {
       scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
         state->tile->frame->width_in_lcu,
         state->tile->frame->height_in_lcu,
-        mv_scale, pos_scale,
+        mv_scale, pos_scale, 1,
         !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet 
     }
   

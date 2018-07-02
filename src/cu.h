@@ -236,6 +236,7 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua,
                                     int32_t nh_in_lcu,
                                     int32_t * mv_scale,
                                     int32_t * cu_pos_scale,
+                                    uint8_t skip_same,
                                     uint8_t only_init);
 
 //Return the pixel range that the upsampling function uses in the source

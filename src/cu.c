@@ -350,16 +350,20 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
 }
 
 
-cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t only_init)
+cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale, uint8_t skip_same, uint8_t only_init)
 {
-  
+  if (skip_same && cu_pos_scale[0] == POS_SCALE_FAC_1X && cu_pos_scale[1] == POS_SCALE_FAC_1X) {
+
+    return kvz_cu_array_copy_ref(base_cua);
+  }
+
   //Allocate the new cua. Use cu_pos_scale to calculate the new size
   uint32_t n_width = nw_in_lcu * LCU_WIDTH;
   uint32_t n_height = nh_in_lcu * LCU_WIDTH;
   cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
 
   kvz_cua_upsampling_parameter_t *param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
-  param->base_cua = base_cua;
+  param->base_cua = kvz_cu_array_copy_ref(base_cua);
   param->cu_pos_scale[0] = cu_pos_scale[0];
   param->cu_pos_scale[1] = cu_pos_scale[1];
   param->mv_scale[0] = mv_scale[0];
@@ -367,7 +371,7 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
   param->nh_in_lcu = nh_in_lcu;
   param->nw_in_lcu = nw_in_lcu;
   param->only_init = only_init;
-  param->out_cua = cua;
+  param->out_cua = kvz_cu_array_copy_ref(cua);
   param->lcu_ind = -1;
   
   kvz_cu_array_upsampling_worker(param);
