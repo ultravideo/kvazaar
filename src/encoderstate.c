@@ -1527,22 +1527,22 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
         const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
         //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
-        kvz_image_scaling_parameter_t *param_hor = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-        param_hor->param = base_param->param;
-        param_hor->pic_in = kvz_image_copy_ref(base_param->pic_in);
-        param_hor->pic_out = NULL;//kvz_image_copy_ref(base_param->pic_out);
-        param_hor->src_buffer = base_param->src_buffer;
-        param_hor->ver_tmp_buffer = base_param->ver_tmp_buffer;
-        param_hor->trgt_buffer = base_param->trgt_buffer;
-        param_hor->block_x = state->tile->offset_x + lcu->position_px.x;
-        param_hor->block_y = state->tile->offset_y + lcu->position_px.y;
-        param_hor->block_width = lcu->size.x;
-        param_hor->block_height = lcu->size.y;
-
         kvz_image_scaling_parameter_t *param_ver = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-        memcpy(param_ver, param_hor, sizeof(kvz_image_scaling_parameter_t));
+        param_ver->param = base_param->param;
         param_ver->pic_in = NULL;
         param_ver->pic_out = kvz_image_copy_ref(base_param->pic_out);
+        param_ver->src_buffer = base_param->src_buffer;
+        param_ver->ver_tmp_buffer = base_param->ver_tmp_buffer;
+        param_ver->trgt_buffer = base_param->trgt_buffer;
+        param_ver->block_x = state->tile->offset_x + lcu->position_px.x;
+        param_ver->block_y = state->tile->offset_y + lcu->position_px.y;
+        param_ver->block_width = lcu->size.x;
+        param_ver->block_height = lcu->size.y;
+
+        kvz_image_scaling_parameter_t *param_hor = calloc(1, sizeof(kvz_image_scaling_parameter_t));
+        memcpy(param_hor, param_ver, sizeof(kvz_image_scaling_parameter_t));
+        param_hor->pic_in = kvz_image_copy_ref(base_param->pic_in);
+        param_hor->pic_out = NULL;//kvz_image_copy_ref(base_param->pic_out);
 
         //First create job for vertical scaling
         kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
@@ -1574,6 +1574,11 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
           int hor_ind = row * state->encoder_control->in.width_in_lcu + id_offset;
           
           if (row >= set_job_row) {
+            //Set correct block parameters for hor job since it may be on a different lcu row than lcu
+            const encoder_state_t * const ilr_state = &state->ILR_state[row];
+            param_hor->block_y = ilr_state->tile->offset_y + ilr_state->lcu_order->position_px.y;
+            param_hor->block_height = ilr_state->lcu_order->size.y;
+
             kvz_threadqueue_free_job(&state->layer->image_hor_scaling_jobs[hor_ind]);
             state->layer->image_hor_scaling_jobs[hor_ind] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param_hor);
 
@@ -1588,7 +1593,6 @@ static void start_block_step_scaling_jobs(encoder_state_t *state, kvz_image_scal
 
             //Add ilr state dependencies to hor job
             for (int k = range_hor[0]; k < range_hor[1]; k++) {
-              const encoder_state_t * const ilr_state = &state->ILR_state[row];
               kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
             }
 
