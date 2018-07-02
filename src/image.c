@@ -783,7 +783,7 @@ void kvz_block_step_scaler_worker(void * opaque_param)
 
     int cp_block_x = range[1] + 1;
     int cp_block_y = in_param->block_y;
-    int cp_block_width = range[3] - range[2] + 1;
+    int cp_block_width = range[3] - cp_block_x + 1;
     int cp_block_height = in_param->block_height;
 
     if(pic_out != NULL ){
@@ -797,7 +797,7 @@ void kvz_block_step_scaler_worker(void * opaque_param)
       }
       kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
       cp_block_y = range[1] + 1;
-      cp_block_height = range[3] - range[2] + 1;
+      cp_block_height = range[3] - cp_block_y + 1;
     }
 
     //Copy from in_pic to the src buffer
