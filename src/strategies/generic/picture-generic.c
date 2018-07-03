@@ -555,7 +555,30 @@ static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
 
 	int y_in_lcu;
 	int x_in_lcu;
+ /*
+ y_in_lcu = ((ypos) & ((LCU_WIDTH)-1));
+ x_in_lcu = ((xpos) & ((LCU_WIDTH)-1));
 
+ int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+ int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+
+ printf("%d ", sample0_y);
+ printf("\n");
+
+ printf("%d ", sample1_y);
+ printf("\n");
+
+ printf("%d ", shift);
+ printf("\n");
+
+ printf("%d ", offset);
+ printf("\n");
+
+ printf("%d ", (sample0_y+sample1_y+64) >> 7);
+ printf("\n");
+
+ printf("%d ", (20+15+1) >> 1);
+ printf("\n");*/
 
 	//After reconstruction, merge the predictors by taking an average of each pixel
 	for (int temp_y = 0; temp_y < height; ++temp_y) {
