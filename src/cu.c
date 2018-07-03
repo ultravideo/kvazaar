@@ -390,7 +390,6 @@ void kvz_cu_array_upsampling_src_range( int32_t range[2], uint32_t lcu_low, uint
   
   uint8_t block_size = 16;
 
-  //Need to round here for some reason acording to shm.
   range[0] = ((SCALE_POS_COORD(lcu_low + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
   range[1] = ((SCALE_POS_COORD(lcu_high + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
 

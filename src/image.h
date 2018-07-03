@@ -125,6 +125,7 @@ typedef struct {
 void kvz_image_scaler_worker( void *opaque_param);
 void kvz_block_scaler_worker( void *opaque_param );
 void kvz_block_step_scaler_worker(void * opaque_param);
+void kvz_tile_step_scaler_worker(void * opaque_param);
 kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, uint8_t skip_same);
 // ***********************************************
 

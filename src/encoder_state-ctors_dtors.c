@@ -177,15 +177,18 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
 
 // ***********************************************
 // Modified for SHVC.
-static int encoder_state_config_layer_init(encoder_state_t * const state)
+static int encoder_state_config_layer_init(encoder_state_t * const state, const int lcu_offset_x, const int lcu_offset_y, const int width, const int height, const int width_in_lcu, const int height_in_lcu, scaling_parameter_t * const scaling_param)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
   if(ctrl->cfg.wpp){
     //Allocate array for jobs. Each LCU has its own scaling job. Scaling is split into horizontal and vertical steps.
-    int ilr_height_in_lcu = ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y;
+    int range[2];
+    kvz_blockScalingSrcHeightRange(range, scaling_param, lcu_offset_y * LCU_WIDTH, height);
+
+    int ilr_height_in_lcu = range[1] - range[0] + 1; //ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y;
     ilr_height_in_lcu = (ilr_height_in_lcu + LCU_WIDTH - 1) / LCU_WIDTH;
-    int num_jobs_hor = ctrl->in.width_in_lcu * ilr_height_in_lcu;
-    int num_jobs_ver = ctrl->in.width_in_lcu * ctrl->in.height_in_lcu;
+    int num_jobs_hor = width_in_lcu * ilr_height_in_lcu;
+    int num_jobs_ver = width_in_lcu * height_in_lcu;
     state->layer->image_hor_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_hor);
     state->layer->image_ver_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_ver);
     state->layer->cua_scaling_jobs = MALLOC(threadqueue_job_t*, num_jobs_ver);
@@ -205,19 +208,29 @@ static int encoder_state_config_layer_init(encoder_state_t * const state)
       state->layer->cua_scaling_jobs[i] = NULL;
     }
 
-    //Allocate buffers for holding the intermediate results of scaling etc.
-    state->layer->img_job_param.src_buffer = kvz_newYuvBuffer(ctrl->layer.upscaling.src_width + ctrl->layer.upscaling.src_padding_x, ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y, ctrl->chroma_format, 0);
+    /*state->layer->img_job_param.src_buffer = kvz_newYuvBuffer(ctrl->layer.upscaling.src_width + ctrl->layer.upscaling.src_padding_x, ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y, ctrl->chroma_format, 0);
     state->layer->img_job_param.ver_tmp_buffer = kvz_newYuvBuffer(ctrl->in.width, ctrl->layer.upscaling.src_height + ctrl->layer.upscaling.src_padding_y, ctrl->chroma_format, 0);
-    state->layer->img_job_param.trgt_buffer = kvz_newYuvBuffer(ctrl->in.width, ctrl->in.height, ctrl->chroma_format, 0);
+    state->layer->img_job_param.trgt_buffer = kvz_newYuvBuffer(ctrl->in.width, ctrl->in.height, ctrl->chroma_format, 0);*/
 
   } else {
     state->layer->image_ver_scaling_jobs = NULL;
     state->layer->image_hor_scaling_jobs = NULL;
     state->layer->cua_scaling_jobs = NULL;
-    state->layer->img_job_param.src_buffer = NULL;
-    state->layer->img_job_param.ver_tmp_buffer = NULL;
-    state->layer->img_job_param.trgt_buffer = NULL;
   }
+
+    //Allocate buffers for holding the intermediate results of scaling etc.
+  int range[4];
+  kvz_blockScalingSrcWidthRange(range, scaling_param, lcu_offset_x * LCU_WIDTH, width);
+  kvz_blockScalingSrcHeightRange(range + 2, scaling_param, lcu_offset_y * LCU_WIDTH, height);
+
+  int src_width = range[1] - range[0] + 1;
+  int src_height = range[3] - range[2] + 1;
+
+  //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
+  state->layer->img_job_param.src_buffer = kvz_newYuvBuffer(src_width, src_height, ctrl->chroma_format, 0);
+  state->layer->img_job_param.ver_tmp_buffer = kvz_newYuvBuffer(width, src_height, ctrl->chroma_format, 0);
+  state->layer->img_job_param.trgt_buffer = kvz_newYuvBuffer(width, height, ctrl->chroma_format, 0);
+  
 
   state->layer->img_job_param.param = NULL;
   state->layer->img_job_param.pic_in = NULL;
@@ -261,11 +274,12 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
     for (int i = 0; i < num_jobs_ver; ++i) {
       kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[i]);
       kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[i]);
-    }
-    kvz_deallocateYuvBuffer(state->layer->img_job_param.src_buffer);
-    kvz_deallocateYuvBuffer(state->layer->img_job_param.ver_tmp_buffer);
-    kvz_deallocateYuvBuffer(state->layer->img_job_param.trgt_buffer);
+    }  
   }
+
+  kvz_deallocateYuvBuffer(state->layer->img_job_param.src_buffer);
+  kvz_deallocateYuvBuffer(state->layer->img_job_param.ver_tmp_buffer);
+  kvz_deallocateYuvBuffer(state->layer->img_job_param.trgt_buffer);
 
   FREE_POINTER(state->layer->image_ver_scaling_jobs);
   FREE_POINTER(state->layer->image_hor_scaling_jobs);
@@ -458,9 +472,10 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
 
     // ***********************************************
     // Modified for SHVC.
+    //TODO: Tile allocates another layer, so could save some memory by not allocating unecessary stuff
     if (encoder->layer.layer_id > 0) {
       child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
-      if (!child_state->layer || !encoder_state_config_layer_init(child_state)) {
+      if (!child_state->layer || !encoder_state_config_layer_init(child_state, 0, 0, encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu, &encoder->layer.upscaling)) {
         fprintf(stderr, "Could not initialize encoder_state->layer!\n");
         return 0;
       }
@@ -609,7 +624,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
 
         // ***********************************************
         // Modified for SHVC.
-        new_child->layer = child_state->layer;
+        new_child->layer = encoder->layer.layer_id > 0 ? MALLOC(encoder_state_config_layer_t, 1) : child_state->layer;//child_state->layer;
 
         // ***********************************************
         
@@ -617,6 +632,16 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           fprintf(stderr, "Could not initialize encoder_state->tile!\n");
           return 0;
         }
+
+        // ***********************************************
+        // Modified for SHVC.
+        if (encoder->layer.layer_id > 0) {
+          if (!new_child->layer || !encoder_state_config_layer_init(new_child, lcu_offset_x, lcu_offset_y, width, height, width_in_lcu, height_in_lcu, &encoder->layer.upscaling)) {
+            fprintf(stderr, "Could not initialize encoder_state->layer!\n");
+            return 0;
+          }
+        }
+        // ***********************************************
       }
       
       if (new_child) {
