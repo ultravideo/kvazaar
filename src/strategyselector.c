@@ -26,9 +26,6 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#elif MACOS
-#include <sys/param.h>
-#include <sys/sysctl.h>
 #else
 #include <unistd.h>
 #endif
@@ -423,7 +420,9 @@ static int altivec_available(void)
 #  elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/param.h>
 #include <sys/sysctl.h>
+#ifndef __APPLE__
 #include <machine/cpu.h>
+#endif
 
 static int altivec_available(void)
 {
