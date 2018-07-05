@@ -23,6 +23,9 @@ test-asan:
     # LeakSanitizer doesn't work inside the container because it requires
     # ptrace so we disable it.
     ASAN_OPTIONS: 'detect_leaks=0'
+    # AddressSanitizer adds some extra symbols so we expect a failure from
+    # the external symbols test.
+    XFAIL_TESTS: test_external_symbols.sh
 
 test-tsan:
   <<: *test-template
