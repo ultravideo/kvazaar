@@ -398,6 +398,24 @@ void kvz_cu_array_upsampling_src_range( int32_t range[2], uint32_t lcu_low, uint
 
 }
 
+// Make a shallow copy from src to dst, while properly handling reference counting
+void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const dst, const kvz_cua_upsampling_parameter_t * const src)
+{
+  kvz_cu_array_free(&dst->base_cua);
+  kvz_cu_array_free(&dst->out_cua);
+  dst->base_cua = kvz_cu_array_copy_ref(src->base_cua);
+  dst->out_cua = kvz_cu_array_copy_ref(dst->out_cua);
+
+  dst->nw_in_lcu = src->nw_in_lcu;
+  dst->nh_in_lcu = src->nh_in_lcu;
+  dst->mv_scale[0] = src->mv_scale[0];
+  dst->mv_scale[1] = src->mv_scale[1];
+  dst->cu_pos_scale[0] = src->cu_pos_scale[0];
+  dst->cu_pos_scale[1] = src->cu_pos_scale[1];
+  dst->only_init = src->only_init;
+  dst->lcu_ind = src->lcu_ind;
+}
+
 #undef IND2X
 #undef IND2Y
 // ***********************************************

@@ -934,4 +934,21 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   return pic_out;
 }
 
+void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src)
+{
+  kvz_image_free(dst->pic_in);
+  kvz_image_free(dst->pic_out);
+  dst->pic_in = kvz_image_copy_ref(src->pic_in);
+  dst->pic_out = kvz_image_copy_ref(src->pic_out);
+
+  dst->src_buffer = src->src_buffer;
+  dst->ver_tmp_buffer = src->ver_tmp_buffer;
+  dst->trgt_buffer = src->trgt_buffer;
+  dst->block_x = src->block_x;
+  dst->block_y = src->block_y;
+  dst->block_width = src->block_width;
+  dst->block_height = src->block_height;
+  dst->param = src->param;
+}
+
 // ***********************************************

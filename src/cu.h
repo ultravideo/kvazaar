@@ -241,6 +241,9 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua,
 
 //Return the pixel range that the upsampling function uses in the source
 void kvz_cu_array_upsampling_src_range(int32_t range[2], uint32_t lcu_low, uint32_t lcu_high, uint32_t src_size, int32_t cu_pos_scale);
+
+// Make a shallow copy from src to dst, while properly handling reference counting
+void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const dst, const kvz_cua_upsampling_parameter_t * const src);
 // ***********************************************
     
 
