@@ -37,9 +37,6 @@
 #include "tables.h"
 #include "threadqueue.h"
 
-#define SAO_BUF_WIDTH (LCU_WIDTH + SAO_DELAY_PX + 2)
-#define SAO_BUF_WIDTH_C (SAO_BUF_WIDTH / 2)
-
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -250,10 +247,18 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
 {
   videoframe_t *const frame = state->tile->frame;
 
-  // Temporary buffers for SAO input pixels.
-  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
-  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C];
-  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C];
+
+  // Temporary buffers for SAO input pixels. The buffers cover the pixels
+  // inside the LCU (LCU_WIDTH x LCU_WIDTH), SAO_DELAY_PX wide bands to the
+  // left and above the LCU, and one pixel border on the left and top
+  // sides. We add two extra pixels to the buffers because the AVX2 SAO
+  // reconstruction reads up to two extra bytes when using edge SAO in the
+  // horizontal direction.
+#define SAO_BUF_WIDTH   (1 + SAO_DELAY_PX   + LCU_WIDTH)
+#define SAO_BUF_WIDTH_C (1 + SAO_DELAY_PX/2 + LCU_WIDTH_C)
+  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH   * SAO_BUF_WIDTH   + 2];
+  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
+  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
 
   // Pointers to the top-left pixel of the LCU in the buffers.
   kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
