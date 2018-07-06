@@ -204,6 +204,7 @@ typedef struct encoder_state_config_layer_t {
   kvz_image_scaling_parameter_t img_job_param; //Hold parameters given to scaling jobs
   kvz_cua_upsampling_parameter_t cua_job_param; //Hold parameters passed to cua upsampling jobs
   
+  uint8_t scaling_started; //Flag for telling if scaling has been started
 } encoder_state_config_layer_t;
 // ***********************************************
 

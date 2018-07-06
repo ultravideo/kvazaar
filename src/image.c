@@ -941,9 +941,13 @@ void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst
   dst->pic_in = kvz_image_copy_ref(src->pic_in);
   dst->pic_out = kvz_image_copy_ref(src->pic_out);
 
+  kvz_deallocateYuvBuffer(dst->src_buffer);
+  kvz_deallocateYuvBuffer(dst->ver_tmp_buffer);
+  kvz_deallocateYuvBuffer(dst->trgt_buffer);
   dst->src_buffer = src->src_buffer;
   dst->ver_tmp_buffer = src->ver_tmp_buffer;
   dst->trgt_buffer = src->trgt_buffer;
+
   dst->block_x = src->block_x;
   dst->block_y = src->block_y;
   dst->block_width = src->block_width;

@@ -753,6 +753,22 @@ static void add_ilr_frames(encoder_state_t *state)
   }
 }
 
+// Scale tile specified area
+static void block_step_scaling(encoder_state_t * const state )
+{
+  //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
+  kvz_image_scaling_parameter_t * const param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
+  kvz_copy_image_scaling_parameters(param, &state->layer->img_job_param);
+  param->block_x = state->tile->offset_x;
+  param->block_y = state->tile->offset_y;
+  param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
+  param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
+
+  kvz_block_step_scaler_worker(param);
+
+  state->layer->scaling_started = 1;
+
+}
 
 // Start the block step scaling job(s) for the given state
 static void start_block_step_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
@@ -899,6 +915,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     break;
   }
   }//END switch
+
+  state->layer->scaling_started = 1;
 }
 
 
@@ -912,8 +930,11 @@ static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_i
 
   //If no scaling needs to be done, just return pic_in
   if (skip_same && param->src_height == param->trgt_height && param->src_width == param->trgt_width) {
+    state->layer->scaling_started = 1;
     return kvz_image_copy_ref(pic_in);
   }
+
+  state->layer->scaling_started = 0;
 
   //Prepare img_job_param.
   state->layer->img_job_param.param = param;
@@ -952,6 +973,18 @@ static void tile_cu_array_upsampling_worker(void *opaque_param)
     kvz_cu_array_upsampling_worker(tmp_param);
   }
 
+}
+
+//Scale tile specified part of cua
+static void cua_lcu_scaling( encoder_state_t * const state )
+{
+  state->layer->cua_job_param.tile = state->tile;
+  state->layer->cua_job_param.lcu_order = state->lcu_order;
+  state->layer->cua_job_param.lcu_order_count = state->lcu_order_count;
+
+  tile_cu_array_upsampling_worker(&state->layer->cua_job_param);
+
+  state->layer->scaling_started = 1;
 }
 
 // Start the cu array scaling job for the given state
@@ -1055,6 +1088,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
   }
   }//END switch
 
+  state->layer->scaling_started = 1;
 }
 
 
@@ -1063,9 +1097,11 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t * const state, const int32_t mv_scale[2], const int32_t pos_scale[2], const uint8_t skip_same)
 {
   if (skip_same && pos_scale[0] == POS_SCALE_FAC_1X && pos_scale[1] == POS_SCALE_FAC_1X) {
-
+    state->layer->scaling_started = 1;
     return kvz_cu_array_copy_ref(state->ILR_state->tile->frame->cu_array);
   }
+
+  state->layer->scaling_started = 0;
 
   //Allocate the new cua.
   uint32_t n_width = state->tile->frame->width_in_lcu * LCU_WIDTH;
@@ -1125,6 +1161,7 @@ static void prepare_ilr_frames(encoder_state_t * const state)
         state->tile->frame->height_in_lcu,
         mv_scale, pos_scale, 1,
         !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet 
+      state->layer->scaling_started = 1;
     }
 
     if (ilr_rec == NULL || scaled_pic == NULL || scaled_cu == NULL) {
@@ -1823,13 +1860,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   if (!use_parallel_encoding) {
     //*********************************************
     //For scalable extension.
-    //Need to wait here for ilr rec and cua scaling to finish if they are done in a thread
-    if (state->tqj_ilr_rec_scaling_done != NULL)
-    {
-      kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
-    }
-    if (state->tqj_ilr_cua_upsampling_done != NULL) {
-      kvz_threadqueue_waitfor(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
+    // Need to check if scaling jobs have been started. If not, need to do scaling first. 
+    if( !state->layer->scaling_started ){
+      block_step_scaling(state);
+      cua_lcu_scaling(state);
     }
     //*********************************************
 
@@ -2055,8 +2089,11 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //Propagate layer scaling parameters to children
       //TODO: Could use subimage/array for out/in(?) images/cua?
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
-        kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+        //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+        sub_state->layer->img_job_param.pic_in = main_state->layer->img_job_param.pic_in;
+        sub_state->layer->img_job_param.pic_out = main_state->layer->img_job_param.pic_out;
         kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
+        sub_state->layer->scaling_started = main_state->layer->scaling_started;
       }
       //*********************************************
 

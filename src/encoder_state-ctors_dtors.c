@@ -254,6 +254,8 @@ static int encoder_state_config_layer_init(encoder_state_t * const state, const 
   state->layer->cua_job_param.lcu_order = NULL;
   state->layer->cua_job_param.lcu_order_count = 0;
 
+  state->layer->scaling_started = 0;
+
   return 1;
 }
 
