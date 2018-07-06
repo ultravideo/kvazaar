@@ -404,7 +404,7 @@ void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const d
   kvz_cu_array_free(&dst->base_cua);
   kvz_cu_array_free(&dst->out_cua);
   dst->base_cua = kvz_cu_array_copy_ref(src->base_cua);
-  dst->out_cua = kvz_cu_array_copy_ref(dst->out_cua);
+  dst->out_cua = kvz_cu_array_copy_ref(src->out_cua);
 
   dst->nw_in_lcu = src->nw_in_lcu;
   dst->nh_in_lcu = src->nh_in_lcu;
@@ -414,6 +414,10 @@ void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const d
   dst->cu_pos_scale[1] = src->cu_pos_scale[1];
   dst->only_init = src->only_init;
   dst->lcu_ind = src->lcu_ind;
+
+  dst->tile = src->tile;
+  dst->lcu_order = src->lcu_order;
+  dst->lcu_order_count = src->lcu_order_count;
 }
 
 #undef IND2X

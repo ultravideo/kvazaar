@@ -219,6 +219,11 @@ typedef struct {
 
   int32_t lcu_ind; //-1 for all lcu, else just the lcu given lcu_ind
 
+  //Use for looping over a tile
+  const void *tile;
+  const void *lcu_order;
+  uint32_t lcu_order_count;
+
 } kvz_cua_upsampling_parameter_t;
 
 /**

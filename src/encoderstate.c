@@ -904,7 +904,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
 //Do necessary preparations for deferred scaling.
 //Actual scaling jobs are started later
-static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
+static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t * const state, const uint8_t skip_same)
 {
   if (pic_in == NULL) {
     return NULL;
@@ -933,12 +933,78 @@ static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_i
   return kvz_image_copy_ref(state->layer->img_job_param.pic_out);
 }
 
+//Loop over a tile
+//TODO: make a proper implementation that doesn't just call kvz_cu_array_upsampling_worker
+static void tile_cu_array_upsampling_worker(void *opaque_param)
+{
+  kvz_cua_upsampling_parameter_t *param = opaque_param;
+
+  for (int i = 0; i < param->lcu_order_count; i++) {
+    kvz_cua_upsampling_parameter_t *tmp_param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
+    kvz_copy_cua_upsampling_parameters(tmp_param, param);
+    int tile_x = ((encoder_state_config_tile_t*)param->tile)->lcu_offset_x;
+    int tile_y = ((encoder_state_config_tile_t*)param->tile)->lcu_offset_y;
+    tmp_param->lcu_ind = ((lcu_order_element_t*)param->lcu_order)[i].id + tile_x + tile_y * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
+    tmp_param->lcu_order = NULL;
+    tmp_param->tile = NULL;
+    tmp_param->lcu_order_count = 0;
+
+    kvz_cu_array_upsampling_worker(tmp_param);
+  }
+
+}
 
 // Start the cu array scaling job for the given state
-static void start_cua_lcu_scaling_job(encoder_state_t *state, const lcu_order_element_t * const lcu)
+static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
 {
   const kvz_cua_upsampling_parameter_t * const state_param = &state->layer->cua_job_param;
   switch (state->type) {
+  case ENCODER_STATE_TYPE_TILE:
+  {
+    int block_x = state->tile->offset_x + lcu->position_px.x;
+    int block_y = state->tile->offset_y + lcu->position_px.y;
+    int block_width = lcu->size.x;
+    int block_height = lcu->size.y;
+    int src_width = state_param->base_cua->width;
+    int src_height = state_param->base_cua->height;
+
+    state->layer->cua_job_param.tile = state->tile;
+    state->layer->cua_job_param.lcu_order = state->lcu_order;
+    state->layer->cua_job_param.lcu_order_count = state->lcu_order_count;
+
+    kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);
+    state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_job_create(tile_cu_array_upsampling_worker, (void*)state_param);
+
+    //Calculate (vertical/horizontal) range of scaling
+    int range[4]; //Range of blocks needed for scaling
+    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, src_width, state_param->cu_pos_scale[0]); //Width  
+    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height, src_height, state_param->cu_pos_scale[1]); //Height
+
+    for (int i = 0; i < state->num_ILR_states; i++) {
+      encoder_state_t *ilr_state = &state->ILR_state[i];
+      int ilr_tile_x = ilr_state->tile->offset_x;
+      int ilr_tile_y = ilr_state->tile->offset_y;
+      int ilr_tile_width = ilr_state->tile->frame->width;
+      int ilr_tile_height = ilr_state->tile->frame->height;
+      int block_x = range[0];
+      int block_y = range[2];
+      int block_width = range[1] - range[0] + 1;
+      int block_height = range[3] - range[2] + 1;
+
+      if (ilr_state->tqj_recon_done != NULL
+        && ABS((block_x << 1) + block_width - (ilr_tile_x << 1) - ilr_tile_width) < block_width + ilr_tile_width
+        && ABS((block_y << 1) + block_height - (ilr_tile_y << 1) - ilr_tile_height) < block_height + ilr_tile_height) {
+        //Areas intersect so add a dependency to ilr tile recon done
+        kvz_threadqueue_job_dep_add(state->tqj_ilr_cua_upsampling_done, ilr_state->tqj_recon_done);
+      }
+    }
+
+    //Dependencies added so submit the job
+    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_cua_upsampling_done);
+
+    break;
+  }
+
   case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
   {
     //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
@@ -962,7 +1028,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t *state, const lcu_order_el
     kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, src_width, param->cu_pos_scale[0]); //Width  
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height, src_height, param->cu_pos_scale[1]); //Height
 
-                                                                                                                        //Map the pixel range to LCU pos
+    //Map the pixel range to LCU pos
     range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
     range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
     range[2] = range[2] / LCU_WIDTH;
@@ -994,7 +1060,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t *state, const lcu_order_el
 
 //Do necessary preparations for deferred scaling.
 //Actual scaling jobs are started later
-static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same)
+static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t * const state, const int32_t mv_scale[2], const int32_t pos_scale[2], const uint8_t skip_same)
 {
   if (skip_same && pos_scale[0] == POS_SCALE_FAC_1X && pos_scale[1] == POS_SCALE_FAC_1X) {
 
@@ -1030,7 +1096,7 @@ static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t *state, i
 * - Add ilr frame to the ref list if ilr is enabled
 * - Prepare scaling jobs if threads are used or do scaling
 */
-static void prepare_ilr_frames(encoder_state_t *state)
+static void prepare_ilr_frames(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
     //TODO: Account for adding several ILR frames. Should ilr rec ever bee NULL?
