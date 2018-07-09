@@ -784,6 +784,8 @@ void kvz_block_step_scaler_worker(void * opaque_param)
     int cp_block_y = in_param->block_y;
     int cp_block_width = range[3] - cp_block_x + 1;
     int cp_block_height = in_param->block_height;
+    int hor_block_y = in_param->block_y;
+    int hor_block_height = in_param->block_height;
 
     if(pic_out != NULL ){
       if (in_param->block_y - in_param->block_height < 0) {
@@ -796,12 +798,15 @@ void kvz_block_step_scaler_worker(void * opaque_param)
       }
       cp_block_y = range[1] + 1;
       cp_block_height = range[3] - cp_block_y + 1;
+      hor_block_y = range[2];
+      hor_block_height = range[3] - range[2] + 1;
     }
 
     //Copy from in_pic to the src buffer
     kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_block_x, cp_block_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
 
-    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 0)) {
+    //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
+    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {  
       //TODO: Do error stuff?
       kvz_image_free(pic_in);
       kvz_image_free(pic_out);
@@ -855,20 +860,21 @@ void kvz_tile_step_scaler_worker(void * opaque_param)
     kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
     
     int cp_block_x = range[0];
-    int cp_block_y = in_param->block_y;
+    int hor_block_y = in_param->block_y;
     int cp_block_width = range[1] - cp_block_x + 1;
-    int cp_block_height = in_param->block_height;
+    int hor_block_height = in_param->block_height;
 
     if (pic_out != NULL) {
       kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
-      cp_block_y = range[0];
-      cp_block_height = range[1] - cp_block_y + 1;
+      hor_block_y = range[0];
+      hor_block_height = range[1] - hor_block_y + 1;
     }
 
     //Copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
-    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, 0, 0, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
+    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, 0, 0, cp_block_x, hor_block_y, cp_block_width, hor_block_height, w_factor, h_factor);
 
-    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 0)) {
+    //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
+    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {
       //TODO: Do error stuff?
       kvz_image_free(pic_in);
       kvz_image_free(pic_out);

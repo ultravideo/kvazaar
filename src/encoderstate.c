@@ -764,7 +764,7 @@ static void block_step_scaling(encoder_state_t * const state )
   param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
   param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
 
-  kvz_block_step_scaler_worker(param);
+  kvz_tile_step_scaler_worker(param);
 
   state->layer->scaling_started = 1;
 
