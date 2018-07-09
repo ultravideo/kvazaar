@@ -773,6 +773,11 @@ static void block_step_scaling(encoder_state_t * const state )
 // Start the block step scaling job(s) for the given state
 static void start_block_step_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
 {
+  //If scaling has already been started, no need to do it here anymore
+  if( state->layer == NULL || state->layer->scaling_started ){
+    return;
+  }
+
   const kvz_image_scaling_parameter_t * const state_param = &state->layer->img_job_param;
   switch (state->type) {
   case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
@@ -990,6 +995,11 @@ static void cua_lcu_scaling( encoder_state_t * const state )
 // Start the cu array scaling job for the given state
 static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
 {
+  //If scaling has already been started, no need to do it here anymore
+  if (state->layer == NULL || state->layer->scaling_started) {
+    return;
+  }
+
   const kvz_cua_upsampling_parameter_t * const state_param = &state->layer->cua_job_param;
   switch (state->type) {
   case ENCODER_STATE_TYPE_TILE:
@@ -1999,10 +2009,16 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           //*********************************************
           //For scalable extension.
           //Set scaling job dones for good measure
-          assert(!state->tqj_ilr_rec_scaling_done);
-          assert(!state->tqj_ilr_cua_upsampling_done);
-          state->tqj_ilr_rec_scaling_done = kvz_threadqueue_copy_ref(state->layer->image_ver_scaling_jobs[lcu->id]);
-          state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_copy_ref(state->layer->cua_scaling_jobs[lcu->id]);
+          if (state->layer != NULL) {
+            assert(!state->tqj_ilr_rec_scaling_done);
+            assert(!state->tqj_ilr_cua_upsampling_done);
+            if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
+              state->tqj_ilr_rec_scaling_done = kvz_threadqueue_copy_ref(state->layer->image_ver_scaling_jobs[lcu->id]);
+            }
+            if (state->layer->cua_scaling_jobs[lcu->id] != NULL) {
+              state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_copy_ref(state->layer->cua_scaling_jobs[lcu->id]);
+            }
+          }
           //*********************************************
         }
       }
