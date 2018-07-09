@@ -2089,11 +2089,13 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //Propagate layer scaling parameters to children
       //TODO: Could use subimage/array for out/in(?) images/cua?
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
-        //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
-        sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
-        sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
-        sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
-        kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
+        if (!main_state->layer->scaling_started) {
+          //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+          sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
+          sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
+          sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
+          kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
+        }
         sub_state->layer->scaling_started = main_state->layer->scaling_started;
       }
       //*********************************************
