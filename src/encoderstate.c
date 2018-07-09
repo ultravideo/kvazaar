@@ -1861,7 +1861,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     //*********************************************
     //For scalable extension.
     // Need to check if scaling jobs have been started. If not, need to do scaling first. 
-    if( !state->layer->scaling_started ){
+    if( state->layer != NULL && !state->layer->scaling_started ){
       block_step_scaling(state);
       cua_lcu_scaling(state);
     }
