@@ -2092,6 +2092,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
         sub_state->layer->img_job_param.pic_in = main_state->layer->img_job_param.pic_in;
         sub_state->layer->img_job_param.pic_out = main_state->layer->img_job_param.pic_out;
+        sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
         kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
         sub_state->layer->scaling_started = main_state->layer->scaling_started;
       }
