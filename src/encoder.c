@@ -347,11 +347,15 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 
   }
 
-  encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || encoder->cfg.roi.dqps;
-
   // NOTE: When tr_depth_inter is equal to 0, the transform is still split
   // for SMP and AMP partition units.
   encoder->tr_depth_inter = 0;
+
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps) {
+    encoder->max_qp_delta_depth = 0;
+  } else {
+    encoder->max_qp_delta_depth = -1;
+  }
 
   //Tiles
   encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||

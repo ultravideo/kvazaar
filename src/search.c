@@ -138,6 +138,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->type      = cu->type;
       to->depth     = cu->depth;
       to->part_size = cu->part_size;
+      to->qp        = cu->qp;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -413,6 +414,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->tr_depth = depth > 0 ? depth : 1;
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
+  cur_cu->qp = state->qp;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.

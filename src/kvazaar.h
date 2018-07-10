@@ -323,6 +323,7 @@ typedef struct kvz_config
   uint8_t *optional_key;
 
   enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
+  int32_t intra_rdo_et; /*!< \since 4.1.0 \brief Use early termination in intra rdo. */
 
   int32_t lossless; /*!< \brief Use lossless coding. */
 
