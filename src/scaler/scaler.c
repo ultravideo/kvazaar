@@ -27,6 +27,7 @@
 
 #define SCALER_MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define SCALER_MAX(x,y) (((x) > (y)) ? (x) : (y))
+#define SCALER_CLIP(val, mn, mx) (SCALER_MIN(mx,SCALER_MAX(mn,val)))
 
 #define SCALER_SHIFT(val,shift) (((shift) < 0) ? ((val)>>(-(shift))) : ((val)<<(shift)))
 #define SCALER_ROUND_SHIFT(val,shift) (((shift) < 0) ? SCALER_SHIFT((val)+(1<<(-(shift)))-1,shift) : SCALER_SHIFT(val, shift))
@@ -1132,7 +1133,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
       //Apply filter
       tmp_row[j] = 0;
       for (int k = 0; k < size; k++) {
-        int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_width - 1);
+        int m = SCALER_CLIP(ref_pos + k - (size >> 1) + 1, 0, src_width - 1);
         tmp_row[j] += filter[k] * src_row[m];
       }
     }
@@ -1160,7 +1161,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
       //Apply filter
       tmp_col[j] = 0;
       for (int k = 0; k < size; k++) {
-        int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
+        int m = SCALER_CLIP(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
         tmp_col[j] += filter[k] * src_col[m * buffer->width];
       }
       //TODO: Why? Filter coefs summ up to 128 applied 2x 128*128= 2^14
@@ -1171,7 +1172,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
 
     //Clip and move to buffer data
     for (int n = 0; n < trgt_height; n++) {
-      src_col[n * buffer->width] = clip(tmp_col[n], 0, 255);
+      src_col[n * buffer->width] = SCALER_CLIP(tmp_col[n], 0, 255);
     }
   }
 }
@@ -1254,7 +1255,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
           trgt_row[t_col + trgt_offset] = 0;
         }
 
-        const int s_ind = clip(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
+        const int s_ind = SCALER_CLIP(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
 
         //Move src pointer to correct position (correct column in vertical resampling)
         pic_data_t *src_col = src + (is_vertical ? i_ind : 0);
@@ -1262,7 +1263,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
         if (is_vertical && o_ind == outer_bound - 1) {
-          trgt_row[t_col + trgt_offset] = clip(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
+          trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
         }
       }
     }
@@ -1907,8 +1908,8 @@ static void blockScalingSrcRange( int range[2], const int scale, const int add, 
   range[1] = ((int)((unsigned int)((block_high * scale + add) >> (shift - 4)) - delta) >> 4) - (size >> 1) + size;
 
   //clip the ranges so that they are within the pic
-  range[0] = clip(range[0], 0, src_size - 1);
-  range[1] = clip(range[1], 0, src_size - 1);
+  range[0] = SCALER_CLIP(range[0], 0, src_size - 1);
+  range[1] = SCALER_CLIP(range[1], 0, src_size - 1);
 
 }
 
