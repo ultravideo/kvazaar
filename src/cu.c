@@ -257,7 +257,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
   //Loop over LCUs/CTUs
   //uint32_t frame_lcu_stride = nw_in_lcu;
   //If lcu ind is -1 then go through all lcu, else just do one lcu
-  uint32_t num_lcu_in_frame = lcu_ind > -1 ? 1 : nw_in_lcu * nh_in_lcu;
+  uint32_t num_lcu_in_frame = lcu_ind > -1 ? lcu_ind + 1 : nw_in_lcu * nh_in_lcu;
   for ( lcu_ind = lcu_ind > -1 ? lcu_ind : 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
     uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,n_width);//(lcu_ind * LCU_WIDTH) % cua->width;
     uint32_t lcu_y = IND2Y(lcu_ind,LCU_WIDTH,nw_in_lcu);//(lcu_ind * LCU_WIDTH) / frame_lcu_stride; 
