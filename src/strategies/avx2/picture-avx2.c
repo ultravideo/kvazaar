@@ -717,6 +717,134 @@ static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel
   }
 }
 
+static void inter_recon_bipred_no_mov_avx2(
+ const int height,
+ const int width,
+ const int ypos,
+ const int xpos,
+ const hi_prec_buf_t*high_precision_rec0,
+ const hi_prec_buf_t*high_precision_rec1,
+ lcu_t* lcu,
+ kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
+ kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
+ kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C]) {
+
+ int y_in_lcu, x_in_lcu;
+ __m256i sample0_epi8, sample1_epi8, temp_y_epi8;
+
+ for (int temp_y = 0; temp_y < height; temp_y += 1) {
+  y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+
+  for (int temp_x = 0; temp_x < width; temp_x += 32) {
+
+   x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+
+   sample0_epi8 = _mm256_loadu_si256((__m256i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu]));
+   sample1_epi8 = _mm256_loadu_si256((__m256i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]));
+
+   temp_y_epi8 = _mm256_avg_epu8(sample0_epi8, sample1_epi8);
+
+   switch (width)
+   {
+
+   case 4:
+
+    int8_t*temp_int_y = (int8_t*)&temp_y_epi8;
+    for (int i = 0; i < 4; i++) {
+     lcu->rec.u[(y_in_lcu)* LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
+    }
+
+
+   case 8:
+
+    // Store 64-bits from vector to memory
+    _mm_storel_epi64((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_y_epi8));
+
+    break;
+
+   case 16:
+
+    // Store 128-bit to memory
+    _mm_storeu_si128((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_y_epi8));
+
+    break;
+
+   default:
+
+    // Store 256-bit integers to memory
+    _mm256_storeu_si256((__m256i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), temp_y_epi8);
+    break;
+
+   }
+
+   if (temp_x < width >> 1 && temp_y < height >> 1) {
+    y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
+    x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+
+    sample0_epi8 = _mm256_loadu_si256((__m256i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]));
+
+    sample1_epi8 = _mm256_loadu_si256((__m256i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]));
+
+    // (sample1 + sample2 + offset)>>shift 
+    __m256i temp_u_epi8 = _mm256_avg_epu8(sample0_epi8, sample1_epi8);
+
+    sample0_epi8 = _mm256_loadu_si256((__m256i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]));
+
+    sample1_epi8 = _mm256_loadu_si256((__m256i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]));
+
+    // (sample1 + sample2 + offset)>>shift
+    __m256i temp_v_epi8 = _mm256_avg_epu8(sample0_epi8, sample1_epi8);
+
+
+    switch (width)
+    {
+    case 8:
+
+     int8_t*temp_int_u = (int8_t*)&temp_u_epi8;
+     int8_t*temp_int_v = (int8_t*)&temp_v_epi8;
+
+     for (int i = 0; i < 4; i++) {
+      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
+      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
+     }
+
+     break;
+
+    case 16:
+
+     // Store 64-bit integer into memory
+     _mm_storel_epi64((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_u_epi8));
+
+     // Store 64-bit integer into memory
+     _mm_storel_epi64((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_v_epi8));
+
+     break;
+
+    case 32:
+
+     // Fill 128 bit vector with packed data and store it to memory
+     _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_u_epi8));
+
+     // Fill 128 bit vector with packed data and store it to memory
+     _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_v_epi8));
+
+
+     break;
+
+    default:
+     _mm256_storeu_si256((__m256i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), temp_u_epi8);
+     _mm256_storeu_si256((__m256i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), temp_v_epi8);
+
+
+    }
+    y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+   }
+  }
+ }
+
+
+}
+
 
 static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	const int hi_prec_luma_rec1,
@@ -744,127 +872,65 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
  __m256i temp_epi16;
 
  __m256i temp_epi8;
- __m256i temp_y_epi32, temp_u_epi32, temp_v_epi32;
+ __m256i temp_y_epi16;
 
- __m256i temp_epi32_u = _mm256_setzero_si256();
- __m256i temp_epi32_v = _mm256_setzero_si256();
-
- __m256i sample0_epi32;
- __m256i sample1_epi32;
-
- __m256i temp_epi8_u, temp_epi8_v;
-
- __m128i offset_4 = _mm_set1_epi32(offset);
- __m128i sample_epi32;
- __m128i sample0_y_epi32, sample1_y_epi32, sample0_u_epi32, sample1_u_epi32, sample0_v_epi32, sample1_v_epi32;
-
- __m128i final_epi8_128;
-
-
-  switch (width)
-  {
-
-   case 4:
-
-	 x_in_lcu = ((xpos) & ((LCU_WIDTH)-1));
-
-	 for (int temp_y = 0; temp_y < height; ++temp_y) {
-	   y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-
-	   sample0_y_epi32 = hi_prec_luma_rec0 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
-
-	   sample1_y_epi32 = hi_prec_luma_rec1 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
-
-
-	   // (sample1 + sample2 + offset)>>shift 
-	   sample_epi32 = _mm_add_epi32(_mm_add_epi32(sample0_y_epi32, sample1_y_epi32), offset_4);
-	   sample_epi32 = _mm_srai_epi32(sample_epi32, shift);
-
-	   final_epi8_128 = _mm_packus_epi16(_mm_packus_epi32(sample_epi32, sample_epi32), sample_epi32);
-
-      int8_t*temp_int_y = (int8_t*)&final_epi8_128;
-
-	   for (int i = 0; i < 4; i++) {
-		   lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
-	   }
-
-	  //lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = _mm_cvtsi128_si32(final_epi8_128);
-			
-
-	   if (temp_y < height >> 1) {
-
-	     y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
-	     x_in_lcu = (((xpos >> 1)) & (LCU_WIDTH_C - 1));
-
-	   sample0_u_epi32 = hi_prec_chroma_rec0 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))), shift_left);
-
-	   sample1_u_epi32 = hi_prec_chroma_rec1 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))), shift_left);
-
-	   // (sample1 + sample2 + offset)>>shift 
-	   sample_epi32 = _mm_add_epi32(_mm_add_epi32(sample0_u_epi32, sample1_u_epi32), offset_4);
-	   sample_epi32 = _mm_srai_epi32(sample_epi32, shift);
-
-	   __m128i temp_u = _mm_packus_epi16(_mm_packus_epi32(sample_epi32, sample_epi32), sample_epi32);
-	   int8_t*temp_int_u = (int8_t*)&temp_u;
-
-	   sample0_v_epi32 = hi_prec_chroma_rec0 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))), shift_left);
-
-	   sample1_v_epi32 = hi_prec_chroma_rec1 ? _mm_cvtepu16_epi32(_mm_loadl_epi64((__m128i*)&(high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
-		 _mm_slli_epi32(_mm_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))), shift_left);
-
-	   // (sample1 + sample2 + offset)>>shift 
-	   sample_epi32 = _mm_add_epi32(_mm_add_epi32(sample0_v_epi32, sample1_v_epi32), offset_4);
-	   sample_epi32 = _mm_srai_epi32(sample_epi32, shift);
-
-	   __m128i temp_v = _mm_packus_epi16(_mm_packus_epi32(sample_epi32, sample_epi32), sample_epi32);
-	   int8_t*temp_int_v = (int8_t*)&temp_v;
-
-	   for (int i = 0; i < 2; i++) 
-       {
-		 lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
-		 lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
-	   }
-      }
-    }
-	break;
- 
-		
-  default:
+ __m256i sample0_epi16;
+ __m256i sample1_epi16;
 
  int start_point = 0;
-	int start_point_uv = 0;
+ int start_point_uv = 0;
 
- if (hi_prec_luma_rec0 ==0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 &&  hi_prec_chroma_rec1 == 0)
+ if (hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
  {
-  
+  inter_recon_bipred_no_mov_avx2(height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
+ }
+
+ else
+ {
   for (int temp_y = 0; temp_y < height; temp_y += 1) {
    temp_epi32 = _mm256_setzero_si256();
    temp_epi16 = _mm256_setzero_si256();
    int temp = 0;
    int temp_uv = 0;
+   __m256i offset_epi16 = _mm256_set1_epi16(offset);
+   __m256i temp_epi16_u = _mm256_setzero_si256();
+   __m256i temp_epi16_v = _mm256_setzero_si256();
+
    y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
 
-   for (int temp_x = 0; temp_x < width; temp_x += 16) {
 
+   for (int temp_x = 0; temp_x < width; temp_x += 16) {
     x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
 
-    sample0_epi32 = (_mm256_cvtepu8_epi16((_mm_loadu_si128((__m128i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu])))));
+    // Load total of 16 elements from memory to vector
+    sample0_epi16 = hi_prec_luma_rec0 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu])) :
+     _mm256_slli_epi16(_mm256_cvtepu8_epi16((_mm_loadu_si128((__m128i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
 
-    sample1_epi32 = (_mm256_cvtepu8_epi16((_mm_loadu_si128((__m128i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu])))));
+    sample1_epi16 = hi_prec_luma_rec1 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu])) :
+     _mm256_slli_epi16(_mm256_cvtepu8_epi16((_mm_loadu_si128((__m128i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
 
-    temp_y_epi32 = _mm256_avg_epu16(sample0_epi32, sample1_epi32);
+    // (sample1 + sample2 + offset)>>shift 
+    temp_y_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+    temp_y_epi16 = _mm256_add_epi16(temp_y_epi16, offset_epi16);
+    temp_y_epi16 = _mm256_srai_epi16(temp_y_epi16, shift);
 
     switch (width)
     {
+
+    case 4:
+
+     temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
+
+     int8_t*temp_int_y = (int8_t*)&temp_epi8;
+
+     for (int i = 0; i < 4; i++) {
+      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
+     }
     case 8:
 
-     // Pack the bits from 16-bit to 8-bit
-     temp_epi8 = _mm256_packus_epi16(temp_y_epi32, temp_y_epi32);
+     // Pack the bits from 1-bit to 8-bit
+     temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
+
 
      // Store 64-bits from vector to memory
      _mm_storel_epi64((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
@@ -873,31 +939,22 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
     case 16:
 
-     // Pack the bits from 32-bit to 8-bit
-     temp_epi8 = _mm256_packus_epi16(temp_y_epi32, temp_y_epi32);
-
-     temp_epi8 = _mm256_permute4x64_epi64(temp_epi8, 216);
-
-     // Store 128-bit to memory
+     temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_y_epi16, temp_y_epi16), 0b10011100);
      _mm_storeu_si128((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
      break;
 
     default:
      if (temp == 0) {
-      temp_epi32 = temp_y_epi32;
-      temp = 1;
+
+      temp_epi16 = temp_y_epi16;
+      temp++;
+
       start_point = y_in_lcu* LCU_WIDTH + x_in_lcu;
      }
 
      else {
-
-      // Convert packed 16-bit integers to packed 8-bit integers and store result to vector
-      temp_epi8 = _mm256_packus_epi16(temp_epi32, temp_y_epi32);
-
-      // Arrange the vector to right order before inserting it
-      temp_epi8 = _mm256_permute4x64_epi64(temp_epi8, 216);
-
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16, temp_y_epi16), 0b10011100);
 
       // Store 256-bits of integer data into memory
       _mm256_storeu_si256((__m256i*)&(lcu->rec.y[start_point]), temp_epi8);
@@ -909,273 +966,68 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
      x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
 
-     sample0_epi32 = (_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))));
+     sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
+      _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
-     sample1_epi32 = (_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))));
+     sample1_epi16 = hi_prec_chroma_rec1 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
+      _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi32 = _mm256_avg_epu16(sample0_epi32, sample1_epi32);
-
-     sample0_epi32 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])));
-
-     sample1_epi32 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])));
-
-     // (sample1 + sample2 + offset)>>shift
-     temp_v_epi32 = _mm256_avg_epu16(sample0_epi32, sample1_epi32);
-
-
-     switch (width)
-     {
-     case 8:
-
-      temp_epi8_u = _mm256_packus_epi16(temp_u_epi32, temp_u_epi32);
-      temp_epi8_v = _mm256_packus_epi16(temp_v_epi32, temp_v_epi32);
-
-      int8_t*temp_int_u = (int8_t*)&temp_epi8_u;
-      int8_t*temp_int_v = (int8_t*)&temp_epi8_v;
-
-      for (int i = 0; i < 4; i++) {
-       lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
-       lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
-      }
-
-      break;
-
-     case 16:
-      temp_epi8 = _mm256_packus_epi16(temp_u_epi32, temp_u_epi32);
-
-      // Store 64-bit integer into memory
-      _mm_storel_epi64((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
-      temp_epi8 = _mm256_packus_epi16(temp_v_epi32, temp_v_epi32);
-
-      // Store 64-bit integer into memory
-      _mm_storel_epi64((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
-      break;
-
-     case 32:
-
-      // Pack the bits from 32-bit to 8-bit
-      temp_epi8_u = _mm256_packus_epi16(temp_u_epi32, temp_u_epi32);
-      temp_epi8_v = _mm256_packus_epi16(temp_v_epi32, temp_v_epi32);
-
-      temp_epi8_u = _mm256_permute4x64_epi64(temp_epi8_u, 216);
-      temp_epi8_v = _mm256_permute4x64_epi64(temp_epi8_v, 216);
-
-      // Fill 128 bit vector with packed data and store it to memory
-      _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_u));
-
-      // Fill 128 bit vector with packed data and store it to memory
-      _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_v));
-
-
-      break;
-
-     default:
-      if (temp_uv == 0) {
-
-       // Store to temporary vector
-       temp_epi32_u = temp_u_epi32;
-       temp_epi32_v = temp_v_epi32;
-
-       // Save starting point to memory
-       start_point_uv = (y_in_lcu)* LCU_WIDTH_C + x_in_lcu;
-
-       temp_uv = 1;
-      }
-
-      else {
-       // Pack 32 bit to 8 bit
-       temp_epi8_u = _mm256_packus_epi16(temp_epi32_u, temp_u_epi32);
-       temp_epi8_v = _mm256_packus_epi16(temp_epi32_v, temp_v_epi32);
-
-       // Arrange the vector to right order before inserting it
-       temp_epi8_u = _mm256_permute4x64_epi64(temp_epi8_u, 216);
-
-       // Store 256-bits of integer data into memory
-       _mm256_storeu_si256((__m256i*)&(lcu->rec.u[start_point_uv]), temp_epi8_u);
-
-       // Arrange the vector to right order before inserting it
-       temp_epi8_v = _mm256_permute4x64_epi64(temp_epi8_v, 216);
-
-       // Store 256-bits of integer data into memory
-       _mm256_storeu_si256((__m256i*)&(lcu->rec.v[start_point_uv]), temp_epi8_v);
-       temp_uv = 0;
-      }
-     }
-     y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-    }
-   }
-  }
- }
-
- else 
- {
-  for (int temp_y = 0; temp_y < height; temp_y += 1) {
-   temp_epi32 = _mm256_setzero_si256();
-   temp_epi16 = _mm256_setzero_si256();
-   int temp = 0;
-   int temp_uv = 0;
-   __m256i idx = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
-   __m256i offset_epi32 = _mm256_set1_epi32(offset);
-   __m256i zeros_256 = _mm256_setzero_si256();
-   __m256i temp_epi16_u = _mm256_setzero_si256(); 
-   __m256i temp_epi16_v = _mm256_setzero_si256();
-
-
-   for (int temp_x = 0; temp_x < width; temp_x += 8) {
-
-
-    y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-    x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-
-    // Load total of 8 elements from memory to vector and convert all to 32-bit
-    sample0_epi32 = hi_prec_luma_rec0 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu])))) :
-     _mm256_slli_epi32(_mm256_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
-
-    sample1_epi32 = hi_prec_luma_rec1 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu])))) :
-     _mm256_slli_epi32(_mm256_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), shift_left);
-
-    // (sample1 + sample2 + offset)>>shift 
-    temp_y_epi32 = _mm256_add_epi32(sample0_epi32, sample1_epi32);
-    temp_y_epi32 = _mm256_add_epi32(temp_y_epi32, offset_epi32);
-    temp_y_epi32 = _mm256_srai_epi32(temp_y_epi32, shift);
-
-    switch (width)
-    {
-    case 8:
-
-     // Pack the bits from 32-bit to 8-bit
-     temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_y_epi32, zeros_256), zeros_256);
-     temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-
-     // Store 64-bits from vector to memory
-     _mm_storel_epi64((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
-     break;
-
-    case 16:
-
-     if (temp == 0) {
-
-      // Store to temporary vector
-      temp_epi32 = temp_y_epi32;
-      temp++;
-
-      // Save starting point to memory
-      start_point = (y_in_lcu)* LCU_WIDTH + x_in_lcu;
-     }
-
-     else if (temp == 1) {
-
-      // Pack the bits from 32-bit to 8-bit
-      temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_epi32, temp_y_epi32), zeros_256);
-      temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-
-      _mm_storeu_si128((__m128i*)&(lcu->rec.y[start_point]), _mm256_castsi256_si128(temp_epi8));
-
-      temp = 0;
-     }
-
-
-     break;
-
-    default:
-     if (temp == 0) {
-
-      temp_epi32 = temp_y_epi32;
-      temp++;
-
-      start_point = y_in_lcu* LCU_WIDTH + x_in_lcu;
-     }
-
-     else if (temp == 1) {
-
-      // Convert packed 16-bit integers to packed 8-bit integers and store result to vector
-      temp_epi16 = _mm256_packus_epi32(temp_epi32, temp_y_epi32);
-      temp++;
-     }
-
-     else if (temp == 2) {
-      temp_epi32 = temp_y_epi32;
-      temp++;
-     }
-
-     else {
-
-      // Convert packed 32-bit integers to packed 8-bit integers and store result to vector
-      temp_epi8 = _mm256_packus_epi16(temp_epi16, _mm256_packus_epi32(temp_epi32, temp_y_epi32));
-
-      // Arrange the vector to right order before inserting it
-      temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-
-
-      // Store 256-bits of integer data into memory
-      _mm256_storeu_si256((__m256i*)&(lcu->rec.y[start_point]), temp_epi8);
-      temp = 0;
-     }
-    }
-
-    if (temp_x < width >> 1 && temp_y < height >> 1) {
-     y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
-     x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
-
-     sample0_epi32 = hi_prec_chroma_rec0 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))) :
-      _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
-
-     sample1_epi32 = hi_prec_chroma_rec1 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))) :
-      _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
+     __m256i temp_u_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_u_epi16 = _mm256_add_epi16(temp_u_epi16, offset_epi16);
+     temp_u_epi16 = _mm256_srai_epi16(temp_u_epi16, shift);
+
+     sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
+      _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
+
+     sample1_epi16 = hi_prec_chroma_rec1 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
+      _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi32 = _mm256_add_epi32(sample0_epi32, sample1_epi32);
-     temp_u_epi32 = _mm256_add_epi32(temp_u_epi32, offset_epi32);
-     temp_u_epi32 = _mm256_srai_epi16(temp_u_epi32, shift);
-
-     sample0_epi32 = hi_prec_chroma_rec0 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))) :
-      _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
-
-     sample1_epi32 = hi_prec_chroma_rec1 ? (_mm256_cvtepu16_epi32(_mm_load_si128((__m128i*) &(high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])))) :
-      _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
-
-     // (sample1 + sample2 + offset)>>shift 
-     temp_v_epi32 = _mm256_add_epi32(sample0_epi32, sample1_epi32);
-     temp_v_epi32 = _mm256_add_epi32(temp_v_epi32, offset_epi32);
-     temp_v_epi32 = _mm256_srai_epi32(temp_v_epi32, shift);
+     __m256i temp_v_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
+     temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
 
      switch (width) {
 
+     case 4:
+
+      int8_t*temp_int_u = (int8_t*)&temp_u_epi16;
+      int8_t*temp_int_v = (int8_t*)&temp_v_epi16;
+
+      for (int i = 0; i < 2; i++)
+      {
+       lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
+       lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
+      }
+
+
      case 8:
 
-      __m256i temp_epi8_u = _mm256_packus_epi16(_mm256_packus_epi32(temp_u_epi32, zeros_256), zeros_256);
+      __m256i temp_epi8_u = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
       int8_t *temp_int_8_u = (int8_t*)&temp_epi8_u;
 
-      __m256i temp_epi8_v = _mm256_packus_epi16(_mm256_packus_epi32(temp_v_epi32, zeros_256), zeros_256);
+      __m256i temp_epi8_v = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
+
       int8_t *temp_int_8_v = (int8_t*)&temp_epi8_v;
 
-
-
       for (int i = 0; i < 4; i++) {
-         lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_8_u[i];
-         lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_8_v[i];
+       lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_8_u[i];
+       lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_8_v[i];
       }
 
       break;
 
      case 16:
 
-      temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_u_epi32, zeros_256), zeros_256);
-
-      temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
+      temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
       // Store 64-bit integer into memory
       _mm_storel_epi64((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
-      temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_v_epi32, zeros_256), zeros_256);
-
-      temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
+      temp_epi8 = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
 
       // Store 64-bit integer into memory
       _mm_storel_epi64((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
@@ -1184,39 +1036,20 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      case 32:
 
-      if (temp_uv == 0) {
+      temp_epi8_u = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), 0b10011100);
+      _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_u));
 
-       // Store to temporary vector
-       temp_epi32_u = temp_u_epi32;
-       temp_epi32_v = temp_v_epi32;
+      temp_epi8_v = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), 0b10011100);
+      _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_v));
 
-       // Save starting point to memory
-       start_point_uv = (y_in_lcu)* LCU_WIDTH_C + x_in_lcu;
-
-       temp_uv++;
-      }
-
-      else {
-
-       // Pack the bits from 32-bit to 8-bit
-       temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_epi32_u, temp_u_epi32), zeros_256);
-       temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-       _mm_storeu_si128((__m128i*)&(lcu->rec.u[start_point_uv]), _mm256_castsi256_si128(temp_epi8));
-
-       temp_epi8 = _mm256_packus_epi16(_mm256_packus_epi32(temp_epi32_v, temp_v_epi32), zeros_256);
-       temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-       _mm_storeu_si128((__m128i*)&(lcu->rec.v[start_point_uv]), _mm256_castsi256_si128(temp_epi8));
-
-       temp_uv = 0;
-      }
       break;
 
      default:
       if (temp_uv == 0) {
 
        // Store to temporary vector
-       temp_epi32_u = temp_u_epi32;
-       temp_epi32_v = temp_v_epi32;
+       temp_epi16_u = temp_u_epi16;
+       temp_epi16_v = temp_v_epi16;
 
        // Save starting point to memory
        start_point_uv = (y_in_lcu)* LCU_WIDTH_C + x_in_lcu;
@@ -1224,44 +1057,20 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
        temp_uv++;
       }
 
-      else if (temp_uv == 1) {
-
-       // Convert packed 16-bit integers to packed 8-bit integers and store result to vector
-       temp_epi16_u = _mm256_packus_epi32(temp_epi32_u, temp_u_epi32);
-       temp_epi16_v = _mm256_packus_epi32(temp_epi32_v, temp_v_epi32);
-       temp_uv++;
-      }
-
-      else if (temp_uv == 2) {
-
-       temp_epi32_u = temp_u_epi32;
-       temp_epi32_v = temp_v_epi32;
-       temp_uv++;
-      }
-
       else {
-       // Pack 32 bit to 8 bit
-       temp_epi8 = _mm256_packus_epi16(temp_epi16_u, _mm256_packus_epi32(temp_epi32_u, temp_u_epi32));
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), 0b10011100);
 
-       // Arrange the vector to right order before inserting it
-       temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-
-       // Store 256-bits of integer data into memory
        _mm256_storeu_si256((__m256i*)&(lcu->rec.u[start_point_uv]), temp_epi8);
 
-       temp_epi8 = _mm256_packus_epi16(temp_epi16_v, _mm256_packus_epi32(temp_epi32_v, temp_v_epi32));
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), 0b10011100);
 
-       // Arrange the vector to right order before inserting it
-       temp_epi8 = _mm256_permutevar8x32_epi32(temp_epi8, idx);
-
-       // Store 256-bits of integer data into memory
        _mm256_storeu_si256((__m256i*)&(lcu->rec.v[start_point_uv]), temp_epi8);
 
        temp_uv = 0;
+
       }
-
-
      }
+     y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     }
 
 
@@ -1269,7 +1078,6 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
   }
 
  }
-}
 }
 
 #endif //COMPILE_INTEL_AVX2
@@ -1304,7 +1112,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
     success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
-	success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
+	   success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
 
   }
 #endif
