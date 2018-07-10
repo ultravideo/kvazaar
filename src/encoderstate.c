@@ -1060,8 +1060,10 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     int block_height = lcu->size.y;
     int src_width = state_param->base_cua->width;
     int src_height = state_param->base_cua->height;
+    int tile_x = state->tile->lcu_offset_x;
+    int tile_y = state->tile->lcu_offset_y;
 
-    param->lcu_ind = lcu->id;
+    param->lcu_ind = lcu->id + tile_x + tile_y * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
 
     kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[lcu->id]);
     state->layer->cua_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, (void*)param);
