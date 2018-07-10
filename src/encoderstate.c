@@ -606,8 +606,8 @@ static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsamplin
 
         //Calculate (vertical/horizontal) range of scaling
         int range[4]; //Range of blocks needed for scaling
-        kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, src_width, param->cu_pos_scale[0]); //Width  
-        kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height, src_height, param->cu_pos_scale[1]); //Height
+        kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, param->cu_pos_scale[0]); //Width  
+        kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
 
                                                                                                                            //Map the pixel range to LCU pos
         range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
@@ -1020,8 +1020,8 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 
     //Calculate (vertical/horizontal) range of scaling
     int range[4]; //Range of blocks needed for scaling
-    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, src_width, state_param->cu_pos_scale[0]); //Width  
-    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height, src_height, state_param->cu_pos_scale[1]); //Height
+    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, state_param->cu_pos_scale[0]); //Width  
+    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, state_param->cu_pos_scale[1]); //Height
 
     for (int i = 0; i < state->num_ILR_states; i++) {
       encoder_state_t *ilr_state = &state->ILR_state[i];
@@ -1068,8 +1068,8 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 
     //Calculate (vertical/horizontal) range of scaling
     int range[4]; //Range of blocks needed for scaling
-    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width, src_width, param->cu_pos_scale[0]); //Width  
-    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height, src_height, param->cu_pos_scale[1]); //Height
+    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, param->cu_pos_scale[0]); //Width  
+    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
 
     //Map the pixel range to LCU pos
     range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
