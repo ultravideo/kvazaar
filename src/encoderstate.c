@@ -766,7 +766,7 @@ static void block_step_scaling(encoder_state_t * const state )
 
   kvz_tile_step_scaler_worker(param);
 
-  state->layer->scaling_started = 1;
+  //state->layer->scaling_started = 1;
 
 }
 
@@ -774,9 +774,9 @@ static void block_step_scaling(encoder_state_t * const state )
 static void start_block_step_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
 {
   //If scaling has already been started, no need to do it here anymore
-  if( state->layer == NULL || state->layer->scaling_started ){
-    return;
-  }
+  //if( state->layer == NULL || state->layer->scaling_started ){
+  //  return;
+  //}
 
   const kvz_image_scaling_parameter_t * const state_param = &state->layer->img_job_param;
   switch (state->type) {
@@ -921,7 +921,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
   }
   }//END switch
 
-  state->layer->scaling_started = 1;
+  //state->layer->scaling_started = 1;
 }
 
 
@@ -989,16 +989,16 @@ static void cua_lcu_scaling( encoder_state_t * const state )
 
   tile_cu_array_upsampling_worker(&state->layer->cua_job_param);
 
-  state->layer->scaling_started = 1;
+  //state->layer->scaling_started = 1;
 }
 
 // Start the cu array scaling job for the given state
 static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
 {
   //If scaling has already been started, no need to do it here anymore
-  if (state->layer == NULL || state->layer->scaling_started) {
-    return;
-  }
+  //if (state->layer == NULL || state->layer->scaling_started) {
+  //  return;
+  //}
 
   const kvz_cua_upsampling_parameter_t * const state_param = &state->layer->cua_job_param;
   switch (state->type) {
@@ -1098,7 +1098,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
   }
   }//END switch
 
-  state->layer->scaling_started = 1;
+  //state->layer->scaling_started = 1;
 }
 
 
@@ -1874,6 +1874,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     if( state->layer != NULL && !state->layer->scaling_started ){
       block_step_scaling(state);
       cua_lcu_scaling(state);
+      state->layer->scaling_started = 1; //Propably no need to set it here, but shouldn't hurt either. Only set if one wavefront row or using tiles in which case layer struct should be separate.
     }
     //*********************************************
 
@@ -1962,15 +1963,18 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         if (state->ILR_state != NULL) {
 
           //Set up scaling jobs
-          start_block_step_scaling_job(state, lcu);
-          start_cua_lcu_scaling_job(state, lcu);
+          if (state->layer != NULL && !state->layer->scaling_started) {
+            start_block_step_scaling_job(state, lcu);
+            start_cua_lcu_scaling_job(state, lcu);
+            //Don't set scaling started to true here since it prevents scaling in other lcu and wavefront rows
+          }
 
           //Add a direct dependecy from ilr states wf_job to this (only for SNR)
           if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
             state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
             state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
             kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[lcu->id]);
-          } else {
+          } else if(state->layer != NULL) {
             if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
               kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
             }
@@ -1980,7 +1984,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           }
         } 
 
-        //TODO: Remove
+        
         ////should be enough to add it to the first only?
         //if (i == 0) {
         //  encoder_state_t* parent = NULL;
@@ -2152,8 +2156,11 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           //*********************************************
           //For scalable extension.
           //Set up scaling jobs
-          start_block_step_scaling_job(&main_state->children[i], NULL);
-          start_cua_lcu_scaling_job(&main_state->children[i], NULL);
+          if (main_state->children[i].layer != NULL && !main_state->children[i].layer->scaling_started) {
+            start_block_step_scaling_job(&main_state->children[i], NULL);
+            start_cua_lcu_scaling_job(&main_state->children[i], NULL);
+            main_state->children[i].layer->scaling_started = 1; //Signal scaling started. Each tile should have its own layer struct so does not interfere with other tiles
+          }
 
           //Add dependency to ilr recon upscaling and cua upsampling
           if (main_state->children[i].tqj_ilr_rec_scaling_done != NULL) {
