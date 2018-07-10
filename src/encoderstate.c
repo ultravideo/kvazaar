@@ -87,7 +87,7 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
       state->children[i].num_ILR_states = 0; //range[1] - range[0];
 
       //Count children
-      for (int i = 0; state->ILR_state->children[i].encoder_control; ++i){
+      for (int j = 0; state->ILR_state->children[j].encoder_control; ++j){
         state->children[i].num_ILR_states++;
       }      
 
@@ -1078,6 +1078,12 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
     range[2] = range[2] / LCU_WIDTH;
     range[3] = (range[3] + LCU_WIDTH - 1) / LCU_WIDTH;
+
+    //TODO: Figure out correct dependency. For now do overkill and hope it works
+    //range[2] = MAX(0, range[2] - 1); //0;
+    range[3] = MIN(range[3] + 1, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
+    //range[0] = MAX(0, range[0] - 1); //0;
+    range[1] = MIN(range[1] + 1, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
 
     //Add dependencies to ilr states
     for (int j = range[2]; j < range[3]; j++) {

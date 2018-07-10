@@ -388,10 +388,10 @@ void kvz_cu_array_upsampling_src_range( int32_t range[2], uint32_t lcu_low, uint
     return;
   }
   
-  uint8_t block_size = 16;
+  uint32_t block_size = 16;
 
-  range[0] = ((SCALE_POS_COORD(lcu_low + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
-  range[1] = ((SCALE_POS_COORD(lcu_high + (int32_t)(block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
+  range[0] = ((SCALE_POS_COORD(lcu_low + (block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
+  range[1] = ((SCALE_POS_COORD(lcu_high + (block_size >> 1), cu_pos_scale) + 4) >> 4) << 4;
 
   range[0] = CLIP(0, src_size - 1, range[0]);
   range[1] = CLIP(0, src_size - 1, range[1]);
