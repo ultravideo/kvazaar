@@ -151,23 +151,28 @@ static void encode_transform_unit(encoder_state_t * const state,
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
     // the last transform unit.
+    // TODO: in case of 444, the 4x4 chroma blocks are coded right after corresponding 4x4 luma block
+    // Based on the pics in ref they're supposed to go "on top", which is impossible to do as is, 
+    // so my best guess is to do them right after
     if (x % 8 == 0 || y % 8 == 0) {
       // Not the last luma transform block so there is nothing more to do.
-      return;
-    } else {
+      if (state->tile->frame->source->chroma_format != KVZ_CSP_444) {
+        return;
+      }
+    }
       // Time to to code the chroma transform blocks. Move to the top-left
       // corner of the block.
       x -= 4;
       y -= 4;
       cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
-    }
+    
   }
 
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    int x_local = (x >> SHIFT) % LCU_WIDTH_C;
-    int y_local = (y >> SHIFT) % LCU_WIDTH_C;
+    int x_local = (x >> SHIFT) % (LCU_WIDTH_C);
+    int y_local = (y >> SHIFT) % (LCU_WIDTH_C);
     scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
     const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];

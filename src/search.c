@@ -352,7 +352,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
   const vector2d_t lcu_px = { x_px >> SHIFT, y_px >> SHIFT };
-#if 0 // TODO: 444 might cause issues. 
+#if 0 // 444: might cause issues. 
   //Just write this as the luma version and that might fix them (and be prettier)?
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
 #endif
@@ -362,7 +362,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
-
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
@@ -390,7 +389,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   if (tr_cu->tr_depth > depth) {
-    int offset = LCU_WIDTH >> (depth + SHIFT);
+    int offset = width >> 1;
     double sum = 0;
 
     sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, tr_cu, lcu);

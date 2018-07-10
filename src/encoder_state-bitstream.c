@@ -377,6 +377,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
   WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
 
+  // TODO: 444 also possible as not separate color planes??? english
   if (encoder->chroma_format == KVZ_CSP_444) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }

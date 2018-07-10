@@ -59,6 +59,10 @@
 #include <stdint.h> // IWYU pragma: export
 #include <stddef.h> // IWYU pragma: export
 
+// DEBUG: should not be in version control
+#include <stdio.h>
+#define PRINTD(string, arg) fprintf(stdout, string, arg)
+
 // The stdlib.h and string.h headers are needed because of MALLOC and FILL
 // macros defined here, as IWYU will remove them from files that use only
 // those macros.
