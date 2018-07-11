@@ -84,11 +84,7 @@
     </Lib>
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-<<<<<<< HEAD
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
-=======
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
->>>>>>> cbb5b20449e091471e8608616b30f3b199b29bfd
     </YASM>
     <ClCompile>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories);$(SolutionDir)..\src\strategies;</AdditionalIncludeDirectories>
@@ -97,11 +93,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
-<<<<<<< HEAD
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
-=======
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
->>>>>>> cbb5b20449e091471e8608616b30f3b199b29bfd
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
@@ -116,11 +108,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
-<<<<<<< HEAD
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
-=======
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
->>>>>>> cbb5b20449e091471e8608616b30f3b199b29bfd
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
@@ -135,11 +123,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-<<<<<<< HEAD
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
-=======
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
->>>>>>> cbb5b20449e091471e8608616b30f3b199b29bfd
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>

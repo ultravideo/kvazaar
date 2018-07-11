@@ -939,10 +939,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
     case 16:
 
-     temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_y_epi16, temp_y_epi16), 0b10011100);
+     temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_y_epi16, temp_y_epi16), 0b11011000);
      _mm_storeu_si128((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
      break;
+
 
     default:
      if (temp == 0) {
@@ -954,7 +955,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      }
 
      else {
-      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16, temp_y_epi16), 0b10011100);
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16, temp_y_epi16), 0b11011000);
 
       // Store 256-bits of integer data into memory
       _mm256_storeu_si256((__m256i*)&(lcu->rec.y[start_point]), temp_epi8);
@@ -1036,10 +1037,10 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      case 32:
 
-      temp_epi8_u = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), 0b10011100);
+      temp_epi8_u = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), 0b11011000);
       _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_u));
 
-      temp_epi8_v = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), 0b10011100);
+      temp_epi8_v = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), 0b11011000);
       _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_v));
 
       break;
@@ -1058,11 +1059,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       }
 
       else {
-       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), 0b10011100);
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), 0b11011000);
 
        _mm256_storeu_si256((__m256i*)&(lcu->rec.u[start_point_uv]), temp_epi8);
 
-       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), 0b10011100);
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), 0b11011000);
 
        _mm256_storeu_si256((__m256i*)&(lcu->rec.v[start_point_uv]), temp_epi8);
 
