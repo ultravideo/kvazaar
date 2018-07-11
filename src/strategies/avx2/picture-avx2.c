@@ -749,9 +749,10 @@ static void inter_recon_bipred_no_mov_avx2(
 
    case 4:
 
+
     int8_t*temp_int_y = (int8_t*)&temp_y_epi8;
     for (int i = 0; i < 4; i++) {
-     lcu->rec.u[(y_in_lcu)* LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
     }
 
 
@@ -798,10 +799,21 @@ static void inter_recon_bipred_no_mov_avx2(
 
     switch (width)
     {
-    case 8:
 
+    case 4:
      int8_t*temp_int_u = (int8_t*)&temp_u_epi8;
      int8_t*temp_int_v = (int8_t*)&temp_v_epi8;
+
+     for (int i = 0; i < 2; i++) {
+      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
+      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
+     }
+     break;
+
+    case 8:
+
+     temp_int_u = (int8_t*)&temp_u_epi8;
+     temp_int_v = (int8_t*)&temp_v_epi8;
 
      for (int i = 0; i < 4; i++) {
       lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
@@ -834,6 +846,7 @@ static void inter_recon_bipred_no_mov_avx2(
     default:
      _mm256_storeu_si256((__m256i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), temp_u_epi8);
      _mm256_storeu_si256((__m256i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), temp_v_epi8);
+     break;
 
 
     }
@@ -920,12 +933,14 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
 
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
-
+     
      int8_t*temp_int_y = (int8_t*)&temp_epi8;
 
      for (int i = 0; i < 4; i++) {
       lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu + i] = temp_int_y[i];
      }
+     break;
+
     case 8:
 
      // Pack the bits from 1-bit to 8-bit
@@ -961,6 +976,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_storeu_si256((__m256i*)&(lcu->rec.y[start_point]), temp_epi8);
       temp = 0;
      }
+     break;
     }
 
     if (temp_x < width >> 1 && temp_y < height >> 1) {
@@ -994,6 +1010,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      case 4:
 
+      __m256i temp_epi8_u = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
+      __m256i temp_epi8_v = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
+
       int8_t*temp_int_u = (int8_t*)&temp_u_epi16;
       int8_t*temp_int_v = (int8_t*)&temp_v_epi16;
 
@@ -1002,15 +1021,16 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
        lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_u[i];
        lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu + i] = temp_int_v[i];
       }
+      break;
 
 
      case 8:
 
-      __m256i temp_epi8_u = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
+      temp_epi8_u = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
       int8_t *temp_int_8_u = (int8_t*)&temp_epi8_u;
 
-      __m256i temp_epi8_v = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
+      temp_epi8_v = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
 
       int8_t *temp_int_8_v = (int8_t*)&temp_epi8_v;
 
@@ -1070,6 +1090,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
        temp_uv = 0;
 
       }
+      break;
      }
      y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     }
