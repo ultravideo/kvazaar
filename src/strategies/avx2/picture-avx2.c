@@ -1053,11 +1053,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      case 32:
 
-      __m256i temp_epi8_u = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), 0b11011000);
-      _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_u));
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), 0b11011000);
+      _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
-      __m256i temp_epi8_v = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), 0b11011000);
-      _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8_v));
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), 0b11011000);
+      _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
       break;
 
