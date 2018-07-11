@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 
   RUN_SUITE(mv_cand_tests);
 
-  RUN_SUITE(bipred_generic_tests);
+  //RUN_SUITE(bipred_generic_tests);
 
   GREATEST_MAIN_END();
 }
