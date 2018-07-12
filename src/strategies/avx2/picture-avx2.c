@@ -931,11 +931,13 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
 
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_extract_epi32(temp_epi8, 0);
+     /*
      lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 0] = _mm256_extract_epi8(temp_epi8, 0);
      lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 1] = _mm256_extract_epi8(temp_epi8, 1);
      lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 2] = _mm256_extract_epi8(temp_epi8, 2);
      lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 3] = _mm256_extract_epi8(temp_epi8, 3);
-
+     */
 
      break;
 
