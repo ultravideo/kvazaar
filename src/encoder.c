@@ -273,7 +273,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       memcpy(&encoder->cfg.gop_lp_definition, &cfg->shared->gop_lp_definition, sizeof(cfg->gop_lp_definition));
     }
 
-    
+    //Set next cfg to the correct value
+    encoder->cfg.next_cfg = NULL;
+    if( prev_enc != NULL )
+    {
+      prev_enc->cfg.next_cfg = &encoder->cfg;
+    }
     // ***********************************************
 
 

@@ -843,6 +843,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         //Map the pixel range to LCU pos
         range_hor[0] = range_hor[0] / LCU_WIDTH; //First LCU that is needed
         range_hor[1] = (range_hor[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+        
+        //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
 
         //Add ilr state dependencies to hor job
         for (int k = range_hor[0]; k < range_hor[1]; k++) {
@@ -1084,7 +1086,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     range[3] = MIN(range[3] + 1, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
     //range[0] = MAX(0, range[0] - 1); //0;
     range[1] = MIN(range[1] + 1, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
-
+    //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
     //Add dependencies to ilr states
     for (int j = range[2]; j < range[3]; j++) {
       const encoder_state_t * const ilr_state = &state->ILR_state[j];

@@ -195,9 +195,11 @@ static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
 
 //Write exstension data
 static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
-                                                       encoder_state_t * const state)
+                                                       encoder_state_t * const state,
+                                                       const int vps_max_sub_layers_minus1,
+                                                       const int vps_max_dec_pic_buffering[MAX_TEMPORAL_LAYERS])
 {
-  encoder_state_write_bitstream_PTL_no_profile(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
+  encoder_state_write_bitstream_PTL_no_profile(stream, state, vps_max_sub_layers_minus1);
   
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
@@ -280,7 +282,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   // int i = vps_base_layer_internal_flag ? 2 : 1
   for (int i = 2; i <= vps_num_profile_tier_level_minus1; i++) {
     WRITE_U(stream, 1, 1, "vps_profile_present_flag[i]");
-    encoder_state_write_bitstream_PTL_scalable(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
+    encoder_state_write_bitstream_PTL_scalable(stream, state, vps_max_sub_layers_minus1);
   }
   
   //TODO: Find out proper values? Set in config
@@ -379,28 +381,40 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   //dpb_size(){
   //TODO: Implement properly.
-  uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
-  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = {{{0},{0}},
-                                                        {{max_dec_pic_buffering_minus1}, {max_dec_pic_buffering_minus1}}}; //needs to be in line (<=) sps values
-  //for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
-  //  state->encoder_control->layer.num_output_layer_sets == 2
-  WRITE_U(stream, 0, 1, "sub_layer_flag_info_present_flag[i]");
-  //  for (int j=0; j <= MaxSubLayersInLayerSetMinus1[OlsIdxToLsIdx[i]]; j++){
-  //    OlsIdxToLsIdx[1]==1; MaxSubLayerInLayersSetMinus1[1] == 0
-  //    if( j>0 && sub_layer_flag_info_present_flag[i] ) write "sub_layer_dpb_info_present_flag[i][j]
-  //    //Always signal for j==0 => sub_layer_dpb_info_present_flag[1][0] == true
-  //    if(sub_layer_dpb_info_present_flag[i][j]){
-  for(int k=0; k < num_layers_in_id_list; k++){
-  //        if (NecessaryLayerFlag[i][k] && (vps_base_layer_internal_flag||(LayerSetLayerIdList[OlsIdxToLsIdx[i]][k] != 0 ) ) ) {
-  //        NecessaryLayerFlag[i][k] == true; vps_base_layer_internal_flag == true
-    WRITE_UE(stream, max_vps_dec_pic_buffering_minus1[1][k][0], "max_vps_dec_pic_buffering_minus1[i][k][j]"); //Max pics in DPF
+  uint16_t max_sub_layers_in_layer_set_minus1 = vps_max_sub_layers_minus1;
+  //uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
+  int max_vps_dec_pic_buffering[MAX_LAYERS+1][MAX_LAYERS][MAX_TEMPORAL_LAYERS] = {0};
+  //Set buffering to match values of vps_max_dec_pic_buffering. Only *[1][k][0] inds are used
+  memcpy( max_vps_dec_pic_buffering[1][0], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
+  memcpy( max_vps_dec_pic_buffering[1][1], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
+
+  //uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = {{{0},{0}},
+  //                                                      {{max_dec_pic_buffering_minus1}, {max_dec_pic_buffering_minus1}}}; //needs to be in line (<=) sps values
+  uint16_t sub_layer_flag_info_present_flag = 1;
+  for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
+  //state->encoder_control->layer.num_output_layer_sets == 2
+    WRITE_U(stream, sub_layer_flag_info_present_flag, 1, "sub_layer_flag_info_present_flag[i]");
+  //for (int j=0; j <= MaxSubLayersInLayerSetMinus1[OlsIdxToLsIdx[i]]; j++){
+    for(int j = 0; j <= max_sub_layers_in_layer_set_minus1; j++){
+  //  OlsIdxToLsIdx[1]==1; MaxSubLayerInLayersSetMinus1[1] == 0
+      if( j > 0 && sub_layer_flag_info_present_flag/*[i]*/ ){ //write "sub_layer_dpb_info_present_flag[i][j]
+        WRITE_U(stream, 1, 1, "sub_layer_dpb_info_present_flag[i][j]");
+      }
+  //  Always signal for j==0 => sub_layer_dpb_info_present_flag[1][0] == true
+  //  if(sub_layer_dpb_info_present_flag[i][j]){
+    //if(j == 0){
+        for(int k=0; k < num_layers_in_id_list; k++){
+  //      if (NecessaryLayerFlag[i][k] && (vps_base_layer_internal_flag||(LayerSetLayerIdList[OlsIdxToLsIdx[i]][k] != 0 ) ) ) {
+  //      NecessaryLayerFlag[i][k] == true; vps_base_layer_internal_flag == true
+          //Don't minus one because it would cause an assert to fail because of reasons?
+          WRITE_UE(stream, max_vps_dec_pic_buffering[i][k][j], "max_vps_dec_pic_buffering_minus1[i][k][j]"); //Max pics in DPF
   //        }
+        }
+        WRITE_UE(stream, 0, "max_vps_num_reorder_pics[i][j]"); //value from SHM == 3
+        WRITE_UE(stream, 0, "max_vps_latency_increase_plus1[i][j]"); //value from SHM
+    //}
+    }
   }
-  WRITE_UE(stream, 3, "max_vps_num_reorder_pics[i][j]"); //value from SHM
-  WRITE_UE(stream, 0, "max_vps_latency_increase_plus1[i][j]"); //value from SHM
-  //    }
-  //  }
-  //}
   //}
 
   uint8_t direct_dep_type_len_minus2 = 0;
@@ -430,23 +444,47 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
-   WRITE_U(stream, MAX(0, state->encoder_control->layer.max_layers-1), 6, "vps_max_layers_minus1" );
-  //*********************************************
-
-  WRITE_U(stream, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1), 3, "vps_max_sub_layers_minus1");
+  WRITE_U(stream, MAX(0, state->encoder_control->layer.max_layers-1), 6, "vps_max_layers_minus1" );
+  
+  int vps_max_sub_layers_minus1 = MAX(0, state->encoder_control->cfg.max_temporal_layer - 1);
+  WRITE_U(stream, vps_max_sub_layers_minus1, 3, "vps_max_sub_layers_minus1");
   WRITE_U(stream, state->encoder_control->cfg.max_temporal_layer <= 1 ? 1 : 0 , 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
-  encoder_state_write_bitstream_PTL(stream, state, MAX(0,state->encoder_control->cfg.max_temporal_layer - 1));
+  encoder_state_write_bitstream_PTL(stream, state, vps_max_sub_layers_minus1);
+  
+  int vps_sub_layer_ordering_info_present = 0;
+  WRITE_U(stream, vps_sub_layer_ordering_info_present, 1, "vps_sub_layer_ordering_info_present_flag");
 
-  WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
+  //Figure out the max dec pic buffering need between all of the layers
+  int vps_max_dec_pic_buffering[MAX_TEMPORAL_LAYERS] = { 0 };
+  vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = state->encoder_control->cfg.gop_len;
+  if( state->encoder_control->cfg.gop_len == 0 ){
+    //Get max ref frames between layers
+    int max_refs = 1;
+    kvz_config *cfg = &state->encoder_control->cfg;
+    while (cfg != NULL){
+      max_refs = MAX(max_refs, cfg->ref_frames);
+      cfg = cfg->next_cfg;
+    }
+    vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = max_refs;
+  }
 
   //for each layer
-  for (int i = MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i <= MAX(0,state->encoder_control->cfg.max_temporal_layer - 1); i++) {
-    //*********************************************
-    //For scalable extension. TODO: Why was it previously 1?
-    WRITE_UE(stream, state->encoder_control->cfg.ref_frames
-              + state->encoder_control->cfg.gop_len, "vps_max_dec_pic_buffering_minus1[i]");
+  for (int i = vps_sub_layer_ordering_info_present ? 0 : vps_max_sub_layers_minus1; i <= vps_max_sub_layers_minus1; i++) {
+    //TODO: use a more conservative bound (number of unique references)
+    if (vps_sub_layer_ordering_info_present){
+      vps_max_dec_pic_buffering[i] = i > 0 ? vps_max_dec_pic_buffering[i-1] : 1;
+      for (int j = 0; j < state->encoder_control->cfg.gop_len; j++) {
+        if( state->encoder_control->cfg.gop[j].tId == i ){
+          vps_max_dec_pic_buffering[i] += state->encoder_control->cfg.gop[j].ref_neg_count + state->encoder_control->cfg.gop[j].ref_pos_count;
+        }
+      }
+      vps_max_dec_pic_buffering[i] = MIN(vps_max_dec_pic_buffering[i], vps_max_dec_pic_buffering[vps_max_sub_layers_minus1]);
+    }
+
+    //TODO: Why was it previously 1? Don't do the minus 1 because asserts fail
+    WRITE_UE(stream, vps_max_dec_pic_buffering[i], "vps_max_dec_pic_buffering_minus1[i]");
     //*********************************************
     WRITE_UE(stream, 0, "vps_num_reorder_pics");
     WRITE_UE(stream, 0, "vps_max_latency_increase");
@@ -487,7 +525,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
     }
 
     //Write vps_extension()
-    encoder_state_write_bitsream_vps_extension(stream, state);
+    encoder_state_write_bitsream_vps_extension(stream, state, vps_max_sub_layers_minus1, vps_max_dec_pic_buffering);
 
     WRITE_U(stream, 0, 1, "vps_extension2_flag");
   }
