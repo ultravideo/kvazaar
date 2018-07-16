@@ -377,7 +377,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
-  static const char * const preset_values[11][22*2] = {
+  static const char * const preset_values[11][23*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -401,6 +401,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -426,6 +427,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -451,6 +453,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -476,6 +479,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -501,6 +505,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -526,6 +531,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -551,6 +557,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -576,6 +583,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -601,6 +609,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -626,6 +635,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "off",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       { NULL }
