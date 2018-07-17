@@ -39,12 +39,11 @@ extern const uint32_t kvz_g_go_rice_prefix_len[5];
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
-uint32_t kvz_get_coeff_cabac_cost(
-  const encoder_state_t * const state,
-  const coeff_t *coeff,
-  int32_t width,
-  int32_t type,
-  int8_t scan_mode);
+uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+                            const coeff_t *coeff,
+                            int32_t width,
+                            int32_t type,
+                            int8_t scan_mode);
 
 int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                     uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);

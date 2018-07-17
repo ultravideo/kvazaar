@@ -365,6 +365,9 @@ typedef struct kvz_config
 
   /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
   uint32_t me_max_steps;
+
+  /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
+  int8_t fast_residual_cost_limit;
 } kvz_config;
 
 /**

@@ -79,6 +79,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->lossless        = false;
   cfg->tmvp_enable     = true;
   cfg->implicit_rdpcm  = false;
+  cfg->fast_residual_cost_limit = 0;
 
   cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
 
@@ -376,7 +377,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
-  static const char * const preset_values[11][22*2] = {
+  static const char * const preset_values[11][23*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -400,6 +401,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -425,6 +427,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -450,6 +453,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "28",
         NULL
       },
       {
@@ -475,6 +479,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -500,6 +505,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -525,6 +531,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -550,6 +557,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -575,6 +583,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -600,6 +609,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       {
@@ -625,6 +635,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "off",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "fast-residual-cost", "0",
         NULL
       },
       { NULL }
@@ -1194,6 +1205,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     cfg->me_max_steps = (uint32_t)steps;
   }
+  else if (OPT("fast-residual-cost"))
+    cfg->fast_residual_cost_limit = atoi(value);
   else {
     return 0;
   }

@@ -195,6 +195,8 @@ Compression tools:
                                    - off: Don't terminate early.
                                    - on: Terminate early.
                                    - sensitive: Terminate even earlier.
+      --fast-residual-cost <int> : Skip CABAC cost for residual coefficients
+                                   when QP is below the limit. [0]
       --(no-)intra-rdo-et    : Check intra modes in rdo stage only until
                                a zero coefficient CU is found. [disabled]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
@@ -304,6 +306,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| fast-residual-cost   | 28    | 28    | 28    | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 
 
 ## Kvazaar library
