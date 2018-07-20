@@ -808,23 +808,33 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     kvz_blockScalingSrcHeightRange(ver_range, state_param->param, param_ver->block_y, param_ver->block_height);
     int set_job_row = 0; //row of the first job not yet set
 
+    //Need to account for SAO/deblock in the ilr state
+    int margin = 0;
+    if (state->ILR_state->encoder_control->cfg.sao_type) {
+      margin += SAO_DELAY_PX;
+    }
+    else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
+      margin += DEBLOCK_DELAY_PX;
+    }
+        
     //Check previous block range to avoid re-creating jobs
     if (lcu->above != NULL) {
       int tmp_block_y = lcu->above->encoder_state->tile->offset_y + lcu->above->position_px.y;
       int tmp_block_height = lcu->above->size.y;
       int tmp_range[2];
       kvz_blockScalingSrcHeightRange(tmp_range, state_param->param, tmp_block_y, tmp_block_height);
-      set_job_row = (tmp_range[1] + LCU_WIDTH - 1) / LCU_WIDTH;
+      set_job_row = ((tmp_range[1] + margin) / LCU_WIDTH) + 1;//(tmp_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //No need to clip since it works a lower bound and ver_range[1] limits row to the correct range
     }
 
     //Map the pixel range to LCU row
     ver_range[0] = ver_range[0] / LCU_WIDTH; //First LCU that is needed
-    ver_range[1] = (ver_range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+    ver_range[1] = ((ver_range[1] + margin) / LCU_WIDTH) + 1;//(ver_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+    ver_range[1] = MIN(ver_range[1], state->num_ILR_states);
 
     //Create hor job for each row that does not have one yet and add dep
     int id_offset = lcu->index; //Offset the hor job index by the column number of the current lcu
     for (int row = ver_range[0]; row < ver_range[1]; row++) {
-      int hor_ind = row * state->encoder_control->in.width_in_lcu + id_offset;
+      int hor_ind = row + id_offset * state->num_ILR_states;//row * state->encoder_control->in.width_in_lcu + id_offset;
 
       if (row >= set_job_row) {
         //Set correct block parameters for hor job since it may be on a different lcu row than lcu
@@ -837,23 +847,24 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
         //Add dependency to ILR jobs
         //Calculate vertical range of block scaling
-        int range_hor[2]; //Range of blocks needed for scaling
-        kvz_blockScalingSrcWidthRange(range_hor, state_param->param, param_hor->block_x, param_hor->block_width);
+        int hor_range[2]; //Range of blocks needed for scaling
+        kvz_blockScalingSrcWidthRange(hor_range, state_param->param, param_hor->block_x, param_hor->block_width);
 
         //Map the pixel range to LCU pos
-        range_hor[0] = range_hor[0] / LCU_WIDTH; //First LCU that is needed
-        range_hor[1] = (range_hor[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+        hor_range[0] = hor_range[0] / LCU_WIDTH; //First LCU that is needed
+        hor_range[1] = ((hor_range[1] + margin) / LCU_WIDTH) + 1;//(hor_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+        hor_range[1] = MIN(hor_range[1], ilr_state->lcu_order_count);
         
         //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
 
         //Add ilr state dependencies to hor job
-        for (int k = range_hor[0]; k < range_hor[1]; k++) {
+        for (int k = hor_range[0]; k < hor_range[1]; k++) {
           kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
         }
 
         //Add dependency to left lcu so that copying to src_buffer is not an issue
         if (lcu->left != NULL) {
-          kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], state->layer->image_hor_scaling_jobs[hor_ind - 1]);
+          kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], state->layer->image_hor_scaling_jobs[hor_ind - state->num_ILR_states /*1*/]);
         }
 
         //Submit hor job
@@ -890,6 +901,15 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     int range[4];
     kvz_blockScalingSrcWidthRange(range, param->param, param->block_x, param->block_width);
     kvz_blockScalingSrcHeightRange(range + 2, param->param, param->block_y, param->block_height);
+
+    //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
+    /*int margin = 0;
+    if (state->ILR_state->encoder_control->cfg.sao_type) {
+      margin += SAO_DELAY_PX;
+    }
+    else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
+      margin += DEBLOCK_DELAY_PX;
+    }*/
 
     for (int i = 0; i < state->num_ILR_states; i++) {
       encoder_state_t *ilr_state = &state->ILR_state[i];
@@ -1025,6 +1045,14 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, state_param->cu_pos_scale[0]); //Width  
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, state_param->cu_pos_scale[1]); //Height
 
+    //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
+    /*int margin = 0;
+    if (state->ILR_state->encoder_control->cfg.sao_type) {
+      margin += SAO_DELAY_PX;
+    } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
+      margin += DEBLOCK_DELAY_PX;
+    }*/
+
     for (int i = 0; i < state->num_ILR_states; i++) {
       encoder_state_t *ilr_state = &state->ILR_state[i];
       int ilr_tile_x = ilr_state->tile->offset_x;
@@ -1075,17 +1103,25 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, param->cu_pos_scale[0]); //Width  
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
 
+    //Need to account for SAO/deblock in the ilr state.
+    int margin = 0;
+    if (state->ILR_state->encoder_control->cfg.sao_type) {
+      margin += SAO_DELAY_PX;
+    } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
+      margin += DEBLOCK_DELAY_PX;
+    }
+
     //Map the pixel range to LCU pos
     range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
-    range[1] = (range[1] + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+    range[1] = ((range[1] + margin) / LCU_WIDTH) + 1;//(range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
     range[2] = range[2] / LCU_WIDTH;
-    range[3] = (range[3] + LCU_WIDTH - 1) / LCU_WIDTH;
+    range[3] = ((range[3] + margin) / LCU_WIDTH) + 1;//(range[3] + margin + LCU_WIDTH - 1) / LCU_WIDTH;
 
-    //TODO: Figure out correct dependency. For now do overkill and hope it works
+    //TODO: Figure out correct dependency.
     //range[2] = MAX(0, range[2] - 1); //0;
-    range[3] = MIN(range[3] + 1, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
+    range[3] = MIN(range[3], state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
     //range[0] = MAX(0, range[0] - 1); //0;
-    range[1] = MIN(range[1] + 1, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
+    range[1] = MIN(range[1], state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
     //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
     //Add dependencies to ilr states
     for (int j = range[2]; j < range[3]; j++) {

@@ -273,7 +273,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
       int32_t col_px_y = (int32_t)block_y;
 
       if ( cu_pos_scale[0] != POS_SCALE_FAC_1X || cu_pos_scale[1] != POS_SCALE_FAC_1X) {
-        //Need to round here for some reason acording to shm.
+        //Need to round here for some reason according to shm.
         col_px_x = ((SCALE_POS_COORD(col_px_x + (int32_t)(block_w >> 1), cu_pos_scale[0]) + 4 ) >> 4 ) << 4;
         col_px_y = ((SCALE_POS_COORD(col_px_y + (int32_t)(block_h >> 1), cu_pos_scale[1]) + 4 ) >> 4 ) << 4;
       }
