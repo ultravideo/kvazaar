@@ -809,7 +809,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     int set_job_row = 0; //row of the first job not yet set
 
     //Need to account for SAO/deblock in the ilr state
-    int margin = 0;
+    int margin = 4; //Accounts for fracmvest?
     if (state->ILR_state->encoder_control->cfg.sao_type) {
       margin += SAO_DELAY_PX;
     }
@@ -903,7 +903,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     kvz_blockScalingSrcHeightRange(range + 2, param->param, param->block_y, param->block_height);
 
     //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
-    /*int margin = 0;
+    /*int margin = 4; //Accounts for fracmvest?
     if (state->ILR_state->encoder_control->cfg.sao_type) {
       margin += SAO_DELAY_PX;
     }
@@ -1046,7 +1046,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, state_param->cu_pos_scale[1]); //Height
 
     //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
-    /*int margin = 0;
+    /*int margin = 4; //Accounts for fracmvest?
     if (state->ILR_state->encoder_control->cfg.sao_type) {
       margin += SAO_DELAY_PX;
     } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
@@ -1104,7 +1104,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
 
     //Need to account for SAO/deblock in the ilr state.
-    int margin = 0;
+    int margin = 4; //Accounts for fracmvest?
     if (state->ILR_state->encoder_control->cfg.sao_type) {
       margin += SAO_DELAY_PX;
     } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
