@@ -1587,7 +1587,7 @@ static void generate_gop_rps(kvz_config *cfg){
       rps->is_used[j] = 1;
     }
 
-    // Index to the ref prs is always the prev one
+    // Index to the ref rps is always the prev one
     rps->delta_ridx = 1;
 
     //First rps cannot use inter rps prediction

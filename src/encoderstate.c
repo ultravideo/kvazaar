@@ -850,7 +850,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         int hor_range[2]; //Range of blocks needed for scaling
         kvz_blockScalingSrcWidthRange(hor_range, state_param->param, param_hor->block_x, param_hor->block_width);
 
-        //Map the pixel range to LCU pos
+        //TODO: Figure out the correct dependency
+        //Map the pixel range to LCU pos.
         hor_range[0] = hor_range[0] / LCU_WIDTH; //First LCU that is needed
         hor_range[1] = ((hor_range[1] + margin) / LCU_WIDTH) + 1;//(hor_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
         hor_range[1] = MIN(hor_range[1], ilr_state->lcu_order_count);
