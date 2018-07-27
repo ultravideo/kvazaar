@@ -780,7 +780,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
   const kvz_image_scaling_parameter_t * const state_param = &state->layer->img_job_param;
   switch (state->type) {
-  case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
+  case ENCODER_STATE_TYPE_WAVEFRONT_ROW: 
   {
     //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
     kvz_image_scaling_parameter_t *param_ver = calloc(1, sizeof(kvz_image_scaling_parameter_t));
@@ -809,14 +809,14 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     int set_job_row = 0; //row of the first job not yet set
 
     //Need to account for SAO/deblock in the ilr state
-    int margin = 4; //Accounts for fracmvest?
+    int margin = 0; //4; //Accounts for fracmvest?
     if (state->ILR_state->encoder_control->cfg.sao_type) {
       margin += SAO_DELAY_PX;
     }
     else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
       margin += DEBLOCK_DELAY_PX;
     }
-        
+    
     //Check previous block range to avoid re-creating jobs
     if (lcu->above != NULL) {
       int tmp_block_y = lcu->above->encoder_state->tile->offset_y + lcu->above->position_px.y;
@@ -842,6 +842,16 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         param_hor->block_y = ilr_state->tile->offset_y + ilr_state->lcu_order->position_px.y;
         param_hor->block_height = ilr_state->lcu_order->size.y;
 
+        //Account for SAO by only upsampling rows that have been SAOd on this lcu row (exclude bottom most margin pixels if not the last lcu row)
+        if( lcu->above != NULL ){
+          param_hor->block_y -= margin;
+        } else {
+          param_hor->block_height -= margin;
+        }
+        if( lcu->below == NULL ){
+          param_hor->block_height += margin;
+        }
+
         kvz_threadqueue_free_job(&state->layer->image_hor_scaling_jobs[hor_ind]);
         state->layer->image_hor_scaling_jobs[hor_ind] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param_hor);
 
@@ -850,7 +860,6 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         int hor_range[2]; //Range of blocks needed for scaling
         kvz_blockScalingSrcWidthRange(hor_range, state_param->param, param_hor->block_x, param_hor->block_width);
 
-        //TODO: Figure out the correct dependency
         //Map the pixel range to LCU pos.
         hor_range[0] = hor_range[0] / LCU_WIDTH; //First LCU that is needed
         hor_range[1] = ((hor_range[1] + margin) / LCU_WIDTH) + 1;//(hor_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
