@@ -939,12 +939,139 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //  }
 //}
 
+//Populate extra rps (rps[num_rps]) if existing rps cannot be used
+static void populate_extra_rps(encoder_state_t *const state )
+{
+  //Populate given rps. Try using existing rps as ref.
+  const encoder_control_t* const encoder = state->encoder_control;
+  kvz_config *cfg = &encoder->cfg;
+  kvz_rps_config *rps = &cfg->rps[cfg->num_rps];
+  const kvz_gop_config *const gop = encoder->cfg.gop_len ? &cfg->gop[state->frame->gop_offset] : NULL;
+
+  //Populate rps from frame ref
+  int poc_shift = 0;
+  for (int j = 0; j < rps->num_negative_pics; j++) {
+    int8_t delta_poc = 0;
+
+    if (gop != NULL) {
+      int8_t found = 0;
+      do {
+        delta_poc = gop->ref_neg[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->image_info[i].layer_id != encoder->layer.layer_id ||
+            state->frame->ref->image_info[i].temporal_id > gop->tId) {
+            continue;
+          }
+          if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
+            found = 1;
+            break;
+          }
+        }
+        if (!found) poc_shift++;
+        if (j + poc_shift == rps->num_negative_pics) {
+          fprintf(stderr, "Failure, reference not found!");
+          exit(EXIT_FAILURE);
+        }
+      } while (!found);
+    }
+    else {
+      delta_poc = j > 0 ? -rps->delta_poc[j - 1] + 1 : 1; //If no gop, needs to be -last+1 (prev - delta_poc - 1 used later)
+    }
+
+    rps->delta_poc[j] = -delta_poc;
+    rps->is_used[j] = !state->frame->is_irap;
+
+    //last_poc = delta_poc;
+  }
+  //last_poc = 0;
+  poc_shift = 0;
+  for (int j = 0; j < rps->num_positive_pics; j++) {
+    int8_t delta_poc = 0;
+
+    if (gop != NULL) {
+      int8_t found = 0;
+      do {
+        delta_poc = gop->ref_pos[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->image_info[i].layer_id != encoder->layer.layer_id ||
+            state->frame->ref->image_info[i].temporal_id > gop->tId) {
+            continue;
+          }
+          if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
+            found = 1;
+            break;
+          }
+        }
+        if (!found) poc_shift++;
+        if (j + poc_shift == rps->num_positive_pics) {
+          fprintf(stderr, "Failure, reference not found!");
+          exit(EXIT_FAILURE);
+        }
+      } while (!found);
+    }
+    else {
+      delta_poc = j > 0 ? rps->delta_poc[j - 1] + 1 : 1; //If no gop needs to be 1+last (delta_poc - prev - 1 used later)
+    }
+
+    rps->delta_poc[j + rps->num_negative_pics] = delta_poc;
+    rps->is_used[j + rps->num_negative_pics] = !state->frame->is_irap;
+
+  }
+
+  rps->inter_rps_pred_flag = 0;
+
+  //Try to use inter rps pred if num rps > 0
+  // With gop try to use the rps that matches the current gop_offset
+  // If no gop used, try the prev rps if 
+  if( cfg->num_rps > 0){
+    const kvz_rps_config *ref_rps = NULL;
+
+    if( gop != NULL){
+      ref_rps = &cfg->rps[state->frame->gop_offset];
+      rps->delta_ridx = cfg->num_rps - state->frame->gop_offset;
+    } else {
+      ref_rps = &cfg->rps[cfg->num_rps-1];
+      rps->delta_ridx = 1;
+    }
+    
+    int delta_rps = 0;
+    int num_ref_pic = ref_rps->num_negative_pics + ref_rps->num_positive_pics;
+    rps->delta_rps = delta_rps;
+    rps->num_ref_idc = num_ref_pic + 1;
+
+    //loop through ref pics
+    int count = 0;
+    for (int j = 0; j < rps->num_ref_idc; j++) {
+      int ref_delta_POC = (j < num_ref_pic) ? ref_rps->delta_poc[j] : 0;
+      rps->ref_idc[j] = 0;
+      //Loop through pics in the cur rps 
+      for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++) {
+        if (rps->delta_poc[k] == ref_delta_POC + delta_rps) {
+          //Found a poc that mathces the ref poc
+          rps->ref_idc[j] = 1;
+          count++;
+          break;
+        }
+      }
+    }
+    //Check that we found a match for all ref idc
+    if (count == rps->num_negative_pics + rps->num_positive_pics) {
+      rps->inter_rps_pred_flag = 1;
+    }
+  }
+}
+
 // Pass ref_neg/pos in the rps
-static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t *const state,
+static void write_short_term_ref_pic_set(bitstream_t *stream, encoder_state_t *const state,
                                           uint8_t called_from_slice_header,
                                          //int ref_negative, int ref_positive,
                                          int rps_idx)
 {
+  //Populate the extra rps if called from the slice header
+  if( called_from_slice_header ){
+    populate_extra_rps(state);
+  }
+
   const encoder_control_t* const encoder = state->encoder_control;
   kvz_rps_config *rps = &((encoder_control_t*)(encoder))->cfg.rps[rps_idx];
   uint8_t inter_ref_pic_set_prediction_flag = rps->inter_rps_pred_flag;
@@ -967,91 +1094,13 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
     WRITE_UE(stream, ABS(delta_rps)-1, "abs_delta_rps_minus1");
 
     for (int i = 0; i < rps->num_ref_idc; i++) {
-      int8_t ref_idc = rps->ref_idc[i];
-      WRITE_U(stream, (ref_idc==1 ? 1 : 0), 1, "used_by_curr_pic_flag[j]");
+      WRITE_U(stream, rps->is_used[i], 1, "used_by_curr_pic_flag[j]");
       //IF !used_by_curr_pic_flag[j] WRITE use_delta_flag[j]
-      if( ref_idc != 1){
-        WRITE_U(stream, ref_idc >> 1, 1, "use_delta_flag[j]");
+      if( !rps->is_used[i] ){
+        WRITE_U(stream, rps->ref_idc[i], 1, "use_delta_flag[j]");
       }
     }
   } else {
-
-    // If called from slice header, we need to populate rps with correct info (rps_idx should be equal to num_rps) 
-    if (called_from_slice_header) {
-      assert(rps_idx == encoder->cfg.num_rps);
-
-      //int last_poc = 0;
-      int poc_shift = 0;
-      
-      for (int j = 0; j < rps->num_negative_pics; j++) {
-        int8_t delta_poc = 0;
-
-        if (encoder->cfg.gop_len) {
-          int8_t found = 0;
-          do {
-            delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
-            for (int i = 0; i < state->frame->ref->used_size; i++) {
-              if (state->frame->ref->image_info[i].layer_id != encoder->layer.layer_id ||
-                  state->frame->ref->image_info[i].temporal_id > encoder->cfg.gop[state->frame->gop_offset].tId ){
-                continue;
-              }
-              if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
-                found = 1;
-                break;
-              }
-            }
-            if (!found) poc_shift++;
-            if (j + poc_shift == rps->num_negative_pics) {
-              fprintf(stderr, "Failure, reference not found!");
-              exit(EXIT_FAILURE);
-            }
-          } while (!found);
-        }
-        else {
-          delta_poc = j > 0 ? -rps->delta_poc[j-1] + 1: 1; //If no gop needs to be -last+1 (prev - delta_poc - 1 used later)
-        }
-
-        rps->delta_poc[j] = -delta_poc; 
-        rps->is_used[j] = !state->frame->is_irap;
-        
-        //last_poc = delta_poc;
-      }
-      //last_poc = 0;
-      poc_shift = 0;
-      for (int j = 0; j < rps->num_positive_pics; j++) {
-        int8_t delta_poc = 0;
-
-        if (encoder->cfg.gop_len) {
-          int8_t found = 0;
-          do {
-            delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
-            for (int i = 0; i < state->frame->ref->used_size; i++) {
-              if (state->frame->ref->image_info[i].layer_id != encoder->layer.layer_id ||
-                  state->frame->ref->image_info[i].temporal_id > encoder->cfg.gop[state->frame->gop_offset].tId ){
-                continue;
-              }
-              if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
-                found = 1;
-                break;
-              }
-            }
-            if (!found) poc_shift++;
-            if (j + poc_shift == rps->num_positive_pics) {
-              fprintf(stderr, "Failure, reference not found!");
-              exit(EXIT_FAILURE);
-            }
-          } while (!found);
-        }
-        else {
-          delta_poc = j > 0 ? rps->delta_poc[j - 1] + 1 : 1; //If no gop needs to be 1+last (delta_poc - prev - 1 used later)
-        }
-
-        rps->delta_poc[j+rps->num_negative_pics] = delta_poc;
-        rps->is_used[j+rps->num_negative_pics] = !state->frame->is_irap;
-        
-        //last_poc = delta_poc;
-      }
-    }
 
     //Write normal rps
     WRITE_UE(stream, rps->num_negative_pics, "num_negative_pics");
@@ -1232,7 +1281,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg.num_rps;
   WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
   for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
-    write_short_term_ref_pic_set_v2( stream, state, false, i);
+    write_short_term_ref_pic_set( stream, state, false, i);
     //write_short_term_ref_pic_set(stream, state, i + 1, 0, i);
     //writeSTermRSet(state, i, i + 1, 0);
   }
@@ -1667,7 +1716,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       kvz_rps_config *rps = &((encoder_control_t*)(encoder))->cfg.rps[encoder->cfg.num_rps];
       rps->num_negative_pics = ref_negative;
       rps->num_positive_pics = ref_positive;
-      write_short_term_ref_pic_set_v2(stream, state, 1, encoder->cfg.num_rps);
+      write_short_term_ref_pic_set(stream, state, 1, encoder->cfg.num_rps);
       break;
     }
     }
