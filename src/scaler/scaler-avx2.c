@@ -324,10 +324,11 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
  int shift_x = param->shift_x - 4;
  int shift_y = param->shift_y - 4;
- __m256i ref_pos_epi16, pointer, size_epi16, temp_mem, temp_filter, decrese;
+ __m256i pointer, temp_mem, temp_filter, decrese;
  __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
- __m256i upscaling_adder = _mm256_set_epi32(8, 9, 10, 11, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF);
+ __m256i upscaling_adder = _mm256_set_epi32(8, 9, 10, 11, src_width, src_width, src_width, src_width);
  __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+ __m128i smallest_epi16;
  int* start;
  int min;
 
@@ -354,22 +355,19 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    start = (int*)&(pointer);
    
    min = src_width-1;
-
-   for (int k = 0; k < 8; k++) {
-    if (min > start[k]) {
-     min = start[k];
-    }
-   }
+   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+   smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+   min = _mm_extract_epi16(smallest_epi16, 0);
    
    tmp_row[j] = 0;
-   temp_mem = _mm256_load_si256(&src_row[min]);
+   temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
    decrese = _mm256_set1_epi32(min);
 
    pointer = _mm256_sub_epi32(pointer, decrese);
 
    temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
 
-   temp_filter = _mm256_load_si256(&(filter[0]));
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
 
    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
@@ -393,17 +391,12 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
     pointer = clip_avx2(ref_pos, src_width, size, upscaling_adder);
     pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
-    start = (int*)&(pointer);
+    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+    min = _mm_extract_epi16(smallest_epi16, 0);
 
-    min = src_width - 1;
-    for (int k = 0; k < 4; k++) {
-     if (min > start[k]) {
-      min = start[k];
-     }
-    }
-
-    temp_filter = _mm256_load_si256(&(filter[8]));
-    temp_mem = _mm256_load_si256(&src_row[min]);
+    temp_filter = _mm256_load_si256((__m256i* )&(filter[8]));
+    temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
     decrese = _mm256_set1_epi32(min);
     pointer = _mm256_sub_epi32(pointer, decrese);
     temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
@@ -456,7 +449,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    tmp_col[j] = 0;
    temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
 
-   temp_filter = _mm256_load_si256(&(filter[0]));
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
 
    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
 
@@ -485,7 +478,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
     start = (int*)&(pointer);
 
-    temp_filter = _mm256_load_si256(&(filter[8]));
+    temp_filter = _mm256_load_si256((__m256i*)&(filter[8]));
 
     temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
     temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
