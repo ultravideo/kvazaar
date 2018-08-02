@@ -271,9 +271,8 @@ static int getFilter(const int** const filter, int is_upsampling, int is_luma, i
  return (sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]));
 }
 
-
 //Resampling is done here per buffer
-void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
 {
  //TODO: Add cropping etc.
 
@@ -282,10 +281,10 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
  int ver_filter = 0;
  int hor_filter = 0;
 
- int src_width = param->src_width + param->src_padding_x;
- int src_height = param->src_height + param->src_padding_y;
- int trgt_width = param->rnd_trgt_width;
- int trgt_height = param->rnd_trgt_height;
+  int src_height = param->src_height;
+  int src_width = param->src_width;
+  int trgt_height = param->trgt_height;//param->rnd_trgt_height;
+  int trgt_width = param->trgt_width;//param->rnd_trgt_width
 
  if (!is_upscaling) {
   int crop_width = src_width - param->right_offset; //- param->left_offset;
@@ -324,16 +323,17 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
  int shift_x = param->shift_x - 4;
  int shift_y = param->shift_y - 4;
- __m256i ref_pos_epi16, pointer, size_epi16, temp_mem, temp_filter, decrese;
+ __m256i pointer, temp_mem, temp_filter, decrese;
  __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
- __m256i upscaling_adder = _mm256_set_epi32(8, 9, 10, 11, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF, 0x7FFFFFFF);
+ __m256i upscaling_adder = _mm256_set_epi32(8, 9, 10, 11, src_width, src_width, src_width, src_width);
  __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+ __m128i smallest_epi16;
  int* start;
  int min;
 
  pic_data_t* tmp_row = buffer->tmp_row;
 
- // Horizontal resampling
+ // Horizontal downsampling
  for (int i = 0; i < src_height; i++) {
   pic_data_t* src_row = &buffer->data[i * buffer->width];
 
@@ -346,30 +346,26 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
    //Choose filter
    const int* filter;
-   int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+   int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
 
 
    pointer = clip_avx2(ref_pos, src_width, size, adder);
    pointer = _mm256_permutevar8x32_epi32(pointer, order);
-   start = (int*)&(pointer);
-   
-   min = src_width-1;
 
-   for (int k = 0; k < 8; k++) {
-    if (min > start[k]) {
-     min = start[k];
-    }
-   }
-   
+   min = src_width - 1;
+   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+   smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+   min = _mm_extract_epi16(smallest_epi16, 0);
+
    tmp_row[j] = 0;
-   temp_mem = _mm256_load_si256(&src_row[min]);
+   temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
    decrese = _mm256_set1_epi32(min);
 
    pointer = _mm256_sub_epi32(pointer, decrese);
 
    temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
 
-   temp_filter = _mm256_load_si256(&(filter[0]));
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
 
    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
@@ -378,7 +374,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    switch (size)
    {
    case 4:
-    
+
     tmp_row[j] = _mm256_extract_epi32(temp_mem, 0);
     break;
 
@@ -393,17 +389,12 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
     pointer = clip_avx2(ref_pos, src_width, size, upscaling_adder);
     pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
-    start = (int*)&(pointer);
+    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+    min = _mm_extract_epi16(smallest_epi16, 0);
 
-    min = src_width - 1;
-    for (int k = 0; k < 4; k++) {
-     if (min > start[k]) {
-      min = start[k];
-     }
-    }
-
-    temp_filter = _mm256_load_si256(&(filter[8]));
-    temp_mem = _mm256_load_si256(&src_row[min]);
+    temp_filter = _mm256_load_si256((__m256i*)&(filter[8]));
+    temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
     decrese = _mm256_set1_epi32(min);
     pointer = _mm256_sub_epi32(pointer, decrese);
     temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
@@ -424,7 +415,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
  pic_data_t* tmp_col = tmp_row; //rename for clarity
 
-                                // Vertical resampling
+ // Vertical downsampling
  __m256i multiplier_epi32 = _mm256_set1_epi32(buffer->width);
  for (int i = 0; i < trgt_width; i++) {
   pic_data_t* src_col = &buffer->data[i];
@@ -441,12 +432,12 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    //Apply filter
    tmp_col[j] = 0;
    for (int k = 0; k < size; k++) {
-    int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
-    tmp_col[j] += filter[k] * src_col[m * buffer->width];
+   int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
+   tmp_col[j] += filter[k] * src_col[m * buffer->width];
    }*/
    //-------------------------------------------------------
 
-   
+
    pointer = clip_avx2(ref_pos, src_height, size, adder);
 
    pointer = _mm256_permutevar8x32_epi32(pointer, order);
@@ -456,7 +447,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    tmp_col[j] = 0;
    temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
 
-   temp_filter = _mm256_load_si256(&(filter[0]));
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
 
    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
 
@@ -485,7 +476,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 
     start = (int*)&(pointer);
 
-    temp_filter = _mm256_load_si256(&(filter[8]));
+    temp_filter = _mm256_load_si256((__m256i*)&(filter[8]));
 
     temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
     temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
@@ -495,6 +486,239 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
     temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
 
     tmp_col[j] += _mm256_extract_epi32(temp_mem, 0);
+
+
+    break;
+   }
+   //---------------------------------------
+
+   //TODO: Why? Filter coefs summ up to 128 applied 2x 128*128= 2^14
+   //TODO: Why?  Filter coefs summ up to 64 applied 2x 64*64= 2^12
+   //Scale values back down
+   tmp_col[j] = is_upscaling ? (tmp_col[j] + 2048) >> 12 : (tmp_col[j] + 8192) >> 14;
+  }
+
+  //Clip and move to buffer data
+  for (int n = 0; n < trgt_height; n++) {
+   src_col[n * buffer->width] = clip(tmp_col[n], 0, 255);
+  }
+ }
+}
+
+//Resampling is done here per buffer
+void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+{
+ //TODO: Add cropping etc.
+
+ //Choose best filter to use when downsampling
+ //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+ int ver_filter = 0;
+ int hor_filter = 0;
+
+ int src_width = param->src_width + param->src_padding_x;
+ int src_height = param->src_height + param->src_padding_y;
+ int trgt_width = param->rnd_trgt_width;
+ int trgt_height = param->rnd_trgt_height;
+
+
+ if (!is_upscaling) {
+  int crop_width = src_width - param->right_offset; //- param->left_offset;
+  int crop_height = src_height - param->bottom_offset; //- param->top_offset;
+
+  if (4 * crop_height > 15 * trgt_height)
+   ver_filter = 7;
+  else if (7 * crop_height > 20 * trgt_height)
+   ver_filter = 6;
+  else if (2 * crop_height > 5 * trgt_height)
+   ver_filter = 5;
+  else if (1 * crop_height > 2 * trgt_height)
+   ver_filter = 4;
+  else if (3 * crop_height > 5 * trgt_height)
+   ver_filter = 3;
+  else if (4 * crop_height > 5 * trgt_height)
+   ver_filter = 2;
+  else if (19 * crop_height > 20 * trgt_height)
+   ver_filter = 1;
+
+  if (4 * crop_width > 15 * trgt_width)
+   hor_filter = 7;
+  else if (7 * crop_width > 20 * trgt_width)
+   hor_filter = 6;
+  else if (2 * crop_width > 5 * trgt_width)
+   hor_filter = 5;
+  else if (1 * crop_width > 2 * trgt_width)
+   hor_filter = 4;
+  else if (3 * crop_width > 5 * trgt_width)
+   hor_filter = 3;
+  else if (4 * crop_width > 5 * trgt_width)
+   hor_filter = 2;
+  else if (19 * crop_width > 20 * trgt_width)
+   hor_filter = 1;
+ }
+
+ int shift_x = param->shift_x - 4;
+ int shift_y = param->shift_y - 4;
+ __m256i pointer, temp_mem, temp_filter, decrese;
+ __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+ __m256i upscaling_adder = _mm256_set_epi32(8, 9, 10, 11, src_width, src_width, src_width, src_width);
+ __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+ __m128i smallest_epi16;
+ int* start;
+ int min;
+
+ pic_data_t* tmp_row = buffer->tmp_row;
+
+ // Horizontal resampling
+ for (int i = 0; i < src_height; i++) {
+  pic_data_t* src_row = &buffer->data[i * buffer->width];
+
+  for (int j = 0; j < trgt_width; j++) {
+   //Calculate reference position in src pic
+   int ref_pos_16 = (int)((unsigned int)(j * param->scale_x + param->add_x) >> shift_x) - param->delta_x;
+   int phase = ref_pos_16 & 15;
+   int ref_pos = ref_pos_16 >> 4;
+
+
+   //Choose filter
+   const int* filter;
+   int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+
+
+   pointer = clip_avx2(ref_pos, src_width, size, adder);
+   pointer = _mm256_permutevar8x32_epi32(pointer, order);
+
+   min = src_width-1;
+   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+   smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+   min = _mm_extract_epi16(smallest_epi16, 0);
+   
+   tmp_row[j] = 0;
+   temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
+   
+   decrese = _mm256_set1_epi32(min);
+
+   pointer = _mm256_sub_epi32(pointer, decrese);
+
+   temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
+
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
+   temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
+   
+
+   
+   
+   temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+   temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+
+   switch (size)
+   {
+   case 4:
+    
+    tmp_row[j] = _mm256_extract_epi32(temp_mem, 0);
+    break;
+
+   case 8:
+    tmp_row[j] = _mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+    break;
+
+
+   default:
+    tmp_row[j] = _mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+
+    pointer = clip_avx2(ref_pos, src_width, size, upscaling_adder);
+    pointer = _mm256_permutevar8x32_epi32(pointer, order);
+
+    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+    min = _mm_extract_epi16(smallest_epi16, 0);
+
+    temp_filter = _mm256_load_si256((__m256i* )&(filter[8]));
+    temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
+
+    decrese = _mm256_set1_epi32(min);
+    pointer = _mm256_sub_epi32(pointer, decrese);
+    temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
+
+    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);   
+    
+
+
+    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+
+    tmp_row[j] += _mm256_extract_epi32(temp_mem, 0);
+    break;
+   }
+  }
+  //Copy tmp row to data
+  memcpy(src_row, tmp_row, sizeof(pic_data_t) * trgt_width);
+ }
+
+ pic_data_t* tmp_col = tmp_row; //rename for clarity
+
+  // Vertical resampling
+ __m256i multiplier_epi32 = _mm256_set1_epi32(buffer->width);
+ for (int i = 0; i < trgt_width; i++) {
+  pic_data_t* src_col = &buffer->data[i];
+  for (int j = 0; j < trgt_height; j++) {
+   //Calculate ref pos
+   int ref_pos_16 = (int)((unsigned int)(j * param->scale_y + param->add_y) >> shift_y) - param->delta_y;
+   int phase = ref_pos_16 & 15;
+   int ref_pos = ref_pos_16 >> 4;
+
+   //Choose filter
+   const int* filter;
+   int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+   
+   pointer = clip_avx2(ref_pos, src_height, size, adder);
+
+   pointer = _mm256_permutevar8x32_epi32(pointer, order);
+   pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
+   start = (int*)&(pointer);
+
+   tmp_col[j] = 0;
+   temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
+
+   temp_filter = _mm256_load_si256((__m256i*)&(filter[0]));
+
+   temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
+
+   temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+   temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+
+
+   switch (size)
+   {
+   case 4:
+
+    tmp_col[j] = _mm256_extract_epi32(temp_mem, 0);
+    break;
+
+   case 8:
+    tmp_col[j] = _mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+    break;
+
+
+   default:
+    tmp_col[j] = _mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+
+    pointer = clip_avx2(ref_pos, src_height, size, upscaling_adder);
+    pointer = _mm256_permutevar8x32_epi32(pointer, order);
+    pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
+
+    start = (int*)&(pointer);
+
+    temp_filter = _mm256_load_si256((__m256i*)&(filter[8]));
+
+    temp_mem = _mm256_set_epi32(src_col[start[7]], src_col[start[6]], src_col[start[5]], src_col[start[4]], src_col[start[3]], src_col[start[2]], src_col[start[1]], src_col[start[0]]);
+    temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
+
+
+    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+    temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+
+    tmp_col[j] += _mm256_extract_epi32(temp_mem, 0);
+    
     
     break;
    }
