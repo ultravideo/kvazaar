@@ -32,7 +32,7 @@ extern SUITE(dct_tests);
 
 extern SUITE(coeff_sum_tests);
 extern SUITE(mv_cand_tests);
-extern SUITE(bipred_generic_tests);
+extern SUITE(inter_recon_bipred_tests);
 
 int main(int argc, char **argv)
 {
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 
   RUN_SUITE(mv_cand_tests);
 
-  //RUN_SUITE(bipred_generic_tests);
+  RUN_SUITE(inter_recon_bipred_tests);
 
   GREATEST_MAIN_END();
 }
