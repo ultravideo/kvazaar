@@ -1032,9 +1032,9 @@ static void populate_extra_rps(encoder_state_t *const state )
         rps->delta_ridx = cfg->num_rps - (state->frame->gop_offset - 1);
         delta_rps = (ref_rps + 1)->delta_rps;
       } else {
-        ref_rps = &cfg->rps[cfg->gop_len - 1];
-        rps->delta_ridx = cfg->num_rps - (cfg->gop_len - 1);
-        delta_rps = cfg->gop[cfg->gop_len - 1].poc_offset - cfg->gop[0].poc_offset - 8;
+        ref_rps = &cfg->rps[1];
+        rps->delta_ridx = cfg->num_rps - 1;
+        delta_rps = -ref_rps->delta_rps;
       }      
     } else {
       ref_rps = &cfg->rps[MAX(rps->num_negative_pics - 1, 0)];
@@ -1713,7 +1713,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     case 11:
       // No gop
       // There should be a valid rps for each ref->used_size - encoder->cfg.ILR_frames
-      WRITE_U(stream, state->frame->ref->used_size - encoder->cfg.ILR_frames, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx");
+      WRITE_U(stream, MAX(state->frame->ref->used_size - encoder->cfg.ILR_frames - 1, 0), kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx");
       break;
 
     case 15:

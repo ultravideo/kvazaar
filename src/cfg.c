@@ -1634,7 +1634,7 @@ static void generate_gop_rps(kvz_config *cfg){
 static void generate_rps(kvz_config *cfg){
   //We need one rps for every intermediate ref list, before the full cfg->ref_frames
   //number of references.
-  cfg->num_rps = cfg->ref_frames + 1;
+  cfg->num_rps = cfg->ref_frames;
   for( int i = 0; i < cfg->num_rps; i++){
     kvz_rps_config *rps = &cfg->rps[i];
 
@@ -1644,9 +1644,11 @@ static void generate_rps(kvz_config *cfg){
     //first rps cannot use inter rps pred
     if( i == 0 ){
       rps->inter_rps_pred_flag = 0;
-      // Has no references; used for Intra-frames
-      rps->num_negative_pics = 0;
+      rps->num_negative_pics = 1;
       rps->num_positive_pics = 0;
+
+      rps->delta_poc[i] = -1;
+      rps->is_used[i] = 1;
     } else {
       // Use inter rps pred
       rps->inter_rps_pred_flag = 1;
@@ -1654,9 +1656,10 @@ static void generate_rps(kvz_config *cfg){
       rps->num_negative_pics = i;
       rps->num_positive_pics = 0;
       rps->delta_rps = -1;
-      rps->num_ref_idc = i;
-      for( int j = 0; j < i; j++ ){ //Loop over ref rps idc
+      rps->num_ref_idc = i + 1;
+      for( int j = 0; j < rps->num_ref_idc; j++ ){ //Loop over ref rps idc
         rps->ref_idc[j] = 1;
+        rps->is_used[j] = 1;
       }
     }
   }
