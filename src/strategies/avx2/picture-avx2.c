@@ -875,23 +875,6 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	kvz_pixel* temp_lcu_v) 
 {
 
- int y_in_lcu;
- int x_in_lcu;
-
- int shift = 15 - KVZ_BIT_DEPTH;
- int offset = 1 << (shift-1);
- int shift_left = 14 - KVZ_BIT_DEPTH;	
- __m256i temp_epi16_y;
-
- __m256i temp_epi8;
- __m256i temp_y_epi16;
-
- __m256i sample0_epi16;
- __m256i sample1_epi16;
-
- int start_point = 0;
- int start_point_uv = 0;
-
  if (hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
  {
   inter_recon_bipred_no_mov_avx2(height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
@@ -899,6 +882,17 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
  else
  {
+  int y_in_lcu, x_in_lcu;
+
+  int shift = 15 - KVZ_BIT_DEPTH;
+  int offset = 1 << (shift - 1);
+  int shift_left = 14 - KVZ_BIT_DEPTH;
+  __m256i temp_epi16_y, temp_epi8, temp_y_epi16, sample0_epi16, sample1_epi16;
+
+  int start_point = 0;
+  int start_point_uv = 0;
+
+
   for (int temp_y = 0; temp_y < height; temp_y += 1) {
    temp_epi16_y = _mm256_setzero_si256();
    int temp = 0;
@@ -931,7 +925,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
 
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
-     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_extract_epi32(temp_epi8, 0);
+
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 0] = _mm256_extract_epi8(temp_epi8, 0);
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 1] = _mm256_extract_epi8(temp_epi8, 1);
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 2] = _mm256_extract_epi8(temp_epi8, 2);
+     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu + 3] = _mm256_extract_epi8(temp_epi8, 3);
 
      break;
 

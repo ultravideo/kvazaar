@@ -89,11 +89,11 @@ static void setup()
 	int shift = 15 - KVZ_BIT_DEPTH;
 	int offset = 1 << (shift - 1);
 
- hi_prec_luma_rec0 = 0; //mv_param[0][0] & 3 || mv_param[0][1] & 3;
- hi_prec_luma_rec1 = 0; //mv_param[1][0] & 3 || mv_param[1][1] & 3;
+ hi_prec_luma_rec0 = mv_param[0][0] & 3 || mv_param[0][1] & 3;
+ hi_prec_luma_rec1 = mv_param[1][0] & 3 || mv_param[1][1] & 3;
 
- hi_prec_chroma_rec0 = 0; //mv_param[0][0] & 7 || mv_param[0][1] & 7;
- hi_prec_chroma_rec1 = 0; //mv_param[1][0] & 7 || mv_param[1][1] & 7;
+ hi_prec_chroma_rec0 = mv_param[0][0] & 7 || mv_param[0][1] & 7;
+ hi_prec_chroma_rec1 = mv_param[1][0] & 7 || mv_param[1][1] & 7;
 
 	if (hi_prec_chroma_rec0) high_precision_rec0 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
 	if (hi_prec_chroma_rec1) high_precision_rec1 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
