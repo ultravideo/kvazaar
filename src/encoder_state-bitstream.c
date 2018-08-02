@@ -1021,20 +1021,27 @@ static void populate_extra_rps(encoder_state_t *const state )
   rps->inter_rps_pred_flag = 0;
 
   //Try to use inter rps pred if num rps > 0
-  // With gop try to use the rps that matches the current gop_offset
+  // With gop try to use the rps that matches the current (gop_offset-1)%gop_len
   // If no gop used, try the prev rps if 
   if( cfg->num_rps > 0){
     const kvz_rps_config *ref_rps = NULL;
-
-    if( gop != NULL){
-      ref_rps = &cfg->rps[state->frame->gop_offset];
-      rps->delta_ridx = cfg->num_rps - state->frame->gop_offset;
-    } else {
-      ref_rps = &cfg->rps[cfg->num_rps-1];
-      rps->delta_ridx = 1;
-    }
-    
     int delta_rps = 0;
+    if( gop != NULL){
+      if (state->frame->gop_offset != 0) {
+        ref_rps = &cfg->rps[state->frame->gop_offset - 1];
+        rps->delta_ridx = cfg->num_rps - (state->frame->gop_offset - 1);
+        delta_rps = (ref_rps + 1)->delta_rps;
+      } else {
+        ref_rps = &cfg->rps[cfg->gop_len - 1];
+        rps->delta_ridx = cfg->num_rps - (cfg->gop_len - 1);
+        delta_rps = cfg->gop[cfg->gop_len - 1].poc_offset - cfg->gop[0].poc_offset - 8;
+      }      
+    } else {
+      ref_rps = &cfg->rps[MAX(rps->num_negative_pics - 1, 0)];
+      rps->delta_ridx = 1;
+      delta_rps = -1;
+    }
+        
     int num_ref_pic = ref_rps->num_negative_pics + ref_rps->num_positive_pics;
     rps->delta_rps = delta_rps;
     rps->num_ref_idc = num_ref_pic + 1;
@@ -1044,11 +1051,13 @@ static void populate_extra_rps(encoder_state_t *const state )
     for (int j = 0; j < rps->num_ref_idc; j++) {
       int ref_delta_POC = (j < num_ref_pic) ? ref_rps->delta_poc[j] : 0;
       rps->ref_idc[j] = 0;
+      rps->is_used[j] = 0;
       //Loop through pics in the cur rps 
       for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++) {
         if (rps->delta_poc[k] == ref_delta_POC + delta_rps) {
           //Found a poc that mathces the ref poc
           rps->ref_idc[j] = 1;
+          rps->is_used[j] = 1;
           count++;
           break;
         }
@@ -1674,8 +1683,16 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   {
     uint8_t num_short_term_ref_pic_sets = encoder->cfg.num_rps;//encoder->layer.num_short_term_ref_pic_sets;
     uint8_t short_term_ref_pic_set_sps_flag = num_short_term_ref_pic_sets != 0 ? encoder->layer.short_term_ref_pic_set_sps_flag : 0;
-    WRITE_U(stream, short_term_ref_pic_set_sps_flag, 1, "short_term_ref_pic_set_sps_flag");
     
+    uint8_t selector = 0;
+    selector += short_term_ref_pic_set_sps_flag ? 1 : 0;
+    selector += state->frame->ref->used_size - encoder->cfg.ILR_frames == ref_negative + ref_positive ? 2 : 0;
+    selector += encoder->cfg.gop_len > 0 ? 4 : 0;
+    selector += num_short_term_ref_pic_sets >= 2 ? 8 : 0;
+    selector += encoder->cfg.gop_len > 0 && (ref_negative != encoder->cfg.gop[state->frame->gop_offset].ref_neg_count || ref_positive != encoder->cfg.gop[state->frame->gop_offset].ref_pos_count) ? 16 : 0;
+
+    WRITE_U(stream, selector < 16 ? short_term_ref_pic_set_sps_flag : 0, 1, "short_term_ref_pic_set_sps_flag");
+
     //if ( !encoder->layer.short_term_ref_pic_set_sps_flag ) {
     //  write_short_term_ref_pic_set(stream, state, ref_negative, ref_positive, num_short_term_ref_pic_sets);
     //} else if (num_short_term_ref_pic_sets > 1) {
@@ -1684,16 +1701,12 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     //  int stRpsIdx = (num_short_term_ref_pic_sets <= poc ? num_short_term_ref_pic_sets : poc) - 1; // num of (available) refs increases with idx/poc
     //  WRITE_U(stream, stRpsIdx, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx"); //TODO: Get correct idx from somewhere
     //}
-    uint8_t selector = 0;
-    selector += short_term_ref_pic_set_sps_flag ? 1 : 0;
-    selector += state->frame->ref->used_size - encoder->cfg.ILR_frames == ref_negative + ref_positive ? 2 : 0;
-    selector += encoder->cfg.gop_len > 0 ? 4 : 0;
-    selector += num_short_term_ref_pic_sets >= 2 ? 8 : 0;
-
+ 
     switch (selector) {
     case 1:
     case 3:
     case 7:
+
       break;
 
     case 9:
@@ -1716,7 +1729,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       kvz_rps_config *rps = &((encoder_control_t*)(encoder))->cfg.rps[encoder->cfg.num_rps];
       rps->num_negative_pics = ref_negative;
       rps->num_positive_pics = ref_positive;
-      write_short_term_ref_pic_set(stream, state, 1, encoder->cfg.num_rps);
+      write_short_term_ref_pic_set(stream, state, true, encoder->cfg.num_rps);
       break;
     }
     }

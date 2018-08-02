@@ -1609,11 +1609,13 @@ static void generate_gop_rps(kvz_config *cfg){
       for( int j = 0; j < rps->num_ref_idc; j++){
         int ref_delta_POC = (j < num_ref_pic) ? ref_rps->delta_poc[j] : 0;
         rps->ref_idc[j] = 0;
+        rps->is_used[j] = 0;
         //Loop through pics in the cur rps 
         for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++){
           if (rps->delta_poc[k] == ref_delta_POC + delta_rps){
             //Found a poc that mathces the ref poc
             rps->ref_idc[j] = 1;
+            rps->is_used[j] = 1;
             count++;
             break;
           }
