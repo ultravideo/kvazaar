@@ -725,9 +725,9 @@ static void inter_recon_bipred_no_mov_avx2(
  const hi_prec_buf_t*high_precision_rec0,
  const hi_prec_buf_t*high_precision_rec1,
  lcu_t* lcu,
- kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
- kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
- kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C]) {
+ kvz_pixel* temp_lcu_y,
+ kvz_pixel* temp_lcu_u,
+ kvz_pixel* temp_lcu_v) {
 
  int y_in_lcu, x_in_lcu;
  __m256i sample0_epi8, sample1_epi8, temp_y_epi8;
@@ -870,9 +870,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	const hi_prec_buf_t*high_precision_rec0,
 	const hi_prec_buf_t*high_precision_rec1,
 	lcu_t* lcu,
-	kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
-	kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-	kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C]) 
+	kvz_pixel* temp_lcu_y,
+	kvz_pixel* temp_lcu_u,
+	kvz_pixel* temp_lcu_v) 
 {
 
  int y_in_lcu;
