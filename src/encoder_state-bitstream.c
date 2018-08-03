@@ -385,8 +385,9 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
   int max_vps_dec_pic_buffering[MAX_LAYERS+1][MAX_LAYERS][MAX_TEMPORAL_LAYERS] = {0};
   //Set buffering to match values of vps_max_dec_pic_buffering. Only *[1][k][0] inds are used
-  memcpy( max_vps_dec_pic_buffering[1][0], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
-  memcpy( max_vps_dec_pic_buffering[1][1], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
+  for (int i = 0; i < num_layers_in_id_list; i++) {
+    memcpy(max_vps_dec_pic_buffering[1][i], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
+  }
 
   //uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = {{{0},{0}},
   //                                                      {{max_dec_pic_buffering_minus1}, {max_dec_pic_buffering_minus1}}}; //needs to be in line (<=) sps values
@@ -458,17 +459,28 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //Figure out the max dec pic buffering need between all of the layers
   int vps_max_dec_pic_buffering[MAX_TEMPORAL_LAYERS] = { 0 };
-  vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = state->encoder_control->cfg.gop_len;
+  //vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = state->encoder_control->cfg.gop_len;
+  int max_refs = 1;
   if( state->encoder_control->cfg.gop_len == 0 ){
     //Get max ref frames between layers
-    int max_refs = 1;
     kvz_config *cfg = &state->encoder_control->cfg;
     while (cfg != NULL){
       max_refs = MAX(max_refs, cfg->ref_frames);
       cfg = cfg->next_cfg;
     }
-    vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = max_refs;
+  } else {
+    //Get max number of pos+neg ref from gops
+    for (int i = 0; i < state->encoder_control->cfg.gop_len; i++) {
+      kvz_gop_config *gop = &state->encoder_control->cfg.gop[i];
+      max_refs = MAX(max_refs, gop->ref_neg_count + gop->ref_pos_count);
+      if(vps_max_sub_layers_minus1 > 0 && gop->tId < vps_max_sub_layers_minus1)
+      {
+        int new_max_refs = MAX(vps_max_dec_pic_buffering[MAX(gop->tId - 1, 0)], gop->ref_neg_count + gop->ref_pos_count);
+        vps_max_dec_pic_buffering[gop->tId] = MAX(vps_max_dec_pic_buffering[gop->tId], new_max_refs);
+      }
+    }
   }
+  vps_max_dec_pic_buffering[vps_max_sub_layers_minus1] = max_refs;
 
   //for each layer
   for (int i = vps_sub_layer_ordering_info_present ? 0 : vps_max_sub_layers_minus1; i <= vps_max_sub_layers_minus1; i++) {
