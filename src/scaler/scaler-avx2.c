@@ -25,6 +25,8 @@
 #include <assert.h>
 #include <immintrin.h>
 
+#define B11011000 0xD8 //0b11011000
+
 // Used only to clip values
 static __m256i clip_avx2(int ref_pos, int src_width, int size, __m256i adder)
 {
@@ -271,6 +273,8 @@ static int getFilter(const int** const filter, int is_upsampling, int is_luma, i
  return (sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]));
 }
 
+
+
 //Resampling is done here per buffer
 void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
 {
@@ -353,7 +357,7 @@ void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t*
    pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
    min = src_width - 1;
-   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
    min = _mm_extract_epi16(smallest_epi16, 0);
 
@@ -389,7 +393,7 @@ void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t*
     pointer = clip_avx2(ref_pos, src_width, size, upscaling_adder);
     pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
-    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
     smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
     min = _mm_extract_epi16(smallest_epi16, 0);
 
@@ -588,7 +592,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
    pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
    min = src_width-1;
-   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+   smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
    min = _mm_extract_epi16(smallest_epi16, 0);
    
@@ -628,7 +632,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
     pointer = clip_avx2(ref_pos, src_width, size, upscaling_adder);
     pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
-    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), 0b11011000));
+    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
     smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
     min = _mm_extract_epi16(smallest_epi16, 0);
 
