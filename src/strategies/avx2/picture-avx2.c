@@ -874,8 +874,8 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	kvz_pixel* temp_lcu_u,
 	kvz_pixel* temp_lcu_v) 
 {
-
- if (hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
+ bool test = false;
+ if (test) //hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
  {
   inter_recon_bipred_no_mov_avx2(height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
  }
