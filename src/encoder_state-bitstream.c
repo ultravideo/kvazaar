@@ -98,7 +98,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // PTL
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
-  WRITE_U(stream, 0, 1, "general_tier_flag");
+  WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
   WRITE_U(stream, (state->encoder_control->bitdepth == 8)?1:2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
@@ -1358,12 +1358,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
 
-  if (encoder->lcu_dqp_enabled) {
+  if (encoder->max_qp_delta_depth >= 0) {
     // Use separate QP for each LCU when rate control is enabled.
     WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
-    WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
+    WRITE_UE(stream, encoder->max_qp_delta_depth, "diff_cu_qp_delta_depth");
   } else {
-  WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
+    WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   }
 
   //TODO: add QP offsets
@@ -1772,15 +1772,17 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
     }
   }
-    
+
   if (state->frame->slicetype != KVZ_SLICE_I) {
+      WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
+      WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[0]) - 1), "num_ref_idx_l0_active_minus1");
     //Override only when ref_negative & positive differ from the default (number of ref frames / zero)
     uint8_t override_flag = (ref_negative != encoder->cfg.ref_frames ) || (ref_positive != 0);
     WRITE_U(stream, override_flag ? 1 : 0, 1, "num_ref_idx_active_override_flag");
     if (override_flag) {
       WRITE_UE(stream, ref_negative + encoder->cfg.ILR_frames != 0 ? ref_negative + encoder->cfg.ILR_frames - 1 : 0, "num_ref_idx_l0_active_minus1");
       if (state->frame->slicetype == KVZ_SLICE_B) {
-        WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
+        WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[1]) - 1), "num_ref_idx_l1_active_minus1");
       }
     }
 

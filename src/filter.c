@@ -262,7 +262,7 @@ static bool is_on_8x8_grid(int x, int y, edge_dir dir)
 
 static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir dir)
 {
-  if (!state->encoder_control->lcu_dqp_enabled) {
+  if (state->encoder_control->max_qp_delta_depth < 0) {
     return state->qp;
   }
 

@@ -350,6 +350,7 @@ typedef struct kvz_config
   uint8_t *optional_key;
 
   enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
+  int32_t intra_rdo_et; /*!< \since 4.1.0 \brief Use early termination in intra rdo. */
 
   int32_t lossless; /*!< \brief Use lossless coding. */
 
@@ -391,6 +392,9 @@ typedef struct kvz_config
 
   /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
   uint32_t me_max_steps;
+
+  /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
+  int8_t fast_residual_cost_limit;
 
 //*********************************************
   //For scalable extension. TODO: Move somewhere else?

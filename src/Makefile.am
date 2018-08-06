@@ -199,8 +199,12 @@ libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.h
 
 if HAVE_PPC
+
+if HAVE_ALTIVEC
 libaltivec_la_CFLAGS = -maltivec
 endif
+
+endif #HAVE_PPC
 
 if HAVE_X86
 

@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=4
-ver_minor=0
+ver_minor=1
 ver_release=0
 
 # Prevents configure from adding a lot of defines to the CFLAGS
@@ -45,15 +45,17 @@ AC_SYS_LARGEFILE
 
 LT_INIT([win32-dll])
 
+AX_CHECK_COMPILE_FLAG([-maltivec],[flag_altivec="true"])
 AX_CHECK_COMPILE_FLAG([-mavx2],   [flag_avx2="true"])
 AX_CHECK_COMPILE_FLAG([-msse4.1], [flag_sse4_1="true"])
 AX_CHECK_COMPILE_FLAG([-msse2],   [flag_sse2="true"])
 
+AM_CONDITIONAL([HAVE_ALTIVEC], [test x"$flag_altivec" = x"true"])
 AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
-KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
+KVZ_CFLAGS="-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
@@ -68,7 +70,10 @@ AS_IF([test "x$with_cryptopp" = "xyes"],
         [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
         [PKG_CHECK_MODULES([cryptopp], [libcrypto++],
             [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
-            [AC_MSG_ERROR([neither cryptopp nor libcrypto++ found with pkg-config])]
+            [PKG_CHECK_MODULES([cryptopp], [libcryptopp],
+                [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
+                [AC_MSG_ERROR([neither cryptopp, libcrypto++ nor libcryptopp found with pkg-config])]
+            )]
         )]
     )]
 )

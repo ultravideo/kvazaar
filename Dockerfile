@@ -9,34 +9,35 @@
 #
 #     RESOLUTION=`avconv -i input.avi 2>&1 | grep Stream | grep -oP ', \K[0-9]+x[0-9]+'`
 #     avconv -i input.avi -an -f rawvideo -pix_fmt yuv420p - | docker run -i -a STDIN -a STDOUT kvazaar -i - --wpp --threads=8 --input-res=$RESOLUTION --preset=ultrafast -o - > output.265
-#  or 
+#  or
 #     RESOLUTION=`ffmpeg -i input.avi 2>&1 | grep Stream | grep -oP ', \K[0-9]+x[0-9]+'`
 #     ffmpeg -i input.avi -an -f rawvideo -pix_fmt yuv420p - | docker run -i -a STDIN -a STDOUT kvazaar -i - --wpp --threads=8 --input-res=$RESOLUTION --preset=ultrafast -o - > output.265
 #
 
-# Use Ubuntu 15.10 as a base for now, it's around 136MB
-FROM ubuntu:15.10
+# Use Ubuntu 18.04 as a base for now, it's around 88MB
+FROM ubuntu:18.04
 
 MAINTAINER Marko Viitanen <fador@iki.fi>
 
-    # List of needed packages to be able to build kvazaar with autotools
-    ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git yasm pkgconf
-    
-    # Run all the commands in one RUN so we don't have any extra history
-    # data in the image.
-    RUN apt-get update \
+# List of needed packages to be able to build kvazaar with autotools
+ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git yasm pkgconf
+
+ADD . kvazaar
+# Run all the commands in one RUN so we don't have any extra history
+# data in the image.
+RUN apt-get update \
     && apt-get install -y $REQUIRED_PACKAGES \
     && apt-get clean \
-    && git clone --depth=1 git://github.com/ultravideo/kvazaar.git; \
-        cd kvazaar; \
-        ./autogen.sh; \
-        ./configure --disable-shared;\
-        make;\
-        make install; \
-    AUTOINSTALLED_PACKAGES=`apt-mark showauto`; \
-    apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES; \
-        apt-get clean autoclean; \
-        apt-get autoremove -y; \
-        rm -rf /var/lib/{apt,dpkg,cache,log}/
+    && cd kvazaar \
+    && ./autogen.sh \
+    && ./configure --disable-shared \
+    && make\
+    && make install \
+    && AUTOINSTALLED_PACKAGES=`apt-mark showauto` \
+    && apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES \
+    && apt-get clean autoclean \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/{apt,dpkg,cache,log}/
+
 ENTRYPOINT ["kvazaar"]
 CMD ["--help"]

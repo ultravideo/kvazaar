@@ -128,10 +128,10 @@ void kvz_image_free(kvz_picture *const im)
  */
 kvz_picture *kvz_image_copy_ref(kvz_picture *im)
 {
-  // The caller should have had another reference.
-  assert(im->refcount > 0);
-  KVZ_ATOMIC_INC(&(im->refcount));
-
+  int32_t new_refcount = KVZ_ATOMIC_INC(&im->refcount);
+  // The caller should have had another reference and we added one
+  // reference so refcount should be at least 2.
+  assert(new_refcount >= 2);
   return im;
 }
 

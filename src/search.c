@@ -138,6 +138,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->type      = cu->type;
       to->depth     = cu->depth;
       to->part_size = cu->part_size;
+      to->qp        = cu->qp;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -262,7 +263,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += kvz_get_coeff_cabac_cost(state, coeffs, width, 0, luma_scan_mode);
+    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -331,8 +332,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += kvz_get_coeff_cabac_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
-    coeff_bits += kvz_get_coeff_cabac_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -413,6 +414,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->tr_depth = depth > 0 ? depth : 1;
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
+  cur_cu->qp = state->qp;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.

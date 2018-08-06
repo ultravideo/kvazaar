@@ -621,7 +621,16 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
+
+    // Early termination if no coefficients has to be coded
+    if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
+      modes_to_check = rdo_mode + 1;
+      break;
+    }
   }
+
+  // Update order according to new costs
+  sort_modes(modes, costs, modes_to_check);
 
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
@@ -845,7 +854,6 @@ void kvz_search_cu_intra(encoder_state_t * const state,
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
-  double best_rough_cost = costs[select_best_mode_index(modes, costs, number_of_modes)];
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {
@@ -872,5 +880,5 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
 
   *mode_out = modes[best_mode_i];
-  *cost_out = skip_rough_search ? costs[best_mode_i]:best_rough_cost;
+  *cost_out = costs[best_mode_i];
 }

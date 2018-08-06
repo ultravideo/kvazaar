@@ -424,7 +424,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
              roi_size * sizeof(*cfg->roi.dqps));
     }
 
-    encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || encoder->cfg.roi.dqps;
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps) {
+    encoder->max_qp_delta_depth = 0;
+  } else {
+    encoder->max_qp_delta_depth = -1;
+  }
 
 
     // NOTE: When tr_depth_inter is equal to 0, the transform is still split

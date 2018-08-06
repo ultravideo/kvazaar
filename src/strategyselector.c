@@ -26,9 +26,6 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#elif MACOS
-#include <sys/param.h>
-#include <sys/sysctl.h>
 #else
 #include <unistd.h>
 #endif
@@ -372,6 +369,7 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
+#  if defined(__linux__)
 #include <fcntl.h>
 #include <unistd.h>
 #include <linux/auxvec.h>
@@ -406,6 +404,49 @@ out_close:
     close(fd);
     return result;
 }
+#  elif defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <machine/cpu.h>
+
+static int altivec_available(void)
+{
+  u_long cpu_features = 0;
+  size_t len = sizeof(cpu_features);
+
+  sysctlbyname("hw.cpu_features", &cpu_features, &len, NULL, 0);
+  return !!(cpu_features & PPC_FEATURE_HAS_ALTIVEC);
+}
+#  elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#ifndef __APPLE__
+#include <machine/cpu.h>
+#endif
+
+static int altivec_available(void)
+{
+  int cpu_altivec = 0;
+  size_t len = sizeof(cpu_altivec);
+#ifdef HW_VECTORUNIT
+  int mib[] = { CTL_HW, HW_VECTORUNIT };
+#else
+  int mib[] = { CTL_MACHDEP, CPU_ALTIVEC };
+#endif
+
+  sysctl(mib, sizeof(mib)/sizeof(mib[0]), &cpu_altivec, &len, NULL, 0);
+  return cpu_altivec;
+}
+#  else
+static int altivec_available(void)
+{
+#if COMPILE_POWERPC_ALTIVEC
+  return 1;
+#else
+  return 0;
+#endif
+}
+#  endif
 #endif //COMPILE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
