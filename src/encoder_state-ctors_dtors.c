@@ -177,7 +177,7 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
 
 // ***********************************************
 // Modified for SHVC.
-static int encoder_state_config_layer_init(encoder_state_t * const state, const int lcu_offset_x, const int lcu_offset_y, const int width, const int height, const int width_in_lcu, const int height_in_lcu, scaling_parameter_t * const scaling_param)
+static int encoder_state_config_layer_init(const encoder_state_t * const state, const int lcu_offset_x, const int lcu_offset_y, const int width, const int height, const int width_in_lcu, const int height_in_lcu, const scaling_parameter_t * const scaling_param)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
   if(ctrl->cfg.wpp){

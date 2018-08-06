@@ -153,7 +153,7 @@ static void scalability_prepare(encoder_state_t *state)
 
 //TODO: To be depricated
 //TODO: Propably overkill, figure out a better way. Need to add bitsream written?
-static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state)
+/*static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t *const state)
 {
   if (state->encoder_control != NULL) {
     for (int i = 0; state->children[i].encoder_control; i++) {
@@ -166,10 +166,10 @@ static void add_dep_from_children(threadqueue_job_t *job, const encoder_state_t 
       add_dep_from_children(job, &state->children[i]);
     }
   }
-}
+}*/
 //TODO: To be depricated
 //Start the per wpp scaling jobs recursively
-static void start_block_scaling_jobs(encoder_state_t *state, kvz_image_scaling_parameter_t *base_param)
+/*static void start_block_scaling_jobs(encoder_state_t *state, kvz_image_scaling_parameter_t *base_param)
 {
   //Go deeper until a leaf state is reached
   if (state->is_leaf) {
@@ -228,7 +228,8 @@ static void start_block_scaling_jobs(encoder_state_t *state, kvz_image_scaling_p
     }
   }
 
-}
+}*/
+/*
 //TODO: To be depricated
 // Scale image by adding a scaling worker job to the job queue
 static kvz_picture* deferred_block_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
@@ -261,12 +262,12 @@ static kvz_picture* deferred_block_scaling(kvz_picture* const pic_in, const scal
   start_block_scaling_jobs(state, &state->layer->img_job_param);
 
   return kvz_image_copy_ref(state->layer->img_job_param.pic_out);
-}
+}*/
 
 //TODO: To be depricated
 //Start the per wpp scaling jobs recursively
 //TODO: Add support for downsampling?
-static void start_block_step_scaling_jobs(encoder_state_t * const state, const kvz_image_scaling_parameter_t * const base_param)
+/*static void start_block_step_scaling_jobs(encoder_state_t * const state, const kvz_image_scaling_parameter_t * const base_param)
 {
   //Go deeper until a leaf state is reached
   if (state->is_leaf) {
@@ -321,7 +322,7 @@ static void start_block_step_scaling_jobs(encoder_state_t * const state, const k
 
                                                                    //Create hor job for each row that does not have one yet and add dep
                                                                    //int id_offset = (lcu->id % state->lcu_order_count) * state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
-        int id_offset = lcu->index; //* state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
+        int id_offset = lcu->index; //times state->ILR_state->encoder_control->in.height_in_lcu; //Offset the hor job index by the column number of the current lcu
         for (int row = ver_range[0]; row < ver_range[1]; row++) {
           int hor_ind = row * state->encoder_control->in.width_in_lcu + id_offset;
 
@@ -398,7 +399,7 @@ static void start_block_step_scaling_jobs(encoder_state_t * const state, const k
       kvz_blockScalingSrcHeightRange(range + 2, param->param, param->block_y, param->block_height);
 
       for (int i = 0; i < state->num_ILR_states; i++) {
-        encoder_state_t *ilr_state = &state->ILR_state[i];
+        const encoder_state_t *ilr_state = &state->ILR_state[i];
         int ilr_tile_x = ilr_state->tile->offset_x;
         int ilr_tile_y = ilr_state->tile->offset_y;
         int ilr_tile_width = ilr_state->tile->frame->width;
@@ -435,11 +436,11 @@ static void start_block_step_scaling_jobs(encoder_state_t * const state, const k
     }
   }
 
-}
+}*/
 
 //TODO: To be depricated
 // Scale image by adding scaling worker jobs to the job queue
-static kvz_picture* deferred_block_step_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
+/*static kvz_picture* deferred_block_step_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
 {
   if (pic_in == NULL) {
     return NULL;
@@ -469,8 +470,8 @@ static kvz_picture* deferred_block_step_scaling(kvz_picture* const pic_in, const
   start_block_step_scaling_jobs(state, &state->layer->img_job_param);
 
   return kvz_image_copy_ref(state->layer->img_job_param.pic_out);
-}
-
+}*/
+/*
 //TODO: To be depricated
 // Scale image by adding a scaling worker job to the job queue
 static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, encoder_state_t *state, uint8_t skip_same)
@@ -516,11 +517,11 @@ static kvz_picture* deferred_image_scaling(kvz_picture* const pic_in, const scal
   //propagate_tqj_ilr_rec_scaling_done_to_children(state);
 
   return pic_out;
-}
+}*/
 
 //TODO: To be depricated
 // Scale cu_array by adding a scaling worker job to the job queue
-static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same)
+/*static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same)
 {
   if (skip_same && state->tile->frame->width_in_lcu == state->ILR_state->tile->frame->width_in_lcu &&
     state->tile->frame->height_in_lcu == state->ILR_state->tile->frame->height_in_lcu) {
@@ -562,11 +563,11 @@ static cu_array_t* deferred_cu_array_upsampling(encoder_state_t *state, int32_t 
   //propagate_tqj_ilr_cua_upsampling_done_to_children(state);
 
   return cua;
-}
+}*/
 
 //TODO: To be depricated
 //Start the per wpp scaling jobs recursively
-static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsampling_parameter_t *base_param)
+/*static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsampling_parameter_t *base_param)
 {
   //Go deeper until a leaf state is reached
   if (state->is_leaf) {
@@ -639,11 +640,11 @@ static void start_cua_lcu_scaling_jobs(encoder_state_t *state, kvz_cua_upsamplin
     }
   }
 
-}
+}*/
 
 //TODO: To be depricated
 // Scale cu_array by adding a scaling worker job for each lcu
-static cu_array_t* deferred_cua_lcu_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same)
+/*static cu_array_t* deferred_cua_lcu_upsampling(encoder_state_t *state, int32_t mv_scale[2], int32_t pos_scale[2], uint8_t skip_same)
 {
   if (skip_same && state->tile->frame->width_in_lcu == state->ILR_state->tile->frame->width_in_lcu &&
     state->tile->frame->height_in_lcu == state->ILR_state->tile->frame->height_in_lcu) {
@@ -675,13 +676,13 @@ static cu_array_t* deferred_cua_lcu_upsampling(encoder_state_t *state, int32_t m
   start_cua_lcu_scaling_jobs(state, param);
 
   return cua;
-}
+}*/
 
 /**
 * Handle adding ilr frames to the ref list.
 *
 * - Add ilr frame to the ref list if ilr is enabled
-*/
+*//*
 //TODO: To be depricated
 static void add_ilr_frames(encoder_state_t *state) 
 {
@@ -748,7 +749,7 @@ static void add_ilr_frames(encoder_state_t *state)
     kvz_image_free(scaled_pic);
     kvz_cu_array_free(&scaled_cu);
   }
-}
+}*/
 
 // Scale tile specified area
 static void block_step_scaling(encoder_state_t * const state )
@@ -919,7 +920,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     }*/
 
     for (int i = 0; i < state->num_ILR_states; i++) {
-      encoder_state_t *ilr_state = &state->ILR_state[i];
+      const encoder_state_t *ilr_state = &state->ILR_state[i];
       int ilr_tile_x = ilr_state->tile->offset_x;
       int ilr_tile_y = ilr_state->tile->offset_y;
       int ilr_tile_width = ilr_state->tile->frame->width;
@@ -1061,7 +1062,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     }*/
 
     for (int i = 0; i < state->num_ILR_states; i++) {
-      encoder_state_t *ilr_state = &state->ILR_state[i];
+      const encoder_state_t *ilr_state = &state->ILR_state[i];
       int ilr_tile_x = ilr_state->tile->offset_x;
       int ilr_tile_y = ilr_state->tile->offset_y;
       int ilr_tile_width = ilr_state->tile->frame->width;

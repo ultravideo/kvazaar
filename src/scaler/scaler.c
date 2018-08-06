@@ -1916,7 +1916,7 @@ static void blockScalingSrcRange( int range[2], const int scale, const int add, 
 void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width)
 {
   //Calculate parameters
-  calculateParameters(base_param, 0, 0, 0);
+  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
 
   blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, base_param->src_width + base_param->src_padding_x);
 }
@@ -1924,7 +1924,7 @@ void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * con
 void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height)
 {
   //Calculate parameters
-  calculateParameters(base_param, 0, 0, 0);
+  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
 
   blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, base_param->src_height + base_param->src_padding_y);
 }

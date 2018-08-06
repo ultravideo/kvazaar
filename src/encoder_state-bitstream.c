@@ -463,7 +463,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   int max_refs = 1;
   if( state->encoder_control->cfg.gop_len == 0 ){
     //Get max ref frames between layers
-    kvz_config *cfg = &state->encoder_control->cfg;
+    const kvz_config *cfg = &state->encoder_control->cfg;
     while (cfg != NULL){
       max_refs = MAX(max_refs, cfg->ref_frames);
       cfg = cfg->next_cfg;
@@ -471,7 +471,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   } else {
     //Get max number of pos+neg ref from gops
     for (int i = 0; i < state->encoder_control->cfg.gop_len; i++) {
-      kvz_gop_config *gop = &state->encoder_control->cfg.gop[i];
+      const kvz_gop_config *gop = &state->encoder_control->cfg.gop[i];
       max_refs = MAX(max_refs, gop->ref_neg_count + gop->ref_pos_count);
       if(vps_max_sub_layers_minus1 > 0 && gop->tId < vps_max_sub_layers_minus1)
       {
@@ -956,8 +956,8 @@ static void populate_extra_rps(encoder_state_t *const state )
 {
   //Populate given rps. Try using existing rps as ref.
   const encoder_control_t* const encoder = state->encoder_control;
-  kvz_config *cfg = &encoder->cfg;
-  kvz_rps_config *rps = &cfg->rps[cfg->num_rps];
+  const kvz_config *cfg = &encoder->cfg;
+  kvz_rps_config *rps = (kvz_rps_config*)&cfg->rps[cfg->num_rps];
   const kvz_gop_config *const gop = encoder->cfg.gop_len ? &cfg->gop[state->frame->gop_offset] : NULL;
 
   //Populate rps from frame ref

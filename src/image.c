@@ -757,7 +757,7 @@ void kvz_block_scaler_worker(void * opaque_param)
 void kvz_block_step_scaler_worker(void * opaque_param)
 {
   kvz_image_scaling_parameter_t *in_param = opaque_param;
-  const kvz_picture * const pic_in = in_param->pic_in;
+  kvz_picture * const pic_in = in_param->pic_in;
   kvz_picture * const pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
 
@@ -845,7 +845,7 @@ void kvz_block_step_scaler_worker(void * opaque_param)
 void kvz_tile_step_scaler_worker(void * opaque_param)
 {
   kvz_image_scaling_parameter_t *in_param = opaque_param;
-  const kvz_picture * const pic_in = in_param->pic_in;
+  kvz_picture * const pic_in = in_param->pic_in;
   kvz_picture * const pic_out = in_param->pic_out;
   const scaling_parameter_t *const param = in_param->param;
 
@@ -917,7 +917,7 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   }
 
   //If no scaling needs to be done, just return pic_in
-  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->src_width) {
+  if (skip_same && param->src_height == param->trgt_height && param->src_width == param->trgt_width) {
     return kvz_image_copy_ref(pic_in);
   }
 
