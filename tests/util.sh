@@ -83,11 +83,19 @@ valgrind_expected_test() {
     
     prepare "${dimensions}" "${frames}"
     
+    # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
+    # valgrind. Otherwise, run without valgrind.
+    
     valgrind_error=2
+    if [ "${KVZ_TEST_VALGRIND:-0}" = '1' ]; then
+        valgrind='valgrind --leak-check=full --error-exitcode=${valgrind_error} --'
+    else
+        valgrind=''
+    fi
+    
     set +e
     print_and_run \
-        libtool execute \
-            valgrind --leak-check=full --error-exitcode=${valgrind_error} -- \
+        libtool execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     valgrind_status="$?"
     
@@ -108,10 +116,17 @@ temporal_test() {
     shift
     
     prepare "${dimensions}" "${frames}"
+    
+    # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
+    # valgrind. Otherwise, run without valgrind.
+    if [ "${KVZ_TEST_VALGRIND:-0}" = '1' ]; then
+        valgrind='valgrind --leak-check=full --error-exitcode=1 --'
+    else
+        valgrind=''
+    fi
 
     print_and_run \
-        libtool execute \
-            valgrind --leak-check=full --error-exitcode=1 -- \
+        libtool execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
