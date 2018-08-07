@@ -80,6 +80,8 @@ typedef struct
   int trgt_padding_x;
   int trgt_padding_y;
 
+  int is_calculated; //Flag that tells that parameters have been calculated. Needs to be set to false manually if values are changed
+
 } scaling_parameter_t;
 
 /*==========================================================================*/

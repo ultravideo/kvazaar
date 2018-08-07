@@ -300,7 +300,7 @@ static void free_chained_img(const kvz_api *const api, kvz_picture *img )
     api->picture_free(img);
     img = next_img;
   }
-  img->base_image = img;
+  //img->base_image = img;
   api->picture_free(img);
 }
 // ***********************************************

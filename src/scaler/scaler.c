@@ -1378,6 +1378,10 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
 //Calculations from SHM
 static void calculateParameters(scaling_parameter_t* const param, const int w_factor, const int h_factor, const int is_chroma)
 {
+  if(param->is_calculated){
+    return;
+  }
+
   //First shift widths/height by an appropriate factor
   param->src_width = SCALER_SHIFT(param->src_width, w_factor);
   param->src_height = SCALER_SHIFT(param->src_height, h_factor);
@@ -1422,6 +1426,8 @@ static void calculateParameters(scaling_parameter_t* const param, const int w_fa
 
   param->delta_x = 4 * phase_x; //- (left_offset << 4)
   param->delta_y = 4 * phase_y; //- (top_offset << 4)
+
+  param->is_calculated = 1;
 }
 
 scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
@@ -1551,6 +1557,7 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
   if (yuv->y->width != param.src_width + param.src_padding_x || yuv->y->height != param.src_height + param.src_padding_y) {
     param.src_width = yuv->y->width - param.src_padding_x;
     param.src_height = yuv->y->height - param.src_padding_y;
+    param.is_calculated = 0;
     calculateParameters(&param, 0, 0, 0);
   }
 
@@ -1612,6 +1619,7 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
+      param.is_calculated = 0;
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
@@ -1676,6 +1684,7 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
     param.src_width = yuv->y->width;
     param.src_height = yuv->y->height;
+    param.is_calculated = 0;
     calculateParameters(&param, w_factor, h_factor, 0);
   }
 
@@ -1749,6 +1758,7 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
+      param.is_calculated = 0;
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
@@ -1875,6 +1885,7 @@ int kvz_yuvBlockScaling( const yuv_buffer_t* const yuv, const scaling_parameter_
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
+      param.is_calculated = 0;
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
@@ -2061,6 +2072,7 @@ int kvz_yuvBlockStepScaling(yuv_buffer_t* const dst, const yuv_buffer_t* const s
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
+      param.is_calculated = 0;
       calculateParameters(&param, w_factor, h_factor, 1);
     }
 
