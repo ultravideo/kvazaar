@@ -789,8 +789,8 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v);
 
     vector2d_t lcu_cpx = { lcu_px.x >> SHIFT, lcu_px.y >> SHIFT };
-    kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
-    kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+    kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
+    kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
 
     search_intra_chroma_rough(state, x_px, y_px, depth,
                               ref_u, ref_v, LCU_WIDTH_C,

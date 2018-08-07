@@ -96,7 +96,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
   const encoder_control_t *ctrl = info->state->encoder_control;
 
   const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;
-  const bool is_frac_chroma = x % 8 != 0 || y % 8 != 0;
+  const bool is_frac_chroma = x % (MIN_C_W) != 0 || y % (MIN_C_H) != 0;
 
   if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Check that the block does not reference pixels that are not final.
@@ -108,9 +108,9 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
       // block.
       margin = 4;
     } else if (is_frac_chroma) {
-      // Odd chroma interpolation needs up to 2 luma pixels outside the
+      // Odd chroma interpolation needs up to 4 luma pixels outside the
       // block.
-      margin = 2;
+      margin = 4 >> SHIFT;
     }
 
     if (ctrl->cfg.sao_type) {
@@ -156,7 +156,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     if (is_frac_luma) {
       margin = 4 << 2;
     } else if (is_frac_chroma) {
-      margin = 2 << 2;
+      margin = 4 << (2 - SHIFT);
     }
   }
 

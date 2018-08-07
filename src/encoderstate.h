@@ -409,11 +409,11 @@ static const uint8_t g_min_in_group[10] = {
 
 //Get the data for vertical buffer position at the left of LCU identified by the position in pixel
 #define OFFSET_VER_BUF(position_x, position_y, cur_pic, i) ((position_y) + i + ((position_x)/LCU_WIDTH - 1) * (cur_pic)->height)
-#define OFFSET_VER_BUF_C(position_x, position_y, cur_pic, i) ((position_y >> SHIFT) + i + ((position_x)/LCU_WIDTH - 1) * ((cur_pic)->height >> SHIFT))
+#define OFFSET_VER_BUF_C(position_x, position_y, cur_pic, i) (((position_y) >> SHIFT) + i + (((position_x)/LCU_WIDTH - 1) * (((cur_pic)->height) >> SHIFT)))
 
 //Get the data for horizontal buffer position at the top of LCU identified by the position in pixel
 #define OFFSET_HOR_BUF(position_x, position_y, cur_pic, i) ((position_x) + i + ((position_y)/LCU_WIDTH - 1) * (cur_pic)->width)
-#define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) ((position_x >> SHIFT) + i + ((position_y)/LCU_WIDTH - 1) * ((cur_pic)->width >> SHIFT))
+#define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) (((position_x) >> SHIFT) + i + (((position_y)/LCU_WIDTH - 1) * (((cur_pic)->width) >> SHIFT)))
   
 /** @} */
 

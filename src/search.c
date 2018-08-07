@@ -352,10 +352,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
   const vector2d_t lcu_px = { x_px >> SHIFT, y_px >> SHIFT };
-#if 0 // 444: might cause issues. 
-  //Just write this as the luma version and that might fix them (and be prettier)?
-  const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-#endif
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + SHIFT) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
@@ -365,6 +361,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
+  // Tad bit better to go lower
   if (x_px % 8 != 0 || y_px % 8 != 0) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
@@ -577,7 +574,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 
   double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes);
 
-  if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (x % (MIN_C_W) == 0 && y % (MIN_C_H) == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
   }
 
@@ -651,6 +648,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
+  lcu_t *const lcu = &work_tree[depth];
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
@@ -813,8 +811,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, lcu);
-
-      if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+      // 444: ? orig 8's
+      if (x % (MIN_C_W) == 0 && y % (MIN_C_H) == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
@@ -1147,6 +1145,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_offset = OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1);
       int luma_bytes = (LCU_WIDTH + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
       int chroma_bytes = ((LCU_WIDTH_C) + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
+
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {

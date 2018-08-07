@@ -233,8 +233,8 @@ static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, co
   // automatic buffer overrun checks.
   hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
   yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (int16_t *)malloc((luma_size >> SHIFT) * sizeof(*yuv->u));
-  yuv->v = (int16_t *)malloc((luma_size >> SHIFT) * sizeof(*yuv->v));
+  yuv->u = (int16_t *)malloc((luma_size >> (2 * SHIFT)) * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc((luma_size >> (2 * SHIFT)) * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   if (optimized_sad != NULL)
@@ -533,27 +533,27 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
 
 
 
-/**
- * \brief BLock Image Transfer from one buffer to another.
- *
- * It's a stupidly simple loop that copies pixels.
- *
- * \param orig  Start of the originating buffer.
- * \param dst  Start of the destination buffer.
- * \param width  Width of the copied region.
- * \param height  Height of the copied region.
- * \param orig_stride  Width of a row in the originating buffer.
- * \param dst_stride  Width of a row in the destination buffer.
- *
- * This should be inlined, but it's defined here for now to see if Visual
- * Studios LTCG will inline it.
- */
+
 #define BLIT_PIXELS_CASE(n) case n:\
   for (y = 0; y < n; ++y) {\
     memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(kvz_pixel));\
   }\
   break;
-
+/**
+* \brief BLock Image Transfer from one buffer to another.
+*
+* It's a stupidly simple loop that copies pixels.
+*
+* \param orig  Start of the originating buffer.
+* \param dst  Start of the destination buffer.
+* \param width  Width of the copied region.
+* \param height  Height of the copied region.
+* \param orig_stride  Width of a row in the originating buffer.
+* \param dst_stride  Width of a row in the destination buffer.
+*
+* This should be inlined, but it's defined here for now to see if Visual
+* Studios LTCG will inline it.
+*/
 void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)

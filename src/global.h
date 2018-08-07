@@ -151,12 +151,23 @@ typedef int16_t coeff_t;
 
 /* END OF CONFIG VARIABLES */
 
+//DEBUG VARS; INCLUDES AND OTHER STUFF
+unsigned n;
+#include <inttypes.h>
+#include <stdio.h>
+
 //! global var to define chroma ratio to luma
 //!   chroma_size = luma_size >> chroma_shift
 //!   but use as chroma_size = luma_size >> SHIFT;
 unsigned kvz_chroma_shift;
+
 //! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
 #define SHIFT kvz_chroma_shift
+//! minimun luma size for chroma to exist for that size (8 or 4)
+#define MIN_C_BLOCK 4 << SHIFT
+//! minimum luma width & height for chroma to exist for that size
+#define MIN_C_W MIN_C_BLOCK
+#define MIN_C_H MIN_C_BLOCK
 
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
@@ -180,7 +191,7 @@ unsigned kvz_chroma_shift;
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
 // LCU_CHROMA_SIZE is not used anywhere as it can't be used to allocate arrays.
 // TODO: remove
-#define LCU_CHROMA_SIZE (LCU_WIDTH_C * LCU_WIDTH_C) 
+#define LCU_CHROMA_SIZE ((LCU_WIDTH_C) * (LCU_WIDTH_C)) 
 
 //! Size of luma filter used in inter searches 
 #define FILTER_SIZE 8

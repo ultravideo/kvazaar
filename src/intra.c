@@ -571,9 +571,10 @@ static void intra_recon_tb_leaf(
   const int shift = color == COLOR_Y ? 0 : SHIFT;
 
   int log2width = LOG2_LCU_WIDTH - depth;
-  if (color != COLOR_Y && depth < MAX_PU_DEPTH) {
+  if (color != COLOR_Y && (depth < MAX_PU_DEPTH)) {
     // Chroma width is half of luma width, when not at maximum depth.
-    log2width -= 1;
+    // 444: Hehe nope
+    log2width -= shift;
   }
   const int width = 1 << log2width;
   const int lcu_width = LCU_WIDTH >> shift;
@@ -674,7 +675,7 @@ void kvz_intra_recon_cu(
     }
   } else {
     const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 && x % 8 == 0 && y % 8 == 0;
+    const bool has_chroma = mode_chroma != -1 && x % (MIN_C_W) == 0 && y % (MIN_C_H) == 0;
     // Process a leaf TU.
     if (has_luma) {
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);

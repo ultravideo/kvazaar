@@ -396,8 +396,9 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     int_mv_in_frame.y + pu_h > ref->height;
 
   // With 420, odd coordinates need interpolation.
-  const bool fractional_chroma = (int_mv.x & 1) || (int_mv.y & 1);
-  const bool fractional_luma = (mv_param[0] & 3) || (mv_param[1] & 3);
+  // 444: ?
+  const int8_t fractional_luma = ((mv_param[0] & 3) || (mv_param[1] & 3)); 
+  const int8_t fractional_chroma = SHIFT ? (mv_in_pu.x & 1) || (mv_in_pu.y & 1) : fractional_luma;
 
   // Generate prediction for luma.
   if (predict_luma) {
@@ -457,7 +458,8 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
-    const vector2d_t int_mv_in_frame_c = { int_mv_in_frame.x / 2, int_mv_in_frame.y / 2 };
+    const int lcu_pu_index_c = (pu_in_lcu.y >> SHIFT) * (LCU_WIDTH_C) + (pu_in_lcu.x >> SHIFT);
+    const vector2d_t mv_in_frame_c = { mv_in_frame.x >> SHIFT, mv_in_frame.y >> SHIFT };
 
     if (int_mv_outside_frame) {
       inter_cp_with_ext_border(ref->u, ref->width / 2,
@@ -530,6 +532,9 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   px_L1.y = &px_buf_L1[0];
   px_L1.u = &px_buf_L1[LCU_LUMA_SIZE];
   px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
+  // 444: added conditional
+  const int hi_prec_chroma_rec0 = SHIFT ? mv_param[0][0] & 7 || mv_param[0][1] & 7 : hi_prec_luma_rec0;
+  const int hi_prec_chroma_rec1 = SHIFT ? mv_param[1][0] & 7 || mv_param[1][1] & 7 : hi_prec_luma_rec1;
 
   yuv_im_t im_L0;
   im_L0.size = pu_w * pu_h;

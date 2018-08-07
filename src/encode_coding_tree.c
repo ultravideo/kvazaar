@@ -69,7 +69,7 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t ctx_offset = type ? 0 : (index * 3 + (index + 1) / 4);
   // 444: go ask someone what this does, and if this is even close to correct. 
   // Added the OR part to the line. 
-  uint8_t shift = type || !SHIFT ? index : (index + 3) / 4;
+  uint8_t shift = type ? index : (index + 3) / 4;
   double bits = 0;
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
@@ -254,7 +254,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if ((depth + SHIFT) <= MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || parent_coeff_u) {
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
