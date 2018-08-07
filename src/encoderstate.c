@@ -808,7 +808,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //Need to account for SAO/deblock in the ilr state
     int margin = 0; //4; //Accounts for fracmvest?
-    if (state->ILR_state->encoder_control->cfg.sao_type) {
+    if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF) {
       margin += SAO_DELAY_PX;
     }
     else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
@@ -912,7 +912,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
     /*int margin = 4; //Accounts for fracmvest?
-    if (state->ILR_state->encoder_control->cfg.sao_type) {
+    if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF) {
       margin += SAO_DELAY_PX;
     }
     else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
@@ -1055,7 +1055,7 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 
     //Need to account for SAO/deblock in the ilr state. TODO: Figure out if it affects tiles
     /*int margin = 4; //Accounts for fracmvest?
-    if (state->ILR_state->encoder_control->cfg.sao_type) {
+    if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF) {
       margin += SAO_DELAY_PX;
     } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
       margin += DEBLOCK_DELAY_PX;
@@ -1112,8 +1112,8 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
 
     //Need to account for SAO/deblock in the ilr state.
-    int margin = 4; //Accounts for fracmvest?
-    if (state->ILR_state->encoder_control->cfg.sao_type) {
+    int margin = 0; //4; //Accounts for fracmvest?
+    if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF) {
       margin += SAO_DELAY_PX;
     } else if (state->ILR_state->encoder_control->cfg.deblock_enable) {
       margin += DEBLOCK_DELAY_PX;
