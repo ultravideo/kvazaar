@@ -1776,8 +1776,8 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   //*********************************************
   //For scalable extension.
-  if ((cfg->shared == NULL && (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay && cfg->intra_period % cfg->gop_len != 0 )) ||
-      (cfg->shared != NULL && (cfg->shared->gop_len && cfg->shared->intra_period && !cfg->shared->gop_lowdelay &&
+  if ((cfg->shared == NULL && (cfg->gop_len && cfg->intra_period > 1 && !cfg->gop_lowdelay && cfg->intra_period % cfg->gop_len != 0 )) ||
+      (cfg->shared != NULL && (cfg->shared->gop_len && cfg->shared->intra_period > 1 && !cfg->shared->gop_lowdelay &&
                                cfg->shared->intra_period % cfg->shared->gop_len != 0))
      )
   {
