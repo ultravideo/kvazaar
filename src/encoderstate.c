@@ -788,13 +788,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     param_ver->block_width = lcu->size.x;
     param_ver->block_height = lcu->size.y;
 
-    kvz_image_scaling_parameter_t *param_hor = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-    kvz_copy_image_scaling_parameters(param_hor, param_ver);
-    
     kvz_image_free(param_ver->pic_in);
     param_ver->pic_in = NULL;
-    kvz_image_free(param_hor->pic_out);
-    param_hor->pic_out = NULL;
     
     //First create job for vertical scaling
     kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
@@ -828,13 +823,19 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     ver_range[0] = ver_range[0] / LCU_WIDTH; //First LCU that is needed
     ver_range[1] = ((ver_range[1] + margin) / LCU_WIDTH) + 1;//(ver_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
     ver_range[1] = MIN(ver_range[1], state->num_ILR_states);
-
+    
     //Create hor job for each row that does not have one yet and add dep
     int id_offset = lcu->index; //Offset the hor job index by the column number of the current lcu
     for (int row = ver_range[0]; row < ver_range[1]; row++) {
       int hor_ind = row + id_offset * state->num_ILR_states;//row * state->encoder_control->in.width_in_lcu + id_offset;
 
       if (row >= set_job_row) {
+        //Create hor param
+        kvz_image_scaling_parameter_t *param_hor = calloc(1, sizeof(kvz_image_scaling_parameter_t));
+        kvz_copy_image_scaling_parameters(param_hor, param_ver);
+        kvz_image_free(param_hor->pic_out);
+        param_hor->pic_out = NULL;
+
         //Set correct block parameters for hor job since it may be on a different lcu row than lcu
         const encoder_state_t * const ilr_state = &state->ILR_state[row];
         param_hor->block_y = ilr_state->tile->offset_y + ilr_state->lcu_order->position_px.y;

@@ -944,8 +944,8 @@ void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst
 {
   kvz_image_free(dst->pic_in);
   kvz_image_free(dst->pic_out);
-  dst->pic_in = kvz_image_copy_ref(src->pic_in);
-  dst->pic_out = kvz_image_copy_ref(src->pic_out);
+  dst->pic_in = src->pic_in != NULL ? kvz_image_copy_ref(src->pic_in) : NULL;
+  dst->pic_out = src->pic_out != NULL ? kvz_image_copy_ref(src->pic_out) : NULL;
 
   kvz_deallocateYuvBuffer(dst->src_buffer);
   kvz_deallocateYuvBuffer(dst->ver_tmp_buffer);

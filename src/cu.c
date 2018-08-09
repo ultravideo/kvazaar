@@ -404,8 +404,8 @@ void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const d
 {
   kvz_cu_array_free(&dst->base_cua);
   kvz_cu_array_free(&dst->out_cua);
-  dst->base_cua = kvz_cu_array_copy_ref(src->base_cua);
-  dst->out_cua = kvz_cu_array_copy_ref(src->out_cua);
+  dst->base_cua = src->base_cua != NULL ? kvz_cu_array_copy_ref(src->base_cua) : NULL;
+  dst->out_cua = src->out_cua != NULL ? kvz_cu_array_copy_ref(src->out_cua) : NULL;
 
   dst->nw_in_lcu = src->nw_in_lcu;
   dst->nh_in_lcu = src->nh_in_lcu;
