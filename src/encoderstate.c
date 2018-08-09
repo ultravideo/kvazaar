@@ -1229,6 +1229,9 @@ static void prepare_ilr_frames(encoder_state_t * const state)
     }
 
     if (ilr_rec == NULL || scaled_pic == NULL || scaled_cu == NULL) {
+      kvz_image_free(ilr_rec);
+      kvz_image_free(scaled_pic);
+      kvz_cu_array_free(&scaled_cu);
       return; //TODO: Add error etc?
     }
 
@@ -2185,7 +2188,9 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
         if (!main_state->layer->scaling_started) {
           //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+          kvz_image_free(sub_state->layer->img_job_param.pic_in);
           sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
+          kvz_image_free(sub_state->layer->img_job_param.pic_out);
           sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
           sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
           kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
