@@ -936,7 +936,6 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      break;
 
     case 16:
-     _MM_SHUFFLE
      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_y_epi16, temp_y_epi16), _MM_SHUFFLE(0, 2, 1, 3));
      _mm_storeu_si128((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
