@@ -751,7 +751,7 @@ static void inter_recon_bipred_no_mov_avx2(
 
    case 4:
 
-    lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_cvtsi256_si32(temp_y_epi8);
+    lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_y_epi8));
 
     break;
 
@@ -810,8 +810,8 @@ static void inter_recon_bipred_no_mov_avx2(
 
     case 8:
 
-     lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm256_cvtsi256_si32(temp_u_epi8);
-     lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm256_cvtsi256_si32(temp_v_epi8);
+     lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_u_epi8));
+     lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_v_epi8));
 
      break;
 
