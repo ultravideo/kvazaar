@@ -141,13 +141,50 @@ TEST test_inter_recon_bipred()
 	memcpy(result.rec.y, lcu1.rec.y, sizeof(kvz_pixel) * 64 * 64);
 	memcpy(result.rec.u, lcu1.rec.u, sizeof(kvz_pixel) * 32 * 32);
 	memcpy(result.rec.v, lcu1.rec.v, sizeof(kvz_pixel) * 32 * 32);
+ 
+ for (temp_y = 0; temp_y < height; ++temp_y) {
+  int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+  for (temp_x = 0; temp_x < width; temp_x += 1) {
+   int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+   printf("%d ", expected_test_result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
+  }
+ }
+ printf("\n");
+ 
+ for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
+  int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
+  for (temp_x = 0; temp_x < width >> 1; ++temp_x) {
+   int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+   printf("%d ", expected_test_result.rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]);
+  }
+ }
+ printf("\n");
 	
-
 	kvz_inter_recon_bipred_generic(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, width, height, xpos, ypos, high_precision_rec0, high_precision_rec1, &result, temp_lcu_y, temp_lcu_u, temp_lcu_v); 
-	
+ 
+ for (temp_y = 0; temp_y < height; ++temp_y) {
+  int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+  for (temp_x = 0; temp_x < width; temp_x += 1) {
+   int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+   printf("%d ", result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
+  }
+ }
+ printf("\n");
+
+
+ for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
+  int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
+  for (temp_x = 0; temp_x < width >> 1; ++temp_x) {
+   int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+   printf("%d ", result.rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]);
+  }
+ }
+ printf("\n");
+
+
 	for (temp_y = 0; temp_y < height; ++temp_y) {
 		int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-		for (temp_x = 0; temp_x < width; ++temp_x) {
+		for (temp_x = 0; temp_x < width; temp_x+=1) {
 			int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
 			ASSERT_EQ_FMT(expected_test_result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu], result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu], "%d");
 		}
