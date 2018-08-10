@@ -33,8 +33,8 @@ static lcu_t lcu1;
 int temp1, temp2, temp3, temp4;
 
 int16_t mv_param[2][2] = { { 3,3 },{ 3,3 } };
-int width = 4;
-int height = 4;
+int width = 8;
+int height = 8;
 int xpos = 0;
 int ypos = 0;
 
@@ -60,19 +60,6 @@ static void setup()
 	memset(lcu1.rec.y, 0, sizeof(kvz_pixel) * 64 * 64);
 	memset(lcu1.rec.u, 0, sizeof(kvz_pixel) * 32 * 32);
 	memset(lcu1.rec.v, 0, sizeof(kvz_pixel) * 32 * 32);
-
-	for (int i = 0; i < LCU_WIDTH*LCU_WIDTH; i++) {
-		temp_lcu_y[i] = rand() %256;
-		lcu1.rec.y[i] = rand() % 256;
-	}
-
-	for (int i = 0; i < LCU_WIDTH_C*LCU_WIDTH_C; i++) {
-		temp_lcu_u[i] = rand() % 256;
-		temp_lcu_v[i] = rand() % 256;
-		lcu1.rec.v[i] = rand() % 256;
-		lcu1.rec.u[i] = rand() % 256;
-	}
-
 
 
 	memset(expected_test_result.rec.y, 0, sizeof(kvz_pixel) * 64 * 64);
@@ -133,10 +120,6 @@ static void setup()
 TEST test_inter_recon_bipred()
 {
 
-	memset(result.rec.y, 0, sizeof(kvz_pixel) * 64 * 64);
-	memset(result.rec.u, 0, sizeof(kvz_pixel) * 32 * 32);
-	memset(result.rec.v, 0, sizeof(kvz_pixel) * 32 * 32);
-
 
 	memcpy(result.rec.y, lcu1.rec.y, sizeof(kvz_pixel) * 64 * 64);
 	memcpy(result.rec.u, lcu1.rec.u, sizeof(kvz_pixel) * 32 * 32);
@@ -180,7 +163,7 @@ TEST test_inter_recon_bipred()
   }
  }
  printf("\n");
-
+ 
 
 	for (temp_y = 0; temp_y < height; ++temp_y) {
 		int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));

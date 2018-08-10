@@ -751,7 +751,7 @@ static void inter_recon_bipred_no_mov_avx2(
 
    case 4:
 
-    lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_y_epi8));
+    _mm_stream_si32((int*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_cvtsi256_si32(temp_y_epi8));
 
     break;
 
@@ -809,9 +809,8 @@ static void inter_recon_bipred_no_mov_avx2(
      break;
 
     case 8:
-
-     lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_u_epi8));
-     lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_v_epi8));
+     _mm_stream_si32((int*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_cvtsi256_si32(temp_u_epi8));
+     _mm_stream_si32((int*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_cvtsi256_si32(temp_v_epi8));
 
      break;
 
@@ -918,11 +917,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
 
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
-     //lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_cvtsi256_si32(temp_epi8);
-     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_extract_epi8(temp_epi8, 0);
-     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu+1] = _mm256_extract_epi8(temp_epi8, 1);
-     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu+2] = _mm256_extract_epi8(temp_epi8, 2);
-     lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu+3] = _mm256_extract_epi8(temp_epi8, 3);
+     _mm_stream_si32((int*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_cvtsi256_si32(temp_epi8));
      break;
 
     case 8:
@@ -992,7 +987,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      switch (width) {
 
      case 4:
-
+      
       temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
       lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + 0] = _mm256_extract_epi8(temp_epi8, 0);
       lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + 1] = _mm256_extract_epi8(temp_epi8, 1);
@@ -1007,25 +1002,12 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
 
      case 8:
-
       temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
-
-    //  lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] =_mm256_cvtsi256_si32(temp_epi8);
-
-      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm256_extract_epi8(temp_epi8, 0);
-      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu+1] = _mm256_extract_epi8(temp_epi8, 1);
-      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu+2] = _mm256_extract_epi8(temp_epi8, 2);
-      lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu+3] = _mm256_extract_epi8(temp_epi8, 3);
-
-
+      _mm_stream_si32((int*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_cvtsi256_si32(temp_epi8));
+      
       temp_epi8 = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
-      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm256_extract_epi8(temp_epi8, 0);
-      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + 1] = _mm256_extract_epi8(temp_epi8, 1);
-      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + 2] = _mm256_extract_epi8(temp_epi8, 2);
-      lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu + 3] = _mm256_extract_epi8(temp_epi8, 3);
-
-
-      //lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu] = _mm256_cvtsi256_si32(temp_epi8);
+      _mm_stream_si32((int*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_cvtsi256_si32(temp_epi8));
+      
 
       break;
 
