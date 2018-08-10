@@ -733,6 +733,8 @@ static void inter_recon_bipred_no_mov_avx2(
 
  int y_in_lcu, x_in_lcu;
  __m256i sample0_epi8, sample1_epi8, temp_y_epi8;
+ int32_t * pointer = 0;
+
 
  for (int temp_y = 0; temp_y < height; temp_y += 1) {
   y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
@@ -750,7 +752,7 @@ static void inter_recon_bipred_no_mov_avx2(
    {
 
    case 4:
-    int32_t * pointer = (int32_t*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]);
+    pointer = (int32_t*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]);
     *pointer = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_y_epi8));
 
     break;
@@ -809,7 +811,7 @@ static void inter_recon_bipred_no_mov_avx2(
      break;
 
     case 8:
-     int32_t * pointer = (int32_t*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]);
+     pointer = (int32_t*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]);
      *pointer = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_u_epi8));
 
      pointer = (int32_t*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]);
@@ -886,6 +888,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
   int start_point = 0;
   int start_point_uv = 0;
+  int32_t * pointer = 0;
 
 
   for (int temp_y = 0; temp_y < height; temp_y += 1) {
@@ -920,7 +923,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
 
-     int32_t * pointer = (int32_t*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]);
+     pointer = (int32_t*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]);
      *pointer = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_epi8));
      break;
 
@@ -1008,7 +1011,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      case 8:
       temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
-      int32_t * pointer = (int32_t*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]);
+      pointer = (int32_t*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]);
       *pointer = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_epi8));
 
       temp_epi8 = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
