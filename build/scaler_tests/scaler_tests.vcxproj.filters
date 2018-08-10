@@ -18,12 +18,18 @@
     <ClInclude Include="..\..\src\scaler\scaler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\scaler\scaler-avx2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\scaler\scaler.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\scaler\main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\scaler\scaler-avx2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
