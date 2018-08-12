@@ -159,15 +159,17 @@ unsigned n;
 //! global var to define chroma ratio to luma
 //!   chroma_size = luma_size >> chroma_shift
 //!   but use as chroma_size = luma_size >> SHIFT;
+unsigned kvz_chroma_shift_w;
+unsigned kvz_chroma_shift_h;
 unsigned kvz_chroma_shift;
 
+#define SHIFT kvz_chroma_shift_w
 //! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
-#define SHIFT kvz_chroma_shift
-//! minimun luma size for chroma to exist for that size (8 or 4)
-#define MIN_C_BLOCK 4 << SHIFT
+#define SHIFT_W kvz_chroma_shift_w
+#define SHIFT_H kvz_chroma_shift_h
 //! minimum luma width & height for chroma to exist for that size
-#define MIN_C_W MIN_C_BLOCK
-#define MIN_C_H MIN_C_BLOCK
+#define MIN_C_W 4 << SHIFT_W
+#define MIN_C_H 4 << SHIFT_H
 
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
@@ -175,6 +177,7 @@ unsigned kvz_chroma_shift;
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
 #define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
+#define LCU_HEIGHT_C (LCU_WIDTH >> SHIFT_H)
 // TODO: if 422 is wanted, should make LCU_HEIGTH_C
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)

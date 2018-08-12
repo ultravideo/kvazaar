@@ -254,9 +254,7 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
 
-  // Take into account chroma subsampling
-  unsigned pb_w = pu_w / 2;
-  unsigned pb_h = pu_h / 2;
+
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -266,30 +264,57 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;
 
-  // Chroma U
-  // Divisions by 2 due to 4:2:0 chroma subsampling
-  kvz_epol_args epol_args = {
-    .src = ref->u,
-    .src_w = ref->width / 2,
-    .src_h = ref->height / 2,
-    .src_s = ref->stride / 2,
-    .blk_x = (state->tile->offset_x + pu_x) / 2 + (mv_param[0] >> 3),
-    .blk_y = (state->tile->offset_y + pu_y) / 2 + (mv_param[1] >> 3),
-    .blk_w = pb_w,
-    .blk_h = pb_h,
-    .pad_l = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
-    .pad_t = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b_simd = 3 // Three rows for AVX2
-  };
+  //Fractional chroma U
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         mv_param[0] >> 2 + SHIFT_W,
+                         mv_param[1] >> 2 + SHIFT_H,
+                         state->tile->offset_x >> SHIFT_W,
+                         state->tile->offset_y >> SHIFT_H,
+                         ref->u,
+                         ref->width >> SHIFT_W,
+                         ref->height >> SHIFT_H,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_u);
+  kvz_sample_14bit_octpel_chroma(state->encoder_control,
+                                         src_u.orig_topleft,
+                                         src_u.stride,
+                                         block_width,
+                                         block_height,
+                                         hi_prec_out->u + (ypos % (LCU_WIDTH_C)) * (LCU_WIDTH_C) 
+                                            + (xpos % (LCU_WIDTH_C)),
+                                         LCU_WIDTH_C,
+                                         mv_frac_x,
+                                         mv_frac_y,
+                                         mv_param);
 
-  // Initialize separately. Gets rid of warning
-  // about using nonstandard extension.
-  epol_args.buf = ext_buffer;
-  epol_args.ext = &ext;
-  epol_args.ext_origin = &ext_origin;
-  epol_args.ext_s = &ext_s;
+  //Fractional chroma V
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         mv_param[0] >> 2 + SHIFT_W,
+                         mv_param[1] >> 2 + SHIFT_H,
+                         state->tile->offset_x >> SHIFT_W,
+                         state->tile->offset_y >> SHIFT_H,
+                         ref->v,
+                         ref->width >> SHIFT_W,
+                         ref->height >> SHIFT_H,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_v);
+  kvz_sample_14bit_octpel_chroma(state->encoder_control,
+                                         src_v.orig_topleft,
+                                         src_v.stride,
+                                         block_width,
+                                         block_height,
+                                         hi_prec_out->v + (ypos  % (LCU_WIDTH_C)) * (LCU_WIDTH_C) 
+                                          + (xpos % (LCU_WIDTH_C)),
+                                         LCU_WIDTH_C,
+                                         mv_frac_x,
+                                         mv_frac_y,
+                                         mv_param);
 
   kvz_get_extended_block(&epol_args);
   kvz_sample_octpel_chroma_hi(state->encoder_control,
@@ -458,31 +483,31 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
-    const int lcu_pu_index_c = (pu_in_lcu.y >> SHIFT) * (LCU_WIDTH_C) + (pu_in_lcu.x >> SHIFT);
-    const vector2d_t mv_in_frame_c = { mv_in_frame.x >> SHIFT, mv_in_frame.y >> SHIFT };
+    const int lcu_pu_index_c = (pu_in_lcu.y >> SHIFT_H) * (LCU_WIDTH_C) + (pu_in_lcu.x >> SHIFT_W);
+    const vector2d_t mv_in_frame_c = { mv_in_frame.x >> SHIFT_W, mv_in_frame.y >> SHIFT_H };
 
-    if (int_mv_outside_frame) {
-      inter_cp_with_ext_border(ref->u, ref->width / 2,
-                               ref->width / 2, ref->height / 2,
-                               yuv_px->u, out_stride_c,
-                               pu_w / 2, pu_h / 2,
-                               &int_mv_in_frame_c);
-      inter_cp_with_ext_border(ref->v, ref->width / 2,
-                               ref->width / 2, ref->height / 2,
-                               yuv_px->v, out_stride_c,
-                               pu_w / 2, pu_h / 2,
-                               &int_mv_in_frame_c);
+    if (mv_is_outside_frame) {
+      inter_cp_with_ext_border(ref->u, ref->width >> SHIFT_W,
+                               ref->width >> SHIFT_W, ref->height >> SHIFT_H,
+                               &lcu->rec.u[lcu_pu_index_c], LCU_WIDTH_C,
+                               width >> SHIFT_W, height >> SHIFT_H,
+                               &mv_in_frame_c);
+      inter_cp_with_ext_border(ref->v, ref->width >> SHIFT_W,
+                               ref->width >> SHIFT_W, ref->height >> SHIFT_H,
+                               &lcu->rec.v[lcu_pu_index_c], LCU_WIDTH_C,
+                               width >> SHIFT_W, height >> SHIFT_H,
+                               &mv_in_frame_c);
     } else {
-      const int frame_mv_index = int_mv_in_frame_c.y * ref->width / 2 + int_mv_in_frame_c.x;
+      const int frame_mv_index = mv_in_frame_c.y * (ref->width >> SHIFT_W) + mv_in_frame_c.x;
 
       kvz_pixels_blit(&ref->u[frame_mv_index],
-                      yuv_px->u,
-                      pu_w / 2, pu_h / 2,
-                      ref->width / 2, out_stride_c);
+                      &lcu->rec.u[lcu_pu_index_c],
+                      width >> SHIFT_W, height >> SHIFT_H,
+                      ref->width >> SHIFT_W, LCU_WIDTH_C);
       kvz_pixels_blit(&ref->v[frame_mv_index],
-                      yuv_px->v,
-                      pu_w / 2, pu_h / 2,
-                      ref->width / 2, out_stride_c);
+                      &lcu->rec.v[lcu_pu_index_c],
+                      width >> SHIFT_W, height >> SHIFT_H,
+                      ref->width >> SHIFT_W, LCU_WIDTH_C);
     }
   }
 
@@ -561,10 +586,22 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
                      im_flags_L0, im_flags_L1,
                      predict_luma, predict_chroma);
 
-  // Free the allocated memory
-  free(temp_lcu_y);
-  free(temp_lcu_u);
-  free(temp_lcu_v);
+  }
+  for (temp_y = 0; temp_y < height >> SHIFT_H; ++temp_y) {
+    int y_in_lcu = (((ypos >> SHIFT_H) + temp_y) & (LCU_WIDTH_C - 1));
+    for (temp_x = 0; temp_x < width >> SHIFT_W; ++temp_x) {
+      int x_in_lcu = (((xpos >> SHIFT_W) + temp_x) & (LCU_WIDTH_C - 1));
+      int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] : (temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+      int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] : (lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+      lcu->rec.u[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
+
+      int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] : (temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+      int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+      lcu->rec.v[y_in_lcu * (LCU_WIDTH_C) + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
+    }
+  }
+  if (high_precision_rec0 != 0) kvz_hi_prec_buf_t_free(high_precision_rec0);
+  if (high_precision_rec1 != 0) kvz_hi_prec_buf_t_free(high_precision_rec1);
 }
 
 

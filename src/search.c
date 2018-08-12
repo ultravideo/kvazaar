@@ -73,15 +73,15 @@ static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from
 static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = (x_local >> SHIFT) + (y_local >> SHIFT) * (LCU_WIDTH_C);
+  const int chroma_index = (x_local >> SHIFT_W) + (y_local >> SHIFT_H) * (LCU_WIDTH_C);
 
   kvz_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
                   width, width, LCU_WIDTH, LCU_WIDTH);
   if (from->rec.chroma_format != KVZ_CSP_400) {
     kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
-                    width >> SHIFT, width >> SHIFT, LCU_WIDTH_C, LCU_WIDTH_C);
+                    width >> SHIFT_W, width >> SHIFT_H, LCU_WIDTH_C, LCU_WIDTH_C);
     kvz_pixels_blit(&from->rec.v[chroma_index], &to->rec.v[chroma_index],
-                    width >> SHIFT, width >> SHIFT, LCU_WIDTH_C, LCU_WIDTH_C);
+                    width >> SHIFT_W, width >> SHIFT_H, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
 
@@ -91,7 +91,8 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
   copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
 
   if (from->rec.chroma_format != KVZ_CSP_400) {
-    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> SHIFT, y_local >> SHIFT);
+    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> SHIFT_W, y_local >> SHIFT_H);
+    // 422: whyyyyyy
     copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> SHIFT);
     copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> SHIFT);
   }
@@ -351,8 +352,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const cu_info_t *const pred_cu,
                              const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
-  const vector2d_t lcu_px = { x_px >> SHIFT, y_px >> SHIFT };
-  const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + SHIFT) : LCU_WIDTH >> depth;
+  const vector2d_t lcu_px = { x_px >> SHIFT_W, y_px >> SHIFT_H };
+  const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + SHIFT_W) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
 
@@ -362,7 +363,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
   // Tad bit better to go lower
-  if (x_px % 8 != 0 || y_px % 8 != 0) {
+  if ((SHIFT_W && x_px % 8 != 0) || (SHIFT_H && y_px % 8 != 0)) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
     return 0;
@@ -1130,7 +1131,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int luma_offset = OFFSET_HOR_BUF(x, y, frame, x_min_in_lcu - 1);
       int chroma_offset = OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu - 1);
       int luma_bytes = (x_max + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
-      int chroma_bytes = ((x_max >> SHIFT) + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
+      int chroma_bytes = ((x_max >> SHIFT_W) + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
 
       memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[luma_offset], luma_bytes);
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
@@ -1144,7 +1145,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int luma_offset = OFFSET_VER_BUF(x, y, frame, y_min_in_lcu - 1);
       int chroma_offset = OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1);
       int luma_bytes = (LCU_WIDTH + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
-      int chroma_bytes = ((LCU_WIDTH_C) + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
+      int chroma_bytes = ((LCU_HEIGHT_C) + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
 
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
@@ -1161,16 +1162,16 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
     int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
 
-    int x_c = x >> SHIFT;
-    int y_c = y >> SHIFT;
-    int x_max_c = x_max >> SHIFT;
-    int y_max_c = y_max >> SHIFT;
+    int x_c = x >> SHIFT_W;
+    int y_c = y >> SHIFT_H;
+    int x_max_c = x_max >> SHIFT_W;
+    int y_max_c = y_max >> SHIFT_H;
 
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(&frame->source->u[x_c + y_c * (frame->source->stride >> SHIFT)], lcu->ref.u,
-                      x_max_c, y_max_c, frame->source->stride >> SHIFT, LCU_WIDTH_C);
+      kvz_pixels_blit(&frame->source->u[x_c + y_c * (frame->source->stride >> SHIFT_W)], lcu->ref.u,
+                      x_max_c, y_max_c, frame->source->stride >> SHIFT_W, LCU_WIDTH_C);
       kvz_pixels_blit(&frame->source->v[x_c + y_c * (frame->source->stride >> SHIFT)], lcu->ref.v,
                       x_max_c, y_max_c, frame->source->stride >> SHIFT, LCU_WIDTH_C);
     }
@@ -1197,10 +1198,10 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
                         x_max, y_max, LCU_WIDTH, pic->rec->stride);
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px >> SHIFT) + (y_px >> SHIFT) * (pic->rec->stride >> SHIFT)],
-                      x_max >> SHIFT, y_max >> SHIFT, LCU_WIDTH_C, pic->rec->stride >> SHIFT);
-      kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px >> SHIFT) + (y_px >> SHIFT) * (pic->rec->stride >> SHIFT)],
-                      x_max >> SHIFT, y_max >> SHIFT, LCU_WIDTH_C, pic->rec->stride >> SHIFT);
+      kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px >> SHIFT_W) + (y_px >> SHIFT_H) * (pic->rec->stride >> SHIFT_W)],
+                      x_max >> SHIFT_W, y_max >> SHIFT_H, LCU_WIDTH_C, pic->rec->stride >> SHIFT_W);
+      kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px >> SHIFT_W) + (y_px >> SHIFT_H) * (pic->rec->stride >> SHIFT_W)],
+                      x_max >> SHIFT_W, y_max >> SHIFT_H, LCU_WIDTH_C, pic->rec->stride >> SHIFT_W);
     }
   }
 }

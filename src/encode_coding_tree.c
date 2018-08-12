@@ -123,7 +123,7 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   const videoframe_t * const frame = state->tile->frame;
   const uint8_t width = LCU_WIDTH >> depth;
-  const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> SHIFT);
+  const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> SHIFT_W);
 
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
 
@@ -171,8 +171,8 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    int x_local = (x >> SHIFT) % (LCU_WIDTH_C);
-    int y_local = (y >> SHIFT) % (LCU_WIDTH_C);
+    int x_local = (x >> SHIFT_W) % (LCU_WIDTH_C);
+    int y_local = (y >> SHIFT_H) % (LCU_WIDTH_C);
     scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
     const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];

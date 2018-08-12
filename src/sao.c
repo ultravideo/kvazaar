@@ -604,29 +604,20 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
 
 static void sao_search_chroma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
-  int block_width  = (LCU_WIDTH >> SHIFT);
-  int block_height = (LCU_WIDTH >> SHIFT);
+  int block_width  = (LCU_WIDTH >> SHIFT_W);
+  int block_height = (LCU_WIDTH >> SHIFT_H);
   const kvz_pixel *orig_list[2];
   const kvz_pixel *rec_list[2];
-#if 0
-  kvz_pixel orig[2][LCU_CHROMA_SIZE];
-  kvz_pixel rec[2][LCU_CHROMA_SIZE];
-#else
-  // 2D-arrays. 
-  kvz_pixel **orig = malloc(2 * sizeof(kvz_pixel*));
-  kvz_pixel **rec = malloc(2 * sizeof(kvz_pixel*));
-  for (int i = 0; i < 2; ++i) {
-    orig[i] = malloc((LCU_WIDTH >> SHIFT) * (LCU_WIDTH >> SHIFT) * sizeof(kvz_pixel));
-    rec[i] = malloc((LCU_WIDTH >> SHIFT) * (LCU_WIDTH >> SHIFT) * sizeof(kvz_pixel));
-  }
-#endif
+  kvz_pixel orig[2][LCU_LUMA_SIZE];
+  kvz_pixel rec[2][LCU_LUMA_SIZE];
   color_t color_i;
 
   // Check for right and bottom boundaries.
-  if (x_ctb * (LCU_WIDTH >> SHIFT) + (LCU_WIDTH >> SHIFT) >= (unsigned)frame->width >> SHIFT) {
-    block_width = (frame->width - x_ctb * LCU_WIDTH) >> SHIFT;
+  if (x_ctb * (LCU_WIDTH_C) + (LCU_WIDTH_C) >= (unsigned)frame->width >> SHIFT_W) {
+    block_width = (frame->width - x_ctb * LCU_WIDTH) >> SHIFT_W;
   }
-  if (y_ctb * (LCU_WIDTH >> SHIFT) + (LCU_WIDTH >> SHIFT) >= (unsigned)frame->height >> SHIFT) {
+  // 422: ??
+  if (y_ctb * (LCU_HEIGHT_C) + (LCU_HEIGHT_C) >= (unsigned)frame->height >> SHIFT_H) {
     block_height = (frame->height - y_ctb * LCU_WIDTH) >> SHIFT;
   }
 
@@ -634,28 +625,18 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
 
   // Copy data to temporary buffers and init orig and rec lists to point to those buffers.
   for (color_i = COLOR_U; color_i <= COLOR_V; ++color_i) {
-    kvz_pixel *data = &frame->source->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->source->stride >> SHIFT)];
-    kvz_pixel *recdata = &frame->rec->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->rec->stride >> SHIFT)];
+    kvz_pixel *data = &frame->source->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->source->stride >> SHIFT_W)];
+    kvz_pixel *recdata = &frame->rec->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->rec->stride >> SHIFT_W)];
     kvz_pixels_blit(data, orig[color_i - 1], block_width, block_height,
-                        frame->source->stride >> SHIFT, block_width);
+                        frame->source->stride >> SHIFT_W, block_width);
     kvz_pixels_blit(recdata, rec[color_i - 1], block_width, block_height,
-                        frame->rec->stride >> SHIFT, block_width);
+                        frame->rec->stride >> SHIFT_W, block_width);
     orig_list[color_i - 1] = &orig[color_i - 1][0];
     rec_list[color_i - 1] = &rec[color_i - 1][0];
   }
 
   // Calculate
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
-#if 1
-  // Free the allocated arrays
-  // NOTE: hope they're not used anywhere
-  for (int i = 0; i < 2; ++i) {
-    free(orig[i]);
-    free(rec[i]);
-  }
-  free(orig);
-  free(rec);
-#endif
 }
 
 static void sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])

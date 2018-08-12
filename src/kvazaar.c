@@ -219,16 +219,16 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
   }
 
   //Chroma
-  for (int i = 0; i < field_out->height >> SHIFT; ++i){
-    kvz_pixel *row_in = frame_in->u + MIN((frame_in->height >> SHIFT) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT);
-    kvz_pixel *row_out = field_out->u + i * (field_out->stride >> SHIFT);
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT));
+  for (int i = 0; i < field_out->height >> SHIFT_H; ++i){
+    kvz_pixel *row_in = frame_in->u + MIN((frame_in->height >> SHIFT_H) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT_W);
+    kvz_pixel *row_out = field_out->u + i * (field_out->stride >> SHIFT_W);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT_W));
   }
 
-  for (int i = 0; i < field_out->height >> SHIFT; ++i){
-    kvz_pixel *row_in = frame_in->v + MIN((frame_in->height >> SHIFT) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT);
-    kvz_pixel *row_out = field_out->v + i * (field_out->stride >> SHIFT);
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT));
+  for (int i = 0; i < field_out->height >> SHIFT_H; ++i){
+    kvz_pixel *row_in = frame_in->v + MIN((frame_in->height >> SHIFT_H) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT_W);
+    kvz_pixel *row_out = field_out->v + i * (field_out->stride >> SHIFT_W);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT_W));
   }
 
   return 1;
@@ -258,14 +258,18 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
+  // We have a picture, set the project-global var to correct value
+  kvz_chroma_shift_w = pic_in->chroma_format == 0 || pic_in->chroma_format == 3 ? 0 : 1;
+  kvz_chroma_shift_h = pic_in->chroma_format == 1 ? 1 : 0;
+
   kvz_picture* frame = kvz_encoder_feed_frame(
     &enc->input_buffer, state, pic_in,
     enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
   );
+
   if (frame) {
     assert(state->frame->num == enc->frames_started);
-    // We have a frame, set the project-global var to correct value
-    kvz_chroma_shift = frame->chroma_format == 0 || frame->chroma_format == 3? 0 : 1;
+
     // Start encoding.
     kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;

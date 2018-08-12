@@ -184,8 +184,8 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
 
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   if (orig_image->chroma_format != KVZ_CSP_400) {
-    im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> SHIFT) + (y_offset >> SHIFT) * (orig_image->stride >> SHIFT)];
-    im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> SHIFT) + (y_offset >> SHIFT) * (orig_image->stride >> SHIFT)];
+    im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> SHIFT_W) + (y_offset >> SHIFT_H) * (orig_image->stride >> SHIFT_W)];
+    im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> SHIFT_W) + (y_offset >> SHIFT_H) * (orig_image->stride >> SHIFT_W)];
   }
 
   im->pts = 0;
@@ -233,8 +233,8 @@ static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, co
   // automatic buffer overrun checks.
   hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
   yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (int16_t *)malloc((luma_size >> (2 * SHIFT)) * sizeof(*yuv->u));
-  yuv->v = (int16_t *)malloc((luma_size >> (2 * SHIFT)) * sizeof(*yuv->v));
+  yuv->u = (int16_t *)malloc((luma_size >> (SHIFT_W + SHIFT_H)) * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc((luma_size >> (SHIFT_W + SHIFT_H)) * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   if (optimized_sad != NULL)
