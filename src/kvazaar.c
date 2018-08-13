@@ -258,10 +258,6 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
-  // We have a picture, set the project-global var to correct value
-  kvz_chroma_shift_w = pic_in->chroma_format == 0 || pic_in->chroma_format == 3 ? 0 : 1;
-  kvz_chroma_shift_h = pic_in->chroma_format == 1 ? 1 : 0;
-
   kvz_picture* frame = kvz_encoder_feed_frame(
     &enc->input_buffer, state, pic_in,
     enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
@@ -269,6 +265,10 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   if (frame) {
     assert(state->frame->num == enc->frames_started);
+
+    // We have a picture, set the project-global var to correct value
+    kvz_chroma_shift_w = frame->chroma_format == 0 || frame->chroma_format == 3 ? 0 : 1;
+    kvz_chroma_shift_h = frame->chroma_format == 1 ? 1 : 0;
 
     // Start encoding.
     kvz_encode_one_frame(state, frame);

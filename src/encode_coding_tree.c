@@ -154,16 +154,16 @@ static void encode_transform_unit(encoder_state_t * const state,
     // TODO: in case of 444, the 4x4 chroma blocks are coded right after corresponding 4x4 luma block
     // Based on the pics in ref they're supposed to go "on top", which is impossible to do as is, 
     // so my best guess is to do them right after
+    if (state->tile->frame->source->chroma_format != KVZ_CSP_444) {
     if (x % 8 == 0 || y % 8 == 0) {
       // Not the last luma transform block so there is nothing more to do.
-      if (state->tile->frame->source->chroma_format != KVZ_CSP_444) {
-        return;
-      }
+      return;
     }
-      // Time to to code the chroma transform blocks. Move to the top-left
-      // corner of the block.
-      x -= 4;
-      y -= 4;
+    // Time to to code the chroma transform blocks. Move to the top-left
+    // corner of the block.
+    x -= 4;
+    y -= 4;
+  }
       cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
     
   }
