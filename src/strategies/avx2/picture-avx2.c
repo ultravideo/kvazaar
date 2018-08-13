@@ -729,7 +729,6 @@ static void inter_recon_bipred_no_mov_avx2(
  kvz_pixel* temp_lcu_u,
  kvz_pixel* temp_lcu_v) {
 
- // Doesn't pass test-asan in gitlab
 
  int y_in_lcu, x_in_lcu;
  __m256i sample0_epi8, sample1_epi8, temp_y_epi8;
@@ -741,11 +740,6 @@ static void inter_recon_bipred_no_mov_avx2(
   for (int temp_x = 0; temp_x < width; temp_x += 32) {
 
    x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-
-   sample0_epi8 = _mm256_loadu_si256((__m256i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu]));
-   sample1_epi8 = _mm256_loadu_si256((__m256i*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]));
-
-   temp_y_epi8 = _mm256_avg_epu8(sample0_epi8, sample1_epi8);
 
    switch (width)
    {
@@ -804,13 +798,8 @@ static void inter_recon_bipred_no_mov_avx2(
     y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
     x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
 
-
-
-    // (sample1 + sample2 + offset)>>shift 
     __m256i temp_u_epi8;
-
-    // (sample1 + sample2 + offset)>>shift
-    __m256i temp_v_epi8 = _mm256_avg_epu8(sample0_epi8, sample1_epi8);
+    __m256i temp_v_epi8;
 
 
     switch (width)
@@ -930,7 +919,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	kvz_pixel* temp_lcu_u,
 	kvz_pixel* temp_lcu_v) 
 {
- //bool test = false;
+
  if (hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
  {
   inter_recon_bipred_no_mov_avx2(height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
