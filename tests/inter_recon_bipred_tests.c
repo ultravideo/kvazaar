@@ -32,9 +32,9 @@ static lcu_t lcu1;
 
 int temp1, temp2, temp3, temp4;
 
-int16_t mv_param[2][2] = { { 3,3 },{ 3,3 } };
-int width = 8;
-int height = 8;
+int16_t mv_param[2][2] = { { 7,7 },{ 7,7 } };
+int width = 16;
+int height = 16;
 int xpos = 0;
 int ypos = 0;
 
