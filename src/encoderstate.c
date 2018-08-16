@@ -304,8 +304,8 @@ static void encoder_state_set_rps(encoder_state_t *state)
   case 1:
   case 3:
   case 7:
-    //state->local_rps->rps_idx = -1;
-    return;
+    state->local_rps->rps_idx = 0;
+    break;
 
   case 9:
   case 11:
@@ -335,6 +335,8 @@ static void encoder_state_set_rps(encoder_state_t *state)
 
   //Copy rps to local rps
   state->local_rps->rps = state->encoder_control->cfg.rps[state->local_rps->rps_idx];
+  assert(ref_negative == state->local_rps->rps.num_negative_pics);
+  assert(ref_positive == state->local_rps->rps.num_positive_pics);
 }
 
 //TODO: disable for now, until the need for a waitfor after this function is fixed

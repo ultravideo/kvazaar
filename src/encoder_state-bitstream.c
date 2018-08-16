@@ -1085,6 +1085,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
 // Pass ref_neg/pos in the rps
 static void write_short_term_ref_pic_set(bitstream_t *stream, encoder_state_t *const state,
+                                          const kvz_rps_config *const rps,
                                           uint8_t called_from_slice_header,
                                          //int ref_negative, int ref_positive,
                                          int rps_idx)
@@ -1095,7 +1096,7 @@ static void write_short_term_ref_pic_set(bitstream_t *stream, encoder_state_t *c
   }*/
 
   const encoder_control_t* const encoder = state->encoder_control;
-  kvz_rps_config *rps = &state->local_rps->rps;//&((encoder_control_t*)(encoder))->cfg.rps[rps_idx];
+  //kvz_rps_config *rps = &state->local_rps->rps;//&((encoder_control_t*)(encoder))->cfg.rps[rps_idx];
   uint8_t inter_ref_pic_set_prediction_flag = rps->inter_rps_pred_flag;
   
   if( rps_idx > 0) {
@@ -1303,7 +1304,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg.num_rps;
   WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
   for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
-    write_short_term_ref_pic_set( stream, state, false, i);
+    write_short_term_ref_pic_set( stream, state, &state->encoder_control->cfg.rps[i], false, i);
     //write_short_term_ref_pic_set(stream, state, i + 1, 0, i);
     //writeSTermRSet(state, i, i + 1, 0);
   }
@@ -1758,7 +1759,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     //}
 
     if( !state->local_rps->local_st_rps_sps_flag ){
-      write_short_term_ref_pic_set(stream, state, 1, num_short_term_ref_pic_sets);
+      write_short_term_ref_pic_set(stream, state, &state->local_rps->rps, true, num_short_term_ref_pic_sets);
     } 
     else if( num_short_term_ref_pic_sets > 0 ){
       WRITE_U(stream, state->local_rps->rps_idx, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx");
