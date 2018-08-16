@@ -451,7 +451,11 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
-  WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "pic_init_qp_minus26");
+  
+  // If tiles and slices = tiles is enabled, signal QP in the slice header. Keeping the PPS constant for OMAF etc
+  bool signal_qp_in_slice_header = (encoder->cfg.slices & KVZ_SLICES_TILES) && encoder->tiles_enable;
+  WRITE_SE(stream, signal_qp_in_slice_header ?0:(((int8_t)encoder->cfg.qp) - 26), "pic_init_qp_minus26");
+
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
 
@@ -804,7 +808,9 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   }
 
   {
-    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
+    // If tiles are enabled, signal the full QP here (relative to the base value of 26)
+    bool signal_qp_in_slice_header = (encoder->cfg.slices & KVZ_SLICES_TILES) && encoder->tiles_enable;
+    int slice_qp_delta = state->frame->QP - (signal_qp_in_slice_header ? 26 : encoder->cfg.qp);
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
 }
