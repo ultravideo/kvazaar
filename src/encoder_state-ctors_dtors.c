@@ -298,6 +298,22 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
 
   return 1;
 }
+
+static int encoder_state_config_local_rps_init(const encoder_state_t * const state )
+{
+  //state->local_rps->rps = calloc(1, sizeof(kvz_rps_config));
+  memset(&state->local_rps->rps, 0, sizeof(kvz_rps_config));
+  state->local_rps->local_st_rps_sps_flag = state->encoder_control->layer.short_term_ref_pic_set_sps_flag;
+
+  return 1;
+}
+
+static int encoder_state_config_local_rps_finalize(encoder_state_t * const state)
+{
+  //free(state->local_rps->rps);
+
+  return 1;
+}
 // ***********************************************
 
 #ifdef KVZ_DEBUG_PRINT_THREADING_INFO
@@ -489,6 +505,12 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       child_state->layer = NULL;
     }
 
+    child_state->local_rps = MALLOC(encoder_state_config_local_rps_t, 1);
+    if (!child_state->local_rps || !encoder_state_config_local_rps_init(child_state)) {
+      fprintf(stderr, "Could not initialize encoder_state->local_rps!\n");
+      return 0;
+    }
+
     // ***********************************************
   } else {
     child_state->encoder_control = parent_state->encoder_control;
@@ -499,6 +521,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     // ***********************************************
     // Modified for SHVC.
     if (!child_state->layer) child_state->layer = parent_state->layer;
+    if (!child_state->local_rps) child_state->local_rps = parent_state->local_rps;
     // ***********************************************
   }
   
@@ -598,7 +621,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         // ***********************************************
         // Modified for SHVC.
         new_child->layer = child_state->layer;
-
+        new_child->local_rps = child_state->local_rps;
         // ***********************************************
 
         if (!new_child->slice || !encoder_state_config_slice_init(new_child, range_start, range_end_slice)) {
@@ -631,7 +654,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         // ***********************************************
         // Modified for SHVC.
         new_child->layer = encoder->layer.layer_id > 0 ? MALLOC(encoder_state_config_layer_t, 1) : child_state->layer;//child_state->layer;
-
+        new_child->local_rps = child_state->local_rps;
         // ***********************************************
         
         if (!new_child->tile || !encoder_state_config_tile_init(new_child, lcu_offset_x, lcu_offset_y, width, height, width_in_lcu, height_in_lcu)) {
@@ -736,7 +759,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         // ***********************************************
         // Modified for SHVC.
         new_child->layer = child_state->layer;
-
+        new_child->local_rps = child_state->local_rps;
         // ***********************************************
 
         if (!kvz_encoder_state_init(new_child, child_state)) {
@@ -892,6 +915,10 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   if( !state->parent || (state->parent->layer != state->layer)){
     encoder_state_config_layer_finalize(state);
     FREE_POINTER(state->layer);
+  }
+  if( !state->parent || (state->parent->local_rps != state->local_rps) ){
+    encoder_state_config_local_rps_finalize(state);
+    FREE_POINTER(state->local_rps);
   }
   // ***********************************************
   kvz_bitstream_finalize(&state->stream);

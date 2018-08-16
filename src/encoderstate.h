@@ -206,6 +206,14 @@ typedef struct encoder_state_config_layer_t {
   
   uint8_t scaling_started; //Flag for telling if scaling has been started
 } encoder_state_config_layer_t;
+
+typedef struct encoder_state_config_local_rps_t {
+
+  kvz_rps_config rps;
+  uint8_t rps_idx;
+  uint8_t local_st_rps_sps_flag;
+
+} encoder_state_config_local_rps_t;
 // ***********************************************
 
 
@@ -265,9 +273,11 @@ typedef struct encoder_state_t {
   // ***********************************************
   // Modified for SHVC.
   encoder_state_config_layer_t *layer;
+  encoder_state_config_local_rps_t *local_rps;  //Hold current states rps
 
   const struct encoder_state_t *ILR_state;
   int num_ILR_states; //How many ILR states ILR_states "points" to. TODO: account for non consecutive states
+  
   // ***********************************************
 
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
