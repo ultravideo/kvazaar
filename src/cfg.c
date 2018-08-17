@@ -1697,6 +1697,7 @@ static void generate_rps(kvz_config *cfg){
       for( int j = 0; j < rps->num_ref_idc; j++ ){ //Loop over ref rps idc
         rps->ref_idc[j] = 1;
         rps->is_used[j] = 1;
+        rps->delta_poc[j] = -j - 1;
       }
     }
   }

@@ -132,6 +132,11 @@ static void scalability_prepare(encoder_state_t *state)
 //Populate extra rps (rps[num_rps]) if existing rps cannot be used
 static void populate_local_rps(encoder_state_t *const state, kvz_rps_config *const rps)
 {
+  //No point in doing this if # of ref pics is 0
+  if( rps->num_negative_pics + rps->num_positive_pics == 0 ){
+    return;
+  }
+
   //Populate given rps. Try using existing rps as ref.
   const encoder_control_t* const encoder = state->encoder_control;
   const kvz_config *const cfg = &encoder->cfg;
@@ -243,14 +248,16 @@ static void populate_local_rps(encoder_state_t *const state, kvz_rps_config *con
       int ref_delta_POC = (j < num_ref_pic) ? ref_rps->delta_poc[j] : 0;
       rps->ref_idc[j] = 0;
       rps->is_used[j] = 0;
-      //Loop through pics in the cur rps 
-      for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++) {
-        if (rps->delta_poc[k] == ref_delta_POC + delta_rps) {
-          //Found a poc that mathces the ref poc
-          rps->ref_idc[j] = 1;
-          rps->is_used[j] = !state->frame->is_irap;
-          count++;
-          break;
+      if( count != rps->num_negative_pics + rps->num_positive_pics){
+        //Loop through pics in the cur rps 
+        for (int k = 0; k < rps->num_negative_pics + rps->num_positive_pics; k++) {
+          if (rps->delta_poc[k] == ref_delta_POC + delta_rps) {
+            //Found a poc that mathces the ref poc
+            rps->ref_idc[j] = 1;
+            rps->is_used[j] = !state->frame->is_irap;
+            count++;
+            break;
+          }
         }
       }
     }
@@ -262,81 +269,186 @@ static void populate_local_rps(encoder_state_t *const state, kvz_rps_config *con
 }
 
 /**
+* Set is used status for cur ref list
+*/
+static void set_cur_is_used(encoder_state_t *state){
+  memset(state->local_rps->is_used, 0, sizeof(state->local_rps->is_used));
+  const int cur_poc = state->frame->poc;
+  const kvz_rps_config *const rps = &state->local_rps->rps;
+  
+  //Get delta poc from rps
+  int num_negative_pics = 0;
+  int num_positive_pics = 0;
+  int num_delta_poc = 0;
+  int16_t delta_pocs[MAX_REF_PIC_COUNT] = { 0 };
+  uint8_t used_by_curr[MAX_REF_PIC_COUNT] = { 0 };
+  //Find the rps is_used ind that poc-wise matches the reference picture
+  if (!state->local_rps->rps.inter_rps_pred_flag) {
+    //No inter pred used so can use delta poc directly to derive the rps ref poc for the given i
+    num_negative_pics = rps->num_negative_pics;
+    num_positive_pics = rps->num_positive_pics;
+    num_delta_poc = num_negative_pics + num_positive_pics;
+    memcpy(delta_pocs, rps->delta_poc, sizeof(delta_pocs));
+    memcpy(used_by_curr, rps->is_used, sizeof(used_by_curr));
+  } else {
+    //Need to derive the rps poc from the reference rps delta pocs [Rec. ITU-T H.265 (7-59)/(7-60)
+    const kvz_rps_config *const ref_rps = &state->encoder_control->cfg.rps[state->local_rps->rps_idx - rps->delta_ridx];
+    int cur_ind = 0;
+    //Add future references that become past references in the cur rps
+    for (int i = ref_rps->num_negative_pics + ref_rps->num_positive_pics - 1; i >= ref_rps->num_negative_pics; i--) {
+      const int d_poc = ref_rps->delta_poc[i] + rps->delta_rps;
+      if (d_poc < 0 && rps->ref_idc[i]) {
+        delta_pocs[cur_ind] = d_poc;
+        used_by_curr[cur_ind++] = rps->is_used[i];
+      }
+    }
+    //Add ref frame if it is in the past
+    if (rps->delta_rps < 0 && rps->ref_idc[rps->num_ref_idc - 1]) {
+      delta_pocs[cur_ind] = rps->delta_rps;
+      used_by_curr[cur_ind++] = rps->is_used[rps->num_ref_idc - 1];
+    }
+    //Add other past references that stay as past references
+    for (int i = 0; i < ref_rps->num_negative_pics; i++) {
+      const int d_poc = ref_rps->delta_poc[i] + rps->delta_rps;
+      if (d_poc < 0 && rps->ref_idc[i]) {
+        delta_pocs[cur_ind] = d_poc;
+        used_by_curr[cur_ind++] = rps->is_used[i];
+      }
+    }
+    num_negative_pics = cur_ind;
+
+    //Add past references that become future references in the cur rps
+    for (int i = ref_rps->num_negative_pics - 1; i >= 0; i--) {
+      const int d_poc = ref_rps->delta_poc[i] + rps->delta_rps;
+      if (d_poc > 0 && rps->ref_idc[i]) {
+        delta_pocs[cur_ind] = d_poc;
+        used_by_curr[cur_ind++] = rps->is_used[i];
+      }
+    }
+    //Add ref frame if it is in the future
+    if (rps->delta_rps > 0 && rps->ref_idc[rps->num_ref_idc - 1]) {
+      delta_pocs[cur_ind] = rps->delta_rps;
+      used_by_curr[cur_ind++] = rps->is_used[rps->num_ref_idc - 1];
+    }
+    //Add other future references that stay as future references
+    for (int i = ref_rps->num_negative_pics; i < ref_rps->num_positive_pics + ref_rps->num_negative_pics; i++) {
+      const int d_poc = ref_rps->delta_poc[i] + rps->delta_rps;
+      if (d_poc > 0 && rps->ref_idc[i]) {
+        delta_pocs[cur_ind] = d_poc;
+        used_by_curr[cur_ind++] = rps->is_used[i];
+      }
+    }
+    num_positive_pics = cur_ind - num_negative_pics;
+    num_delta_poc = cur_ind;
+  }
+
+  //Loop over reference frames
+  int count = 0;
+  for(int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++){
+    //If ref is an ilr always set it as used
+    if(state->frame->ref->image_info[ref_idx].layer_id < state->encoder_control->layer.layer_id ){
+      state->local_rps->is_used[ref_idx] = 1;
+      count++;
+      continue;
+    }
+    //Find the rps is_used ind that poc-wise matches the reference picture
+    for (int i = 0; i < num_delta_poc; i++) {
+      if( cur_poc + delta_pocs[i] == state->frame->ref->pocs[ref_idx]){
+        state->local_rps->is_used[ref_idx] = used_by_curr[i];
+        count++;
+        break;
+      }
+    }
+  }
+
+  assert(count == state->frame->ref->used_size);
+}
+
+/**
 * Set local rps for state
 */
 static void encoder_state_set_rps(encoder_state_t *state)
 {
-  //Check if cfg has the correct rps or if we need to generate a new one
-  const encoder_control_t *const encoder = state->encoder_control;
+  //I-Slice does not need a rps
+  if (state->frame->slicetype != KVZ_SLICE_I) {
+    //Check if cfg has the correct rps or if we need to generate a new one
+    const encoder_control_t *const encoder = state->encoder_control;
 
-  int j;
-  int ref_negative = 0;
-  int ref_positive = 0;
-  if (encoder->cfg.gop_len) {
-    for (j = 0; j < state->frame->ref->used_size; j++) {
-      if (state->frame->ref->image_info[j].layer_id != encoder->layer.layer_id) {
-        continue;
-      }
-      else if (state->frame->ref->pocs[j] < state->frame->poc) {
-        ref_negative++;
-      }
-      else {
-        ref_positive++;
+    int j;
+    int ref_negative = 0;
+    int ref_positive = 0;
+    if (encoder->cfg.gop_len) {
+      for (j = 0; j < state->frame->ref->used_size; j++) {
+        if (state->frame->ref->image_info[j].layer_id != encoder->layer.layer_id) {
+          continue;
+        }
+        else if (state->frame->ref->pocs[j] < state->frame->poc) {
+          ref_negative++;
+        }
+        else {
+          ref_positive++;
+        }
       }
     }
+    else ref_negative = state->frame->ref->used_size - encoder->cfg.ILR_frames; //TODO: Need to check actual number of ilr frames?
+
+    uint8_t num_short_term_ref_pic_sets = encoder->cfg.num_rps;//encoder->layer.num_short_term_ref_pic_sets;
+    uint8_t short_term_ref_pic_set_sps_flag = num_short_term_ref_pic_sets != 0 ? encoder->layer.short_term_ref_pic_set_sps_flag : 0;
+
+    uint8_t selector = 0;
+    selector += short_term_ref_pic_set_sps_flag ? 1 : 0;
+    selector += state->frame->ref->used_size - encoder->cfg.ILR_frames == ref_negative + ref_positive ? 2 : 0;
+    selector += encoder->cfg.gop_len > 0 ? 4 : 0;
+    selector += num_short_term_ref_pic_sets >= 2 ? 8 : 0;
+    selector += encoder->cfg.gop_len > 0 && (ref_negative != encoder->cfg.gop[state->frame->gop_offset].ref_neg_count || ref_positive != encoder->cfg.gop[state->frame->gop_offset].ref_pos_count) ? 16 : 0;
+    selector += state->frame->is_irap ? 32 : 0;
+
+    state->local_rps->local_st_rps_sps_flag = selector < 16 ? short_term_ref_pic_set_sps_flag : 0;
+
+    switch (selector) {
+    case 1:
+    case 3:
+    case 7:
+      state->local_rps->rps_idx = 0;
+      break;
+
+    case 9:
+    case 11:
+      // No gop
+      // There should be a valid rps for each ref->used_size - encoder->cfg.ILR_frames
+      state->local_rps->rps_idx = MAX(state->frame->ref->used_size - encoder->cfg.ILR_frames - 1, 0);
+      break;
+
+    case 15:
+      // Gop
+      // There should be a valid rps for the cur gop structure indexed by gop offset
+      state->local_rps->rps_idx = state->frame->gop_offset;
+      break;
+
+    default: {
+      // No valid rps
+      // Need to write a new rps (with rpsIdx == num_rps)
+      // Set num pos/neg ref in the rps
+      state->local_rps->rps_idx = encoder->cfg.num_rps;
+      kvz_rps_config *rps = &state->local_rps->rps;
+      rps->num_negative_pics = ref_negative;
+      rps->num_positive_pics = ref_positive;
+      populate_local_rps(state, rps);
+      set_cur_is_used(state);
+      return;
+    }
+    }//END switch
+
+    //Copy rps to local rps
+    state->local_rps->rps = state->encoder_control->cfg.rps[state->local_rps->rps_idx];
+    assert(ref_negative == state->local_rps->rps.num_negative_pics);
+    assert(ref_positive == state->local_rps->rps.num_positive_pics);
+    set_cur_is_used(state);
+  } else {
+    state->local_rps->rps.num_negative_pics = 0;
+    state->local_rps->rps.num_positive_pics = 0;
+    state->local_rps->local_st_rps_sps_flag = 0;
   }
-  else ref_negative = state->frame->ref->used_size - encoder->cfg.ILR_frames; //TODO: Need to check actual number of ilr frames?
-
-  uint8_t num_short_term_ref_pic_sets = encoder->cfg.num_rps;//encoder->layer.num_short_term_ref_pic_sets;
-  uint8_t short_term_ref_pic_set_sps_flag = num_short_term_ref_pic_sets != 0 ? encoder->layer.short_term_ref_pic_set_sps_flag : 0;
-
-  uint8_t selector = 0;
-  selector += short_term_ref_pic_set_sps_flag ? 1 : 0;
-  selector += state->frame->ref->used_size - encoder->cfg.ILR_frames == ref_negative + ref_positive ? 2 : 0;
-  selector += encoder->cfg.gop_len > 0 ? 4 : 0;
-  selector += num_short_term_ref_pic_sets >= 2 ? 8 : 0;
-  selector += encoder->cfg.gop_len > 0 && (ref_negative != encoder->cfg.gop[state->frame->gop_offset].ref_neg_count || ref_positive != encoder->cfg.gop[state->frame->gop_offset].ref_pos_count) ? 16 : 0;
-  selector += state->frame->is_irap ? 32 : 0;
-
-  state->local_rps->local_st_rps_sps_flag = selector < 16 ? short_term_ref_pic_set_sps_flag : 0;
-
-  switch (selector) {
-  case 1:
-  case 3:
-  case 7:
-    state->local_rps->rps_idx = 0;
-    break;
-
-  case 9:
-  case 11:
-    // No gop
-    // There should be a valid rps for each ref->used_size - encoder->cfg.ILR_frames
-    state->local_rps->rps_idx = MAX(state->frame->ref->used_size - encoder->cfg.ILR_frames - 1, 0);
-    break;
-
-  case 15:
-    // Gop
-    // There should be a valid rps for the cur gop structure indexed by gop offset
-    state->local_rps->rps_idx = state->frame->gop_offset;
-    break;
-
-  default: {
-    // No valid rps
-    // Need to write a new rps (with rpsIdx == num_rps)
-    // Set num pos/neg ref in the rps
-    state->local_rps->rps_idx = encoder->cfg.num_rps;
-    kvz_rps_config *rps = &state->local_rps->rps;
-    rps->num_negative_pics = ref_negative;
-    rps->num_positive_pics = ref_positive;
-    populate_local_rps(state, rps);
-    return;
-  }
-  }//END switch
-
-  //Copy rps to local rps
-  state->local_rps->rps = state->encoder_control->cfg.rps[state->local_rps->rps_idx];
-  assert(ref_negative == state->local_rps->rps.num_negative_pics);
-  assert(ref_positive == state->local_rps->rps.num_positive_pics);
 }
 
 //TODO: disable for now, until the need for a waitfor after this function is fixed

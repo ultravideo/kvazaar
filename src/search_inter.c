@@ -1623,8 +1623,17 @@ static void search_pu_inter(encoder_state_t * const state,
   // Default to candidate 0
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);
-
+  
+  
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
+    // ***********************************************
+    // Modified for SHVC.
+    //Check is used status of ref_idx
+    if( !state->local_rps->is_used[ref_idx] ){
+      continue;
+    }
+    // ***********************************************
+    
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 

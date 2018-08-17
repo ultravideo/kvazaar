@@ -213,6 +213,8 @@ typedef struct encoder_state_config_local_rps_t {
   uint8_t rps_idx;
   uint8_t local_st_rps_sps_flag;
 
+  uint8_t is_used[MAX_REF_PIC_COUNT+MAX_LAYERS]; //Is used status for cur ref pictures
+
 } encoder_state_config_local_rps_t;
 // ***********************************************
 
