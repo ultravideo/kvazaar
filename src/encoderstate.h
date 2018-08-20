@@ -97,7 +97,7 @@ typedef struct encoder_state_config_frame_t {
   int8_t ref_list;
 
   //! L0 and L1 reference index list
-  uint8_t ref_LX[2][16];
+  uint8_t ref_LX[2][MAX_REF_PIC_COUNT];
   //! L0 reference index list size
   uint8_t ref_LX_size[2];
 
@@ -214,6 +214,7 @@ typedef struct encoder_state_config_local_rps_t {
   uint8_t local_st_rps_sps_flag;
 
   uint8_t is_used[MAX_REF_PIC_COUNT+MAX_LAYERS]; //Is used status for cur ref pictures
+  uint8_t num_ref_idx_LX_active[2];
 
 } encoder_state_config_local_rps_t;
 // ***********************************************

@@ -343,11 +343,14 @@ static void set_cur_is_used(encoder_state_t *state){
   }
 
   //Loop over reference frames
+  state->local_rps->num_ref_idx_LX_active[0] = 0;
+  state->local_rps->num_ref_idx_LX_active[1] = 0;
   int count = 0;
   for(int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++){
     //If ref is an ilr always set it as used
     if(state->frame->ref->image_info[ref_idx].layer_id < state->encoder_control->layer.layer_id ){
       state->local_rps->is_used[ref_idx] = 1;
+      state->local_rps->num_ref_idx_LX_active[0]++;
       count++;
       continue;
     }
@@ -355,6 +358,15 @@ static void set_cur_is_used(encoder_state_t *state){
     for (int i = 0; i < num_delta_poc; i++) {
       if( cur_poc + delta_pocs[i] == state->frame->ref->pocs[ref_idx]){
         state->local_rps->is_used[ref_idx] = used_by_curr[i];
+        //Update num ridx active
+        for (int reflist = 0; reflist < 2; reflist++) {
+          for (int j = 0; j < state->frame->ref_LX_size[reflist]; j++) {
+            if( state->frame->ref_LX[reflist][j] == ref_idx){
+              if(state->local_rps->is_used[ref_idx]) state->local_rps->num_ref_idx_LX_active[reflist]++;
+              break;
+            }
+          }
+        }
         count++;
         break;
       }
@@ -370,7 +382,7 @@ static void set_cur_is_used(encoder_state_t *state){
 static void encoder_state_set_rps(encoder_state_t *state)
 {
   //I-Slice does not need a rps
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+  if (state->frame->ref->used_size != 0) {
     //Check if cfg has the correct rps or if we need to generate a new one
     const encoder_control_t *const encoder = state->encoder_control;
 
@@ -445,9 +457,14 @@ static void encoder_state_set_rps(encoder_state_t *state)
     assert(ref_positive == state->local_rps->rps.num_positive_pics);
     set_cur_is_used(state);
   } else {
+    //Set stuff to zero for good measure
+    memset(&state->local_rps->rps, 0, sizeof(kvz_rps_config));
     state->local_rps->rps.num_negative_pics = 0;
     state->local_rps->rps.num_positive_pics = 0;
     state->local_rps->local_st_rps_sps_flag = 0;
+    state->local_rps->rps_idx = 0;
+    memset(state->local_rps->is_used, 0, sizeof(state->local_rps->is_used));
+    memset(state->local_rps->num_ref_idx_LX_active, 0, sizeof(state->local_rps->num_ref_idx_LX_active));
   }
 }
 

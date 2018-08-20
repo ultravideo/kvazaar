@@ -1794,12 +1794,12 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
     //Override only when ref_negative & positive differ from the default (number of ref frames / zero)
-    uint8_t override_flag = (state->frame->ref_LX_size[0] != encoder->cfg.ref_frames + encoder->cfg.ILR_frames ) || (state->frame->ref_LX_size[1] != 0);
+    uint8_t override_flag = (state->local_rps->num_ref_idx_LX_active[0] != encoder->cfg.ref_frames + encoder->cfg.ILR_frames ) || (state->local_rps->num_ref_idx_LX_active[1] != 0);
     WRITE_U(stream, override_flag ? 1 : 0, 1, "num_ref_idx_active_override_flag");
     if (override_flag) {
-      WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[0]) - 1), "num_ref_idx_l0_active_minus1");
+      WRITE_UE(stream, MAX(0, ((int)state->local_rps->num_ref_idx_LX_active[0]) - 1), "num_ref_idx_l0_active_minus1");
       if (state->frame->slicetype == KVZ_SLICE_B) {
-        WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[1]) - 1), "num_ref_idx_l1_active_minus1");
+        WRITE_UE(stream, MAX(0, ((int)state->local_rps->num_ref_idx_LX_active[1]) - 1), "num_ref_idx_l1_active_minus1");
       }
     }
 

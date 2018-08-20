@@ -305,6 +305,10 @@ static int encoder_state_config_local_rps_init(const encoder_state_t * const sta
   memset(&state->local_rps->rps, 0, sizeof(kvz_rps_config));
   state->local_rps->local_st_rps_sps_flag = state->encoder_control->layer.short_term_ref_pic_set_sps_flag;
 
+  state->local_rps->rps_idx = 0;
+  memset(state->local_rps->is_used, 0, sizeof(state->local_rps->is_used));
+  memset(state->local_rps->num_ref_idx_LX_active, 0, sizeof(state->local_rps->num_ref_idx_LX_active));
+
   return 1;
 }
 

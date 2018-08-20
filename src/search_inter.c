@@ -1429,7 +1429,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
                                    uint32_t *inter_bitcost)
 {
   const image_list_t *const ref = info->state->frame->ref;
-  uint8_t (*ref_LX)[16] = info->state->frame->ref_LX;
+  uint8_t (*ref_LX)[MAX_REF_PIC_COUNT] = info->state->frame->ref_LX;
   const videoframe_t * const frame = info->state->tile->frame;
   const int cu_width = LCU_WIDTH >> depth;
   const int x         = info->origin.x;
