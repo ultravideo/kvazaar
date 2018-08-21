@@ -52,6 +52,7 @@ static int sao_edge_ddistortion_generic(const kvz_pixel *orig_data,
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
+
   for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
       const kvz_pixel *c_data = &rec_data[y * block_width + x];
