@@ -27,6 +27,8 @@
 #include "strategies/strategies-picture.h"
 #include "threads.h"
 
+#include "strategies/strategies-resample.h"
+
 /**
 * \brief Allocate a new image with 420.
 * This function signature is part of the libkvz API.
@@ -750,10 +752,16 @@ void kvz_block_scaler_worker(void * opaque_param)
 
 }
 
-//Handle hor/ver scaling steps:
-//  If pic_in is given, copy relevant block to src_buffer and run horizontal scaling step
-//  If pic_out is given, run vertical scaling step and copy relevant block from trgt_buffer to pic_out
-//  If both are given, do both directions and the given block is taken to mean the pic_out block that should be calculated
+/** \brief Handle hor/ver scaling steps
+*  If tiles not used:
+*    If pic_in is given, copy relevant block to src_buffer and run horizontal scaling step
+*    If pic_out is given, run vertical scaling step and copy relevant block from trgt_buffer to pic_out
+*    If both are given, do both directions and the given block is taken to mean the pic_out block that should be calculated
+*  If tiles used:
+*    If pic_in is given, copy relevant tile to src_buffer and run horizontal scaling step; src_buffer is filled starting from (0,0)
+*    If pic_out is given, run vertical scaling step and copy relevant block from trgt_buffer to pic_out; trgt_buffer is indexed starting from (0,0)
+*    If both are given, do both directions and the given block is taken to mean the pic_out block that should be calculated
+*/
 void kvz_block_step_scaler_worker(void * opaque_param)
 {
   kvz_image_scaling_parameter_t *in_param = opaque_param;
@@ -766,47 +774,65 @@ void kvz_block_step_scaler_worker(void * opaque_param)
   int h_factor = -1;
 
   //Hor Scaling
-  if( pic_in != NULL ){
-    //Get range that needs to be copied from pic_in
-    //range[0:1] is prev blocks range and range[2:3] is the new block range
-    //Only copy pixels not in range[0:1] (already copied by previous workers).
-    //Getting the correct block_x of the previous block does not matter as only range[1] is used
+  if (pic_in != NULL) {
+    
     int range[4];
-    if (in_param->block_x - in_param->block_width < 0){
-      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
-      range[1] = range[2] - 1;
+    if (in_param->use_tiles){
+      kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);    
     } else {
-      kvz_blockScalingSrcWidthRange(range, param, in_param->block_x - in_param->block_width, in_param->block_width);
-      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
-    }
-
-    int cp_block_x = range[1] + 1;
-    int cp_block_y = in_param->block_y;
-    int cp_block_width = range[3] - cp_block_x + 1;
-    int cp_block_height = in_param->block_height;
-    int hor_block_y = in_param->block_y;
-    int hor_block_height = in_param->block_height;
-
-    if(pic_out != NULL ){
-      if (in_param->block_y - in_param->block_height < 0) {
-        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+      //Get range that needs to be copied from pic_in
+      //range[0:1] is prev blocks range and range[2:3] is the new block range
+      //Only copy pixels not in range[0:1] (already copied by previous workers).
+      //Getting the correct block_x of the previous block does not matter as only range[1] is used
+      if (in_param->block_x - in_param->block_width < 0) {
+        kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
         range[1] = range[2] - 1;
       }
       else {
-        kvz_blockScalingSrcHeightRange(range, param, in_param->block_y - in_param->block_height, in_param->block_height);
-        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+        kvz_blockScalingSrcWidthRange(range, param, in_param->block_x - in_param->block_width, in_param->block_width);
+        kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
       }
-      cp_block_y = range[1] + 1;
-      cp_block_height = range[3] - cp_block_y + 1;
-      hor_block_y = range[2];
-      hor_block_height = range[3] - range[2] + 1;
+    }
+
+    int cp_block_x = in_param->use_tiles ? range[0] : (range[1] + 1);
+    int cp_block_y = in_param->block_y;
+    int cp_block_width = (in_param->use_tiles ? range[1] : range[3]) - cp_block_x + 1;
+    int cp_block_height = in_param->block_height;
+    
+    //When using tiles, copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
+    int cp_dst_x = in_param->use_tiles ? 0 : cp_block_x;
+    int cp_dst_y = in_param->use_tiles ? 0 : cp_block_y;
+    
+    int hor_block_y = in_param->block_y;
+    int hor_block_height = in_param->block_height;
+
+    if (pic_out != NULL) {
+      if (in_param->use_tiles){
+        kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
+        cp_block_y  = hor_block_y = range[0];
+        cp_block_height = hor_block_height = range[1] - hor_block_y + 1;
+      } else {
+        //Do the same procedure as with horizontal range
+        if (in_param->block_y - in_param->block_height < 0) {
+          kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+          range[1] = range[2] - 1;
+        }
+        else {
+          kvz_blockScalingSrcHeightRange(range, param, in_param->block_y - in_param->block_height, in_param->block_height);
+          kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+        }
+        cp_block_y = range[1] + 1;
+        cp_block_height = range[3] - cp_block_y + 1;
+        hor_block_y = range[2];
+        hor_block_height = range[3] - range[2] + 1;
+      }
     }
 
     //Copy from in_pic to the src buffer
-    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_block_x, cp_block_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
+    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_dst_x, cp_dst_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
 
     //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
-    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {  
+    if (!kvz_yuvBlockStepScaling_adapter(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0, kvz_resample_block_step)) {
       //TODO: Do error stuff?
       kvz_image_free(pic_in);
       kvz_image_free(pic_out);
@@ -818,7 +844,7 @@ void kvz_block_step_scaler_worker(void * opaque_param)
   //Ver scaling
   if (pic_out != NULL) {
     //Do ver scaling step
-    if (!kvz_yuvBlockStepScaling(in_param->trgt_buffer, in_param->ver_tmp_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 1)) {
+    if (!kvz_yuvBlockStepScaling_adapter(in_param->trgt_buffer, in_param->ver_tmp_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 1, kvz_resample_block_step)) {
       //TODO: Do error stuff?
       kvz_image_free(pic_in);
       kvz_image_free(pic_out);
@@ -826,85 +852,177 @@ void kvz_block_step_scaler_worker(void * opaque_param)
       return;
     }
 
+    const int dst_x = in_param->block_x;
+    const int dst_y = in_param->block_y;
+    const int src_x = in_param->use_tiles ? 0 : in_param->block_x;
+    const int src_y = in_param->use_tiles ? 0 : in_param->block_y;
+
     //Copy results to pic_out
-    kvz_copy_YuvBuffer_block_to_uint8(pic_out->y, pic_out->u, pic_out->v, pic_out->stride, in_param->trgt_buffer, in_param->block_x, in_param->block_y, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, w_factor, h_factor);
-    
+    kvz_copy_YuvBuffer_block_to_uint8(pic_out->y, pic_out->u, pic_out->v, pic_out->stride, in_param->trgt_buffer, dst_x, dst_y, src_x, src_y, in_param->block_width, in_param->block_height, w_factor, h_factor);
+
   }
 
   //Do deallocation
   kvz_image_free(pic_in);
   kvz_image_free(pic_out);
   free(in_param);
-
 }
+
+//Handle hor/ver scaling steps:
+//  If pic_in is given, copy relevant block to src_buffer and run horizontal scaling step
+//  If pic_out is given, run vertical scaling step and copy relevant block from trgt_buffer to pic_out
+//  If both are given, do both directions and the given block is taken to mean the pic_out block that should be calculated
+//void kvz_block_step_scaler_worker(void * opaque_param)
+//{
+//  kvz_image_scaling_parameter_t *in_param = opaque_param;
+//  kvz_picture * const pic_in = in_param->pic_in;
+//  kvz_picture * const pic_out = in_param->pic_out;
+//  const scaling_parameter_t *const param = in_param->param;
+//
+//  //TODO: account for chroma format properly
+//  int w_factor = -1;
+//  int h_factor = -1;
+//
+//  //Hor Scaling
+//  if( pic_in != NULL ){
+//    //Get range that needs to be copied from pic_in
+//    //range[0:1] is prev blocks range and range[2:3] is the new block range
+//    //Only copy pixels not in range[0:1] (already copied by previous workers).
+//    //Getting the correct block_x of the previous block does not matter as only range[1] is used
+//    int range[4];
+//    if (in_param->block_x - in_param->block_width < 0){
+//      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
+//      range[1] = range[2] - 1;
+//    } else {
+//      kvz_blockScalingSrcWidthRange(range, param, in_param->block_x - in_param->block_width, in_param->block_width);
+//      kvz_blockScalingSrcWidthRange(range + 2, param, in_param->block_x, in_param->block_width);
+//    }
+//
+//    int cp_block_x = range[1] + 1;
+//    int cp_block_y = in_param->block_y;
+//    int cp_block_width = range[3] - cp_block_x + 1;
+//    int cp_block_height = in_param->block_height;
+//    int hor_block_y = in_param->block_y;
+//    int hor_block_height = in_param->block_height;
+//
+//    if(pic_out != NULL ){
+//      if (in_param->block_y - in_param->block_height < 0) {
+//        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+//        range[1] = range[2] - 1;
+//      }
+//      else {
+//        kvz_blockScalingSrcHeightRange(range, param, in_param->block_y - in_param->block_height, in_param->block_height);
+//        kvz_blockScalingSrcHeightRange(range + 2, param, in_param->block_y, in_param->block_height);
+//      }
+//      cp_block_y = range[1] + 1;
+//      cp_block_height = range[3] - cp_block_y + 1;
+//      hor_block_y = range[2];
+//      hor_block_height = range[3] - range[2] + 1;
+//    }
+//
+//    //Copy from in_pic to the src buffer
+//    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_block_x, cp_block_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
+//
+//    //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
+//    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {  
+//      //TODO: Do error stuff?
+//      kvz_image_free(pic_in);
+//      kvz_image_free(pic_out);
+//      free(in_param);
+//      return;
+//    }
+//  }
+//
+//  //Ver scaling
+//  if (pic_out != NULL) {
+//    //Do ver scaling step
+//    if (!kvz_yuvBlockStepScaling(in_param->trgt_buffer, in_param->ver_tmp_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 1)) {
+//      //TODO: Do error stuff?
+//      kvz_image_free(pic_in);
+//      kvz_image_free(pic_out);
+//      free(in_param);
+//      return;
+//    }
+//
+//    //Copy results to pic_out
+//    kvz_copy_YuvBuffer_block_to_uint8(pic_out->y, pic_out->u, pic_out->v, pic_out->stride, in_param->trgt_buffer, in_param->block_x, in_param->block_y, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, w_factor, h_factor);
+//    
+//  }
+//
+//  //Do deallocation
+//  kvz_image_free(pic_in);
+//  kvz_image_free(pic_out);
+//  free(in_param);
+//
+//}
 
 //Handle hor/ver scaling steps for tiles:
 //  If pic_in is given, copy relevant tile to src_buffer and run horizontal scaling step; src_buffer is filled starting from (0,0)
 //  If pic_out is given, run vertical scaling step and copy relevant block from trgt_buffer to pic_out; trgt_buffer is indexed starting from (0,0)
 //  If both are given, do both directions and the given block is taken to mean the pic_out block that should be calculated
-void kvz_tile_step_scaler_worker(void * opaque_param)
-{
-  kvz_image_scaling_parameter_t *in_param = opaque_param;
-  kvz_picture * const pic_in = in_param->pic_in;
-  kvz_picture * const pic_out = in_param->pic_out;
-  const scaling_parameter_t *const param = in_param->param;
-
-  //TODO: account for chroma format properly
-  int w_factor = -1;
-  int h_factor = -1;
-
-  //Hor Scaling
-  if (pic_in != NULL) {
-    //Get range needed to be copied from pic_in
-    int range[2];
-    kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
-    
-    int cp_block_x = range[0];
-    int hor_block_y = in_param->block_y;
-    int cp_block_width = range[1] - cp_block_x + 1;
-    int hor_block_height = in_param->block_height;
-
-    if (pic_out != NULL) {
-      kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
-      hor_block_y = range[0];
-      hor_block_height = range[1] - hor_block_y + 1;
-    }
-
-    //Copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
-    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, 0, 0, cp_block_x, hor_block_y, cp_block_width, hor_block_height, w_factor, h_factor);
-
-    //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
-    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {
-      //TODO: Do error stuff?
-      kvz_image_free(pic_in);
-      kvz_image_free(pic_out);
-      free(in_param);
-      return;
-    }
-  }
-
-  //Ver scaling
-  if (pic_out != NULL) {
-    //Do ver scaling step
-    if (!kvz_yuvBlockStepScaling(in_param->trgt_buffer, in_param->ver_tmp_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 1)) {
-      //TODO: Do error stuff?
-      kvz_image_free(pic_in);
-      kvz_image_free(pic_out);
-      free(in_param);
-      return;
-    }
-
-    //Copy results to pic_out (trgt_buffer should only hold one tile and start from (0,0)
-    kvz_copy_YuvBuffer_block_to_uint8(pic_out->y, pic_out->u, pic_out->v, pic_out->stride, in_param->trgt_buffer, in_param->block_x, in_param->block_y, 0, 0, in_param->block_width, in_param->block_height, w_factor, h_factor);
-
-  }
-
-  //Do deallocation
-  kvz_image_free(pic_in);
-  kvz_image_free(pic_out);
-  free(in_param);
-
-}
+//void kvz_tile_step_scaler_worker(void * opaque_param)
+//{
+//  kvz_image_scaling_parameter_t *in_param = opaque_param;
+//  kvz_picture * const pic_in = in_param->pic_in;
+//  kvz_picture * const pic_out = in_param->pic_out;
+//  const scaling_parameter_t *const param = in_param->param;
+//
+//  //TODO: account for chroma format properly
+//  int w_factor = -1;
+//  int h_factor = -1;
+//
+//  //Hor Scaling
+//  if (pic_in != NULL) {
+//    //Get range needed to be copied from pic_in
+//    int range[2];
+//    kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
+//    
+//    int cp_block_x = range[0];
+//    int hor_block_y = in_param->block_y;
+//    int cp_block_width = range[1] - cp_block_x + 1;
+//    int hor_block_height = in_param->block_height;
+//
+//    if (pic_out != NULL) {
+//      kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
+//      hor_block_y = range[0];
+//      hor_block_height = range[1] - hor_block_y + 1;
+//    }
+//
+//    //Copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
+//    kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, 0, 0, cp_block_x, hor_block_y, cp_block_width, hor_block_height, w_factor, h_factor);
+//
+//    //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
+//    if (!kvz_yuvBlockStepScaling(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0)) {
+//      //TODO: Do error stuff?
+//      kvz_image_free(pic_in);
+//      kvz_image_free(pic_out);
+//      free(in_param);
+//      return;
+//    }
+//  }
+//
+//  //Ver scaling
+//  if (pic_out != NULL) {
+//    //Do ver scaling step
+//    if (!kvz_yuvBlockStepScaling(in_param->trgt_buffer, in_param->ver_tmp_buffer, param, in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, 1)) {
+//      //TODO: Do error stuff?
+//      kvz_image_free(pic_in);
+//      kvz_image_free(pic_out);
+//      free(in_param);
+//      return;
+//    }
+//
+//    //Copy results to pic_out (trgt_buffer should only hold one tile and start from (0,0)
+//    kvz_copy_YuvBuffer_block_to_uint8(pic_out->y, pic_out->u, pic_out->v, pic_out->stride, in_param->trgt_buffer, in_param->block_x, in_param->block_y, 0, 0, in_param->block_width, in_param->block_height, w_factor, h_factor);
+//
+//  }
+//
+//  //Do deallocation
+//  kvz_image_free(pic_in);
+//  kvz_image_free(pic_out);
+//  free(in_param);
+//
+//}
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
@@ -959,6 +1077,8 @@ void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst
   dst->block_width = src->block_width;
   dst->block_height = src->block_height;
   dst->param = src->param;
+
+  dst->use_tiles = src->use_tiles;
 }
 
 // ***********************************************

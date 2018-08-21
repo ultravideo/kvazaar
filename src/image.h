@@ -118,6 +118,8 @@ typedef struct {
   int block_width;
   int block_height;
 
+  int use_tiles;
+
   const scaling_parameter_t *param;
 } kvz_image_scaling_parameter_t;
 

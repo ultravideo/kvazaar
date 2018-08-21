@@ -221,6 +221,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\extras\libmd5.c" />
     <ClCompile Include="..\..\src\extras\crypto.cpp" />
+    <ClCompile Include="..\..\src\strategies\strategies-resample.c">
+      <Filter>Optimization\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\resample-generic.c">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -411,6 +417,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\extras\libmd5.h" />
     <ClInclude Include="..\..\src\extras\crypto.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-resample.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\resample-generic.h">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

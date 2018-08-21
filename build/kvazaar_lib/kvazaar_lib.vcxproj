@@ -178,6 +178,7 @@
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
+    <ClCompile Include="..\..\src\strategies\generic\resample-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\sao-generic.c" />
     <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
@@ -216,6 +217,7 @@
     <ClCompile Include="..\..\src\strategies\strategies-ipol.c" />
     <ClCompile Include="..\..\src\strategies\strategies-nal.c" />
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
+    <ClCompile Include="..\..\src\strategies\strategies-resample.c" />
     <ClCompile Include="..\..\src\strategies\strategies-sao.c" />
     <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c" />
     <ClCompile Include="..\..\src\videoframe.c" />
@@ -235,6 +237,7 @@
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
+    <ClInclude Include="..\..\src\strategies\generic\resample-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />
@@ -275,6 +278,7 @@
     <ClInclude Include="..\..\src\strategies\strategies-ipol.h" />
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-resample.h" />
     <ClInclude Include="..\..\src\strategies\strategies-sao.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.h" />

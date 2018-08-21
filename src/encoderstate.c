@@ -1101,7 +1101,8 @@ static void block_step_scaling(encoder_state_t * const state )
   param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
   param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
 
-  kvz_tile_step_scaler_worker(param);
+  param->use_tiles = 1;
+  kvz_block_step_scaler_worker(param);
 
   //state->layer->scaling_started = 1;
 
@@ -1130,6 +1131,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     kvz_image_free(param_ver->pic_in);
     param_ver->pic_in = NULL;
     
+    param_ver->use_tiles = 0;
+
     //First create job for vertical scaling
     kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
     state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param_ver);
@@ -1241,9 +1244,11 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     param->block_width = state_param->trgt_buffer->y->width; //Trgt buffer should be the size of the block
     param->block_height = state_param->trgt_buffer->y->height;
 
+    param->use_tiles = 1;
+
     //Do hor/ver scaling in the same job
     kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done); //Should have been set to NULL anyway
-    state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_tile_step_scaler_worker, (void*)param);
+    state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param);
 
     //Need to add dependency to all ilr tiles that that are within the src range
     int range[4];

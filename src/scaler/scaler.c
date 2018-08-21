@@ -25,6 +25,8 @@
 #include <assert.h>
 #include <stdio.h>
 
+#define DEFAULT_RESAMPLE_BLOCK_STEP_FUNC resampleBlockStep
+
 #define SCALER_MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define SCALER_MAX(x,y) (((x) > (y)) ? (x) : (y))
 #define SCALER_CLIP(val, mn, mx) (SCALER_MIN(mx,SCALER_MAX(mn,val)))
@@ -1271,6 +1273,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
 }
 
+
 //Do the resampling in one pass using 2D-convolution.
 static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height )
 {
@@ -1941,7 +1944,7 @@ void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * co
 }
 
 // Do block scaling in one direction. yuv buffer should not be modified.
-int kvz_yuvBlockStepScaling(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
+int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func * const resample_func)
 {
   /*========== Basic Initialization ==============*/
 
@@ -2066,7 +2069,7 @@ int kvz_yuvBlockStepScaling(yuv_buffer_t* const dst, const yuv_buffer_t* const s
   /*==========Start Resampling=============*/
 
   //Resample y
-  resampleBlockStep(src->y, dst->y, -src_offset_luma, -dst_offset_luma, block_x, block_y, block_width, block_height, &param, is_upscaling, 1, is_vertical);
+  /*resampleBlockStep*/resample_func(src->y, dst->y, -src_offset_luma, -dst_offset_luma, block_x, block_y, block_width, block_height, &param, is_upscaling, 1, is_vertical);
 
   //Skip chroma if CHROMA_400
   if (param.chroma != CHROMA_400) {
@@ -2078,11 +2081,19 @@ int kvz_yuvBlockStepScaling(yuv_buffer_t* const dst, const yuv_buffer_t* const s
 
     //In order to scale blocks not divisible by 2 correctly, need to do some tricks
     //Resample u
-    resampleBlockStep(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    /*resampleBlockStep*/resample_func(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
 
     //Resample v
-    resampleBlockStep(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+    /*resampleBlockStep*/resample_func(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
   }
 
   return 1;
 }
+
+int kvz_yuvBlockStepScaling(yuv_buffer_t * const dst, const yuv_buffer_t * const src, const scaling_parameter_t * const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
+{
+  return kvz_yuvBlockStepScaling_adapter(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, kvz_default_block_step_resample_func);
+}
+
+//Set the default resample function
+resample_block_step_func *const kvz_default_block_step_resample_func = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC;

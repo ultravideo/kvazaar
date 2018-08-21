@@ -85,6 +85,7 @@ typedef struct
 } scaling_parameter_t;
 
 /*==========================================================================*/
+
 /*===========================Scaling parameter utility functions=================================*/
 /**
 * \brief Returns the appropriate chroma format for the given parameters
@@ -171,6 +172,11 @@ void kvz_copy_uint8_block_to_YuvBuffer(const yuv_buffer_t* dst, const uint8_t* c
 void kvz_copy_YuvBuffer_block_to_uint8(uint8_t* const y, uint8_t* const u, uint8_t* const v, const int luma_stride, const yuv_buffer_t * const src, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor);
 /*=======================================================*/
 
+/*============================Resample function pointer typedef================================*/
+typedef void (resample_block_step_func)(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical);
+
+extern resample_block_step_func *const kvz_default_block_step_resample_func;  
+/*=============================================================================================*/
 
 /*================Main scaling functions========================*/
 //TODO: Return/recycle the same buffer for the scaled yuv. Use yuv it self and not a separate buffer?
@@ -201,6 +207,13 @@ int kvz_yuvBlockScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t
 */
 int kvz_yuvBlockStepScaling( yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
 
+/**
+* \brief Function for scaling an image, given in a yuv buffer, in either the vertical or horizontal direction (can handle down- and upscaling).
+* \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
+*        Result given in dst buffer.
+* \param func uses the given function pointer as the resample function
+*/
+int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func *const resample_func);
 /*=============================================================*/
 
 /*================Block scaling helper functions========================*/
