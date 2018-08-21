@@ -368,6 +368,10 @@ typedef struct kvz_config
 
   /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
   int8_t fast_residual_cost_limit;
+
+  /** \brief Set QP at CU level keeping pic_init_qp_minus26 in PPS zero */
+  int8_t set_qp_in_cu;
+
 } kvz_config;
 
 /**

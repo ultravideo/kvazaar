@@ -121,6 +121,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->roi.width = 0;
   cfg->roi.height = 0;
   cfg->roi.dqps = NULL;
+  cfg->set_qp_in_cu = false;
 
   cfg->erp_aqp = false;
 
@@ -1150,6 +1151,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
 
     fclose(f);
+  }
+  else if OPT("set-qp-in-cu") {
+    cfg->set_qp_in_cu = (bool)atobool(value);
   }
   else if OPT("erp-aqp") {
     cfg->erp_aqp = (bool)atobool(value);
