@@ -117,221 +117,92 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
   __m256i v_accum = { 0 };
   __m256i v_offset = _mm256_loadu_si256((__m256i*) offsets);
   __m256i temp_v_offset;
+  __m128i vector_c_data;
+  __m128i vector_a, vector_b;
+
 
   for (y = 1; y < block_height - 1; ++y) {
-   x = 1;
-   switch (block_width) {
-   case 16:
+
+   for (x = 1; x < block_width - 16; x += 16) {
 
     const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-    __m128i v_c_data = _mm_loadl_epi64((__m128i*)c_data);
-    __m128i v_a = _mm_loadl_epi64((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
-    __m128i v_c = v_c_data;
-    __m128i v_b = _mm_loadl_epi64((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
+    vector_c_data = _mm_loadu_si128((__m128i*)c_data);
+    vector_a = _mm_loadu_si128((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
 
-    __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
+    vector_b = _mm_loadu_si128((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
+    __m128i temp_cat = sao_calc_eo_cat_avx2_256(&vector_a, &vector_b, &vector_c_data);
 
-    temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
+    //Split temp_cat vector to higher and upper parts
+    __m256i vector_cat_lower = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 0)));
+    __m256i vector_cat_upper = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 1)));
 
-    __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + 1])));
-    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
-    __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
+    // Re-arrenge offsets to right order
+    temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, vector_cat_lower);
+    __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
+
+    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(vector_c_data));
+
+    __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
+
     __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
     v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
 
-    break;
-
-   default:
-    for (x = 1;  x < block_width - 16; x += 16) {
-     const kvz_pixel *c_data = &rec_data[y * block_width + x];
-
-     __m128i vector_c_data = _mm_loadu_si128((__m128i*)c_data);
-     __m128i vector_a = _mm_loadu_si128((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
-     
-     __m128i vector_c = vector_c_data;
-     __m128i vector_b = _mm_loadu_si128((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
-     __m128i temp_cat = sao_calc_eo_cat_avx2_256(&vector_a, &vector_b, &vector_c);
-
-
-     __m256i vector_cat_lower = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 0)));
-     __m256i vector_cat_upper = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 1)));
-
-     
-     temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, vector_cat_lower);
-     __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
-
-     v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(vector_c));
-     __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
-
-     __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
-     v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
-
-     temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, vector_cat_upper);
-     v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x + 8])));
-
-
-
-     v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(vector_c, 1))));
-
-     v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
-
-     v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
-     v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
-    }
-
-    c_data = &rec_data[y * block_width + x];
-
-    v_c_data = _mm_loadl_epi64((__m128i*)c_data);
-    v_a = _mm_loadl_epi64((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
-    v_c = v_c_data;
-    v_b = _mm_loadl_epi64((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
-
-    v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
-
-    temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
-
-
-    v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
-
-    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
+    temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, vector_cat_upper);
+    v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x + 8])));
+    int64_t*c_pointer = (int64_t*)&vector_c_data;
+    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(c_pointer[1])));
 
     v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
 
     v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
     v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
-    break;
    }
 
-    //Handle last 6 pixels separately to prevent reading over boundary
-    const kvz_pixel *c_data = &rec_data[y * block_width + x];
-    __m128i v_c_data = load_6_pixels(c_data);
-    const kvz_pixel* a_ptr = &c_data[a_ofs.y * block_width + a_ofs.x];
-    const kvz_pixel* b_ptr = &c_data[b_ofs.y * block_width + b_ofs.x];
-    __m128i v_a = load_6_pixels(a_ptr);
-    __m128i v_c = v_c_data;
-    __m128i v_b = load_6_pixels(b_ptr);
 
-    __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
-
-    temp_v_offset = _mm256_permutevar8x32_epi32(load_5_offsets(offsets), v_cat);
-   
-    const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
-    __m256i v_diff = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
-    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
-
-    __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
-    __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
-    v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
-  }
-
-  //Full horizontal sum
-  v_accum = _mm256_hadd_epi32(v_accum, v_accum);
-  v_accum = _mm256_hadd_epi32(v_accum, v_accum);
-  int32_t* pointer = (int32_t*)&v_accum;
-  sum += pointer[0] + pointer[4];
-
-  return sum;
-}
-
-
-static int sao_edge_ddistortion_avx25(const kvz_pixel *orig_data,
-                                     const kvz_pixel *rec_data,
-                                     int block_width,
-                                     int block_height,
-                                     int eo_class,
-                                     int offsets[NUM_SAO_EDGE_CATEGORIES])
-
- /*
-{
- int y, x;
- int sum = 0;
- vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
- vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
-
- for (y = 1; y < block_height - 1; ++y) {
-  for (x = 1; x < block_width - 1; ++x) {
+   // After x> (block_width-16) handle 8 pixels and after that the last 6 pixels
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
-   kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-   kvz_pixel c = c_data[0];
-   kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
 
-   int offset = offsets[sao_calc_eo_cat(a, b, c)];
+   vector_c_data = _mm_loadl_epi64((__m128i*)c_data);
+   vector_a = _mm_loadl_epi64((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
+   vector_b = _mm_loadl_epi64((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
 
-   if (offset != 0) {
-    int diff = orig_data[y * block_width + x] - c;
-    // Offset is applied to reconstruction, so it is subtracted from diff.
-    sum += (diff - offset) * (diff - offset) - diff * diff;
-   }
-  }
- }
+   __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2_256(&vector_a, &vector_b, &vector_c_data));
 
- return sum;
-}*/
+   temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
 
 
-{
-  int y, x;
-  int sum = 0;
-  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
+   __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
 
-  __m256i v_accum = { 0 };
+   v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(vector_c_data));
 
-  for (y = 1; y < block_height - 1; ++y) {
+   __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
 
-    for (x = 1; x < block_width - 8; x+=8) {
-      const kvz_pixel *c_data = &rec_data[y * block_width + x];
+   __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
+   v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
 
-      __m128i v_c_data = _mm_loadl_epi64((__m128i*)c_data);
-      
+   //Handle last 6 pixels separately to prevent reading over boundary
+   x += 8;
+   c_data = &rec_data[y * block_width + x];
+   vector_c_data = load_6_pixels(c_data);
+   const kvz_pixel *a_ptr = &c_data[a_ofs.y * block_width + a_ofs.x];
+   const kvz_pixel *b_ptr = &c_data[b_ofs.y * block_width + b_ofs.x];
+   vector_a = load_6_pixels(a_ptr);
+   vector_b = load_6_pixels(b_ptr);
 
-      __m128i v_a = _mm_loadl_epi64((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
-      __m128i v_c = v_c_data;
-      __m128i v_b = _mm_loadl_epi64((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
+   v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2_256(&vector_a, &vector_b, &vector_c_data));
 
-      __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
-      
-     
-      __m256i v_offset = _mm256_loadu_si256((__m256i*) offsets);
-      v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
+   temp_v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
 
-   
-      __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
+   const kvz_pixel *orig_ptr = &(orig_data[y * block_width + x]);
+   v_diff = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
 
-      v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
-      __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
+   v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(vector_c_data));
 
-      int*test = (int*)&v_diff_minus_offset;
-      for (int i = 0; i < 8; i++) {
-       printf("%d", test[i]);
-      }
 
-      __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
-      v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
-    }
-
-    //Handle last 6 pixels separately to prevent reading over boundary
-    const kvz_pixel *c_data = &rec_data[y * block_width + x];
-    __m128i v_c_data = load_6_pixels(c_data);
-    const kvz_pixel* a_ptr = &c_data[a_ofs.y * block_width + a_ofs.x];
-    const kvz_pixel* b_ptr = &c_data[b_ofs.y * block_width + b_ofs.x];
-    __m128i v_a = load_6_pixels(a_ptr);
-    __m128i v_c = v_c_data;
-    __m128i v_b = load_6_pixels(b_ptr);
-
-    __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
-
-    __m256i v_offset = load_5_offsets(offsets);  //load_5_offsets(offsets);
-    v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
-   
-    const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
-    __m256i v_diff = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
-    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
-
-    __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
-    __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
-    v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
+   v_diff_minus_offset = _mm256_sub_epi32(v_diff, temp_v_offset);
+   v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
+   v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
   }
 
   //Full horizontal sum
@@ -342,7 +213,6 @@ static int sao_edge_ddistortion_avx25(const kvz_pixel *orig_data,
 
   return sum;
 }
-
 
 /*
 // Mapping of edge_idx values to eo-classes.
