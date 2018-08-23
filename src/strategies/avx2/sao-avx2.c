@@ -35,17 +35,6 @@
 // Might be useful to check that if (when) this file
 // is difficult to understand.
 
-// Mapping of edge_idx values to eo-classes.
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
- // Mapping relationships between a, b and c to eo_idx.
- static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-
- int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
- return sao_eo_idx_to_eo_category[eo_idx];
-}
-
 static INLINE __m128i load_6_pixels(const kvz_pixel* data)
 {
   return _mm_insert_epi16(_mm_cvtsi32_si128(*(int32_t*)&(data[0])), *(int16_t*)&(data[4]), 2);
