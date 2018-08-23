@@ -227,6 +227,9 @@
     <ClCompile Include="..\..\src\strategies\generic\resample-generic.c">
       <Filter>Optimization\strategies\generic</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\resample-avx2.c">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -422,6 +425,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\generic\resample-generic.h">
       <Filter>Optimization\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\resample-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
