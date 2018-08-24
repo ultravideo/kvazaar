@@ -954,6 +954,7 @@ static int prepareFilter(const int** const filter, int is_upsampling, int is_lum
 //  }
 // }
 //}
+
 #define SCALER_MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define SCALER_MAX(x,y) (((x) > (y)) ? (x) : (y))
 #define SCALER_CLIP(val, mn, mx) (SCALER_MIN(mx,SCALER_MAX(mn,val)))
@@ -1013,18 +1014,18 @@ void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const pic_buff
 
       const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
 
-                                                 //Inner loop:
-                                                 //  if is_vertical -> loop over x (block width)
-                                                 //  if !is_vertical -> loop over k (filter inds)-
+      //Calculate reference position in src pic
+      const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
+      const int phase = ref_pos_16 & 15;
+      const int ref_pos = ref_pos_16 >> 4;
+
+      //Inner loop:
+      //  if is_vertical -> loop over x (block width)
+      //  if !is_vertical -> loop over k (filter inds)-
       for (int i_ind = inner_init; i_ind < inner_bound; i_ind++) {
 
         const int f_ind = is_vertical ? o_ind : i_ind; //Filter index
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
-
-                                                       //Calculate reference position in src pic
-        int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
-        int phase = ref_pos_16 & 15;
-        int ref_pos = ref_pos_16 >> 4;
 
         //Choose filter
         //const int *filter;

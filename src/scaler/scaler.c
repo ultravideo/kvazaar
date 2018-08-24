@@ -1235,6 +1235,11 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
       
       const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
 
+      //Calculate reference position in src pic
+      const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
+      const int phase = ref_pos_16 & 15;
+      const int ref_pos = ref_pos_16 >> 4;
+      
       //Inner loop:
       //  if is_vertical -> loop over x (block width)
       //  if !is_vertical -> loop over k (filter inds)-
@@ -1242,12 +1247,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
         const int f_ind = is_vertical ? o_ind : i_ind; //Filter index
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
-
-        //Calculate reference position in src pic
-        int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
-        int phase = ref_pos_16 & 15;
-        int ref_pos = ref_pos_16 >> 4;
-
+        
         //Choose filter
         //const int *filter;
         //const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
