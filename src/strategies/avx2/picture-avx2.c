@@ -922,15 +922,16 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 	kvz_pixel* temp_lcu_v) 
 {
 
- if (hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
+ bool test = false;
+ if (test)//(hi_prec_luma_rec0 == 0 && hi_prec_luma_rec1 == 0 && hi_prec_chroma_rec0 == 0 && hi_prec_chroma_rec1 == 0)
  {
   inter_recon_bipred_no_mov_avx2(height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
  }
 
  else
  {
-  int y_in_lcu, x_in_lcu;
 
+  int y_in_lcu, x_in_lcu;
   int shift = 15 - KVZ_BIT_DEPTH;
   int offset = 1 << (shift - 1);
   int shift_left = 14 - KVZ_BIT_DEPTH;
@@ -977,9 +978,12 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      temp_y_epi16 = _mm256_srai_epi16(temp_y_epi16, shift);
 
      temp_epi8 = _mm256_packus_epi16(temp_y_epi16, temp_y_epi16);
-
+     
      pointer = (int32_t*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]);
      *pointer = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp_epi8));
+     
+     //lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu] = _mm256_extract_epi32(temp_epi8, 0);
+
      break;
 
     case 8:
@@ -1024,7 +1028,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      break;
 
-
+     
     default:
 
      // Load total of 16 elements from memory to vector
@@ -1049,7 +1053,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
      }
 
      else {
-      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_y, temp_y_epi16), _MM_SHUFFLE(1, 3, 2, 0));
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_y, temp_y_epi16), _MM_SHUFFLE(3, 1, 2, 0));
 
       // Store 256-bits of integer data into memory
       _mm256_storeu_si256((__m256i*)&(lcu->rec.y[start_point]), temp_epi8);
@@ -1212,10 +1216,10 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
       temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
-      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), _MM_SHUFFLE(1, 3, 2, 0));
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), _MM_SHUFFLE(3, 1, 2, 0));
       _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
-      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), _MM_SHUFFLE(1, 3, 2, 0));
+      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_v_epi16, temp_v_epi16), _MM_SHUFFLE(3, 1, 2, 0));
       _mm_storeu_si128((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
 
       break;
@@ -1268,11 +1272,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       }
 
       else {
-       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), _MM_SHUFFLE(1, 3, 2, 0));
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), _MM_SHUFFLE(3, 1, 2, 0));
 
        _mm256_storeu_si256((__m256i*)&(lcu->rec.u[start_point_uv]), temp_epi8);
 
-       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), _MM_SHUFFLE(1, 3, 2, 0));
+       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), _MM_SHUFFLE(3, 1, 2, 0));
 
        _mm256_storeu_si256((__m256i*)&(lcu->rec.v[start_point_uv]), temp_epi8);
 
