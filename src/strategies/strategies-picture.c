@@ -61,7 +61,7 @@ cost_pixel_any_size_multi_func * kvz_satd_any_size_quad = 0;
 
 pixels_calc_ssd_func * kvz_pixels_calc_ssd = 0;
 
-inter_recon_bipred_func * kvz_inter_recon_bipred_generic = 0;
+inter_recon_bipred_func * kvz_inter_recon_bipred_blend = 0;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
