@@ -144,7 +144,7 @@ TEST test_inter_recon_bipred()
  }
  printf("\n");*/
 	
-	kvz_inter_recon_bipred_generic(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, width, height, xpos, ypos, high_precision_rec0, high_precision_rec1, &result, temp_lcu_y, temp_lcu_u, temp_lcu_v); 
+	kvz_inter_recon_bipred_blend(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, width, height, xpos, ypos, high_precision_rec0, high_precision_rec1, &result, temp_lcu_y, temp_lcu_u, temp_lcu_v); 
  /*
  for (temp_y = 0; temp_y < height; ++temp_y) {
   int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
@@ -195,7 +195,7 @@ SUITE(inter_recon_bipred_tests)
 			continue;
 		}
 
-		kvz_inter_recon_bipred_generic = strategies.strategies[i].fptr;
+		kvz_inter_recon_bipred_blend = strategies.strategies[i].fptr;
 		RUN_TEST(test_inter_recon_bipred);
 	}
 }

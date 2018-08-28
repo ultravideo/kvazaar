@@ -478,7 +478,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
   inter_recon_unipred(state, ref2, xpos, ypos, width, height, mv_param[1], lcu, high_precision_rec1);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  kvz_inter_recon_bipred_generic(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
+  kvz_inter_recon_bipred_blend(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, height, width, ypos, xpos, high_precision_rec0, high_precision_rec1, lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v);
  
   if (high_precision_rec0 != 0) kvz_hi_prec_buf_t_free(high_precision_rec0);
   if (high_precision_rec1 != 0) kvz_hi_prec_buf_t_free(high_precision_rec1);
