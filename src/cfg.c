@@ -1690,7 +1690,7 @@ static void generate_rps(kvz_config *cfg){
       // Use inter rps pred
       rps->inter_rps_pred_flag = 1;
       //Only have negative ref and as many as i
-      rps->num_negative_pics = i;
+      rps->num_negative_pics = i + 1;
       rps->num_positive_pics = 0;
       rps->delta_rps = -1;
       rps->num_ref_idc = i + 1;
