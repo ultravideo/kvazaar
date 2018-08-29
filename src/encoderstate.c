@@ -1175,6 +1175,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         //Create hor param
         kvz_image_scaling_parameter_t *param_hor = calloc(1, sizeof(kvz_image_scaling_parameter_t));
         kvz_copy_image_scaling_parameters(param_hor, param_ver);
+        
+        param_hor->pic_in = kvz_image_copy_ref(state_param->pic_in);
         kvz_image_free(param_hor->pic_out);
         param_hor->pic_out = NULL;
 
