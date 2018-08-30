@@ -175,7 +175,10 @@ void kvz_copy_YuvBuffer_block_to_uint8(uint8_t* const y, uint8_t* const u, uint8
 /*============================Resample function pointer typedef================================*/
 typedef void (resample_block_step_func)(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical);
 
-extern resample_block_step_func *const kvz_default_block_step_resample_func;  
+typedef void (resample_func)(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
+
+extern resample_block_step_func *const kvz_default_block_step_resample_func;
+extern resample_func *const kvz_default_resample_func;
 /*=============================================================================================*/
 
 /*================Main scaling functions========================*/
@@ -185,6 +188,14 @@ extern resample_block_step_func *const kvz_default_block_step_resample_func;
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 */
 yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+
+/**
+* \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
+* \param resample_func Pass the function to be used for resampling
+*        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
+*/
+yuv_buffer_t* kvz_yuvScaling_adapter(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst, resample_func *const resample_func);
+
 /**
 * \brief Experimental. Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
@@ -211,7 +222,7 @@ int kvz_yuvBlockStepScaling( yuv_buffer_t* const dst, const yuv_buffer_t* const 
 * \brief Function for scaling an image, given in a yuv buffer, in either the vertical or horizontal direction (can handle down- and upscaling).
 * \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
 *        Result given in dst buffer.
-* \param func uses the given function pointer as the resample function
+* \param resample_func uses the given function pointer as the resample function
 */
 int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func *const resample_func);
 /*=============================================================*/

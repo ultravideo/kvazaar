@@ -1,5 +1,5 @@
-#ifndef SCALER_AVX2_H_
-#define SCALER_AVX2_H_
+#ifndef STRATEGIES_RESAMPLE_GENERIC_H_
+#define STRATEGIES_RESAMPLE_GENERIC_H_
 /*****************************************************************************
 * This file is part of Kvazaar HEVC encoder.
 *
@@ -19,18 +19,15 @@
 * You should have received a copy of the GNU General Public License along
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
-#include "scaler.h"
 
-//#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-//#define MAX(x,y) (((x) > (y)) ? (x) : (y))
-//
-//#define SHIFT(x,y) (((y) < 0) ? ((x)>>(-(y))) : ((x)<<(y)))
+/**
+* \ingroup Optimization
+* \file
+* Generic C implementations of optimized functions.
+*/
 
+#include "global.h" // IWYU pragma: keep
 
-//void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
-//void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
+int kvz_strategy_register_resample_generic(void* opaque);
 
-extern resample_block_step_func *const kvz_default_block_step_resample_func_avx2;
-extern resample_func *const kvz_default_resample_func_avx2;
-
-#endif
+#endif //STRATEGIES_RESAMPLE_GENERIC_H_

@@ -637,7 +637,7 @@ void kvz_image_scaler_worker( void *opaque_param)
                                                         pic_in->stride, param->chroma, 0);
   //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
   
-  yuv_buffer_t* trgt_pic = kvz_yuvScaling(src_pic, param, NULL );
+  yuv_buffer_t* trgt_pic = kvz_yuvScaling_adapter(src_pic, param, NULL, kvz_resample);//kvz_yuvScaling(src_pic, param, NULL );
 
   if (trgt_pic != NULL) {
     //Get out_img padding

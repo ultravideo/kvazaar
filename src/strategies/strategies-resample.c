@@ -1,5 +1,3 @@
-#ifndef SCALER_AVX2_H_
-#define SCALER_AVX2_H_
 /*****************************************************************************
 * This file is part of Kvazaar HEVC encoder.
 *
@@ -19,18 +17,25 @@
 * You should have received a copy of the GNU General Public License along
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
-#include "scaler.h"
 
-//#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-//#define MAX(x,y) (((x) > (y)) ? (x) : (y))
-//
-//#define SHIFT(x,y) (((y) < 0) ? ((x)>>(-(y))) : ((x)<<(y)))
+#include "strategies/strategies-resample.h"
+
+#include "strategies/generic/resample-generic.h"
+#include "strategies/avx2/resample-avx2.h"
+#include "strategyselector.h"
 
 
-//void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
-//void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
+resample_block_step_func * kvz_resample_block_step = 0;
+resample_func * kvz_resample = 0;
 
-extern resample_block_step_func *const kvz_default_block_step_resample_func_avx2;
-extern resample_func *const kvz_default_resample_func_avx2;
+int kvz_strategy_register_resample(void * opaque)
+{
+  bool success = true;
 
-#endif
+  success &= kvz_strategy_register_resample_generic(opaque);
+  if(kvz_g_hardware_flags.intel_flags.avx2) {
+    success &= kvz_strategy_register_resample_avx2(opaque);
+  }
+
+  return success;
+}
