@@ -573,7 +573,7 @@ void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const pic_buff
   __m256i downsampling_adder = _mm256_set_epi32(8, 9, 10, 11, src_size, src_size, src_size, src_size);
   __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   __m128i smallest_epi16;
-  __m256i multiplier_epi32 = _mm256_set1_epi32(src_buffer->width); //Stride of src buffer
+  __m256i multiplier_epi32 = _mm256_set1_epi32(s_stride); //Stride of src buffer
   //int* start;
   int min = 0;
 

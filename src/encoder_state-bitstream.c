@@ -1095,7 +1095,7 @@ static void write_short_term_ref_pic_set(bitstream_t *stream, encoder_state_t *c
     populate_extra_rps(state);
   }*/
 
-  const encoder_control_t* const encoder = state->encoder_control;
+  //const encoder_control_t* const encoder = state->encoder_control;
   //kvz_rps_config *rps = &state->local_rps->rps;//&((encoder_control_t*)(encoder))->cfg.rps[rps_idx];
   uint8_t inter_ref_pic_set_prediction_flag = rps->inter_rps_pred_flag;
   
