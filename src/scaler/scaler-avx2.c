@@ -371,8 +371,8 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
    min = _mm_extract_epi16(smallest_epi16, 0);
    
    tmp_row[j] = 0;
-   //TODO: Gives a read access error when using the original load in vs2015 
-   temp_mem = _mm256_maskload_epi32(&src_row[min], _mm256_set1_epi32(0xf0000000));//_mm256_load_si256((__m256i*)(&(src_row[min])));
+   //src_row is not aligned to a 32-bit boundary so using load gives an error
+   temp_mem = _mm256_loadu_si256((__m256i*)(&(src_row[min])));//_mm256_maskload_epi32(&src_row[min], _mm256_set1_epi32(0xf0000000));//_mm256_load_si256((__m256i*)(&(src_row[min])));
    
    decrese = _mm256_set1_epi32(min);
 
@@ -412,7 +412,8 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
     min = _mm_extract_epi16(smallest_epi16, 0);
 
     temp_filter = _mm256_load_si256((__m256i* )&(filter[8]));
-    temp_mem = _mm256_load_si256((__m256i*)&(src_row[min]));
+    //src_row is not aligned to a 32-bit boundary so using load gives an error
+    temp_mem = _mm256_loadu_si256((__m256i*)(&(src_row[min]))); //_mm256_maskload_epi32(&src_row[min], _mm256_set1_epi32(0xf0000000));//_mm256_load_si256((__m256i*)&(src_row[min]));
 
     decrese = _mm256_set1_epi32(min);
     pointer = _mm256_sub_epi32(pointer, decrese);
