@@ -284,7 +284,7 @@ static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, con
 //
 
 //Resampling is done here per buffer
-void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
 {
  //TODO: Add cropping etc.
 
@@ -517,7 +517,7 @@ void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* 
 }
 
 
-void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
+static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
 {
   //TODO: Add cropping etc.
 
