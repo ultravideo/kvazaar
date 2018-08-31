@@ -723,5 +723,70 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
   }
 }
 
+//AVX2 cumulator. Sum epi32 values in 8 __m256i arrays into one output __m256i array
+static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0)
+{  /*
+          v7 v6 v5 v4 v3 v2 v1 v0
+          |  |  |  |  |  |  |  |
+  shuffle \ /   \ /   \ /   \ /
+          / \   / \   / \   / \
+  add     -+-   -+-   -+-   -+-   
+           |     |     |     |
+  shuffle  \     /     \     /
+            \   /       \   /
+             \ /         \ /
+             / \         / \
+  add        -+-         -+-
+              |           |
+              ----   ------
+  shuffle         \ /
+                  / \
+  add             -+-
+                   |
+                  out
+   */
+  __m256i tmp00, tmp01;
+  __m256i tmp10, tmp11;
+  __m256i tmp20, tmp21;
+  __m256i tmp30, tmp31;
+  __m256i add3, add2, add1, add0;
+  
+  //Consts for permute
+  const int hi_epi128i = 0x13;
+  const int low_epi128i = 0x02;
+  const int hi_epi64i = 0x00;
+  const int low_epi64i = 0x00;
+  const __m256i swap_tmp = _mm256_set_epi32(7, 5, 6, 4, 3, 1, 2, 0);
+  const __m256i swap_final = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
+
+  //First stage
+  tmp31 = _mm256_permute2x128_si256(v7, v6, hi_epi128i); tmp30 = _mm256_permute2x128_si256(v7, v6, low_epi128i);
+  tmp21 = _mm256_permute2x128_si256(v5, v4, hi_epi128i); tmp20 = _mm256_permute2x128_si256(v5, v4, low_epi128i);
+  tmp11 = _mm256_permute2x128_si256(v3, v2, hi_epi128i); tmp10 = _mm256_permute2x128_si256(v3, v2, low_epi128i);
+  tmp01 = _mm256_permute2x128_si256(v1, v0, hi_epi128i); tmp00 = _mm256_permute2x128_si256(v1, v0, low_epi128i);
+
+  add3 = _mm256_add_epi32(tmp31, tmp30);
+  add2 = _mm256_add_epi32(tmp21, tmp20);
+  add1 = _mm256_add_epi32(tmp11, tmp20);
+  add0 = _mm256_add_epi32(tmp01, tmp00);
+
+  //Second stage
+  tmp11 = _mm256_unpackhi_epi64(add2, add3); tmp10 = _mm256_unpacklo_epi64(add2, add3);
+  tmp01 = _mm256_unpackhi_epi64(add0, add1); tmp00 = _mm256_unpacklo_epi64(add0, add1);
+
+  add1 = _mm256_add_epi32(tmp11, tmp10);
+  add0 = _mm256_add_epi32(tmp01, tmp00);
+
+  //Final stage
+  add1 = _mm256_permutevar8x32_epi32(add1, swap_tmp);
+  add0 = _mm256_permutevar8x32_epi32(add0, swap_tmp); 
+
+  tmp01 = _mm256_unpackhi_epi32(add0, add1); tmp00 = _mm256_unpacklo_epi32(add0, add1);
+
+  add0 = _mm256_add_epi32(tmp01, tmp00);
+
+  return _mm256_permutevar8x32_epi32(add0, swap_final);
+}
+
 //Set the default resample function
 resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC_AVX2; resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;
