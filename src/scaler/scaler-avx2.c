@@ -788,5 +788,49 @@ static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256
   return _mm256_permutevar8x32_epi32(add0, swap_final);
 }
 
+//Avx load for loading epi32 values from memory
+static __m256i _mm256_loadu_n_epi32(const int *src, unsigned n)
+{
+  __m256i dst;
+
+  switch (n) {
+
+  case 1:
+    dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, src[0]);
+    break;
+
+  case 2:
+    dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, src[1], src[0]);
+    break;
+
+  case 3:
+    dst = _mm256_set_epi32(0, 0, 0, 0, 0, src[2], src[1], src[0]);
+    break;
+
+  case 7:
+    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[6], 2), 1);
+    //Fall through
+  case 6:
+    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[5], 1), 1);
+    //Fall through
+  case 5:
+    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[4], 0), 1);
+    //Fall through
+  case 4:
+    dst = _mm256_set_m128i(_mm256_extracti128_si256(dst, 1), _mm_loadu_si128((__m128i*)src));
+    break;
+
+  case 8:
+    dst = _mm256_loadu_si256((__m256i*)src);
+    break;
+
+  default:
+    //Not a valid number of values to load
+    break;
+  } //END Switch
+
+  return dst;
+}
+
 //Set the default resample function
 resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC_AVX2; resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;
