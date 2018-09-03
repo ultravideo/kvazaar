@@ -130,6 +130,7 @@ static const struct option long_options[] = {
   { "high-tier",                no_argument, NULL, 0 },
   { "me-steps",           required_argument, NULL, 0 },
   { "fast-residual-cost", required_argument, NULL, 0 },
+  { "set-qp-in-cu",             no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -409,6 +410,8 @@ void print_help(void)
     "                               the QP delta map followed by width*height delta\n"
     "                               QP values in raster order. The map can be of any\n"
     "                               size and will be scaled to the video size.\n"
+    "      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.\n"
+    "                               in PPS zero.\n"
     "      --(no-)erp-aqp         : Use adaptive QP for 360 degree video with\n"
     "                               equirectangular projection. [disabled]\n"
     "      --level <number>       : Use the given HEVC level in the output and give\n"

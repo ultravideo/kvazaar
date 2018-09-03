@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "July 2018" "kvazaar v1.2.0" "User Commands"
+.TH KVAZAAR "1" "August 2018" "kvazaar v1.2.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -145,6 +145,10 @@ file. The file format is: width and height of
 the QP delta map followed by width*height delta
 QP values in raster order. The map can be of any
 size and will be scaled to the video size.
+.TP
+\fB\-\-set\-qp\-in\-cu        
+Set QP at CU level keeping pic_init_qp_minus26.
+in PPS zero.
 .TP
 \fB\-\-(no\-)erp\-aqp        
 Use adaptive QP for 360 degree video with
