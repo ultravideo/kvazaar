@@ -4,6 +4,8 @@
 #include <stdio.h>
 
 #include "scaler.h"
+#include "scaler-avx2.h"
+
 #include <math.h>
 #include <memory.h>
 
@@ -820,7 +822,9 @@ static void validate_test2()
 int main()
 {
   //vscaling();
-  validate_test2();
+  //validate_test2();
+  int r = test_avx();
+  printf("%d", r);
 
   system("Pause");
   return EXIT_SUCCESS;

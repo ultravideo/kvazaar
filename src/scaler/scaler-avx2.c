@@ -31,6 +31,10 @@
 
 #define B11011000 0xD8 //0b11011000
 
+//Consts for permute
+#define HI_epi128 0x13
+#define LOW_epi128 0x02
+
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
 {
@@ -723,6 +727,129 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
   }
 }
 
+//AVX2 cumulator. Sum epi32 values in n (max 8) __m256i arrays, with the array divided between m (1,2,4,8) groups, into one output __m256i array
+//Only n/m least significant input vectors are used.
+static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0, const unsigned n, const unsigned m)
+{
+  /*
+          v7 v6 v5 v4 v3 v2 v1 v0
+          |  |  |  |  |  |  |  |
+  shuffle \ /   \ /   \ /   \ /
+          / \   / \   / \   / \
+  add     -+-   -+-   -+-   -+-
+           |     |     |     |
+  shuffle  \     /     \     /
+            \   /       \   /
+             \ /         \ /
+             / \         / \
+  add        -+-         -+-
+              |           |
+              ----   ------
+  shuffle         \ /
+                  / \
+  add             -+-
+                   |
+                  out
+  */
+
+  if( (n == 0) || (m == 0)){
+    return _mm256_setzero_si256();
+  }
+
+  if( m == 8 ){
+    return v0;
+  }
+
+  __m256i tmp00, tmp01;
+  __m256i tmp10, tmp11;
+  __m256i tmp20, tmp21;
+  __m256i tmp30, tmp31;
+  __m256i add3, add2, add1, add0;
+
+  //Set unused tmps to zero
+  switch (n) {
+
+  case 1: //Fall through
+  case 2: //Fall through
+    tmp11 = _mm256_setzero_si256(); tmp10 = _mm256_setzero_si256();
+    add1 = _mm256_setzero_si256();
+  case 3: //Fall through
+  case 4: //Fall through
+    tmp21 = _mm256_setzero_si256(); tmp20 = _mm256_setzero_si256();
+  case 5: //Fall through
+  case 6: //Fall through
+    tmp31 = _mm256_setzero_si256(); tmp30 = _mm256_setzero_si256();
+    add3 = _mm256_setzero_si256();
+    break;
+
+  default:
+    break;
+  }//END switch
+
+  //Swap orders
+  const __m256i swap_tmp = _mm256_set_epi32(7, 5, 6, 4, 3, 1, 2, 0);
+  const __m256i swap_final = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
+
+  //First stage
+  if (m > 1) {
+    switch (n) {
+
+    default:
+      //8 is max allowed n value
+      //Fall through
+    case 8: //Fall through
+    case 7: //Fall through
+      tmp31 = _mm256_permute2x128_si256(v7, v6, HI_epi128); tmp30 = _mm256_permute2x128_si256(v7, v6, LOW_epi128);
+      add3 = _mm256_add_epi32(tmp31, tmp30);
+    case 6: //Fall through
+    case 5: //Fall through
+      tmp21 = _mm256_permute2x128_si256(v5, v4, HI_epi128); tmp20 = _mm256_permute2x128_si256(v5, v4, LOW_epi128);
+      add2 = _mm256_add_epi32(tmp21, tmp20);
+    case 4: //Fall through
+    case 3: //Fall through
+      tmp11 = _mm256_permute2x128_si256(v3, v2, HI_epi128); tmp10 = _mm256_permute2x128_si256(v3, v2, LOW_epi128);
+      add1 = _mm256_add_epi32(tmp11, tmp20);
+    case 2: //Fall through
+    case 1: //Fall through
+      tmp01 = _mm256_permute2x128_si256(v1, v0, HI_epi128); tmp00 = _mm256_permute2x128_si256(v1, v0, LOW_epi128);
+      add0 = _mm256_add_epi32(tmp01, tmp00);
+      break;
+    }//END switch
+    
+  } else {
+    add3 = v3;
+    add2 = v2;
+    add1 = v1;
+    add0 = v0;
+  }
+
+  //Second stage
+  if (m > 3) {
+    if (n > 4) {
+      tmp11 = _mm256_unpackhi_epi64(add2, add3); tmp10 = _mm256_unpacklo_epi64(add2, add3);
+      add1 = _mm256_add_epi32(tmp11, tmp10);
+    }
+
+    tmp01 = _mm256_unpackhi_epi64(add0, add1); tmp00 = _mm256_unpacklo_epi64(add0, add1);
+    add0 = _mm256_add_epi32(tmp01, tmp00);
+
+  } else {
+    add1 = _mm256_permute4x64_epi64(v1, B11011000);
+    add0 = _mm256_permute4x64_epi64(v0, B11011000);
+  }
+
+  //Final stage
+  add1 = _mm256_permutevar8x32_epi32(add1, swap_tmp);
+  add0 = _mm256_permutevar8x32_epi32(add0, swap_tmp);
+
+  tmp01 = _mm256_unpackhi_epi32(add0, add1); tmp00 = _mm256_unpacklo_epi32(add0, add1);
+
+  add0 = _mm256_add_epi32(tmp01, tmp00);
+
+  return _mm256_permutevar8x32_epi32(add0, swap_final);
+}
+
+
 //AVX2 cumulator. Sum epi32 values in 8 __m256i arrays into one output __m256i array
 static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0)
 {  /*
@@ -751,19 +878,15 @@ static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256
   __m256i tmp30, tmp31;
   __m256i add3, add2, add1, add0;
   
-  //Consts for permute
-  const int hi_epi128i = 0x13;
-  const int low_epi128i = 0x02;
-  const int hi_epi64i = 0x00;
-  const int low_epi64i = 0x00;
+  //Swap orders
   const __m256i swap_tmp = _mm256_set_epi32(7, 5, 6, 4, 3, 1, 2, 0);
   const __m256i swap_final = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
 
   //First stage
-  tmp31 = _mm256_permute2x128_si256(v7, v6, hi_epi128i); tmp30 = _mm256_permute2x128_si256(v7, v6, low_epi128i);
-  tmp21 = _mm256_permute2x128_si256(v5, v4, hi_epi128i); tmp20 = _mm256_permute2x128_si256(v5, v4, low_epi128i);
-  tmp11 = _mm256_permute2x128_si256(v3, v2, hi_epi128i); tmp10 = _mm256_permute2x128_si256(v3, v2, low_epi128i);
-  tmp01 = _mm256_permute2x128_si256(v1, v0, hi_epi128i); tmp00 = _mm256_permute2x128_si256(v1, v0, low_epi128i);
+  tmp31 = _mm256_permute2x128_si256(v7, v6, HI_epi128); tmp30 = _mm256_permute2x128_si256(v7, v6, LOW_epi128);
+  tmp21 = _mm256_permute2x128_si256(v5, v4, HI_epi128); tmp20 = _mm256_permute2x128_si256(v5, v4, LOW_epi128);
+  tmp11 = _mm256_permute2x128_si256(v3, v2, HI_epi128); tmp10 = _mm256_permute2x128_si256(v3, v2, LOW_epi128);
+  tmp01 = _mm256_permute2x128_si256(v1, v0, HI_epi128); tmp00 = _mm256_permute2x128_si256(v1, v0, LOW_epi128);
 
   add3 = _mm256_add_epi32(tmp31, tmp30);
   add2 = _mm256_add_epi32(tmp21, tmp20);
@@ -788,48 +911,245 @@ static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256
   return _mm256_permutevar8x32_epi32(add0, swap_final);
 }
 
-//Avx load for loading epi32 values from memory
-static __m256i _mm256_loadu_n_epi32(const int *src, unsigned n)
+//Avx load for loading n (max 8) epi32 values from memory
+static __m256i _mm256_loadu_n_epi32(const int *src, const unsigned n)
 {
-  __m256i dst;
+  __m256i dst = _mm256_setzero_si256();
 
   switch (n) {
+  case 0:
+    break;
 
   case 1:
-    dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, src[0]);
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, src[0]);
+    dst = _mm256_set_epi64x(0, 0, 0, (int64_t)src[0]);
     break;
 
   case 2:
-    dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, src[1], src[0]);
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, src[1], src[0]);
+    dst = _mm256_set_epi64x(0, 0, 0, (((int64_t)src[1]) << 32) | (int64_t)src[0]);
     break;
 
   case 3:
-    dst = _mm256_set_epi32(0, 0, 0, 0, 0, src[2], src[1], src[0]);
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, src[2], src[1], src[0]);
+    dst = _mm256_set_epi64x(0, 0, (int64_t)src[2], (((int64_t)src[1]) << 32) | (int64_t)src[0]);
+    break;
+
+  case 4:
+    dst = _mm256_inserti128_si256(dst, _mm_loadu_si128((__m128i*)src), 0);
+    break;
+
+  case 5:
+    //dst = _mm256_set_epi32(0, 0, 0, src[4], src[3], src[2], src[1], src[0]);
+    dst = _mm256_set_epi64x(0, (int64_t)src[4], (((int64_t)src[3]) << 32) | (int64_t)src[2], (((int64_t)src[1]) << 32) | (int64_t)src[0]);
+    break;
+
+  case 6:
+    //dst = _mm256_set_epi32(0, 0, src[5], src[4], src[3], src[2], src[1], src[0]);
+    dst = _mm256_set_epi64x(0, (((int64_t)src[5]) << 32) | (int64_t)src[4], (((int64_t)src[3]) << 32) | (int64_t)src[2], (((int64_t)src[1]) << 32) | (int64_t)src[0]);
     break;
 
   case 7:
-    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[6], 2), 1);
-    //Fall through
-  case 6:
-    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[5], 1), 1);
-    //Fall through
-  case 5:
-    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[4], 0), 1);
-    //Fall through
-  case 4:
-    dst = _mm256_set_m128i(_mm256_extracti128_si256(dst, 1), _mm_loadu_si128((__m128i*)src));
+    //dst = _mm256_set_epi32(0, src[6], src[5], src[4], src[3], src[2], src[1], src[0]);
+    dst = _mm256_set_epi64x((int64_t)src[6], (((int64_t)src[5])<<32) | (int64_t)src[4], (((int64_t)src[3]) << 32) | (int64_t)src[2], (((int64_t)src[1]) << 32) | (int64_t)src[0]);
     break;
 
+  default:
+    //Not a valid number of values to load. Only max 8 values can be loaded 
+    //Fall through
   case 8:
     dst = _mm256_loadu_si256((__m256i*)src);
     break;
 
-  default:
-    //Not a valid number of values to load
-    break;
   } //END Switch
 
   return dst;
+}
+
+//Read n (max 8) epi32i values from src specified by idx
+static __m256i _mm256_gather_n_epi32(const int *src, const unsigned idx[8], const unsigned n)
+{
+  __m256i dst = _mm256_setzero_si256();
+
+  switch(n){
+  
+  default:
+    //Only eight values can be loaded
+    //Fall through
+  case 8:
+    //dst = _mm256_set_epi32(src[idx[7]], src[idx[6]], src[idx[5]], src[idx[4]], src[idx[3]], src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x( (((int64_t)src[idx[7]])<<32) | (int64_t)src[idx[6]], (((int64_t)src[idx[5]])<<32) | (int64_t)src[idx[4]], (((int64_t)src[idx[3]])<<32) | (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 7:
+    //dst = _mm256_set_epi32(0, src[idx[6]], src[idx[5]], src[idx[4]], src[idx[3]], src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x((int64_t)src[idx[6]], (((int64_t)src[idx[5]])<<32) | (int64_t)src[idx[4]], (((int64_t)src[idx[3]])<<32) | (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 6:
+    //dst = _mm256_set_epi32(0, 0, src[idx[5]], src[idx[4]], src[idx[3]], src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x(0, (((int64_t)src[idx[5]])<<32) | (int64_t)src[idx[4]], (((int64_t)src[idx[3]])<<32) | (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 5:
+    //dst = _mm256_set_epi32(0, 0, 0, src[idx[4]], src[idx[3]], src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x(0, (int64_t)src[idx[4]], (((int64_t)src[idx[3]]) << 32) | (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 4:
+    //dst = _mm256_set_epi32(0, 0, 0, 0, src[idx[3]], src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x(0, 0, (((int64_t)src[idx[3]])<<32) | (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 3:
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, src[idx[2]], src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x(0, 0, (int64_t)src[idx[2]], (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 2:
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, src[idx[1]], src[idx[0]]);
+    dst = _mm256_set_epi64x(0, 0, 0, (((int64_t)src[idx[1]])<<32) | (int64_t)src[idx[0]]);
+    break;
+    
+  case 1:
+    //dst = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, src[idx[0]]);
+    dst = _mm256_set_epi64x(0, 0, 0, (int64_t)src[idx[0]]);
+    break;
+    
+  case 0:
+    break;
+
+  }//END Switch
+
+  return dst;
+}
+
+//Avx store n epi32 from src to dst
+static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
+{
+  switch (n) {
+  case 0:
+    break;
+
+  case 1:
+    dst[0] = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 2: {
+    int64_t v1v0 = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+
+    dst[0] = (int)v1v0;
+    dst[1] = (int)(v1v0 >> 32);
+
+    break;
+  }
+
+  case 3: {
+    __m128i tmp = _mm256_castsi256_si128(src);
+    int64_t v1v0 = _mm_extract_epi64(tmp, 0);
+
+    dst[0] = (int)v1v0;
+    dst[1] = (int)(v1v0 >> 32);
+    dst[2] = _mm_extract_epi32(tmp, 2);
+
+    break;
+  }
+
+  case 4:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    break;
+
+  case 5: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+
+    dst[4] = _mm_extract_epi32(_mm256_extracti128_si256(src, 1), 0);
+
+    break;
+  }
+
+  case 6: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+
+    int64_t v1v0 = _mm_extract_epi64(_mm256_extracti128_si256(src, 1), 0);
+
+    dst[4] = (int)v1v0;
+    dst[5] = (int)(v1v0 >> 32);
+
+    break;
+  } 
+
+  case 7: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    int64_t v1v0 = _mm_extract_epi64(tmp, 0);
+
+    dst[4] = (int)(v1v0);
+    dst[5] = (int)(v1v0 >> 32);
+    dst[6] = _mm_extract_epi32(tmp, 2);
+    
+    break;
+  }
+
+  default:
+    //Only max 8 values can be stored
+    //Fall through
+  case 8:
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
+  }
+}
+
+//static __m256i _mm256_gather_n_epi32_v2(const int *src, unsigned idx[8], unsigned n)
+//{
+//  __m256i dst = _mm256_setzero_si256();
+//
+//  switch (n) {
+//
+//  default:
+//    //Only eight values can be loaded
+//    //Fall through
+//  case 8:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[idx[7]], 3), 1);
+//    //Fall through
+//  case 7:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[idx[6]], 2), 1);
+//    //Fall through
+//  case 6:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[idx[5]], 1), 1);
+//    //Fall through
+//  case 5:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 1), src[idx[4]], 0), 1);
+//    //Fall through
+//  case 4:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 0), src[idx[3]], 3), 0);
+//    //Fall through
+//  case 3:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 0), src[idx[2]], 2), 0);
+//    //Fall through
+//  case 2:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 0), src[idx[1]], 1), 0);
+//    //Fall through
+//  case 1:
+//    dst = _mm256_inserti128_si256(dst, _mm_insert_epi32(_mm256_extracti128_si256(dst, 0), src[idx[0]], 0), 0);
+//    //Fall through
+//  case 0:
+//    break;
+//
+//  }//END Switch
+//
+//  return dst;
+//}
+
+int test_avx()
+{
+  unsigned in[8] = {0,1,2,3,4,5,6,7};
+  unsigned out[8] = {0,0,0,0,0,0,0,0};
+  __m256i v1 = _mm256_gather_n_epi32(in, in, 8);
+  __m256i v2 = _mm256_loadu_n_epi32(in, 8);
+  _mm256_storeu_n_epi32(out, v2, 8);
+
+  return _mm_extract_epi32( _mm256_extracti128_si256(v1, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(v2, 1), 0) + out[3];
 }
 
 //Set the default resample function
