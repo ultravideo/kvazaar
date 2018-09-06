@@ -31,8 +31,9 @@
 //void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
 
 extern resample_block_step_func *const kvz_default_block_step_resample_func_avx2;
+extern resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2;
 extern resample_func *const kvz_default_resample_func_avx2;
 
-int test_avx();
+//int test_avx();
 
 #endif

@@ -823,7 +823,7 @@ int main()
 {
   //vscaling();
   //validate_test2();
-  int r = test_avx();
+  //int r = test_avx();
   printf("%d", r);
 
   system("Pause");
