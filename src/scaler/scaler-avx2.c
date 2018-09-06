@@ -727,8 +727,8 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
   }
 }
 
-//AVX2 cumulator. Sum epi32 values in n (max 8) __m256i arrays, with the array divided between m (1,2,4,8) groups, into one output __m256i array
-//Only n/m least significant input vectors are used.
+//AVX2 cumulator. Sum epi32 values in n (max 8) groups in __m256i arrays, with the array divided between m (1,2,4,8) groups, into one output __m256i array
+//Only enough least significant input vectors are used to fufill the n groups requirement.
 static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0, const unsigned n, const unsigned m)
 {
   /*
@@ -766,34 +766,90 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
   __m256i tmp30, tmp31;
   __m256i add3, add2, add1, add0;
 
-  //Set unused tmps to zero
-  switch (n) {
 
-  case 1: //Fall through
-  case 2: //Fall through
-    tmp11 = _mm256_setzero_si256(); tmp10 = _mm256_setzero_si256();
-    add1 = _mm256_setzero_si256();
-  case 3: //Fall through
-  case 4: //Fall through
-    tmp21 = _mm256_setzero_si256(); tmp20 = _mm256_setzero_si256();
-  case 5: //Fall through
-  case 6: //Fall through
-    tmp31 = _mm256_setzero_si256(); tmp30 = _mm256_setzero_si256();
-    add3 = _mm256_setzero_si256();
-    break;
+  //Set unused vals to zero
+  if (m == 1) { //Stage One
+    switch (n) {
+    case 1:
+      v1 = _mm256_setzero_si256();
+      //Fall through
+    case 2:
+      add1 = _mm256_setzero_si256();
+      break;
+    case 3:
+      v3 = _mm256_setzero_si256();
+      break;
+    case 5:
+      v5 = _mm256_setzero_si256();
+      //Fall through
+    case 6:
+      add3 = _mm256_setzero_si256();
+      break;
+    case 7:
+      v7 = _mm256_setzero_si256();
+      break;
 
-  default:
-    break;
-  }//END switch
+    default:
+      break;
+    }//END switch 
+  } else if(m < 4) { //Stage Two
+    switch (n) {
+    case 1:
+      v0 = _mm256_inserti128_si256(v0, _mm_setzero_si128(), 1);
+      //Fall through
+    case 2:
+      add1 = _mm256_setzero_si256();
+      break;
+    case 3:
+      v1 = _mm256_inserti128_si256(v1, _mm_setzero_si128(), 1);
+      break;
+    case 5:
+      v2 = _mm256_inserti128_si256(v2, _mm_setzero_si128(), 1);
+      //Fall through
+    case 6:
+      add3 = _mm256_setzero_si256();
+      break;
+    case 7:
+      v3 = _mm256_inserti128_si256(v3, _mm_setzero_si128(), 1);
+      break;
+
+    default:
+      break;
+    }//END switch
+  } else { //Final Stage
+    switch (n) {
+
+    case 7:
+      v1 = _mm256_blend_epi32(v1, _mm256_setzero_si256(), 0xC0);
+      break;
+    case 6:
+      v1 = _mm256_blend_epi32(v1, _mm256_setzero_si256(), 0xF0);
+      break;
+    case 5:
+      v1 = _mm256_blend_epi32(v1, _mm256_setzero_si256(), 0xFC);
+      break;
+    case 3:
+      v0 = _mm256_blend_epi32(v0, _mm256_setzero_si256(), 0xC0);
+      break;
+    case 2:
+      v0 = _mm256_blend_epi32(v0, _mm256_setzero_si256(), 0xF0);
+      break;
+    case 1:
+      v0 = _mm256_blend_epi32(v0, _mm256_setzero_si256(), 0xFC);
+      break;
+
+    default:
+      break;
+    }//END switch
+  }
 
   //Swap orders
   const __m256i swap_tmp = _mm256_set_epi32(7, 5, 6, 4, 3, 1, 2, 0);
   const __m256i swap_final = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
 
   //First stage
-  if (m > 1) {
+  if (m < 2) {
     switch (n) {
-
     default:
       //8 is max allowed n value
       //Fall through
@@ -808,7 +864,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     case 4: //Fall through
     case 3: //Fall through
       tmp11 = _mm256_permute2x128_si256(v3, v2, HI_epi128); tmp10 = _mm256_permute2x128_si256(v3, v2, LOW_epi128);
-      add1 = _mm256_add_epi32(tmp11, tmp20);
+      add1 = _mm256_add_epi32(tmp11, tmp10);
     case 2: //Fall through
     case 1: //Fall through
       tmp01 = _mm256_permute2x128_si256(v1, v0, HI_epi128); tmp00 = _mm256_permute2x128_si256(v1, v0, LOW_epi128);
@@ -816,30 +872,50 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
       break;
     }//END switch
     
-  } else {
-    add3 = v3;
-    add2 = v2;
-    add1 = v1;
-    add0 = v0;
+  } else if (m < 4){
+    switch (n) {
+    default:
+      //8 is max allowed n value
+      //Fall through
+    case 8: //Fall through
+    case 7: //Fall through
+      add3 = v3;
+    case 6: //Fall through
+    case 5: //Fall through
+      add2 = v2;
+    case 4: //Fall through
+    case 3: //Fall through
+      add1 = v1;
+    case 2: //Fall through
+    case 1: //Fall through
+      add0 = v0;
+      break;
+    }//END switch
   }
 
   //Second stage
-  if (m > 3) {
+  if (m < 4) {
     if (n > 4) {
       tmp11 = _mm256_unpackhi_epi64(add2, add3); tmp10 = _mm256_unpacklo_epi64(add2, add3);
-      add1 = _mm256_add_epi32(tmp11, tmp10);
+      add2 = _mm256_add_epi32(tmp11, tmp10);
     }
 
     tmp01 = _mm256_unpackhi_epi64(add0, add1); tmp00 = _mm256_unpacklo_epi64(add0, add1);
     add0 = _mm256_add_epi32(tmp01, tmp00);
 
   } else {
-    add1 = _mm256_permute4x64_epi64(v1, B11011000);
+    if (n > 4) {
+      add2 = _mm256_permute4x64_epi64(v1, B11011000);
+    }
     add0 = _mm256_permute4x64_epi64(v0, B11011000);
   }
 
   //Final stage
-  add1 = _mm256_permutevar8x32_epi32(add1, swap_tmp);
+  if (n > 4) {
+    add1 = _mm256_permutevar8x32_epi32(add2, swap_tmp);
+  } else {
+    add1 = _mm256_setzero_si256();
+  }
   add0 = _mm256_permutevar8x32_epi32(add0, swap_tmp);
 
   tmp01 = _mm256_unpackhi_epi32(add0, add1); tmp00 = _mm256_unpacklo_epi32(add0, add1);
@@ -851,7 +927,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
 
 
 //AVX2 cumulator. Sum epi32 values in 8 __m256i arrays into one output __m256i array
-static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0)
+static __m256i _mm256_accumulate_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256i v4, __m256i v3, __m256i v2, __m256i v1, __m256i v0)
 {  /*
           v7 v6 v5 v4 v3 v2 v1 v0
           |  |  |  |  |  |  |  |
@@ -890,7 +966,7 @@ static __m256i _mm256_accumul_8_epi32(__m256i v7, __m256i v6, __m256i v5, __m256
 
   add3 = _mm256_add_epi32(tmp31, tmp30);
   add2 = _mm256_add_epi32(tmp21, tmp20);
-  add1 = _mm256_add_epi32(tmp11, tmp20);
+  add1 = _mm256_add_epi32(tmp11, tmp10);
   add0 = _mm256_add_epi32(tmp01, tmp00);
 
   //Second stage
@@ -1143,12 +1219,35 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
 
 int test_avx()
 {
-  unsigned in[8] = {0,1,2,3,4,5,6,7};
+  unsigned in[18] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
+  unsigned in2[8] = {2, 3, 5, 7, 9, 11, 13, 17};
   unsigned out[8] = {0,0,0,0,0,0,0,0};
-  __m256i v1 = _mm256_gather_n_epi32(in, in, 8);
+  unsigned out2[4] = {0,0,0,0};
+  unsigned out3 = 0;
+  __m256i z = _mm256_setzero_si256();
+  __m256i v1 = _mm256_gather_n_epi32(in, in2, 8);
   __m256i v2 = _mm256_loadu_n_epi32(in, 8);
   _mm256_storeu_n_epi32(out, v2, 8);
+  _mm256_storeu_n_epi32(out2, v1, 4);
 
+  __m256i v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 2, 1);
+  v3 = _mm256_accumulate_8_epi32(z, z, z, z, z, z, v1, v2);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 8, 1);
+
+  v1 = _mm256_gather_n_epi32(in, in2+4, 4);
+  v2 = _mm256_loadu_n_epi32(out2, 4);
+
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 4, 2);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 1, 2);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 3, 2);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 2, 2);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 8, 4);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 7, 4);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 6, 4);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 2, 4);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 3, 4);
+  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 1, 4);
+  
   return _mm_extract_epi32( _mm256_extracti128_si256(v1, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(v2, 1), 0) + out[3];
 }
 
