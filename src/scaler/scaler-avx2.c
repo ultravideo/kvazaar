@@ -36,6 +36,8 @@
 #define HI_epi128 0x13
 #define LOW_epi128 0x02
 
+#define SELECT_LOW_4_BITS 0xF
+
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
 {
@@ -45,7 +47,6 @@ static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, con
  __m256i add_values_epi32 = _mm256_set1_epi32(add_val);
  add_values_epi32 = _mm256_add_epi32(add_values_epi32, lane);
 
- // Compare integers so value is in range 0 - (src-width-1)
  add_values_epi32 = _mm256_max_epi32(min_epi32, add_values_epi32);
  add_values_epi32 = _mm256_min_epi32(add_values_epi32, max_epi32);
  
@@ -1220,22 +1221,39 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
   const int inner_bound = is_vertical ? block_x + block_width : filter_size;
   const int s_stride = is_vertical ? src_buffer->width : 1; //Multiplier to s_ind
 
-                                                            //Specify bounds for trgt buffer and filter
-                                                            //const int trgt_bound = is_vertical ? inner_bound : outer_bound;
+  //Specify bounds for trgt buffer and filter
+  const int trgt_bound = is_vertical ? inner_bound : outer_bound;
   const int filter_bound = is_vertical ? outer_bound : inner_bound;
 
-  const int o_step = is_vertical ? filter_size : 1; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
-  const int i_step = is_vertical ? 1 : filter_size; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
+  //Calculate outer and inner step so as to maximize lane/register usage:
+  //  The accumulation can be done for 8 pixels at the same time
+  //  If filter_size is 12, need to limit f_step to 8
+  //  If filter_size is 4, can use only 4 ymm to hold eight pixels' filters
+  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int f_step = SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
+  const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
 
-  __m256i base_mask = _mm256_set_epi32(0x80000000, 0xc0000000, 0xe0000000, 0xf0000000, 0xf8000000, 0xfc000000, 0xfe000000, 0xff000000); //Mask used to load/store. Shifting to the left allows masking out values from the end if width is not a multiple of step size etc.
-  __m256i pointer, temp_mem, temp_filter, decrese;
-  __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-  __m256i downsampling_adder = _mm256_set_epi32(8, 9, 10, 11, src_size, src_size, src_size, src_size);
-  __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  const int o_step = is_vertical ? f_step : t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
+  const int i_step = is_vertical ? t_step : f_step; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
+
+  const __m256i zero = _mm256_setzero_si256(); //Zero vector
+  const __m256i scale_round = is_upscaling ? _mm256_set1_epi32(2048) : _mm256_set1_epi32(8192); //Rounding constant for normalizing pixel values to the correct range
+  const int scale_shift = is_upscaling ? 12 : 14; //Amount of shift in the final pixel value normalization
+
+  __m256i pointer, temp_trgt_epi32, decrese, filter_res_epi32;
+  __m256i temp_mem[8], temp_filter[8];
+  const __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   __m128i smallest_epi16;
-  __m256i multiplier_epi32 = _mm256_set1_epi32(s_stride); //Stride of src buffer
-                                                          //int* start;
+  const __m256i multiplier_epi32 = _mm256_set1_epi32(s_stride); //Stride of src buffer
   int min = 0;
+
+  __m256i t_ind_epi32, ref_pos_16_epi32, phase_epi32, ref_pos_epi32;
+  const __m256i scale_epi32 = _mm256_set1_epi32(scale);
+  const __m256i add_epi32 = _mm256_set1_epi32(add);
+  const __m256i delta_epi32 = _mm256_set1_epi32(delta);
+  const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < (block_y + block_height); y++) {
@@ -1248,12 +1266,19 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
     //  if !is_vertical -> loop over x (block width)
     for (int o_ind = outer_init; o_ind < outer_bound; o_ind += o_step) {
 
-      const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
+      //const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
+      t_ind_epi32 = is_vertical ? _mm256_set1_epi32(y) : clip_add_avx2(o_ind, adderr, 0, outer_bound - 1);
 
-                                                 //Calculate reference position in src pic
-      const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
-      const int phase = ref_pos_16 & 15;
-      const int ref_pos = ref_pos_16 >> 4;
+      //Calculate reference position in src pic
+      //const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
+      //const int phase = ref_pos_16 & 15;
+      //const int ref_pos = ref_pos_16 >> 4;
+      ref_pos_16_epi32 = _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(t_ind_epi32, scale_epi32), add_epi32), shift), delta_epi32);
+      phase_epi32 = _mm256_and_si256(ref_pos_16_epi32, phase_mask);
+      ref_pos_epi32 = _mm256_srai_epi32(ref_pos_16_epi32, 4);
+
+      const int *phase = (int*)&phase_epi32;
+      const int *ref_pos = (int*)&ref_pos_epi32;
 
       //Inner loop:
       //  if is_vertical -> loop over x (block width)
@@ -1261,124 +1286,135 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
       for (int i_ind = inner_init; i_ind < inner_bound; i_ind += i_step) {
 
         const int f_ind = is_vertical ? o_ind : i_ind; //Filter index
-        const int f_step = is_vertical ? o_step : i_step; //Filter step aka how many filter coeff multiplys and accumulations done in one loop
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
-        const int t_step = is_vertical ? i_step : o_step; //Target buffer step aka how many target buffer values are calculated in one loop
 
-        const int mask_shift = SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8); //lane can hold 8 integers. Shift determines how many values should be masked from the end
-
-                                                                                 //Choose filter
-                                                                                 //const int *filter;
-                                                                                 //const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
-
-                                                                                 //Set trgt buffer val to zero on first loop over filter
-        if (f_ind == 0) {
-          //Process step number of elements at the same time
-          memset(&trgt_row[t_col + trgt_offset], 0, sizeof(pic_data_t)*t_step); //trgt_row[t_col + trgt_offset] = 0;
-        }
+        //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
+        const int f_num = SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8); 
+        const int t_num = SCALER_CLIP(t_col + t_step - trgt_bound, 0, 8);
+        
+        //Set trgt buffer val to zero on first loop over filter
+        //if (f_ind == 0) {
+        //  //Process step number of elements at the same time
+        //  memset(&trgt_row[t_col + trgt_offset], 0, sizeof(pic_data_t)*t_num);
+        //}
 
         //Move src pointer to correct position (correct column in vertical resampling)
         pic_data_t *src_col = src + (is_vertical ? i_ind : 0);
 
-        //const int s_ind = SCALER_CLIP(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
-
-        //Get the source incides of all the elements that are processed 
-        pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1), adder, 0, src_size - 1);
-        pointer = _mm256_permutevar8x32_epi32(pointer, order);
-
-        if (is_vertical) {
-          //Get indices that form column
-          pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
-        }
-        else {
-          //Get the smallest indice in pointer
-          min = src_size - 1;
-          smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
-          smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
-          min = _mm_extract_epi16(smallest_epi16, 0);
-        }
-
-        //Load src values to mem
-        //TODO: Use correct inds
-        //TODO: would set be faster here? Would need to concider the mask though.
-        temp_mem = is_vertical
-          ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, mask_shift), 1)
-          : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, mask_shift));
-
-        if (!is_vertical) {
-          //Sort indices in the correct order
-          decrese = _mm256_set1_epi32(min);
-          pointer = _mm256_sub_epi32(pointer, decrese);
-          temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
-        }
-
-        //Load filter
-        temp_filter = _mm256_maskload_epi32(&getFilterCoeff(filter, filter_size, phase, f_ind), _mm256_slli_epi32(base_mask, mask_shift));
-
-        //Multiply source by the filter coeffs and sum
-        temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
-        temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-        temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-
-        //Prepare to store values back to trgt_row
-        switch (f_step) {
-        case 4:
-          //Workaround for extract on earlier visual studios
-          trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0);//_mm256_extract_epi32(temp_mem, 0);
-          break;
-
-        case 8:
-          trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
-          break;
-
-        case 12:
-          //Do filter operations for the remaining coefficients
-          trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
-
-          pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1) + 1, downsampling_adder, 0, src_size - 1);
+        //Get filter pixels for each ref_pos and do multiplication
+        for (int i = 0; i < t_num; i++) {
+          //Get the source incides of all the elements that are processed 
+          pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1), adder, 0, src_size - 1);
           pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
           if (is_vertical) {
+            //Get indices that form a column
             pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
           }
           else {
+            //Get the smallest indice in pointer
+            min = src_size - 1;
             smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
             smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
             min = _mm_extract_epi16(smallest_epi16, 0);
           }
 
-          const int tmp_mask_shift = 4; //The code assumes 12-tap so only do the remaining 4 taps
-          temp_mem = is_vertical
-            ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, tmp_mask_shift), 1)
-            : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, tmp_mask_shift));
+          //Load src values to mem
+          temp_mem[i] = is_vertical
+            ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
+            : _mm256_loadu_n_epi32(&src_col[min], f_num);
 
           if (!is_vertical) {
+            //Sort indices in the correct order
             decrese = _mm256_set1_epi32(min);
             pointer = _mm256_sub_epi32(pointer, decrese);
-            temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
+            temp_mem[i] = _mm256_permutevar8x32_epi32(temp_mem[i], pointer);
           }
 
-          temp_filter = _mm256_maskload_epi32(&getFilterCoeff(filter, filter_size, phase, 8), _mm256_slli_epi32(base_mask, tmp_mask_shift));
+          //Load filter
+          temp_filter[i] = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num);
 
-          temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
-          temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-          temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+          //Multiply source by the filter coeffs and sum
+          temp_mem[i] = _mm256_mullo_epi32(temp_mem[i], temp_filter[i]);
+        }
 
-          trgt_row[t_col + trgt_offset] += _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0); //_mm256_extract_epi32(temp_mem, 0);
-          break;
+        //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+        //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+        filter_res_epi32 = t_num == 8 
+                             ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
+                             : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm);
 
-        default:
-          //Should not go here
-          assert(0);
-          break;
-        }//END switch
+        //Prepare to store values back to trgt_row
+        //switch (f_step) {
+        //case 4:
+        //  //Workaround for extract on earlier visual studios
+        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0);//_mm256_extract_epi32(temp_mem, 0);
+        //  break;
+
+        //case 8:
+        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+        //  break;
+
+        //case 12:
+        //  //Do filter operations for the remaining coefficients
+        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
+
+        //  pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1) + 1, downsampling_adder, 0, src_size - 1);
+        //  pointer = _mm256_permutevar8x32_epi32(pointer, order);
+
+        //  if (is_vertical) {
+        //    pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
+        //  }
+        //  else {
+        //    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
+        //    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
+        //    min = _mm_extract_epi16(smallest_epi16, 0);
+        //  }
+
+        //  const int tmp_mask_shift = 4; //The code assumes 12-tap so only do the remaining 4 taps
+        //  temp_mem = is_vertical
+        //    ? _mm256_gather_n_epi32( src_col, (int*)&pointer, tmp_mask_shift)
+        //    : _mm256_loadu_n_epi32(&src_col[min], tmp_mask_shift);
+
+        //  if (!is_vertical) {
+        //    decrese = _mm256_set1_epi32(min);
+        //    pointer = _mm256_sub_epi32(pointer, decrese);
+        //    temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
+        //  }
+
+        //  temp_filter = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase, 8), tmp_mask_shift);
+
+        //  temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
+        //  temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+        //  temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
+
+        //  trgt_row[t_col + trgt_offset] += _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0); //_mm256_extract_epi32(temp_mem, 0);
+        //  break;
+
+        //default:
+        //  //Should not go here
+        //  assert(0);
+        //  break;
+        //}//END switch
 
          //trgt_row[t_col + trgt_offset] += getFilterCoeff(filter, filter_size, phase, f_ind) * src_col[s_ind * s_stride + src_offset];
 
-         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
-        if (is_vertical && o_ind == outer_bound - 1) {
-          trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
+        //Sum filtered pixel values back to trgt_row so need to load the existing values (except for first pass)
+        if (f_ind != 0) {
+          temp_trgt_epi32 = _mm256_loadu_n_epi32(&trgt_row[t_col + trgt_offset], t_num);
+          filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, temp_trgt_epi32);
         }
+        
+        //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
+        if (is_vertical && o_ind == outer_bound - 1) {
+          //trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
+          filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
+          filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
+          filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
+        }
+
+        //Write back the new values for the current t_num pixels
+        _mm256_storeu_n_epi32(&trgt_row[t_col + trgt_offset], filter_res_epi32, t_num);        
       }
     }
   }
