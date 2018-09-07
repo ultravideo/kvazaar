@@ -34,7 +34,7 @@ int kvz_strategy_register_resample_avx2(void * opaque)
   bool success = true;
 
   success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2_2", 0, kvz_alt1_block_step_resample_func_avx2);
-  success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2", 1, kvz_default_block_step_resample_func_avx2);
+  success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2", 40, kvz_default_block_step_resample_func_avx2);
   
   success &= kvz_strategyselector_register(opaque, "resample", "avx2", 0, kvz_default_resample_func_avx2);
 
