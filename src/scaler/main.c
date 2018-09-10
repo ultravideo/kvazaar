@@ -287,6 +287,7 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
   switch (ver) {
   case 2:
     func = kvz_alt1_block_step_resample_func_avx2;
+    break;
 
   default:
   case 1:
