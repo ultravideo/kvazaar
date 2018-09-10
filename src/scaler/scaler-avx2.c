@@ -721,7 +721,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         //trgt_row[t_col + trgt_offset] += getFilterCoeff(filter, filter_size, phase, f_ind) * src_col[s_ind * s_stride + src_offset];
 
         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
-        if (is_vertical && o_ind == outer_bound - 1) {
+        if (is_vertical && o_ind + o_step >= outer_bound) {
           trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
         }
       }
@@ -1236,7 +1236,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
   const int o_step = is_vertical ? f_step : t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
   const int i_step = is_vertical ? t_step : f_step; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
 
-  const __m256i zero = _mm256_setzero_si256(); //Zero vector
+  //const __m256i zero = _mm256_setzero_si256(); //Zero vector
   const __m256i scale_round = is_upscaling ? _mm256_set1_epi32(2048) : _mm256_set1_epi32(8192); //Rounding constant for normalizing pixel values to the correct range
   const int scale_shift = is_upscaling ? 12 : 14; //Amount of shift in the final pixel value normalization
 
@@ -1406,7 +1406,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         }
         
         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
-        if (is_vertical && o_ind == outer_bound - 1) {
+        if (is_vertical && o_ind + o_step >= outer_bound) {
           //trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
           filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
           filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
