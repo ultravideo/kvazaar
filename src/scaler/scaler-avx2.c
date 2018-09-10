@@ -1289,8 +1289,8 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const int f_num = SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8); 
-        const int t_num = SCALER_CLIP(t_col + t_step - trgt_bound, 0, 8);
+        const int f_num = SCALER_CLIP(filter_bound - f_ind - f_step, 0, 8); 
+        const int t_num = SCALER_CLIP(trgt_bound - t_col - t_step, 0, 8);
         
         //Set trgt buffer val to zero on first loop over filter
         //if (f_ind == 0) {
