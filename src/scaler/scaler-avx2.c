@@ -630,7 +630,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         //const int s_ind = SCALER_CLIP(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1); //src_buffer row/col index for cur resampling dir
 
         //Get the source incides of all the elements that are processed 
-        pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1), adder, 0, src_size - 1);
+        pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1) + 1, adder, 0, src_size - 1);
         pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
         if (is_vertical) {
@@ -648,7 +648,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         //TODO: Use correct inds
         //TODO: would set be faster here? Would need to concider the mask though.
         temp_mem = is_vertical 
-          ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, mask_shift), 1) 
+          ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, mask_shift), 4) 
           : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, mask_shift));
         
         if (!is_vertical) {
@@ -694,7 +694,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
           
           const int tmp_mask_shift = 4; //The code assumes 12-tap so only do the remaining 4 taps
           temp_mem = is_vertical
-            ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, tmp_mask_shift), 1)
+            ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, tmp_mask_shift), 4)
             : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, tmp_mask_shift));
 
           if (!is_vertical) {
@@ -1289,8 +1289,8 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const int f_num = SCALER_CLIP(filter_bound - f_ind - f_step, 0, 8); 
-        const int t_num = SCALER_CLIP(trgt_bound - t_col - t_step, 0, 8);
+        const int f_num = 8 - SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8);
+        const int t_num = 8 - SCALER_CLIP(t_col + t_step - trgt_bound, 0, 8);
         
         //Set trgt buffer val to zero on first loop over filter
         //if (f_ind == 0) {
@@ -1304,7 +1304,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         //Get filter pixels for each ref_pos and do multiplication
         for (int i = 0; i < t_num; i++) {
           //Get the source incides of all the elements that are processed 
-          pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1), adder, 0, src_size - 1);
+          pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1) + 1, adder, 0, src_size - 1);
           pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
           if (is_vertical) {
