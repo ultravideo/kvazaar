@@ -523,6 +523,21 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
  }
 }
 
+static int num_distinct_ordered(int *list, int n)
+{
+  if(n <= 0){
+    return 0;
+  }
+
+  int count = 1;
+  for (int i = 1; i < n; i++) {
+    if(list[i-1] != list[i] ){
+      count++;
+    }
+  }
+
+  return count;
+}
 
 static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
 {
@@ -612,7 +627,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
         const int t_step = is_vertical ? i_step : o_step; //Target buffer step aka how many target buffer values are calculated in one loop
 
-        const int mask_shift = SCALER_CLIP( f_ind + f_step - filter_bound, 0, 8); //lane can hold 8 integers. Shift determines how many values should be masked from the end
+        const int mask_shift = SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8); //lane can hold 8 integers. Shift determines how many values should be masked from the end
 
         //Choose filter
         //const int *filter;
@@ -633,6 +648,8 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1) + 1, adder, 0, src_size - 1);
         pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
+        const int src_mask_shift = 8 - num_distinct_ordered((int*)&pointer, 8 - mask_shift); //Shift determines how many values should be masked from the end of the src to not over index
+
         if (is_vertical) {
           //Get indices that form column
           pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
@@ -645,11 +662,10 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
         }
 
         //Load src values to mem
-        //TODO: Use correct inds
-        //TODO: would set be faster here? Would need to concider the mask though.
+        //Use src mask on load
         temp_mem = is_vertical 
           ? _mm256_mask_i32gather_epi32(_mm256_setzero_si256(), src_col, pointer, _mm256_slli_epi32(base_mask, mask_shift), 4) 
-          : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, mask_shift));
+          : _mm256_maskload_epi32(&src_col[min], _mm256_slli_epi32(base_mask, src_mask_shift));
         
         if (!is_vertical) {
           //Sort indices in the correct order
@@ -1231,7 +1247,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
   //  If filter_size is 4, can use only 4 ymm to hold eight pixels' filters
   const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
   const int f_step = SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
-  const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
+  //const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
 
   const int o_step = is_vertical ? f_step : t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
   const int i_step = is_vertical ? t_step : f_step; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
@@ -1242,9 +1258,9 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
 
   __m256i pointer, temp_trgt_epi32, decrese, filter_res_epi32;
   __m256i temp_mem[8], temp_filter[8];
-  const __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  //const __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-  const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  //const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   __m128i smallest_epi16;
   const __m256i multiplier_epi32 = _mm256_set1_epi32(s_stride); //Stride of src buffer
   int min = 0;
@@ -1289,23 +1305,32 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const int f_num = 8 - SCALER_CLIP(f_ind + f_step - filter_bound, 0, 8);
-        const int t_num = 8 - SCALER_CLIP(t_col + t_step - trgt_bound, 0, 8);
+        const int f_num = SCALER_CLIP(filter_bound - f_ind, 0, f_step);
+        const int t_num = SCALER_CLIP(trgt_bound - t_col, 0, t_step);
         
+        //Define a special case when filter_num is 4 that puts two "loops" into the same temp_mem[ind]
+        const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
+
         //Set trgt buffer val to zero on first loop over filter
         //if (f_ind == 0) {
         //  //Process step number of elements at the same time
         //  memset(&trgt_row[t_col + trgt_offset], 0, sizeof(pic_data_t)*t_num);
         //}
 
-        //Move src pointer to correct position (correct column in vertical resampling)
-        pic_data_t *src_col = src + (is_vertical ? i_ind : 0);
+        
 
         //Get filter pixels for each ref_pos and do multiplication
         for (int i = 0; i < t_num; i++) {
+          const int ind = i >> (fm >> 1); //Index to the temp avx2 vector arrays
+
+          //Move src pointer to correct position (correct column in vertical resampling)
+          pic_data_t *src_col = src + (is_vertical ? i_ind + i : 0);
+
           //Get the source incides of all the elements that are processed 
-          pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1) + 1, adder, 0, src_size - 1);
-          pointer = _mm256_permutevar8x32_epi32(pointer, order);
+          pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1) + 1, adderr, 0, src_size - 1);
+          //pointer = _mm256_permutevar8x32_epi32(pointer, order);
+
+          const int src_num = num_distinct_ordered((int*)&pointer, f_num);
 
           if (is_vertical) {
             //Get indices that form a column
@@ -1320,27 +1345,49 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
           }
 
           //Load src values to mem
-          temp_mem[i] = is_vertical
-            ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
-            : _mm256_loadu_n_epi32(&src_col[min], f_num);
+          if (fm == 1 || (i % 2) == 0) {
+            temp_mem[ind] = is_vertical
+              ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
+              : _mm256_loadu_n_epi32(&src_col[min], src_num);
+          } else {
+            //Filter less than 8 elements at a time so can fit more "loops" in the same temp_mem[ind]
+            temp_mem[ind] = _mm256_inserti128_si256(temp_mem[ind], _mm256_extracti128_si256(is_vertical
+              ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
+              : _mm256_loadu_n_epi32(&src_col[min], src_num), 0), 1);
+          }
 
           if (!is_vertical) {
             //Sort indices in the correct order
-            decrese = _mm256_set1_epi32(min);
-            pointer = _mm256_sub_epi32(pointer, decrese);
-            temp_mem[i] = _mm256_permutevar8x32_epi32(temp_mem[i], pointer);
+            
+            if (fm == 1 || (i % 2) == 0) {
+              decrese = _mm256_set1_epi32(min);
+              pointer = _mm256_sub_epi32(pointer, decrese);
+              temp_mem[ind] = _mm256_permutevar8x32_epi32(temp_mem[ind], pointer);
+            } else {
+              //Only permute high 128bits
+              decrese = _mm256_set1_epi32(min - 4);
+              pointer = _mm256_inserti128_si256(pointer, _mm256_castsi256_si128(_mm256_sub_epi32(pointer, decrese)), 1);
+              temp_mem[ind] = _mm256_blend_epi32(temp_mem[ind], _mm256_permutevar8x32_epi32(temp_mem[ind], pointer), 0xF0);
+            }
           }
 
           //Load filter
-          temp_filter[i] = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num);
+          if (fm == 1 || (i % 2) == 0) {
+            temp_filter[ind] = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num);
+          } else {
+            temp_filter[ind] = _mm256_inserti128_si256(temp_filter[ind], _mm256_castsi256_si128(_mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num)), 1);
+          }
 
           //Multiply source by the filter coeffs and sum
-          temp_mem[i] = _mm256_mullo_epi32(temp_mem[i], temp_filter[i]);
+          //Only do multiplication when fm number of "loops" are set or no more future "loops"
+          if (fm == 1 || (i % 2) == 1 || i + 1 >= t_num ) {
+            temp_mem[ind] = _mm256_mullo_epi32(temp_mem[ind], temp_filter[ind]);
+          }
         }
 
         //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
         //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-        filter_res_epi32 = t_num == 8 
+        filter_res_epi32 = t_num == 8 && fm == 1
                              ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
                              : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm);
 
@@ -1478,6 +1525,8 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
 //  v3 = _mm256_accumulate_8_epi32(z, z, z, z, z, z, v1, v2);
 //  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 8, 1);
 //
+//  v3 = _mm256_accumulate_nxm_epi32(v2, v2, v1, v1, v2, v1, v1, v2, 8, 2);
+//
 //  v1 = _mm256_gather_n_epi32(in, in2+4, 4);
 //  v2 = _mm256_loadu_n_epi32(out2, 4);
 //
@@ -1491,6 +1540,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
 //  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 2, 4);
 //  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 3, 4);
 //  v3 = _mm256_accumulate_nxm_epi32(z, z, z, z, z, z, v1, v2, 1, 4);
+//
 //  
 //  return _mm_extract_epi32( _mm256_extracti128_si256(v1, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(v2, 1), 0) + out[3];
 //}
