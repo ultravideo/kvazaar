@@ -1311,14 +1311,6 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         //Define a special case when filter_num is 4 that puts two "loops" into the same temp_mem[ind]
         const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
 
-        //Set trgt buffer val to zero on first loop over filter
-        //if (f_ind == 0) {
-        //  //Process step number of elements at the same time
-        //  memset(&trgt_row[t_col + trgt_offset], 0, sizeof(pic_data_t)*t_num);
-        //}
-
-        
-
         //Get filter pixels for each ref_pos and do multiplication
         for (int i = 0; i < t_num; i++) {
           const int ind = i >> (fm >> 1); //Index to the temp avx2 vector arrays
@@ -1385,66 +1377,9 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
           }
         }
 
-        //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-        //temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
         filter_res_epi32 = t_num == 8 && fm == 1
                              ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
                              : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm);
-
-        //Prepare to store values back to trgt_row
-        //switch (f_step) {
-        //case 4:
-        //  //Workaround for extract on earlier visual studios
-        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0);//_mm256_extract_epi32(temp_mem, 0);
-        //  break;
-
-        //case 8:
-        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
-        //  break;
-
-        //case 12:
-        //  //Do filter operations for the remaining coefficients
-        //  trgt_row[t_col + trgt_offset] = _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0) + _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 1), 0);//_mm256_extract_epi32(temp_mem, 0) + _mm256_extract_epi32(temp_mem, 4);
-
-        //  pointer = clip_add_avx2(ref_pos + f_ind - (filter_size >> 1) + 1, downsampling_adder, 0, src_size - 1);
-        //  pointer = _mm256_permutevar8x32_epi32(pointer, order);
-
-        //  if (is_vertical) {
-        //    pointer = _mm256_mullo_epi32(pointer, multiplier_epi32);
-        //  }
-        //  else {
-        //    smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
-        //    smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
-        //    min = _mm_extract_epi16(smallest_epi16, 0);
-        //  }
-
-        //  const int tmp_mask_shift = 4; //The code assumes 12-tap so only do the remaining 4 taps
-        //  temp_mem = is_vertical
-        //    ? _mm256_gather_n_epi32( src_col, (int*)&pointer, tmp_mask_shift)
-        //    : _mm256_loadu_n_epi32(&src_col[min], tmp_mask_shift);
-
-        //  if (!is_vertical) {
-        //    decrese = _mm256_set1_epi32(min);
-        //    pointer = _mm256_sub_epi32(pointer, decrese);
-        //    temp_mem = _mm256_permutevar8x32_epi32(temp_mem, pointer);
-        //  }
-
-        //  temp_filter = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase, 8), tmp_mask_shift);
-
-        //  temp_mem = _mm256_mullo_epi32(temp_mem, temp_filter);
-        //  temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-        //  temp_mem = _mm256_hadd_epi32(temp_mem, temp_mem);
-
-        //  trgt_row[t_col + trgt_offset] += _mm_extract_epi32(_mm256_extracti128_si256(temp_mem, 0), 0); //_mm256_extract_epi32(temp_mem, 0);
-        //  break;
-
-        //default:
-        //  //Should not go here
-        //  assert(0);
-        //  break;
-        //}//END switch
-
-         //trgt_row[t_col + trgt_offset] += getFilterCoeff(filter, filter_size, phase, f_ind) * src_col[s_ind * s_stride + src_offset];
 
         //Sum filtered pixel values back to trgt_row so need to load the existing values (except for first pass)
         if (f_ind != 0) {
