@@ -38,6 +38,14 @@
 
 #define SELECT_LOW_4_BITS 0xF
 
+#if defined(__clang__)
+#define FALLTHROUGH [[clang::fallthrough]]
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FALLTHROUGH
+#endif
+
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
 {
@@ -790,7 +798,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     case 1:
       v1 = _mm256_setzero_si256();
-      //Fall through
+      FALLTHROUGH;
     case 2:
       add1 = _mm256_setzero_si256();
       break;
@@ -799,7 +807,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
       break;
     case 5:
       v5 = _mm256_setzero_si256();
-      //Fall through
+      FALLTHROUGH;
     case 6:
       add3 = _mm256_setzero_si256();
       break;
@@ -814,7 +822,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     case 1:
       v0 = _mm256_inserti128_si256(v0, _mm_setzero_si128(), 1);
-      //Fall through
+      FALLTHROUGH;
     case 2:
       add1 = _mm256_setzero_si256();
       break;
@@ -823,7 +831,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
       break;
     case 5:
       v2 = _mm256_inserti128_si256(v2, _mm_setzero_si128(), 1);
-      //Fall through
+      FALLTHROUGH;
     case 6:
       add3 = _mm256_setzero_si256();
       break;
@@ -870,21 +878,24 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     default:
       //8 is max allowed n value
-      //Fall through
-    case 8: //Fall through
-    case 7: //Fall through
+      FALLTHROUGH;
+    case 8: FALLTHROUGH;
+    case 7:
       tmp31 = _mm256_permute2x128_si256(v7, v6, HI_epi128); tmp30 = _mm256_permute2x128_si256(v7, v6, LOW_epi128);
       add3 = _mm256_add_epi32(tmp31, tmp30);
-    case 6: //Fall through
-    case 5: //Fall through
+      FALLTHROUGH;
+    case 6: FALLTHROUGH;
+    case 5: 
       tmp21 = _mm256_permute2x128_si256(v5, v4, HI_epi128); tmp20 = _mm256_permute2x128_si256(v5, v4, LOW_epi128);
       add2 = _mm256_add_epi32(tmp21, tmp20);
-    case 4: //Fall through
-    case 3: //Fall through
+      FALLTHROUGH;
+    case 4: FALLTHROUGH;
+    case 3: 
       tmp11 = _mm256_permute2x128_si256(v3, v2, HI_epi128); tmp10 = _mm256_permute2x128_si256(v3, v2, LOW_epi128);
       add1 = _mm256_add_epi32(tmp11, tmp10);
-    case 2: //Fall through
-    case 1: //Fall through
+      FALLTHROUGH;
+    case 2: FALLTHROUGH;
+    case 1:
       tmp01 = _mm256_permute2x128_si256(v1, v0, HI_epi128); tmp00 = _mm256_permute2x128_si256(v1, v0, LOW_epi128);
       add0 = _mm256_add_epi32(tmp01, tmp00);
       break;
@@ -894,18 +905,21 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     default:
       //8 is max allowed n value
-      //Fall through
-    case 8: //Fall through
-    case 7: //Fall through
+      FALLTHROUGH;
+    case 8: FALLTHROUGH;
+    case 7:
       add3 = v3;
-    case 6: //Fall through
-    case 5: //Fall through
+      FALLTHROUGH;
+    case 6: FALLTHROUGH;
+    case 5: 
       add2 = v2;
-    case 4: //Fall through
-    case 3: //Fall through
+      FALLTHROUGH;
+    case 4: FALLTHROUGH;
+    case 3: 
       add1 = v1;
-    case 2: //Fall through
-    case 1: //Fall through
+      FALLTHROUGH;
+    case 2: FALLTHROUGH;
+    case 1: 
       add0 = v0;
       break;
     }//END switch
@@ -1050,7 +1064,7 @@ static __m256i _mm256_loadu_n_epi32(const int *src, const unsigned n)
 
   default:
     //Not a valid number of values to load. Only max 8 values can be loaded 
-    //Fall through
+    FALLTHROUGH;
   case 8:
     dst = _mm256_loadu_si256((__m256i*)src);
     break;
@@ -1187,7 +1201,7 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
 
   default:
     //Only max 8 values can be stored
-    //Fall through
+    FALLTHROUGH;
   case 8:
     _mm256_storeu_si256((__m256i*)dst, src);
     break;
