@@ -1319,8 +1319,8 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
         const int t_col = is_vertical ? i_ind : o_ind; //trgt_buffer column
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const int f_num = SCALER_CLIP(filter_bound - f_ind, 0, f_step);
-        const int t_num = SCALER_CLIP(trgt_bound - t_col, 0, t_step);
+        const unsigned f_num = SCALER_CLIP(filter_bound - f_ind, 0, f_step);
+        const unsigned t_num = SCALER_CLIP(trgt_bound - t_col, 0, t_step);
         
         //Define a special case when filter_num is 4 that puts two "loops" into the same temp_mem[ind]
         const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
@@ -1353,12 +1353,12 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
           //Load src values to mem
           if (fm == 1 || (i % 2) == 0) {
             temp_mem[ind] = is_vertical
-              ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
+              ? _mm256_gather_n_epi32(src_col, (unsigned*)&pointer, f_num)
               : _mm256_loadu_n_epi32(&src_col[min], src_num);
           } else {
             //Filter less than 8 elements at a time so can fit more "loops" in the same temp_mem[ind]
             temp_mem[ind] = _mm256_inserti128_si256(temp_mem[ind], _mm256_extracti128_si256(is_vertical
-              ? _mm256_gather_n_epi32(src_col, (int*)&pointer, f_num)
+              ? _mm256_gather_n_epi32(src_col, (unsigned*)&pointer, f_num)
               : _mm256_loadu_n_epi32(&src_col[min], src_num), 0), 1);
           }
 
