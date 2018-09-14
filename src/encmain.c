@@ -815,7 +815,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
-      fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
+      fprintf(stderr, " FPS: %.2f\n", ((double)frames_done / (opts->config->shared != NULL ? opts->config->shared->max_layers : 1))/wall_time);
     }
     for (int i = 0; i < opts->num_inputs; i++) {
       pthread_join(input_threads[i], NULL);
