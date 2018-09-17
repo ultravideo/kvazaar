@@ -776,7 +776,7 @@ void kvz_block_step_scaler_worker(void * opaque_param)
   //Hor Scaling
   if (pic_in != NULL) {
     
-    int range[4];
+    int range[4] = {0, 0, 0, 0};
     if (in_param->use_tiles){
       kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);    
     } else {
