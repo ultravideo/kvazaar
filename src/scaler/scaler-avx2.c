@@ -1464,12 +1464,12 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
                                                  //const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
 
   const unsigned x_step = t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
-  const unsigned i_step = is_vertical ? 1 : f_step; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
+  const unsigned i_step = 1; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
 
-  const unsigned filter_loops = (filter_size + 7) >> 3; //Number of loops needed to perform filtering in max 8 coeff chunks
+  const unsigned num_filter_loops = (filter_size + 7) >> 3; //Number of loops needed to perform filtering in max 8 coeff chunks
 
   const unsigned x_init = block_x;
-  const unsigned x_bound = (block_x * filter_loops) + block_width;
+  const unsigned x_bound = (block_x * num_filter_loops) + block_width;
   const unsigned i_init = 0;
   const unsigned i_bound = is_vertical ? filter_size : x_step;
   const unsigned s_stride = is_vertical ? src_buffer->width : 1; //Multiplier to s_ind
@@ -1487,7 +1487,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   assert(filter_size <= 12);
 
   __m256i pointer, temp_trgt_epi32, decrese, filter_res_epi32;
-  __m256i temp_mem[12], temp_filter[12];
+  __m256i temp_mem[8], temp_filter[8];
   //const __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   //const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
@@ -1512,8 +1512,10 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
     // loop over x (block width)
     for (unsigned x = x_init; x < x_bound; x += x_step) {
 
+      const unsigned t_col = x >> (num_filter_loops >> 1); //trgt_buffer column
+
       //const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
-      t_ind_epi32 = is_vertical ? _mm256_set1_epi32(y) : clip_add_avx2(x, adderr, 0, x_bound - 1);
+      t_ind_epi32 = is_vertical ? _mm256_set1_epi32(y) : clip_add_avx2(t_col, adderr, 0, trgt_bound - 1);
 
       //Calculate reference position in src pic
       //const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
@@ -1526,8 +1528,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
       const unsigned *phase = (unsigned*)&phase_epi32;
       const int *ref_pos = (int*)&ref_pos_epi32;
 
-      const int f_ind = is_vertical ? 0 : (x % filter_loops) * f_step; //Filter index
-      const unsigned t_col = x; //trgt_buffer column
+      const int f_ind = is_vertical ? 0 : (x % num_filter_loops) * f_step; //Filter index
 
                                                        //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
       const unsigned f_num = SCALER_CLIP(filter_bound - f_ind, 0, f_step);

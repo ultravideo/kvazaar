@@ -301,7 +301,7 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
   resample_block_step_func *func;
   switch (ver) {
   case 3:
-    func = kvz_alt1_block_step_resample_func_avx2;
+    func = kvz_alt2_block_step_resample_func_avx2;
     break;
 
   case 2:
@@ -336,8 +336,6 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
         block_width, bh, 0, func);
     }
   }
-
-  if( ver == 3) func = kvz_alt2_block_step_resample_func_avx2;
 
   //Vertical
   for (size_t y = 0; y < (1 << part); y++) {
