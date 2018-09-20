@@ -900,8 +900,8 @@ static void validate_test3()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t out_width = in_width >> 1;//264;
+  int32_t out_height = in_height >> 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -968,7 +968,7 @@ static void validate_test3()
     }
 
     yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
-    yuv_io_write(out_file1, out11, out11->y->width, out11->y->height);
+    yuv_io_write(out_file11, out11, out11->y->width, out11->y->height);
     yuv_io_write(out_file2, out2, out2->y->width, out2->y->height);
     yuv_io_write(out_file3, out3, out3->y->width, out3->y->height);
     yuv_io_write(out_file4, out4, out4->y->width, out4->y->height);
