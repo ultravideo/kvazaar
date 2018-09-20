@@ -456,7 +456,7 @@ static int getFilter(const int** const filter, int is_upsampling, int is_luma, i
 
 //Helper function for choosing the correct filter
 //Returns the size of the filter and the filter param is set to the correct filter
-static int prepareFilter(const int** const filter, int is_upsampling, int is_luma, int filter_ind)
+static unsigned prepareFilter(const int** const filter, int is_upsampling, int is_luma, int filter_ind)
 {
   if (is_upsampling) {
     //Upsampling so use 8- or 4-tap filters
