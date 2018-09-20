@@ -28,6 +28,7 @@
 
 #define DEFAULT_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2
 #define ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v2
+#define ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v3
 #define DEFAULT_RESAMPLE_FUNC_AVX2 resample_avx2
 
 #define B11011000 0xD8 //0b11011000
@@ -1598,7 +1599,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
           }
         } else {
           //Get src row corresponding to cur filter index i
-          const int s_ind = ref_pos[0] + i - (filter_size >> 1) + 1;
+          const int s_ind = SCALER_CLIP(ref_pos[0] + i - (filter_size >> 1) + 1, 0, src_size - 1);
           temp_mem[0] = _mm256_loadu_n_epi32(&src[s_ind * s_stride + x], t_num);
 
           temp_filter[0] = _mm256_set1_epi32(getFilterCoeff(filter, filter_size, phase[0], i));
@@ -1722,4 +1723,5 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 //Set the default resample function
 resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
 resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2 = &ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
+resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = &ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
 resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;

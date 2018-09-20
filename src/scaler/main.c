@@ -300,6 +300,10 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
 
   resample_block_step_func *func;
   switch (ver) {
+  case 3:
+    func = kvz_alt1_block_step_resample_func_avx2;
+    break;
+
   case 2:
     func = kvz_alt1_block_step_resample_func_avx2;
     break;
@@ -332,6 +336,8 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
         block_width, bh, 0, func);
     }
   }
+
+  if( ver == 3) func = kvz_alt2_block_step_resample_func_avx2;
 
   //Vertical
   for (size_t y = 0; y < (1 << part); y++) {
@@ -912,17 +918,20 @@ static void validate_test3()
   char out_file_name11[BUFF_SIZE];
   char out_file_name2[BUFF_SIZE];
   char out_file_name3[BUFF_SIZE];
+  char out_file_name4[BUFF_SIZE];
   sprintf(out_file_name1, "Kimono1_%ix%i_%i_ref.yuv", out_width, out_height, framerate);
   sprintf(out_file_name11, "Kimono1_%ix%i_%i_avx2.yuv", out_width, out_height, framerate);
   sprintf(out_file_name2, "Kimono1_%ix%i_%i_block_avx2.yuv", out_width, out_height, framerate);
   sprintf(out_file_name3, "Kimono1_%ix%i_%i_block_avx2_2.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name4, "Kimono1_%ix%i_%i_block_avx2_3.yuv", out_width, out_height, framerate);
 
   FILE* out_file1 = fopen(out_file_name1, "wb");
   FILE* out_file11 = fopen(out_file_name11, "wb");
   FILE* out_file2 = fopen(out_file_name2, "wb");
   FILE* out_file3 = fopen(out_file_name3, "wb");
+  FILE* out_file4 = fopen(out_file_name4, "wb");
   FILE* file = fopen(in_file_name, "rb");
-  if (file == NULL || out_file1 == NULL || out_file2 == NULL) {
+  if (file == NULL || out_file1 == NULL || out_file2 == NULL || out_file3 == NULL || out_file11 == NULL || out_file4 == NULL) {
     perror("File open failed");
     printf("File name: %s", in_file_name);
   }
@@ -932,6 +941,7 @@ static void validate_test3()
   yuv_buffer_t* out11 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
   yuv_buffer_t* out2 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
   yuv_buffer_t* out3 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* out4 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
   int i = 0;
 
   while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
@@ -940,6 +950,8 @@ static void validate_test3()
     kvzScaling_avx2(data, &out11);
     kvzBlockStepScaling_avx2(data, &out2, 1);
     kvzBlockStepScaling_avx2(data, &out3, 2);
+    kvzBlockStepScaling_avx2(data, &out4, 3);
+
 
     if (memcmp(out1->y->data, out11->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out11->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out11->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
       printf("Frame %i differs in avx2\n", i + 1);
@@ -953,10 +965,15 @@ static void validate_test3()
       printf("Frame %i differs in block avx2_2\n", i + 1);
     }
 
+    if (memcmp(out1->y->data, out4->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out4->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out4->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
+      printf("Frame %i differs in block avx2_3\n", i + 1);
+    }
+
     yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
     yuv_io_write(out_file1, out11, out11->y->width, out11->y->height);
     yuv_io_write(out_file2, out2, out2->y->width, out2->y->height);
     yuv_io_write(out_file3, out3, out3->y->width, out3->y->height);
+    yuv_io_write(out_file4, out4, out4->y->width, out4->y->height);
 
     printf("Frame number %i\r", ++i);
   }
@@ -967,11 +984,13 @@ static void validate_test3()
   kvz_deallocateYuvBuffer(out11);
   kvz_deallocateYuvBuffer(out2);
   kvz_deallocateYuvBuffer(out3);
+  kvz_deallocateYuvBuffer(out4);
   fclose(file);
   fclose(out_file1);
   fclose(out_file11);
   fclose(out_file2);
   fclose(out_file3);
+  fclose(out_file4);
 
 }
 
