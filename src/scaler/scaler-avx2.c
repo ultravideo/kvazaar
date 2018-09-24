@@ -1463,13 +1463,13 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   const unsigned f_step = SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
                                                  //const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
 
-  const unsigned x_step = t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
+  const int x_step = t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
   const unsigned i_step = 1; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
 
-  const unsigned num_filter_parts = (filter_size + 7) >> 3; //Number of loops needed to perform filtering in max 8 coeff chunks
+  const unsigned num_filter_parts = is_vertical ? 1 : (filter_size + 7) >> 3; //Number of loops needed to perform filtering in max 8 coeff chunks
 
-  const unsigned x_init = block_x;
-  const unsigned x_bound = block_x + block_width;
+  const int x_init = block_x;
+  const int x_bound = block_x + block_width;
   const unsigned i_init = 0;
   const unsigned i_bound = is_vertical ? filter_size : x_step;
   const unsigned s_stride = is_vertical ? src_buffer->width : 1; //Multiplier to s_ind
@@ -1504,13 +1504,12 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < (block_y + block_height); y++) {
 
-    pic_data_t* src = is_vertical ? src_buffer->data : &src_buffer->data[y * src_buffer->width];
-    src += src_offset;
-    pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width];
+    pic_data_t* src = is_vertical ? src_buffer->data + src_offset : &src_buffer->data[y * src_buffer->width + src_offset];
+    pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width + trgt_offset];
 
     //Outer loop:
     // loop over x (target block width)
-    for (unsigned x = x_init; x < x_bound; x += x_step) {
+    for (int x = x_init; x < x_bound; x += x_step) {
       
       //const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
       t_ind_epi32 = is_vertical ? _mm256_set1_epi32(y) : clip_add_avx2(x, adderr, 0, trgt_bound - 1);
@@ -1629,7 +1628,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
         //Sum filtered pixel values back to trgt_row so need to load the existing values (except for first pass)
         if (f_ind != 0) {
-          temp_trgt_epi32 = _mm256_loadu_n_epi32(&trgt_row[x + trgt_offset], t_num);
+          temp_trgt_epi32 = _mm256_loadu_n_epi32(&trgt_row[x], t_num);
           filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, temp_trgt_epi32);
         }
 
@@ -1642,7 +1641,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
         }
 
         //Write back the new values for the current t_num pixels
-        _mm256_storeu_n_epi32(&trgt_row[x + trgt_offset], filter_res_epi32, t_num);
+        _mm256_storeu_n_epi32(&trgt_row[x], filter_res_epi32, t_num);
       }
 
     }
