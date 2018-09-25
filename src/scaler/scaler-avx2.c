@@ -1458,28 +1458,18 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
   //  If filter_size is 12, need to limit f_step to 8
-  //  If filter_size is 4, can use only 4 ymm to hold eight pixels' filters
-  const unsigned t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
-  const unsigned f_step = SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
-                                                 //const int fm = 8 >> (f_step >> 1); //How many filter inds can be fit in one ymm
-
-  const int x_step = t_step; //Step size of outer loop. Adjust depending on how many values can be calculated concurrently with SIMD 
-  const unsigned i_step = 1; //Step size of inner loop. Adjust depending on how many values can be calculated concurrently with SIMD
-
+  //  If filter_size is 4, can use 4 vector registers to hold eight pixels' filters
+  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int f_step = SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
+  
   const unsigned num_filter_parts = is_vertical ? 1 : (filter_size + 7) >> 3; //Number of loops needed to perform filtering in max 8 coeff chunks
 
-  const int x_init = block_x;
   const int x_bound = block_x + block_width;
-  const unsigned i_init = 0;
-  const unsigned i_bound = is_vertical ? filter_size : x_step;
-  const unsigned s_stride = is_vertical ? src_buffer->width : 1; //Multiplier to s_ind
+  const int y_bound = block_y + block_height;
+  const unsigned i_bound = is_vertical ? filter_size : t_step;
 
-                                                            //Specify bounds for trgt buffer and filter
-  const unsigned trgt_bound = x_bound;
-  const unsigned filter_bound = filter_size;
+  const unsigned s_stride = src_buffer->width;
 
-
-                                                    //const __m256i zero = _mm256_setzero_si256(); //Zero vector
   const __m256i scale_round = is_upscaling ? _mm256_set1_epi32(2048) : _mm256_set1_epi32(8192); //Rounding constant for normalizing pixel values to the correct range
   const int scale_shift = is_upscaling ? 12 : 14; //Amount of shift in the final pixel value normalization
 
@@ -1492,8 +1482,10 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   //const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   __m128i smallest_epi16;
-  const __m256i multiplier_epi32 = _mm256_set1_epi32(s_stride); //Stride of src buffer
   int min = 0;
+
+  int ref_pos_tmp;
+  unsigned phase_tmp;
 
   __m256i t_ind_epi32, ref_pos_16_epi32, phase_epi32, ref_pos_epi32;
   const __m256i scale_epi32 = _mm256_set1_epi32(scale);
@@ -1502,31 +1494,33 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
-  for (int y = block_y; y < (block_y + block_height); y++) {
+  for (int y = block_y; y < y_bound; y++) {
 
     pic_data_t* src = is_vertical ? src_buffer->data + src_offset : &src_buffer->data[y * src_buffer->width + src_offset];
     pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width + trgt_offset];
 
     //Outer loop:
     // loop over x (target block width)
-    for (int x = x_init; x < x_bound; x += x_step) {
-      
-      //const int t_ind = is_vertical ? y : o_ind; //trgt_buffer row/col index for cur resampling dir
-      t_ind_epi32 = is_vertical ? _mm256_set1_epi32(y) : clip_add_avx2(x, adderr, 0, trgt_bound - 1);
+    for (int x = block_x; x < x_bound; x += t_step) {
+
+      const unsigned *phase;
+      const int *ref_pos;
 
       //Calculate reference position in src pic
-      //const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;
-      //const int phase = ref_pos_16 & 15;
-      //const int ref_pos = ref_pos_16 >> 4;
-      ref_pos_16_epi32 = _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(t_ind_epi32, scale_epi32), add_epi32), shift), delta_epi32);
-      phase_epi32 = _mm256_and_si256(ref_pos_16_epi32, phase_mask);
-      ref_pos_epi32 = _mm256_srai_epi32(ref_pos_16_epi32, 4);
+      if (!is_vertical) {
+        t_ind_epi32 = clip_add_avx2(x, adderr, 0, x_bound - 1);
+      
+        ref_pos_16_epi32 = _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(t_ind_epi32, scale_epi32), add_epi32), shift), delta_epi32);
+        phase_epi32 = _mm256_and_si256(ref_pos_16_epi32, phase_mask);
+        ref_pos_epi32 = _mm256_srai_epi32(ref_pos_16_epi32, 4);
 
-      const unsigned *phase = (unsigned*)&phase_epi32;
-      const int *ref_pos = (int*)&ref_pos_epi32;
-
-
-                                                       
+        phase = (unsigned*)&phase_epi32;
+        ref_pos = (int*)&ref_pos_epi32;
+      } else {
+        const int ref_pos_16 = (int)((unsigned int)(y * scale + add) >> shift) - delta;
+        phase_tmp = ref_pos_16 & 15; phase = &phase_tmp;
+        ref_pos_tmp = ref_pos_16 >> 4; ref_pos = &ref_pos_tmp;
+      }                                               
       
       //Loop over filter segments if filter is longer than f_step 
       for (unsigned filter_part = 0; filter_part < num_filter_parts; filter_part++) {
@@ -1534,28 +1528,23 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
         const int f_ind = filter_part * f_step; //Filter index
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const unsigned f_num = SCALER_CLIP(filter_bound - f_ind, 0, f_step);
-        const unsigned t_num = SCALER_CLIP(trgt_bound - x, 0, t_step);
+        const unsigned f_num = SCALER_CLIP(filter_size - f_ind, 0, f_step);
+        const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
 
         const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
 
         //Inner loop:
         // if is_vertical -> loop over k (filter inds)
-        // if !is_vertical -> loop over x (in x_step)
-        for (unsigned i = i_init; i < i_bound; i += i_step) {
-
-
+        // if !is_vertical -> loop over x (in t_step)
+        for (unsigned i = 0; i < i_bound; i++) {
 
           if (!is_vertical) {
             //Define a special case when filter_num is 4 that puts two "loops" into the same temp_mem[ind]
 
             const int ind = i >> (fm >> 1); //Index to the temp avx2 vector arrays
 
-                                            //Move src pointer to correct position (correct column in vertical resampling)
-
             //Get the source incides of all the elements that are processed 
             pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1) + 1, adderr, 0, src_size - 1);
-            //pointer = _mm256_permutevar8x32_epi32(pointer, order);
 
             const int src_num = num_distinct_ordered((int*)&pointer, f_num);
 
@@ -1565,33 +1554,28 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
             smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
             min = _mm_extract_epi16(smallest_epi16, 0);
 
-            //Load src values to mem
             if (fm == 1 || (i % 2) == 0) {
+              //Load src values to mem
               temp_mem[ind] = _mm256_loadu_n_epi32(&src[min], src_num);
+
+              //Get correct pixel values pased on pointer
+              decrese = _mm256_set1_epi32(min);
+              pointer = _mm256_sub_epi32(pointer, decrese);
+              temp_mem[ind] = _mm256_permutevar8x32_epi32(temp_mem[ind], pointer);
+
+              //Load filter
+              temp_filter[ind] = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num);
+
             }
             else {
               //Filter less than 8 elements at a time so can fit more "loops" in the same temp_mem[ind]
               temp_mem[ind] = _mm256_inserti128_si256(temp_mem[ind], _mm256_extracti128_si256(_mm256_loadu_n_epi32(&src[min], src_num), 0), 1);
-            }
 
-            //Get correct pixel values pased on pointer
-            if (fm == 1 || (i % 2) == 0) {
-              decrese = _mm256_set1_epi32(min);
-              pointer = _mm256_sub_epi32(pointer, decrese);
-              temp_mem[ind] = _mm256_permutevar8x32_epi32(temp_mem[ind], pointer);
-            }
-            else {
               //Only permute high 128bits
               decrese = _mm256_set1_epi32(min - 4);
               pointer = _mm256_inserti128_si256(pointer, _mm256_castsi256_si128(_mm256_sub_epi32(pointer, decrese)), 1);
               temp_mem[ind] = _mm256_blend_epi32(temp_mem[ind], _mm256_permutevar8x32_epi32(temp_mem[ind], pointer), 0xF0);
-            }
 
-            //Load filter
-            if (fm == 1 || (i % 2) == 0) {
-              temp_filter[ind] = _mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num);
-            }
-            else {
               temp_filter[ind] = _mm256_inserti128_si256(temp_filter[ind], _mm256_castsi256_si128(_mm256_loadu_n_epi32(&getFilterCoeff(filter, filter_size, phase[i], f_ind), f_num)), 1);
             }
 
@@ -1634,7 +1618,6 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
         //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
         if (is_vertical) {
-          //trgt_row[t_col + trgt_offset] = SCALER_CLIP(is_upscaling ? (trgt_row[t_col + trgt_offset] + 2048) >> 12 : (trgt_row[t_col + trgt_offset] + 8192) >> 14, 0, 255);
           filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
           filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
           filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
@@ -1643,7 +1626,6 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
         //Write back the new values for the current t_num pixels
         _mm256_storeu_n_epi32(&trgt_row[x], filter_res_epi32, t_num);
       }
-
     }
   }
 }
