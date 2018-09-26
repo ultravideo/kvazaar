@@ -1478,9 +1478,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
   __m256i pointer, temp_trgt_epi32, decrese, filter_res_epi32;
   __m256i temp_mem[8], temp_filter[8];
-  //const __m256i adder = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-  //const __m256i order = _mm256_set_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   __m128i smallest_epi16;
   int min = 0;
 
@@ -1506,6 +1504,8 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
       const unsigned *phase;
       const int *ref_pos;
 
+      const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
+
       //Calculate reference position in src pic
       if (!is_vertical) {
         t_ind_epi32 = clip_add_avx2(x, adderr, 0, x_bound - 1);
@@ -1529,8 +1529,6 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
         //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
         const unsigned f_num = SCALER_CLIP(filter_size - f_ind, 0, f_step);
-        const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
-
         const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
 
         //Inner loop:
@@ -1588,44 +1586,45 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
           else {
             //Get src row corresponding to cur filter index i
             const int s_ind = SCALER_CLIP(ref_pos[0] + (int)i - (filter_size >> 1) + 1, 0, src_size - 1);
-            temp_mem[0] = _mm256_loadu_n_epi32(&src[s_ind * s_stride + x], t_num);
+            *temp_mem = _mm256_loadu_n_epi32(&src[s_ind * s_stride + x], t_num);
 
-            temp_filter[0] = _mm256_set1_epi32(getFilterCoeff(filter, filter_size, phase[0], i));
+            *temp_filter = _mm256_set1_epi32(getFilterCoeff(filter, filter_size, *phase, i));
 
-            temp_mem[0] = _mm256_mullo_epi32(temp_mem[0], temp_filter[0]);
+            *temp_mem = _mm256_mullo_epi32(*temp_mem, *temp_filter);
 
             if (i == 0) {
-              filter_res_epi32 = temp_mem[0];
+              filter_res_epi32 = *temp_mem;
             }
             else {
-              filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, temp_mem[0]);
+              filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, *temp_mem);
             }
           }
-
         }
 
         if (!is_vertical) {
-          filter_res_epi32 = t_num == 8 && fm == 1
-            ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
-            : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm);
+          //Accumulate multiplication step results to the final filtered values
+          if (f_ind == 0) {
+            filter_res_epi32 = t_num == 8 && fm == 1
+              ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
+              : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm);
+          } else {
+            filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, t_num == 8 && fm == 1
+              ? _mm256_accumulate_8_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0])
+              : _mm256_accumulate_nxm_epi32(temp_mem[7], temp_mem[6], temp_mem[5], temp_mem[4], temp_mem[3], temp_mem[2], temp_mem[1], temp_mem[0], t_num, fm));
+          }
         }
-
-        //Sum filtered pixel values back to trgt_row so need to load the existing values (except for first pass)
-        if (f_ind != 0) {
-          temp_trgt_epi32 = _mm256_loadu_n_epi32(&trgt_row[x], t_num);
-          filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, temp_trgt_epi32);
-        }
-
-        //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
-        if (is_vertical) {
-          filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
-          filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
-          filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
-        }
-
-        //Write back the new values for the current t_num pixels
-        _mm256_storeu_n_epi32(&trgt_row[x], filter_res_epi32, t_num);
       }
+
+      //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
+      if (is_vertical) {
+        filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
+        filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
+        filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
+      }
+
+      //Write back the new values for the current t_num pixels
+      _mm256_storeu_n_epi32(&trgt_row[x], filter_res_epi32, t_num);
+
     }
   }
 }
