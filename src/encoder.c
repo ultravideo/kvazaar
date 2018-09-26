@@ -295,7 +295,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     // ***********************************************
     // Modified for SHVC.
     // Share the thread queue if prev encoder has been set
-    // Use paralellism parameters from the highest level
+    // Use max paralellism parameters from the different levels
 
     int max_threads = encoder->cfg.threads;
     if (max_threads < 0) {
@@ -326,21 +326,30 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       // Add two frames so that we have frames ready to be coded when one is
       // completed.
       encoder->cfg.owf += 2;
-      if( encoder->cfg.layer == 0)
+
+      if( encoder->cfg.layer == 0){
         fprintf(stderr, "Layer 0:\n");
-      else
+      } else {
+        //Account for prev layer's owf. Use the max owf between layers
+        encoder->cfg.owf = MAX(encoder->cfg.owf, prev_enc->cfg.owf);
         fprintf(stderr, "Layer %d (supersedes previous parameters):\n", encoder->cfg.layer);
+      }
       fprintf(stderr, "  --owf=auto value set to %d.\n", encoder->cfg.owf);
     }
 
     if (encoder->cfg.threads < 0) {
       encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
+     
+      
 
       if ( cfg->shared != NULL && cfg->shared->owf >= 0) {
-        if (encoder->cfg.layer == 0)
+        if (encoder->cfg.layer == 0){
           fprintf(stderr, "Layer 0:\n");
-        else
+        } else {
+          //Account for prev layer's thread number (full parallelism between layers not possible so divide by 2)
+          encoder->cfg.threads = MIN(max_threads, encoder->cfg.threads + prev_enc->cfg.threads / 2);
           fprintf(stderr, "Layer %d (supersedes previous parameters):\n", encoder->cfg.layer);
+        }
       }
       fprintf(stderr, "  --threads=auto value set to %d.\n", encoder->cfg.threads);
     }
