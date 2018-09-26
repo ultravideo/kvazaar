@@ -1476,11 +1476,9 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   //Only filter size of max 12 supported
   assert(filter_size <= 12);
 
-  __m256i pointer, temp_trgt_epi32, decrese, filter_res_epi32;
+  __m256i pointer, decrese, filter_res_epi32;
   __m256i temp_mem[8], temp_filter[8];
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-  __m128i smallest_epi16;
-  int min = 0;
 
   int ref_pos_tmp;
   unsigned phase_tmp;
@@ -1545,12 +1543,8 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
             pointer = clip_add_avx2(ref_pos[i] + f_ind - (filter_size >> 1) + 1, adderr, 0, src_size - 1);
 
             const int src_num = num_distinct_ordered((int*)&pointer, f_num);
-
-            //Get the smallest indice in pointer
-            min = src_size - 1;
-            smallest_epi16 = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_packus_epi32(pointer, pointer), B11011000));
-            smallest_epi16 = _mm_minpos_epu16(smallest_epi16);
-            min = _mm_extract_epi16(smallest_epi16, 0);
+            
+            const int min = _mm_extract_epi32(_mm256_castsi256_si128(pointer), 0);
 
             if (fm == 1 || (i % 2) == 0) {
               //Load src values to mem
