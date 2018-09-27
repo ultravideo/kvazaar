@@ -30,6 +30,7 @@
 #define ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v2
 #define ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v3
 #define DEFAULT_RESAMPLE_FUNC_AVX2 resample_avx2
+#define ALT_RESAMPLE_FUNC_AVX2 resample2resampleBlockStep_alt2_avx2
 
 #define B11011000 0xD8 //0b11011000
 
@@ -1623,6 +1624,19 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   }
 }
 
+static void resample2resampleBlockStep_alt2_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+{
+  pic_buffer_t* tmp = kvz_newPictureBuffer(param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, 0);
+
+  //Vertical resampling
+  kvz_alt2_block_step_resample_func_avx2(buffer, tmp, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, param, is_upscaling, is_luma, 0);
+
+  //Horizontal resampling
+  kvz_alt2_block_step_resample_func_avx2(tmp, buffer, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->trgt_height + param->trgt_padding_y, param, is_upscaling, is_luma, 1);
+
+  kvz_deallocatePictureBuffer(tmp);
+}
+
 //static __m256i _mm256_gather_n_epi32_v2(const int *src, unsigned idx[8], unsigned n)
 //{
 //  __m256i dst = _mm256_setzero_si256();
@@ -1706,3 +1720,4 @@ resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = &DEF
 resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2 = &ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
 resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = &ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
 resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;
+resample_func *const kvz_alt_resample_func_avx2 = &ALT_RESAMPLE_FUNC_AVX2;

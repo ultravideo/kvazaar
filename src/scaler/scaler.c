@@ -28,6 +28,7 @@
 
 #define DEFAULT_RESAMPLE_BLOCK_STEP_FUNC resampleBlockStep
 #define DEFAULT_RESAMPLE_FUNC resample
+#define ALT_RESAMPLE_FUNC resample2resampleBlockStep_default
 
 
 pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
@@ -165,7 +166,7 @@ static pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, in
 /**
  * \brief Deallocate a picture buffer.
  */
-static void deallocatePictureBuffer(pic_buffer_t* buffer)
+void kvz_deallocatePictureBuffer(pic_buffer_t* buffer)
 {
   if (buffer != NULL) {
     free(buffer->data);
@@ -460,7 +461,7 @@ static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
     int tmp_size = SCALER_MAX(pic->width, pic->height);
     ret->tmp_row = malloc(sizeof(pic_buffer_t) * tmp_size);
     if (ret->tmp_row == NULL) {
-      deallocatePictureBuffer(ret);
+      kvz_deallocatePictureBuffer(ret);
       return NULL; //TODO: Add error message?
     }
     memcpy(ret->tmp_row, pic->tmp_row, tmp_size);
@@ -486,9 +487,9 @@ void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv)
 {
   if (yuv == NULL) return;
 
-  deallocatePictureBuffer(yuv->y);
-  deallocatePictureBuffer(yuv->u);
-  deallocatePictureBuffer(yuv->v);
+  kvz_deallocatePictureBuffer(yuv->y);
+  kvz_deallocatePictureBuffer(yuv->u);
+  kvz_deallocatePictureBuffer(yuv->v);
 
   free(yuv);
 }
@@ -1188,7 +1189,7 @@ yuv_buffer_t* kvz_yuvScaling_adapter(const yuv_buffer_t* const yuv, const scalin
   }
 
   //Deallocate buffer
-  deallocatePictureBuffer(buffer);
+  kvz_deallocatePictureBuffer(buffer);
 
   return dst;
 }
@@ -1333,7 +1334,7 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   }
 
   //Deallocate buffer
-  //deallocatePictureBuffer(buffer);
+  //kvz_deallocatePictureBuffer(buffer);
 
   return dst;
 }
@@ -1651,6 +1652,20 @@ int kvz_yuvBlockStepScaling(yuv_buffer_t * const dst, const yuv_buffer_t * const
   return kvz_yuvBlockStepScaling_adapter(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, kvz_default_block_step_resample_func);
 }
 
+static void resample2resampleBlockStep_default(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+{
+  pic_buffer_t* tmp = kvz_newPictureBuffer(param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, 0);
+
+  //Vertical resampling
+  kvz_default_block_step_resample_func(buffer, tmp, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, param, is_upscaling, is_luma, 0);
+
+  //Horizontal resampling
+  kvz_default_block_step_resample_func(tmp, buffer, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->trgt_height + param->trgt_padding_y, param, is_upscaling, is_luma, 1);
+
+  kvz_deallocatePictureBuffer(tmp);
+}
+
 //Set the default resample function
 resample_block_step_func *const kvz_default_block_step_resample_func = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC;
 resample_func *const kvz_default_resample_func = &DEFAULT_RESAMPLE_FUNC;
+resample_func *const kvz_alt_resample_func  = &ALT_RESAMPLE_FUNC;

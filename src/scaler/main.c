@@ -199,6 +199,32 @@ static void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   *out = kvz_yuvScaling(in, &param, *out);
 }
 
+static void kvzScaling_ver(yuv_buffer_t* in, yuv_buffer_t** out, int ver)
+{
+  resample_func *func;
+  switch (ver) {
+  case 2:
+    func = kvz_alt_resample_func;
+    break;
+
+  default:
+  case 1:
+    func = kvz_default_resample_func;
+  }
+
+  //Create picture buffers based on given kvz_pictures
+  int32_t in_y_width = in->y->width;
+  int32_t in_y_height = in->y->height;
+  int32_t out_y_width = (*out)->y->width;
+  int32_t out_y_height = (*out)->y->height;
+
+  //assumes 420
+  //int is_420 = in->y->width != in->u->width ? 1 : 0;
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+
+  *out = kvz_yuvScaling_adapter(in, &param, *out, func);
+}
+
 static void kvzBlockScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
@@ -992,10 +1018,69 @@ static void validate_test3()
 
 }
 
+static void validate_test4()
+{
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = in_width << 1;//264;
+  int32_t out_height = in_height << 1;//130;
+  int32_t out_chroma_width = out_width >> 1;
+  int32_t out_chroma_height = out_height >> 1;
+  int framerate = 24;
+  int frames = 10;
+
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  char out_file_name1[BUFF_SIZE];
+  char out_file_name2[BUFF_SIZE];
+  sprintf(out_file_name1, "Kimono1_%ix%i_%i_ref.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name2, "Kimono1_%ix%i_%i_block.yuv", out_width, out_height, framerate);
+
+  FILE* out_file1 = fopen(out_file_name1, "wb");
+  FILE* out_file2 = fopen(out_file_name2, "wb");
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL || out_file1 == NULL || out_file2 == NULL) {
+    perror("File open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* out2 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  int i = 0;
+
+  while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
+
+    kvzScaling_ver(data, &out1, 1);
+    kvzScaling_ver(data, &out2, 2);
+
+    if (memcmp(out1->y->data, out2->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out2->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out2->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
+      printf("Frame %i differs\n", i + 1);
+    }
+
+    yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
+    yuv_io_write(out_file2, out2, out2->y->width, out2->y->height);
+
+    printf("Frame number %i\r", ++i);
+  }
+  printf("Wrote %i frames.\n", i);
+
+  kvz_deallocateYuvBuffer(data);
+  kvz_deallocateYuvBuffer(out1);
+  kvz_deallocateYuvBuffer(out2);
+  fclose(file);
+  fclose(out_file1);
+  fclose(out_file2);
+
+}
+
 int main()
 {
   //vscaling();
-  validate_test3();
+  validate_test4();
   //int r = test_avx();
   //printf("%d", r);
 

@@ -157,7 +157,12 @@ yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const u
 yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv);
 
 /**
-* \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
+* \brief Deallocate picture buffer
+*/
+void kvz_deallocatePictureBuffer(pic_buffer_t* buffer);
+
+/**
+* \brief Deallocate yuv buffer
 */
 void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv);
 
@@ -179,6 +184,7 @@ typedef void (resample_func)(const pic_buffer_t* const buffer, const scaling_par
 
 extern resample_block_step_func *const kvz_default_block_step_resample_func;
 extern resample_func *const kvz_default_resample_func;
+extern resample_func *const kvz_alt_resample_func;
 /*=============================================================================================*/
 
 /*================Main scaling functions========================*/
