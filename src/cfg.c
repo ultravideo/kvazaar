@@ -1961,6 +1961,11 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
     }*/
 
+    if(cfg->shared->max_layers > 2) {
+      fprintf(stderr, "Input error: Currently, only max 2 layers are supported\n");
+      error = 1;
+    }
+
     if( cfg->ILR_frames + cfg->ref_frames == 0) {
       fprintf(stderr, "Input error: There needs to be at least one type of reference frame\n");
       error = 1;
