@@ -264,6 +264,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       encoder->cfg.threads = cfg->shared->threads;
       encoder->cfg.owf = cfg->shared->owf;
       encoder->cfg.intra_period = cfg->shared->intra_period;
+      encoder->cfg.multiview = cfg->shared->multiview;
 
       //Move gop
       encoder->cfg.max_temporal_layer = cfg->shared->max_temporal_layer;

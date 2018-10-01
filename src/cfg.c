@@ -95,6 +95,7 @@ int kvz_config_init(kvz_config *cfg)
   
   cfg->threads = -1;
   cfg->cpuid = 1;
+  cfg->multiview = 0;
 
   // Defaults for what sizes of PUs are tried.
   cfg->pu_depth_inter.min = 2; // 0-3
@@ -166,6 +167,7 @@ static void shared_init(kvz_config *cfg)
   cfg->shared->wpp = cfg->wpp;
   cfg->shared->owf = cfg->owf;
   cfg->shared->threads = cfg->threads;
+  cfg->shared->multiview = cfg->multiview;
 
   cfg->shared->max_layers = 1;
   cfg->shared->max_input_layers = 0;
@@ -1020,6 +1022,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
+  else if OPT("multiview")
+    cfg->shared->multiview = atoi(value);
   else if OPT("pu-depth-inter")
     return sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max) == 2;
   else if OPT("pu-depth-intra")
