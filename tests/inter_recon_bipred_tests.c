@@ -32,9 +32,9 @@ static lcu_t lcu1;
 
 int temp1, temp2, temp3, temp4;
 
-int16_t mv_param[2][2] = { { 3,3 },{ 3,3 } };
-int width = 32;
-int height = 32;
+int16_t mv_param[2][2] = { { 7,7 },{ 7,7 } };
+int width = 8;
+int height = 8;
 int xpos = 0;
 int ypos = 0;
 
@@ -133,7 +133,7 @@ TEST test_inter_recon_bipred()
    printf("%d ", expected_test_result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
   }
  }
- printf("\n");*/
+ printf("\n");
  /*
  for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
   int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
@@ -154,7 +154,7 @@ TEST test_inter_recon_bipred()
   }
  }
  printf("\n");
- /*
+ */
 
  for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
   int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
@@ -163,7 +163,7 @@ TEST test_inter_recon_bipred()
    printf("%d ", result.rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]);
   }
  }
- printf("\n");*/
+ printf("\n");
  
 
 	for (temp_y = 0; temp_y < height; ++temp_y) {
