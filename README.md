@@ -117,6 +117,7 @@ Video structure:
                                    - 8: B-frame pyramid of length 8
                                    - lp-<string>: Low-delay P-frame GOP
                                      (e.g. lp-g8d4t2, see README)
+      --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.

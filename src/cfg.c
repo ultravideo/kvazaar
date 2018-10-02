@@ -117,6 +117,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->gop_lp_definition.d = 3;
   cfg->gop_lp_definition.t = 1;
+  cfg->open_gop = true;
 
   cfg->roi.width = 0;
   cfg->roi.height = 0;
@@ -938,6 +939,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
     }
+  }
+  else if OPT("open-gop") {
+    cfg->open_gop = (bool)atobool(value);
   }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
