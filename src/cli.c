@@ -87,6 +87,7 @@ static const struct option long_options[] = {
   { "slices",             required_argument, NULL, 0 },
   { "threads",            required_argument, NULL, 0 },
   { "cpuid",              required_argument, NULL, 0 },
+  { "multiview",          required_argument, NULL, 0 },
   { "pu-depth-inter",     required_argument, NULL, 0 },
   { "pu-depth-intra",     required_argument, NULL, 0 },
   { "info",                     no_argument, NULL, 0 },

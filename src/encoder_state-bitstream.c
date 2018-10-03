@@ -202,16 +202,21 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
   
-  uint16_t  num_scalability_types = 1; //TODO: calculate from actual mask?
+  bool scalability_mask_flag[16] = { false };
 
-  //for (int i = 0; i < 16; i++){
-    //TODO: Implement scalability mask flags in configuration?
-    //WRITE_U(stream, 0, 1, "scalability_mask_flag[i]");
-    //num_scalability_types += 0;
-  //}
-  //Write in one operation
-  //TODO: implement scalability mask proberly
-  WRITE_U(stream, 0x2000, 16, "scalability_mask_flag[i]"); // 0x2000 = 0010000000000000
+  if(state->encoder_control->cfg.multiview) {
+    scalability_mask_flag[1] = 1; // multiview
+  } else {
+    scalability_mask_flag[2] = 1; // spatial/quality scalability
+  }
+
+  uint16_t num_scalability_types = 0;
+
+  for(int i = 0;i < 16; i++) {
+    WRITE_U(stream, scalability_mask_flag[i], 1, "scalability_mask_flag[i]");
+    if(scalability_mask_flag[i])
+      num_scalability_types++;
+  }
 
   //Value from SHM
   uint8_t dimension_id_len[1] = { 1 };
