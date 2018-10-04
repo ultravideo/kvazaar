@@ -1185,10 +1185,29 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   if (state->frame->num == 0) {
     state->frame->poc = 0;
   } else if (cfg->gop_len && !cfg->gop_lowdelay) {
-    // Calculate POC according to the global frame counter and GOP structure
-    int32_t poc = state->frame->num - 1;
-    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
-    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
+
+    int32_t framenum = state->frame->num - 1;
+    // Handle closed GOP
+    // Closed GOP structure has an extra IDR between the GOPs
+    if (cfg->intra_period > 0 && !cfg->open_gop) {
+      if (((state->frame->num - 1) % (cfg->intra_period + 1)) == cfg->intra_period) {
+        // Insert IDR before each new GOP after intra period in closed GOP configuration
+        state->frame->poc = 0;
+      } else {
+        // Calculate gop_offset again here with the new frame number
+        framenum = framenum % (cfg->intra_period + 1);
+        state->frame->gop_offset = (framenum + cfg->gop_len) % cfg->gop_len;
+        int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
+        state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
+        // This should not be an irap picture in closed GOP
+        state->frame->is_irap = false;
+      }
+    } else { // Open GOP
+      // Calculate POC according to the global frame counter and GOP structure
+      int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
+      state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
+    }
+    
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else if (cfg->intra_period > 0) {
     state->frame->poc = state->frame->num % cfg->intra_period;
@@ -1197,9 +1216,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   // Check whether the frame is a keyframe or not.
-  if (state->frame->num == 0) {
+  if (state->frame->num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
-  } else {
+  } else if(cfg->open_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
       cfg->intra_period > 0 &&
       (state->frame->poc % cfg->intra_period) == 0;
@@ -1213,7 +1232,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     if (state->frame->num == 0 ||
         cfg->intra_period == 1 ||
         cfg->gop_len == 0 ||
-        cfg->gop_lowdelay)
+        cfg->gop_lowdelay ||
+        !cfg->open_gop) // Closed GOP uses IDR pictures
     {
       state->frame->pictype = KVZ_NAL_IDR_W_RADL;
     } else {

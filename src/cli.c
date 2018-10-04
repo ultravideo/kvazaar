@@ -131,6 +131,8 @@ static const struct option long_options[] = {
   { "me-steps",           required_argument, NULL, 0 },
   { "fast-residual-cost", required_argument, NULL, 0 },
   { "set-qp-in-cu",             no_argument, NULL, 0 },
+  { "open-gop",                 no_argument, NULL, 0 },
+  { "no-open-gop",              no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -395,6 +397,7 @@ void print_help(void)
     "                                   - 8: B-frame pyramid of length 8\n"
     "                                   - lp-<string>: Low-delay P-frame GOP\n"
     "                                     (e.g. lp-g8d4t2, see README)\n"
+    "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
     "      --bitrate <integer>    : Target bitrate [0]\n"
     "                                   - 0: Disable rate control.\n"

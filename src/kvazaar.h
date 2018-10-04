@@ -372,6 +372,9 @@ typedef struct kvz_config
   /** \brief Set QP at CU level keeping pic_init_qp_minus26 in PPS zero */
   int8_t set_qp_in_cu;
 
+  /** \brief Flag to enable/disable open GOP configuration */
+  int8_t open_gop;
+
 } kvz_config;
 
 /**
