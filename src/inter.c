@@ -1078,8 +1078,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // ***********************************************
   // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
   bool is_cur_ref_long_term = state->frame->ref->image_info[current_ref].is_long_term;
-  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[ state->frame->ref->ref_LXs[colocated_ref]
-          [col_list][colocated->inter.mv_ref[col_list]]].is_long_term; 
+  bool is_col_ref_long_term = state->frame->ref->images[colocated_ref]->picture_info[state->frame->ref->ref_LXs[colocated_ref][col_list][colocated->inter.mv_ref[col_list]]].is_long_term; 
 
   if (is_cur_ref_long_term != is_col_ref_long_term) {
     return false;
@@ -1125,8 +1124,8 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
     if (scaling) {
       // ***********************************************
       // Modified for SHVC. Not scalability specific. This is how longtermref scaling is handeled in (S)HM
-      bool is_cur_ref_long_term = state->frame->ref->image_info[cur_cu->inter.mv_ref[reflist]].is_long_term ? true : false;
-      bool is_cand_ref_long_term = state->frame->ref->image_info[cand->inter.mv_ref[cand_list]].is_long_term ? true : false;
+      bool is_cur_ref_long_term = state->frame->ref->image_info[state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]]].is_long_term ? true : false;
+      bool is_cand_ref_long_term = state->frame->ref->image_info[state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]]].is_long_term ? true : false;
       if (is_cur_ref_long_term == is_cand_ref_long_term) {
         mv_cand_out[0] = cand->inter.mv[cand_list][0];
         mv_cand_out[1] = cand->inter.mv[cand_list][1];
@@ -1480,11 +1479,14 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     int ref_negative = 0;
     int ref_positive = 0;
     for (j = 0; j < state->frame->ref->used_size; j++) {
-      if (state->frame->ref->pocs[j] < state->frame->poc) {
+      //*********************************************
+      //For scalable extension. Add ILR to ref_neg
+      if (state->frame->ref->pocs[j] <= state->frame->poc) {
         ref_negative++;
       } else {
         ref_positive++;
       }
+      //*********************************************
     }
     num_ref = MIN(ref_negative, ref_positive);
   }

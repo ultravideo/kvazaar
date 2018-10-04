@@ -2680,7 +2680,7 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
     if (state->frame->ref->pocs[i] <= state->frame->poc) {
       state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = i;
       state->frame->ref_LX_size[0] += 1;
-      if (l1_negative_refs && state->frame->ref->pocs[i] != state->frame->poc) {
+      if (l1_negative_refs) {
         state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = i;
         state->frame->ref_LX_size[1] += 1;
       }
