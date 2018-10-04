@@ -1784,8 +1784,8 @@ int kvz_config_validate(const kvz_config *const cfg)
   {
     fprintf(stderr,
             "Input error: intra period (%d) not a multiple of B-gop length (%d)\n",
-            cfg->intra_period,
-            cfg->gop_len);
+            cfg->shared == NULL ? cfg->intra_period : cfg->shared->intra_period,
+            cfg->shared == NULL ? cfg->gop_len : cfg->shared->gop_len);
     error = 1;
   }
   
