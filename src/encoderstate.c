@@ -1181,6 +1181,11 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->height
   );
 
+  // Use this flag to handle closed gop irap picture selection.
+  // If set to true, irap is already set and we avoid
+  // setting it based on the intra period
+  bool is_closed_normal_gop = false;
+
   // Set POC.
   if (state->frame->num == 0) {
     state->frame->poc = 0;
@@ -1190,7 +1195,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     // Handle closed GOP
     // Closed GOP structure has an extra IDR between the GOPs
     if (cfg->intra_period > 0 && !cfg->open_gop) {
-      if (((state->frame->num - 1) % (cfg->intra_period + 1)) == cfg->intra_period) {
+      is_closed_normal_gop = true;
+      if (framenum % (cfg->intra_period + 1) == cfg->intra_period) {
         // Insert IDR before each new GOP after intra period in closed GOP configuration
         state->frame->poc = 0;
       } else {
@@ -1218,7 +1224,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   // Check whether the frame is a keyframe or not.
   if (state->frame->num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
-  } else if(cfg->open_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
+  } else if(!is_closed_normal_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
       cfg->intra_period > 0 &&
       (state->frame->poc % cfg->intra_period) == 0;
