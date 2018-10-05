@@ -13,8 +13,8 @@ valgrind_test 264x130 10 $common_args --gop=8 -p1 --owf=4
 valgrind_test 264x130 10 $common_args --gop=lp-g4d3t1 -p5 --owf=4
 valgrind_test 264x130 10 $common_args --gop=8 -p8 --owf=4 --no-open-gop
 # Do more extensive tests in a private gitlab CI runner
-[ ! -z "$GITLAB_CI" ] && valgrind_test 264x130 20 $common_args --gop=8 -p8 --owf=0 --no-open-gop
-[ ! -z "$GITLAB_CI" ] && valgrind_test 264x130 40 $common_args --gop=8 -p32 --owf=4 --no-open-gop
-[ ! -z "$GITLAB_CI" ] && valgrind_test 264x130 70 $common_args --gop=8 -p64 --owf=4 --no-open-gop
-[ ! -z "$GITLAB_CI" ] && valgrind_test 264x130 50 $common_args --gop=8 -p40 --owf=4 --no-open-gop
-[ ! -z "$GITLAB_CI" ] && valgrind_test 264x130 10 $common_args --gop=8 -p8 --owf=0 --no-open-gop --bipred
+[ ! -z ${GITLAB_CI+x} ] && valgrind_test 264x130 20 $common_args --gop=8 -p8 --owf=0 --no-open-gop
+[ ! -z ${GITLAB_CI+x} ] && valgrind_test 264x130 40 $common_args --gop=8 -p32 --owf=4 --no-open-gop
+[ ! -z ${GITLAB_CI+x} ] && valgrind_test 264x130 70 $common_args --gop=8 -p64 --owf=4 --no-open-gop
+[ ! -z ${GITLAB_CI+x} ] && valgrind_test 264x130 50 $common_args --gop=8 -p40 --owf=4 --no-open-gop
+[ ! -z ${GITLAB_CI+x} ] && valgrind_test 264x130 10 $common_args --gop=8 -p8 --owf=0 --no-open-gop --bipred
