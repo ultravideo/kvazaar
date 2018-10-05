@@ -2867,7 +2867,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   const kvz_config * const cfg = &state->encoder_control->cfg;
 
   encoder_set_source_picture(state, frame);
-
+  
   assert(!state->tile->frame->cu_array);
   state->tile->frame->cu_array = kvz_cu_array_alloc(
       state->tile->frame->width,

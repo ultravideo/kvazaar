@@ -265,18 +265,26 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
   memset(info->ref_list[0], 0, 16 * sizeof(int));
   memset(info->ref_list[1], 0, 16 * sizeof(int));
 
+  // ***********************************************
+  // Modified for SHVC.
+  
   for (size_t i = 0; i < state->frame->ref_LX_size[0]; i++) {
+    if (!state->local_rps->is_used[state->frame->ref_LX[0][i]]) continue;
+
     info->ref_list[0][i] = state->frame->ref->pocs[state->frame->ref_LX[0][i]];
+    info->ref_list_len[0]++;
   }
 
   for (size_t i = 0; i < state->frame->ref_LX_size[1]; i++) {
+    if(!state->local_rps->is_used[state->frame->ref_LX[1][i]]) continue;
+
     info->ref_list[1][i] = state->frame->ref->pocs[state->frame->ref_LX[1][i]];
+    info->ref_list_len[1]++;
   }
 
-  info->ref_list_len[0] = state->frame->ref_LX_size[0];
-  info->ref_list_len[1] = state->frame->ref_LX_size[1];
-  // ***********************************************
-  // Modified for SHVC.
+  info->ref_list_len[0] = state->local_rps->num_ref_idx_LX_active[0]; //state->frame->ref_LX_size[0];
+  info->ref_list_len[1] = state->local_rps->num_ref_idx_LX_active[1]; //state->frame->ref_LX_size[1];
+
   info->lid = state->encoder_control->layer.layer_id;
   info->tid = state->encoder_control->cfg.gop[state->frame->gop_offset].tId;
   // ***********************************************
