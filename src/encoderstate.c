@@ -1200,9 +1200,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         // Insert IDR before each new GOP after intra period in closed GOP configuration
         state->frame->poc = 0;
       } else {
-        // Calculate gop_offset again here with the new frame number
+        // Calculate frame number again and use that for the POC
         framenum = framenum % (cfg->intra_period + 1);
-        state->frame->gop_offset = (framenum + cfg->gop_len) % cfg->gop_len;
         int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
         state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
         // This should not be an irap picture in closed GOP
