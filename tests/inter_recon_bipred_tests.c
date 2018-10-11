@@ -32,9 +32,9 @@ static lcu_t lcu1;
 
 int temp1, temp2, temp3, temp4;
 
-int16_t mv_param[2][2] = { { 7,7 },{ 7,7 } };
-int width = 8;
-int height = 8;
+int16_t mv_param[2][2] = { { 3,3 },{ 3,3 } };
+int width = 16;
+int height = 16;
 int xpos = 0;
 int ypos = 0;
 
@@ -125,27 +125,10 @@ TEST test_inter_recon_bipred()
 	memcpy(result.rec.y, lcu1.rec.y, sizeof(kvz_pixel) * 64 * 64);
 	memcpy(result.rec.u, lcu1.rec.u, sizeof(kvz_pixel) * 32 * 32);
 	memcpy(result.rec.v, lcu1.rec.v, sizeof(kvz_pixel) * 32 * 32);
- /*
- for (temp_y = 0; temp_y < height; ++temp_y) {
-  int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-  for (temp_x = 0; temp_x < width; temp_x += 1) {
-   int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-   printf("%d ", expected_test_result.rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
-  }
- }
- printf("\n");
- /*
- for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
-  int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
-  for (temp_x = 0; temp_x < width >> 1; ++temp_x) {
-   int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
-   printf("%d ", expected_test_result.rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]);
-  }
- }
- printf("\n");*/
+
 	
 	kvz_inter_recon_bipred_blend(hi_prec_luma_rec0, hi_prec_luma_rec1, hi_prec_chroma_rec0, hi_prec_chroma_rec1, width, height, xpos, ypos, high_precision_rec0, high_precision_rec1, &result, temp_lcu_y, temp_lcu_u, temp_lcu_v); 
- /*
+ 
  for (temp_y = 0; temp_y < height; ++temp_y) {
   int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
   for (temp_x = 0; temp_x < width; temp_x += 1) {
@@ -154,8 +137,8 @@ TEST test_inter_recon_bipred()
   }
  }
  printf("\n");
- */
-
+ 
+ /*
  for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
   int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
   for (temp_x = 0; temp_x < width >> 1; ++temp_x) {
@@ -164,7 +147,7 @@ TEST test_inter_recon_bipred()
   }
  }
  printf("\n");
- 
+ */
 
 	for (temp_y = 0; temp_y < height; ++temp_y) {
 		int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
