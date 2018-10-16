@@ -190,6 +190,40 @@ static void lcu_set_coeff(lcu_t *lcu, int x_local, int y_local, int width, cu_in
 }
 
 
+//Calculates cost for all zero coeffs
+static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree, const int x, const int y,
+  const int depth)
+{
+  int x_local = SUB_SCU(x);
+  int y_local = SUB_SCU(y);
+  int cu_width = LCU_WIDTH >> depth;
+  lcu_t *const lcu = &work_tree[depth];
+
+  const int luma_index = y_local * LCU_WIDTH + x_local;
+  const int chroma_index = (y_local / 2) * LCU_WIDTH_C + (x_local / 2);
+
+  double ssd = 0.0;
+  ssd += LUMA_MULT * kvz_pixels_calc_ssd(
+    &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
+    LCU_WIDTH, LCU_WIDTH, cu_width
+    );
+  if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+      &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
+      LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
+      );
+    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+      &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
+      LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
+      );
+  }
+  // Save the pixels at a lower level of the working tree.
+  copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1]);
+
+  return ssd;
+}
+
+
 /**
 * Calculate RD cost for a Coding Unit.
 * \return Cost of block
@@ -544,27 +578,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       kvz_inter_recon_cu(state, lcu, x, y, cu_width);
 
       if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
-        const int luma_index   = y_local * LCU_WIDTH + x_local;
-        const int chroma_index = (y_local / 2) * LCU_WIDTH_C + (x_local / 2);
+        //Calculate cost for zero coeffs
+        inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
 
-        double ssd = 0.0;
-        ssd += LUMA_MULT * kvz_pixels_calc_ssd(
-          &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
-          LCU_WIDTH, LCU_WIDTH, cu_width
-        );
-        ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
-          &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
-          LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
-        );
-        ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
-          &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
-          LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
-        );
-
-        inter_zero_coeff_cost = ssd + inter_bitcost * state->lambda;
-
-        // Save the pixels at a lower level of the working tree.
-        copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1]);
       }
 
       const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
