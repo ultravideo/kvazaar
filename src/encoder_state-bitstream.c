@@ -1847,8 +1847,9 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
         // Always use L0 for prediction
         WRITE_U(stream, 1, 1, "collocated_from_l0_flag");
       }
-      
-      if (ref_negative + encoder->cfg.ILR_frames > 1) {
+
+      int num_ref_idx_l0 = override_flag ? state->local_rps->num_ref_idx_LX_active[0] : ref_negative + encoder->cfg.ILR_frames;
+      if ( num_ref_idx_l0 > 1) {
         // Use first reference from L0
         // ToDo: use better reference
         WRITE_UE(stream, 0, "collocated_ref_idx");
