@@ -913,12 +913,11 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
   int shift = 15 - KVZ_BIT_DEPTH;
   int offset = 1 << (shift - 1);
   int8_t shift_left = 14 - KVZ_BIT_DEPTH;
-  __m256i temp_epi32_y, temp_epi8, temp_y_epi32, sample0_epi32, sample1_epi32, temp_epi16;
+  __m256i temp_epi8, temp_y_epi32, sample0_epi32, sample1_epi32, temp_epi16;
   int32_t * pointer = 0;
   __m256i offset_epi32 = _mm256_set1_epi32(offset);
   
   for (int temp_y = 0; temp_y < height; ++temp_y) {
-   temp_epi32_y = _mm256_setzero_si256();
 
    y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
 
