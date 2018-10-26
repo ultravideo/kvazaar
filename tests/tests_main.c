@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 
   RUN_SUITE(mv_cand_tests);
 
+  // Doesn't work in git
   //RUN_SUITE(inter_recon_bipred_tests);
 
   GREATEST_MAIN_END();

@@ -913,36 +913,17 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
   int shift = 15 - KVZ_BIT_DEPTH;
   int offset = 1 << (shift - 1);
   int8_t shift_left = 14 - KVZ_BIT_DEPTH;
-
   __m256i temp_epi32_y, temp_epi8, temp_y_epi32, sample0_epi32, sample1_epi32, temp_epi16;
-
   int32_t * pointer = 0;
-
   __m256i offset_epi32 = _mm256_set1_epi32(offset);
-  /*
-  printf("%d ", hi_prec_luma_rec0);
-  for (int temp_y = 0; temp_y < height; ++temp_y) {
-   int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-   for (int temp_x = 0; temp_x < width; ++temp_x) {
-    int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-    int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-    int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-    uint8_t luku = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
-    lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = luku;
-   }
-  }
-  */
   
   for (int temp_y = 0; temp_y < height; ++temp_y) {
    temp_epi32_y = _mm256_setzero_si256();
 
-
    y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-
 
    for (int temp_x = 0; temp_x < width; temp_x += 8) {
     x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-
 
     switch (width)
     {
@@ -950,11 +931,8 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
     case 4:
 
      // Load total of 4 elements from memory to vector
-
      sample0_epi32 = hi_prec_luma_rec0 ? _mm256_cvtepi16_epi32(_mm_loadl_epi64((__m128i*) &(high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu]))) :
       _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_cvtsi32_si128(*(int32_t*)&(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu]))), 14 - KVZ_BIT_DEPTH);
-
-
 
      sample1_epi32 = hi_prec_luma_rec1 ? _mm256_cvtepu16_epi32(_mm_loadl_epi64((__m128i*) &(high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu]))) :
       _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_cvtsi32_si128(*(int32_t*) &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]))), 14 - KVZ_BIT_DEPTH);
@@ -962,9 +940,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      // (sample1 + sample2 + offset)>>shift 
      temp_y_epi32 = _mm256_add_epi32(sample0_epi32, sample1_epi32);
-
      temp_y_epi32 = _mm256_add_epi32(temp_y_epi32, offset_epi32);
-
      temp_y_epi32 = _mm256_srai_epi32(temp_y_epi32, shift);
 
      // Pack the bits from 32-bit to 8-bit
@@ -988,9 +964,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      // (sample1 + sample2 + offset)>>shift 
      temp_y_epi32 = _mm256_add_epi32(sample0_epi32, sample1_epi32);
-
      temp_y_epi32 = _mm256_add_epi32(temp_y_epi32, offset_epi32);
-
      temp_y_epi32 = _mm256_srai_epi32(temp_y_epi32, shift);
 
      // Pack the bits from 32-bit to 8-bit
@@ -1010,12 +984,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
   __m256i sample0_epi16, sample1_epi16;
   int temp_uv = 0;
-
   int start_point_uv = 0;
-
   __m256i temp_u_epi16 = _mm256_setzero_si256();
   __m256i temp_v_epi16 = _mm256_setzero_si256();
-
   __m256i offset_epi16 = _mm256_set1_epi16(offset);
   __m256i temp_epi16_u = _mm256_setzero_si256();
   __m256i temp_epi16_v = _mm256_setzero_si256();
@@ -1028,6 +999,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
     case 8:
 
+     // Load 4 pixels to vector
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_castsi128_si256(_mm_loadl_epi64((__m128i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_cvtsi32_si128(*(int32_t*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
@@ -1035,11 +1007,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_cvtsi32_si128(*(int32_t*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-
-     temp_u_epi16 = _mm256_adds_epi16(temp_u_epi16, offset_epi16);
-
-     temp_u_epi16 = _mm256_srli_epi16(temp_u_epi16, shift);
+     temp_u_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_u_epi16 = _mm256_add_epi16(temp_u_epi16, offset_epi16);
+     temp_u_epi16 = _mm256_srai_epi16(temp_u_epi16, shift);
 
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_castsi128_si256(_mm_loadu_si128((__m128i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
@@ -1049,11 +1019,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_v_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-
-     temp_v_epi16 = _mm256_adds_epi16(temp_v_epi16, offset_epi16);
-
-     temp_v_epi16 = _mm256_srli_epi16(temp_v_epi16, shift);
+     temp_v_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
+     temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
      temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
@@ -1069,6 +1037,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
     case 16:
 
+     // Load 8 pixels to vector
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_castsi128_si256(_mm_loadu_si128((__m128i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
@@ -1076,11 +1045,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-
-     temp_u_epi16 = _mm256_adds_epi16(temp_u_epi16, offset_epi16);
-
-     temp_u_epi16 = _mm256_srli_epi16(temp_u_epi16, shift);
+     temp_u_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_u_epi16 = _mm256_add_epi16(temp_u_epi16, offset_epi16);
+     temp_u_epi16 = _mm256_srai_epi16(temp_u_epi16, shift);
 
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_castsi128_si256(_mm_loadu_si128((__m128i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
@@ -1090,17 +1057,14 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_v_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-
-     temp_v_epi16 = _mm256_adds_epi16(temp_v_epi16, offset_epi16);
-
-     temp_v_epi16 = _mm256_srli_epi16(temp_v_epi16, shift);
+     temp_v_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
+     temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
      temp_epi8 = _mm256_packus_epi16(temp_u_epi16, temp_u_epi16);
 
      // Store 64-bit integer into memory
      _mm_storel_epi64((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
 
      temp_epi8 = _mm256_packus_epi16(temp_v_epi16, temp_v_epi16);
 
@@ -1111,6 +1075,7 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
     case 32:
 
+     // Load 16 pixels to vector
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
@@ -1118,11 +1083,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-
-     temp_u_epi16 = _mm256_adds_epi16(temp_u_epi16, offset_epi16);
-
-     temp_u_epi16 = _mm256_srli_epi16(temp_u_epi16, shift);
+     temp_u_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_u_epi16 = _mm256_add_epi16(temp_u_epi16, offset_epi16);
+     temp_u_epi16 = _mm256_srai_epi16(temp_u_epi16, shift);
 
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_castsi128_si256(_mm_loadu_si128((__m128i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
@@ -1131,11 +1094,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_v_epi16 = _mm256_adds_epu16(sample0_epi16, sample1_epi16);
-
-     temp_v_epi16 = _mm256_adds_epu16(temp_v_epi16, offset_epi16);
-
-     temp_v_epi16 = _mm256_srli_epi16(temp_v_epi16, shift);
+     temp_v_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
+     temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
      temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_u_epi16, temp_u_epi16), _MM_SHUFFLE(3, 1, 2, 0));
      _mm_storeu_si128((__m128i*)&(lcu->rec.u[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
@@ -1154,9 +1115,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_u_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-     temp_u_epi16 = _mm256_adds_epi16(temp_u_epi16, offset_epi16);
-     temp_u_epi16 = _mm256_srli_epi16(temp_u_epi16, shift);
+     temp_u_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_u_epi16 = _mm256_add_epi16(temp_u_epi16, offset_epi16);
+     temp_u_epi16 = _mm256_srai_epi16(temp_u_epi16, shift);
 
      sample0_epi16 = hi_prec_chroma_rec0 ? _mm256_loadu_si256((__m256i*) &(high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu])) :
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
@@ -1165,9 +1126,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
       _mm256_slli_epi16(_mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*) &(lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), shift_left);
 
      // (sample1 + sample2 + offset)>>shift 
-     temp_v_epi16 = _mm256_adds_epi16(sample0_epi16, sample1_epi16);
-     temp_v_epi16 = _mm256_adds_epi16(temp_v_epi16, offset_epi16);
-     temp_v_epi16 = _mm256_srli_epi16(temp_v_epi16, shift);
+     temp_v_epi16 = _mm256_add_epi16(sample0_epi16, sample1_epi16);
+     temp_v_epi16 = _mm256_add_epi16(temp_v_epi16, offset_epi16);
+     temp_v_epi16 = _mm256_srai_epi16(temp_v_epi16, shift);
 
      if (temp_uv == 0) {
 
@@ -1183,11 +1144,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
 
      else {
       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_u, temp_u_epi16), _MM_SHUFFLE(3, 1, 2, 0));
-
       _mm256_storeu_si256((__m256i*)&(lcu->rec.u[start_point_uv]), temp_epi8);
 
       temp_epi8 = _mm256_permute4x64_epi64(_mm256_packus_epi16(temp_epi16_v, temp_v_epi16), _MM_SHUFFLE(3, 1, 2, 0));
-
       _mm256_storeu_si256((__m256i*)&(lcu->rec.v[start_point_uv]), temp_epi8);
 
       temp_uv = 0;
