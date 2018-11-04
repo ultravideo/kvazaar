@@ -51,8 +51,6 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
 
- #define FILTER_SIZE_Y 8 //Luma filter size
-
   // Fractional luma 1/4-pel
   kvz_extended_block src = {0, 0, 0, 0};
 
@@ -66,7 +64,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
                          ref->y,
                          ref->width,
                          ref->height,
-                         FILTER_SIZE_Y,
+                         KVZ_LUMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src);
@@ -75,7 +73,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
                                      src.stride,
                                      block_width,
                                      block_height,
-                                     lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH),
+                                     lcu->rec.y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
                                      LCU_WIDTH,
                                      mv_frac_x,
                                      mv_frac_y,
@@ -96,8 +94,6 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
 
-#define FILTER_SIZE_Y 8 //Luma filter size
-
   // Fractional luma 1/4-pel
   kvz_extended_block src = { 0, 0, 0, 0 };
 
@@ -111,7 +107,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
                          ref->y,
                          ref->width,
                          ref->height,
-                         FILTER_SIZE_Y,
+                         KVZ_LUMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src);
@@ -120,7 +116,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
                                            src.stride,
                                            block_width,
                                            block_height,
-                                           hi_prec_out->y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH),
+                                           hi_prec_out->y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
                                            LCU_WIDTH,
                                            mv_frac_x,
                                            mv_frac_y,
@@ -147,8 +143,6 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
   block_width >>= 1;
   block_height >>= 1;
 
-#define FILTER_SIZE_C 4 //Chroma filter size
-
   // Fractional chroma 1/8-pel
   kvz_extended_block src_u = { 0, 0, 0, 0 };
   kvz_extended_block src_v = { 0, 0, 0, 0 };
@@ -162,7 +156,7 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
                          ref->u,
                          ref->width >> 1,
                          ref->height >> 1,
-                         FILTER_SIZE_C,
+                         KVZ_CHROMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src_u);
@@ -178,12 +172,12 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
                          ref->v,
                          ref->width >> 1,
                          ref->height >> 1,
-                         FILTER_SIZE_C,
+                         KVZ_CHROMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src_v);
   kvz_sample_octpel_chroma(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
-    block_height, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+    block_height, lcu->rec.v + (ypos  % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
   if (src_v.malloc_used) free(src_v.buffer);
@@ -207,8 +201,6 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
   block_width >>= 1;
   block_height >>= 1;
 
-#define FILTER_SIZE_C 4 //Chroma filter size
-
   // Fractional chroma 1/8-pel
   kvz_extended_block src_u = { 0, 0, 0, 0 };
   kvz_extended_block src_v = { 0, 0, 0, 0 };
@@ -223,7 +215,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          ref->u,
                          ref->width >> 1,
                          ref->height >> 1,
-                         FILTER_SIZE_C,
+                         KVZ_CHROMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src_u);
@@ -232,7 +224,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                                          src_u.stride,
                                          block_width,
                                          block_height,
-                                         hi_prec_out->u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
+                                         hi_prec_out->u + (ypos % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
                                          LCU_WIDTH_C,
                                          mv_frac_x,
                                          mv_frac_y,
@@ -248,7 +240,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          ref->v,
                          ref->width >> 1,
                          ref->height >> 1,
-                         FILTER_SIZE_C,
+                         KVZ_CHROMA_FILTER_TAPS,
                          block_width,
                          block_height,
                          &src_v);
@@ -257,7 +249,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                                          src_v.stride,
                                          block_width,
                                          block_height,
-                                         hi_prec_out->v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
+                                         hi_prec_out->v + (ypos  % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
                                          LCU_WIDTH_C,
                                          mv_frac_x,
                                          mv_frac_y,

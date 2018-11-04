@@ -213,7 +213,7 @@ unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
 }
 
 void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
-                                       const int strides[4],
+                                       const int stride,
                                        const kvz_pixel *orig,
                                        const int orig_stride,
                                        unsigned costs[4])
@@ -221,10 +221,10 @@ void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
   int32_t diff[4][4 * 4];
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
-      diff[0][x + y * 4] = orig[x + y * orig_stride] - preds[0][x + y * strides[0]];
-      diff[1][x + y * 4] = orig[x + y * orig_stride] - preds[1][x + y * strides[1]];
-      diff[2][x + y * 4] = orig[x + y * orig_stride] - preds[2][x + y * strides[2]];
-      diff[3][x + y * 4] = orig[x + y * orig_stride] - preds[3][x + y * strides[3]];
+      diff[0][x + y * 4] = orig[x + y * orig_stride] - preds[0][x + y * stride];
+      diff[1][x + y * 4] = orig[x + y * orig_stride] - preds[1][x + y * stride];
+      diff[2][x + y * 4] = orig[x + y * orig_stride] - preds[2][x + y * stride];
+      diff[3][x + y * 4] = orig[x + y * orig_stride] - preds[3][x + y * stride];
     }
   }
 
@@ -328,15 +328,15 @@ static unsigned satd_8x8_subblock_generic(const kvz_pixel * piOrg, const int32_t
 }
 
 static void satd_8x8_subblock_quad_generic(const kvz_pixel **preds,
-                                       const int *strides,
+                                       const int stride,
                                        const kvz_pixel *orig,
                                        const int orig_stride,
                                        unsigned *costs)
 {
-  costs[0] = satd_8x8_subblock_generic(orig, orig_stride, preds[0], strides[0]);
-  costs[1] = satd_8x8_subblock_generic(orig, orig_stride, preds[1], strides[1]);
-  costs[2] = satd_8x8_subblock_generic(orig, orig_stride, preds[2], strides[2]);
-  costs[3] = satd_8x8_subblock_generic(orig, orig_stride, preds[3], strides[3]);
+  costs[0] = satd_8x8_subblock_generic(orig, orig_stride, preds[0], stride);
+  costs[1] = satd_8x8_subblock_generic(orig, orig_stride, preds[1], stride);
+  costs[2] = satd_8x8_subblock_generic(orig, orig_stride, preds[2], stride);
+  costs[3] = satd_8x8_subblock_generic(orig, orig_stride, preds[3], stride);
 }
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
@@ -394,7 +394,7 @@ SATD_DUAL_NXN(64, kvz_pixel)
   static void satd_any_size_ ## suffix ( \
       int width, int height, \
       const kvz_pixel **preds, \
-      const int *strides, \
+      const int stride, \
       const kvz_pixel *orig, \
       const int orig_stride, \
       unsigned num_modes, \
@@ -408,7 +408,7 @@ SATD_DUAL_NXN(64, kvz_pixel)
     if (width % 8 != 0) { \
       /* Process the first column using 4x4 blocks. */ \
       for (int y = 0; y < height; y += 4) { \
-        kvz_satd_4x4_subblock_ ## suffix(preds, strides, orig, orig_stride, sums); \
+        kvz_satd_4x4_subblock_ ## suffix(preds, stride, orig, orig_stride, sums); \
             } \
       orig_ptr += 4; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
@@ -419,23 +419,23 @@ SATD_DUAL_NXN(64, kvz_pixel)
     if (height % 8 != 0) { \
       /* Process the first row using 4x4 blocks. */ \
       for (int x = 0; x < width; x += 4 ) { \
-        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs, strides, orig_ptr, orig_stride, sums); \
+        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
             } \
       orig_ptr += 4 * orig_stride; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
-        pred_ptrs[blk] += 4 * strides[blk]; \
+        pred_ptrs[blk] += 4 * stride; \
             }\
       height -= 4; \
         } \
     /* The rest can now be processed with 8x8 blocks. */ \
     for (int y = 0; y < height; y += 8) { \
       orig_ptr = &orig[y * orig_stride]; \
-      pred_ptrs[0] = &preds[0][y * strides[0]]; \
-      pred_ptrs[1] = &preds[1][y * strides[1]]; \
-      pred_ptrs[2] = &preds[2][y * strides[2]]; \
-      pred_ptrs[3] = &preds[3][y * strides[3]]; \
+      pred_ptrs[0] = &preds[0][y * stride]; \
+      pred_ptrs[1] = &preds[1][y * stride]; \
+      pred_ptrs[2] = &preds[2][y * stride]; \
+      pred_ptrs[3] = &preds[3][y * stride]; \
       for (int x = 0; x < width; x += 8) { \
-        satd_8x8_subblock_ ## suffix(pred_ptrs, strides, orig_ptr, orig_stride, sums); \
+        satd_8x8_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
         orig_ptr += 8; \
         pred_ptrs[0] += 8; \
         pred_ptrs[1] += 8; \

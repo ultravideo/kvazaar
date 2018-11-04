@@ -108,7 +108,7 @@ typedef unsigned (cost_pixel_any_size_func)(
     const kvz_pixel *block2, int stride2
 );
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixel *orig, unsigned num_modes, unsigned *costs_out);
-typedef void (cost_pixel_any_size_multi_func)(int width, int height, const kvz_pixel **preds, const int *strides, const kvz_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
+typedef void (cost_pixel_any_size_multi_func)(int width, int height, const kvz_pixel **preds, const int stride, const kvz_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
 
 typedef unsigned (pixels_calc_ssd_func)(const kvz_pixel *const ref, const kvz_pixel *const rec, const int ref_stride, const int rec_stride, const int width);
 
