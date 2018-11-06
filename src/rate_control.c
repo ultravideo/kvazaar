@@ -79,8 +79,19 @@ static double gop_allocate_bits(encoder_state_t * const state)
   int pictures_coded = MAX(0, state->frame->num - encoder->cfg.owf);
 
   int gop_offset = (state->frame->gop_offset - encoder->cfg.owf) % MAX(1, encoder->cfg.gop_len);
+
+  if(encoder->cfg.gop_lp_definition.d != 0 && encoder->cfg.gop_lp_definition.t != 0)
+  {
+    // With LP-GOP the bits coded is not always updated correctly so this is 
+    // a band-aid fix for getting a better bit allocation
+    uint64_t previous_bits = state->previous_encoder_state->frame->cur_pic_target_bits;
+    bits_coded = previous_bits > bits_coded ? 0 : bits_coded - previous_bits;
+    // Subtract number of pictures in the partially coded GOP.
+    pictures_coded -= gop_offset + 1;
+  }
+
   // Only take fully coded GOPs into account.
-  if (encoder->cfg.gop_len > 0 && gop_offset != encoder->cfg.gop_len - 1) {
+  else if (encoder->cfg.gop_len > 0 && gop_offset != encoder->cfg.gop_len - 1) {
     // Subtract number of bits in the partially coded GOP.
     bits_coded -= state->frame->cur_gop_bits_coded;
     // Subtract number of pictures in the partially coded GOP.
