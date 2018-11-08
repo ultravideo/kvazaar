@@ -40,6 +40,273 @@
 #include "tables.h"
 #include "transform.h"
 
+static INLINE int32_t reduce_mm256i(__m256i src)
+{
+  __m128i a = _mm256_extracti128_si256(src, 0);
+  __m128i b = _mm256_extracti128_si256(src, 1);
+
+  a = _mm_add_epi32(a, b);
+  b = _mm_shuffle_epi32(a, _MM_SHUFFLE(0, 1, 2, 3));
+
+  a = _mm_add_epi32(a, b);
+  b = _mm_shuffle_epi32(a, _MM_SHUFFLE(2, 3, 0, 1));
+
+  a = _mm_add_epi32(a, b);
+  return _mm_cvtsi128_si32(a);
+}
+
+static INLINE int32_t reduce_16x_i16(__m256i src)
+{
+  __m128i a = _mm256_extracti128_si256(src, 0);
+  __m128i b = _mm256_extracti128_si256(src, 1);
+  __m256i c = _mm256_cvtepi16_epi32(a);
+  __m256i d = _mm256_cvtepi16_epi32(b);
+
+  c = _mm256_add_epi32(c, d);
+  return reduce_mm256i(c);
+}
+
+// If ints is completely zero, returns 16 in *first and -1 in *last
+static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t *last)
+{
+  // Note that nonzero_bytes will always have both bytes set for a set word
+  // even if said word only had one of its bytes set, because we're doing 16
+  // bit wide comparisons. No big deal, just shift results to the right by one
+  // bit to have the results represent indexes of first set words, not bytes.
+  // Another note, it has to use right shift instead of division to preserve
+  // behavior on an all-zero vector (-1 / 2 == 0, but -1 >> 1 == -1)
+  const __m256i zero = _mm256_setzero_si256();
+
+  __m256i zeros = _mm256_cmpeq_epi16(ints, zero);
+  uint32_t nonzero_bytes = ~((uint32_t)_mm256_movemask_epi8(zeros));
+  *first = (    (int32_t)_tzcnt_u32(nonzero_bytes)) >> 1;
+  *last = (31 - (int32_t)_lzcnt_u32(nonzero_bytes)) >> 1;
+}
+
+// Rearranges a 16x32b double vector into a format suitable for a stable SIMD
+// max algorithm:
+// (abcd|efgh) (ijkl|mnop) => (aceg|ikmo) (bdfh|jlnp)
+static INLINE void rearrange_512(__m256i *hi, __m256i *lo)
+{
+  __m256i tmphi, tmplo;
+
+  tmphi = _mm256_shuffle_epi32(*hi, _MM_SHUFFLE(3, 1, 2, 0));
+  tmplo = _mm256_shuffle_epi32(*lo, _MM_SHUFFLE(3, 1, 2, 0));
+
+  tmphi = _mm256_permute4x64_epi64(tmphi, _MM_SHUFFLE(3, 1, 2, 0));
+  tmplo = _mm256_permute4x64_epi64(tmplo, _MM_SHUFFLE(3, 1, 2, 0));
+
+  *hi = _mm256_permute2x128_si256(tmplo, tmphi, 0x31);
+  *lo = _mm256_permute2x128_si256(tmplo, tmphi, 0x20);
+}
+
+static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
+    __m256i ns, __m256i changes,
+    int16_t *final_change, int32_t *min_pos)
+{
+  __m128i nslo, nshi, chlo, chhi;
+  __m256i pllo, plhi; // Payload
+  __m256i tmp1, tmp2;
+
+  nshi = _mm256_extracti128_si256(ns, 1);
+  nslo = _mm256_extracti128_si256(ns, 0);
+  chhi = _mm256_extracti128_si256(changes, 1);
+  chlo = _mm256_extracti128_si256(changes, 0);
+
+  // Interleave ns and lo into 32-bit variables and to two 256-bit wide vecs,
+  // to have the same data layout as in costs. Zero extend to 32b width, shift
+  // changes 16 bits to the left, and store them into the same vectors.
+  tmp1 = _mm256_cvtepu16_epi32(nslo);
+  tmp2 = _mm256_cvtepu16_epi32(chlo);
+  tmp2 = _mm256_bslli_epi128(tmp2, 2);
+  pllo = _mm256_or_si256(tmp1, tmp2);
+
+  tmp1 = _mm256_cvtepu16_epi32(nshi);
+  tmp2 = _mm256_cvtepu16_epi32(chhi);
+  tmp2 = _mm256_bslli_epi128(tmp2, 2);
+  plhi = _mm256_or_si256(tmp1, tmp2);
+
+  // Reorder to afford result stability (if multiple atoms tie for cheapest,
+  // rightmost ie. the highest is the wanted one)
+  rearrange_512(&costs_hi, &costs_lo);
+  rearrange_512(&plhi, &pllo);
+
+  // 0: pick hi, 1: pick lo (equality evaluates as 0)
+  __m256i cmpmask1 = _mm256_cmpgt_epi32(costs_hi, costs_lo);
+  __m256i cost1    = _mm256_blendv_epi8(costs_hi, costs_lo, cmpmask1);
+  __m256i pl1      = _mm256_blendv_epi8(plhi, pllo, cmpmask1);
+
+  __m256i cost2    = _mm256_shuffle_epi32(cost1, _MM_SHUFFLE(2, 3, 0, 1));
+  __m256i pl2      = _mm256_shuffle_epi32(pl1,   _MM_SHUFFLE(2, 3, 0, 1));
+
+  __m256i cmpmask2 = _mm256_cmpgt_epi32(cost2, cost1);
+  __m256i cost3    = _mm256_blendv_epi8(cost2, cost1, cmpmask2);
+  __m256i pl3      = _mm256_blendv_epi8(pl2,   pl1,   cmpmask2);
+
+  __m256i cost4    = _mm256_shuffle_epi32(cost3, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i pl4      = _mm256_shuffle_epi32(pl3,   _MM_SHUFFLE(1, 0, 3, 2));
+
+  __m256i cmpmask3 = _mm256_cmpgt_epi32(cost4, cost3);
+  __m256i cost5    = _mm256_blendv_epi8(cost4, cost3, cmpmask3);
+  __m256i pl5      = _mm256_blendv_epi8(pl4,   pl3,   cmpmask3);
+
+  __m256i cost6    = _mm256_permute4x64_epi64(cost5, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i pl6      = _mm256_permute4x64_epi64(pl5,   _MM_SHUFFLE(1, 0, 3, 2));
+
+  __m256i cmpmask4 = _mm256_cmpgt_epi32(cost6, cost5);
+  __m256i pl7      = _mm256_blendv_epi8(pl6,   pl5,   cmpmask4);
+
+  __m128i res128 = _mm256_castsi256_si128(pl7);
+  uint32_t tmp = (uint32_t)_mm_extract_epi32(res128, 0);
+  uint16_t n = (uint16_t)(tmp & 0xffff);
+  uint16_t chng = (uint16_t)(tmp >> 16);
+
+  *final_change = (int16_t)chng;
+  *min_pos = (int32_t)n;
+}
+
+#define VEC_WIDTH 16
+#define SCAN_SET_SIZE 16
+#define LOG2_SCAN_SET_SIZE 4
+
+static INLINE int32_t hide_block_sign(__m256i coefs, const coeff_t * __restrict q_coef_reord, __m256i deltas_h, __m256i deltas_l, coeff_t * __restrict q_coef, const uint32_t * __restrict scan, int32_t subpos, int32_t last_cg)
+{
+  // Ensure that the block is 256 bit (32 byte) aligned
+  assert(subpos % (32 / sizeof(coeff_t)) == 0);
+  assert(((size_t)q_coef_reord) % 32 == 0);
+  assert(SCAN_SET_SIZE == 16);
+
+  __m256i q_coefs = _mm256_load_si256((__m256i *)(q_coef_reord + subpos));
+
+  int32_t first_nz_pos_in_cg, last_nz_pos_in_cg;
+  int32_t abssum = 0;
+
+  // Find first and last nonzero coeffs
+  get_first_last_nz_int16(q_coefs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
+
+  // Sum all kvz_quant coeffs between first and last
+  abssum = reduce_16x_i16(q_coefs);
+
+  if (last_nz_pos_in_cg >= 0 && last_cg == -1) {
+    last_cg = 1;
+  }
+
+  if (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4) {
+
+    uint32_t q_coef_signbits = _mm256_movemask_epi8(q_coefs);
+    int32_t signbit = (q_coef_signbits >> (2 * first_nz_pos_in_cg + 1)) & 0x1;
+
+    if (signbit != (abssum & 0x1)) { // compare signbit with sum_parity
+      int32_t min_pos = -1;
+      int16_t final_change = 0;
+
+      const int32_t mask_max = (last_cg == 1) ? last_nz_pos_in_cg : SCAN_SET_SIZE - 1;
+
+      const __m256i zero = _mm256_setzero_si256();
+      const __m256i ones = _mm256_set1_epi16(1);
+      const __m256i maxiters = _mm256_set1_epi16(mask_max);
+      const __m256i ff = _mm256_set1_epi8(0xff);
+
+      const __m256i fnpics = _mm256_set1_epi16((int16_t)first_nz_pos_in_cg);
+      const __m256i ns = _mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+
+      __m256i block_signbit = _mm256_set1_epi16(((int16_t)signbit) * -1);
+      __m256i coef_signbits = _mm256_cmpgt_epi16(zero, coefs);
+      __m256i signbits_equal_block = _mm256_cmpeq_epi16(coef_signbits, block_signbit);
+
+      __m256i q_coefs_zero = _mm256_cmpeq_epi16(q_coefs, zero);
+
+      __m256i dus_packed = _mm256_packs_epi32(deltas_l, deltas_h);
+      __m256i dus_ordered = _mm256_permute4x64_epi64(dus_packed, _MM_SHUFFLE(3, 1, 2, 0));
+      __m256i dus_positive = _mm256_cmpgt_epi16(dus_ordered, zero);
+
+      __m256i q_coef_abss = _mm256_abs_epi16(q_coefs);
+      __m256i q_coefs_plusminus_one = _mm256_cmpeq_epi16(q_coef_abss, ones);
+
+      __m256i eq_fnpics = _mm256_cmpeq_epi16(fnpics, ns);
+      __m256i lt_fnpics = _mm256_cmpgt_epi16(fnpics, ns);
+
+      __m256i maxcost_subcond1s = _mm256_and_si256(eq_fnpics, q_coefs_plusminus_one);
+      __m256i maxcost_subcond2s = _mm256_andnot_si256(signbits_equal_block, lt_fnpics);
+      __m256i elsecond1s_inv = _mm256_or_si256(dus_positive, maxcost_subcond1s);
+      __m256i elsecond1s = _mm256_andnot_si256(elsecond1s_inv, ff);
+
+      __m256i outside_maxiters = _mm256_cmpgt_epi16(ns, maxiters);
+
+      __m256i negdelta_cond1s = _mm256_andnot_si256(q_coefs_zero, dus_positive);
+      __m256i negdelta_cond2s = _mm256_andnot_si256(maxcost_subcond2s, q_coefs_zero);
+      __m256i negdelta_mask16s_part1 = _mm256_or_si256(negdelta_cond1s, negdelta_cond2s);
+      __m256i negdelta_mask16s = _mm256_andnot_si256(outside_maxiters, negdelta_mask16s_part1);
+
+      __m256i posdelta_mask16s_part1 = _mm256_andnot_si256(q_coefs_zero, elsecond1s);
+      __m256i posdelta_mask16s = _mm256_andnot_si256(outside_maxiters, posdelta_mask16s_part1);
+
+      __m256i maxcost_cond1_parts = _mm256_andnot_si256(dus_positive, maxcost_subcond1s);
+      __m256i maxcost_cond1s = _mm256_andnot_si256(q_coefs_zero, maxcost_cond1_parts);
+      __m256i maxcost_cond2s = _mm256_and_si256(q_coefs_zero, maxcost_subcond2s);
+      __m256i maxcost_mask16s_parts = _mm256_or_si256(maxcost_cond1s, maxcost_cond2s);
+      __m256i maxcost_mask16s = _mm256_or_si256(maxcost_mask16s_parts, outside_maxiters);
+
+      __m128i tmp_l, tmp_h;
+      tmp_l = _mm256_extracti128_si256(negdelta_mask16s, 0);
+      tmp_h = _mm256_extracti128_si256(negdelta_mask16s, 1);
+      __m256i negdelta_mask32s_l = _mm256_cvtepi16_epi32(tmp_l);
+      __m256i negdelta_mask32s_h = _mm256_cvtepi16_epi32(tmp_h);
+
+      tmp_l = _mm256_extracti128_si256(posdelta_mask16s, 0);
+      tmp_h = _mm256_extracti128_si256(posdelta_mask16s, 1);
+      __m256i posdelta_mask32s_l = _mm256_cvtepi16_epi32(tmp_l);
+      __m256i posdelta_mask32s_h = _mm256_cvtepi16_epi32(tmp_h);
+
+      tmp_l = _mm256_extracti128_si256(maxcost_mask16s, 0);
+      tmp_h = _mm256_extracti128_si256(maxcost_mask16s, 1);
+      __m256i maxcost_mask32s_l = _mm256_cvtepi16_epi32(tmp_l);
+      __m256i maxcost_mask32s_h = _mm256_cvtepi16_epi32(tmp_h);
+
+      // Output value generation
+      // cur_change_max: zero
+      // cur_change_negdelta: ff
+      // cur_change_posdelta: ones
+      __m256i costs_negdelta_h = _mm256_sub_epi32(zero, deltas_h);
+      __m256i costs_negdelta_l = _mm256_sub_epi32(zero, deltas_l);
+      // costs_posdelta_l and _h: deltas_l and _h
+      __m256i costs_max_lh = _mm256_set1_epi32(0x7fffffff);
+
+      __m256i change_neg = _mm256_and_si256(negdelta_mask16s, ones);
+      __m256i change_pos = _mm256_and_si256(posdelta_mask16s, ff);
+      __m256i change_max = _mm256_and_si256(maxcost_mask16s, zero);
+
+      __m256i cost_neg_l = _mm256_and_si256(negdelta_mask32s_l, costs_negdelta_l);
+      __m256i cost_neg_h = _mm256_and_si256(negdelta_mask32s_h, costs_negdelta_h);
+      __m256i cost_pos_l = _mm256_and_si256(posdelta_mask32s_l, deltas_l);
+      __m256i cost_pos_h = _mm256_and_si256(posdelta_mask32s_h, deltas_h);
+      __m256i cost_max_l = _mm256_and_si256(maxcost_mask32s_l, costs_max_lh);
+      __m256i cost_max_h = _mm256_and_si256(maxcost_mask32s_h, costs_max_lh);
+
+      __m256i changes = _mm256_or_si256(change_neg, _mm256_or_si256(change_pos, change_max));
+      __m256i costs_l = _mm256_or_si256(cost_neg_l, _mm256_or_si256(cost_pos_l, cost_max_l));
+      __m256i costs_h = _mm256_or_si256(cost_neg_h, _mm256_or_si256(cost_pos_h, cost_max_h));
+
+      get_cheapest_alternative(costs_h, costs_l, ns, changes, &final_change, &min_pos);
+
+      coeff_t cheapest_q = q_coef_reord[min_pos + subpos];
+      if (cheapest_q == 32767 || cheapest_q == -32768)
+        final_change = -1;
+
+      uint32_t coef_signs = _mm256_movemask_epi8(coef_signbits);
+      uint32_t cheapest_coef_sign_mask = (uint32_t)(1 << (2 * min_pos));
+
+      if (!(coef_signs & cheapest_coef_sign_mask))
+        q_coef[scan[min_pos + subpos]] += final_change;
+      else
+        q_coef[scan[min_pos + subpos]] -= final_change;
+    } // Hide
+  }
+  if (last_cg == 1)
+    last_cg = 0;
+
+  return last_cg;
+}
 
 /**
  * \brief quantize transformed coefficents
@@ -64,11 +331,12 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   assert(quant_coeff[0] <= (1 << 15) - 1 && quant_coeff[0] >= -(1 << 15)); //Assuming flat values to fit int16_t
 
   uint32_t ac_sum = 0;
+  int32_t last_cg = -1;
 
   __m256i v_ac_sum = _mm256_setzero_si256();
   __m256i v_quant_coeff = _mm256_set1_epi16(quant_coeff[0]);
 
-  for (int32_t n = 0; n < width * height; n += 16) {
+  for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
 
     __m256i v_level = _mm256_loadu_si256((__m256i*)&(coef[n]));
     __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
@@ -104,15 +372,23 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(0, 1, 0, 1)));
   ac_sum += _mm_cvtsi128_si32(temp);
 
-  if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
+  if (!encoder->cfg.signhide_enable || ac_sum < 2)
+    return;
 
-  int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
+  coeff_t coef_reord[LCU_WIDTH * LCU_WIDTH >> 2] ALIGNED(32);
+  coeff_t q_coef_reord[LCU_WIDTH * LCU_WIDTH >> 2] ALIGNED(32);
 
-  for (int32_t n = 0; n < width * height; n += 16) {
+  // Reorder coef and q_coef for sequential access
+  for (int32_t n = 0; n < width * height; n++) {
+    coef_reord[n] = coef[scan[n]];
+    q_coef_reord[n] = q_coef[scan[n]];
+  }
 
-    __m256i v_level = _mm256_loadu_si256((__m256i*)&(coef[n]));
+  assert(VEC_WIDTH == SCAN_SET_SIZE);
+  for (int32_t subpos = (width * height - 1) & (~(VEC_WIDTH - 1)); subpos >= 0; subpos -= VEC_WIDTH) {
 
-    v_level = _mm256_abs_epi16(v_level);
+    __m256i v_coef = _mm256_load_si256((__m256i *)(coef_reord + subpos));
+    __m256i v_level = _mm256_abs_epi16(v_coef);
     __m256i low_a = _mm256_unpacklo_epi16(v_level, _mm256_set1_epi16(0));
     __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_set1_epi16(0));
 
@@ -130,7 +406,6 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
 
     v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
 
-    __m256i v_coef = _mm256_loadu_si256((__m256i*)&(coef[n]));
     __m256i v_coef_a = _mm256_unpacklo_epi16(_mm256_abs_epi16(v_coef), _mm256_set1_epi16(0));
     __m256i v_coef_b = _mm256_unpackhi_epi16(_mm256_abs_epi16(v_coef), _mm256_set1_epi16(0));
     __m256i v_quant_coeff_a = _mm256_unpacklo_epi16(v_quant_coeff, _mm256_set1_epi16(0));
@@ -142,95 +417,15 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
     v_coef_a = _mm256_srai_epi32(v_coef_a, q_bits8);
     v_coef_b = _mm256_srai_epi32(v_coef_b, q_bits8);
     
-    _mm_storeu_si128((__m128i*)&(delta_u[n+0*4]), _mm256_castsi256_si128(v_coef_a));
-    _mm_storeu_si128((__m128i*)&(delta_u[n+2*4]), _mm256_extracti128_si256(v_coef_a, 1));
-    _mm_storeu_si128((__m128i*)&(delta_u[n+1*4]), _mm256_castsi256_si128(v_coef_b));
-    _mm_storeu_si128((__m128i*)&(delta_u[n+3*4]), _mm256_extracti128_si256(v_coef_b, 1));
+    __m256i deltas_h = _mm256_permute2x128_si256(v_coef_a, v_coef_b, 0x31);
+    __m256i deltas_l = _mm256_permute2x128_si256(v_coef_a, v_coef_b, 0x20);
+
+    last_cg = hide_block_sign(v_coef, q_coef_reord, deltas_h, deltas_l, q_coef, scan, subpos, last_cg);
   }
 
-  if (ac_sum >= 2) {
-#define SCAN_SET_SIZE 16
-#define LOG2_SCAN_SET_SIZE 4
-    int32_t n, last_cg = -1, abssum = 0, subset, subpos;
-    for (subset = (width*height - 1) >> LOG2_SCAN_SET_SIZE; subset >= 0; subset--) {
-      int32_t first_nz_pos_in_cg = SCAN_SET_SIZE, last_nz_pos_in_cg = -1;
-      subpos = subset << LOG2_SCAN_SET_SIZE;
-      abssum = 0;
-
-      // Find last coeff pos
-      for (n = SCAN_SET_SIZE - 1; n >= 0; n--)  {
-        if (q_coef[scan[n + subpos]])  {
-          last_nz_pos_in_cg = n;
-          break;
-        }
-      }
-
-      // First coeff pos
-      for (n = 0; n <SCAN_SET_SIZE; n++) {
-        if (q_coef[scan[n + subpos]]) {
-          first_nz_pos_in_cg = n;
-          break;
-        }
-      }
-
-      // Sum all kvz_quant coeffs between first and last
-      for (n = first_nz_pos_in_cg; n <= last_nz_pos_in_cg; n++) {
-        abssum += q_coef[scan[n + subpos]];
-      }
-
-      if (last_nz_pos_in_cg >= 0 && last_cg == -1) {
-        last_cg = 1;
-      }
-
-      if (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4) {
-        int32_t signbit = (q_coef[scan[subpos + first_nz_pos_in_cg]] > 0 ? 0 : 1);
-        if (signbit != (abssum & 0x1)) { // compare signbit with sum_parity
-          int32_t min_cost_inc = 0x7fffffff, min_pos = -1, cur_cost = 0x7fffffff;
-          int16_t final_change = 0, cur_change = 0;
-          for (n = (last_cg == 1 ? last_nz_pos_in_cg : SCAN_SET_SIZE - 1); n >= 0; n--) {
-            uint32_t blkPos = scan[n + subpos];
-            if (q_coef[blkPos] != 0) {
-              if (delta_u[blkPos] > 0) {
-                cur_cost = -delta_u[blkPos];
-                cur_change = 1;
-              }
-              else if (n == first_nz_pos_in_cg && abs(q_coef[blkPos]) == 1) {
-                cur_cost = 0x7fffffff;
-              }
-              else {
-                cur_cost = delta_u[blkPos];
-                cur_change = -1;
-              }
-            }
-            else if (n < first_nz_pos_in_cg && ((coef[blkPos] >= 0) ? 0 : 1) != signbit) {
-              cur_cost = 0x7fffffff;
-            }
-            else {
-              cur_cost = -delta_u[blkPos];
-              cur_change = 1;
-            }
-
-            if (cur_cost < min_cost_inc) {
-              min_cost_inc = cur_cost;
-              final_change = cur_change;
-              min_pos = blkPos;
-            }
-          } // CG loop
-
-          if (q_coef[min_pos] == 32767 || q_coef[min_pos] == -32768) {
-            final_change = -1;
-          }
-
-          if (coef[min_pos] >= 0) q_coef[min_pos] += final_change;
-          else q_coef[min_pos] -= final_change;
-        } // Hide
-      }
-      if (last_cg == 1) last_cg = 0;
-    }
-
+#undef VEC_WIDTH
 #undef SCAN_SET_SIZE
 #undef LOG2_SCAN_SET_SIZE
-  }
 }
 
 static INLINE __m128i get_residual_4x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
