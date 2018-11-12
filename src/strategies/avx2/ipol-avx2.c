@@ -360,10 +360,10 @@ static void kvz_four_tap_filter_ver_16bit_4x4_no_round_avx2(int8_t *filter, int1
   __m128i filtered01 = _mm_packs_epi32(sum0123, sum1234);
   __m128i filtered23 = _mm_packs_epi32(sum2345, sum3456);
 
-  *(int64_t*)&out[0 * out_stride] = _mm_cvtsi128_si64(filtered01);
-  *(int64_t*)&out[1 * out_stride] = _mm_extract_epi64(filtered01, 1);
-  *(int64_t*)&out[2 * out_stride] = _mm_cvtsi128_si64(filtered23);
-  *(int64_t*)&out[3 * out_stride] = _mm_extract_epi64(filtered23, 1);
+  _mm_storel_pi((__m64*)&out[0 * out_stride], _mm_castsi128_ps(filtered01));
+  _mm_storeh_pi((__m64*)&out[1 * out_stride], _mm_castsi128_ps(filtered01));
+  _mm_storel_pi((__m64*)&out[2 * out_stride], _mm_castsi128_ps(filtered23));
+  _mm_storeh_pi((__m64*)&out[3 * out_stride], _mm_castsi128_ps(filtered23));
 }
 
 INLINE static void filter_row_ver_16b_8x1_avx2(int16_t *data, int64_t stride, __m256i* taps, kvz_pixel * out, int64_t out_stride)
@@ -479,10 +479,10 @@ INLINE static void filter_row_ver_16b_8x1_avx2(int16_t *data, int64_t stride, __
   __m128i filtered04 = _mm256_castsi256_si128(filtered04_26);
   __m128i filtered26 = _mm256_extracti128_si256(filtered04_26, 1);
 
-  *(int64_t*)(out + 0 * out_stride) = _mm_extract_epi64(filtered04, 0);
-  *(int64_t*)(out + 2 * out_stride) = _mm_extract_epi64(filtered26, 0);
-  *(int64_t*)(out + 4 * out_stride) = _mm_extract_epi64(filtered04, 1);
-  *(int64_t*)(out + 6 * out_stride) = _mm_extract_epi64(filtered26, 1);
+  _mm_storel_pi((__m64*)&out[0 * out_stride], _mm_castsi128_ps(filtered04));
+  _mm_storel_pi((__m64*)&out[2 * out_stride], _mm_castsi128_ps(filtered26));
+  _mm_storeh_pi((__m64*)&out[4 * out_stride], _mm_castsi128_ps(filtered04));
+  _mm_storeh_pi((__m64*)&out[6 * out_stride], _mm_castsi128_ps(filtered26));
 }
 
 INLINE static void filter_row_ver_16b_8x1_no_round_avx2(int16_t *data, int64_t stride, __m256i *taps, int16_t *out, int64_t out_stride) {
