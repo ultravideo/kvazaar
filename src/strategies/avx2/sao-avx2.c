@@ -194,18 +194,6 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
   return sum;
 }
 
-/*
-// Mapping of edge_idx values to eo-classes.
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
-// Mapping relationships between a, b and c to eo_idx.
-static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-
-int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
-return sao_eo_idx_to_eo_category[eo_idx];
-}
-*/
 
 static INLINE void accum_count_eo_cat_avx2(__m256i*  __restrict v_diff_accum,
                                            __m256i* __restrict v_count,
@@ -242,35 +230,6 @@ static INLINE void accum_count_eo_cat_avx2_256(__m256i*  __restrict v_diff_accum
   accum_count_eo_cat_avx2(&(v_diff_accum[ EO_CAT ]), &(v_count[ EO_CAT ]), &V_CAT , &v_diff, EO_CAT);
 
 
-/*
-static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
-                                      const kvz_pixel *rec_data,
-                                      int eo_class,
-                                      int block_width,
-                                      int block_height,
-                                      int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
-{
-  int y, x;
-  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
-  // Arrays orig_data and rec_data are quarter size for chroma.
-
-  // Don't sample the edge pixels because this function doesn't have access to
-  // their neighbours.
-  for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 1; ++x) {
-      const kvz_pixel *c_data = &rec_data[y * block_width + x];
-      kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-      kvz_pixel c = c_data[0];
-      kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
-
-      int eo_cat = sao_calc_eo_cat(a, b, c);
-
-      cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
-      cat_sum_cnt[1][eo_cat] += 1;
-    }
-  }
-}*/
 
 static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
  const kvz_pixel *rec_data,
@@ -289,6 +248,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
  // Don't sample the edge pixels because this function doesn't have access to
  // their neighbours.
+
 
  __m128i temp_cat;
  for (y = 1; y < block_height - 1; ++y) {
@@ -386,23 +346,14 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
 }
 
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
- // Mapping relationships between a, b and c to eo_idx.
- static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
 
- int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
- return sao_eo_idx_to_eo_category[eo_idx];
-}
-
-static void sao_reconstruct_color_avx(const encoder_control_t * const encoder,
- const kvz_pixel *rec_data,
+static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
+ const kvz_pixel *rec_data, 
  kvz_pixel *new_rec_data,
  const sao_info_t *sao,
- int stride,
+ int stride, 
  int new_stride,
- int block_width,
+ int block_width, 
  int block_height,
  color_t color_i)
 {
@@ -412,127 +363,56 @@ static void sao_reconstruct_color_avx(const encoder_control_t * const encoder,
  if (sao->type == SAO_TYPE_BAND) {
   int offsets[1 << KVZ_BIT_DEPTH];
   kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
+
   for (int y = 0; y < block_height; ++y) {
-   for (int x = 0; x < block_width; ++x) {
-    new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
+   for (int temp_x = 0; temp_x < block_width; ++temp_x) {
+    new_rec_data[y * new_stride + temp_x] = offsets[rec_data[y * stride + temp_x]];
    }
+   
   }
  }
  else {
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
+
+  vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+  vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+  __m256i v_offset_v = load_5_offsets(sao->offsets + offset_v);
+
   for (int y = 0; y < block_height; ++y) {
-   for (int x = 0; x < block_width; ++x) {
-    vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-    vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+   for (int x = 0; x < block_width; x += 8) {
+
     const kvz_pixel *c_data = &rec_data[y * stride + x];
     kvz_pixel *new_data = &new_rec_data[y * new_stride + x];
-    kvz_pixel a = c_data[a_ofs.y * stride + a_ofs.x];
-    kvz_pixel c = c_data[0];
-    kvz_pixel b = c_data[b_ofs.y * stride + b_ofs.x];
+    const kvz_pixel* a_ptr = &c_data[a_ofs.y * stride + a_ofs.x];
+    const kvz_pixel* c_ptr = &c_data[0];
+    const kvz_pixel* b_ptr = &c_data[b_ofs.y * stride + b_ofs.x];
 
-    int eo_cat = sao_calc_eo_cat(a, b, c);
+    __m128i v_a = _mm_loadl_epi64((__m128i*)a_ptr);
+    __m128i v_b = _mm_loadl_epi64((__m128i*)b_ptr);
+    __m128i v_c = _mm_loadl_epi64((__m128i*)c_ptr);
 
-    printf("%d", eo_cat);
+    __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
 
-    new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
+    
+    __m256i v_new_data = _mm256_permutevar8x32_epi32(v_offset_v, v_cat);
+    v_new_data = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
+    __m128i v_new_data_128 = _mm_packus_epi32(_mm256_castsi256_si128(v_new_data), _mm256_extracti128_si256(v_new_data, 1));
+    v_new_data_128 = _mm_packus_epi16(v_new_data_128, v_new_data_128);
+
+    if ((block_width - x) >= 8) {
+     _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
+    }
+    else {
+
+     kvz_pixel arr[8];
+     _mm_storel_epi64((__m128i*)arr, v_new_data_128);
+     for (int i = 0; i < block_width - x; ++i) new_data[i] = arr[i];
+    }
+
    }
   }
  }
-}
-/*
-Does't work
-
-
-*/
-static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
-                                       const kvz_pixel *rec_data, kvz_pixel *new_rec_data,
-                                       const sao_info_t *sao,
-                                       int stride, int new_stride,
-                                       int block_width, int block_height,
-                                       color_t color_i)
-{
-  // Arrays orig_data and rec_data are quarter size for chroma.
-  int offset_v = color_i == COLOR_V ? 5 : 0;
-
-  if (sao->type == SAO_TYPE_BAND) {
-    int offsets[1 << KVZ_BIT_DEPTH];
-    kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
-    for (int y = 0; y < block_height; ++y) {
-      for (int x = 0; x < block_width; ++x) {
-        new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
-      }
-    }
-  } else {
-    // Don't sample the edge pixels because this function doesn't have access to
-    // their neighbours.
-
-   vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-   vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
-    for (int y = 0; y < block_height; ++y) {
-      for (int x = 0; x < block_width; x+=16) {
-
-        const kvz_pixel *c_data = &rec_data[y * stride + x];
-        kvz_pixel *new_data = &new_rec_data[y * new_stride + x];
-        const kvz_pixel* a_ptr = &c_data[a_ofs.y * stride + a_ofs.x];
-        const kvz_pixel* c_ptr = &c_data[0];
-        const kvz_pixel* b_ptr = &c_data[b_ofs.y * stride + b_ofs.x];
-
-        
-        /*
-        __m128i v_a = _mm_loadl_epi64((__m128i*)a_ptr);
-        __m128i v_b = _mm_loadl_epi64((__m128i*)b_ptr);
-        __m128i v_c = _mm_loadl_epi64((__m128i*)c_ptr);*/
-
-        __m128i v_a = _mm_loadu_si128((__m128i*)a_ptr);
-        __m128i v_b = _mm_loadu_si128((__m128i*)b_ptr);
-        __m128i v_c = _mm_loadu_si128((__m128i*)c_ptr);
-
-        __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c) );
-
-        __m128i temp_cat = sao_calc_eo_cat_avx2_256(&v_a, &v_b, &v_c);
-        
-        int8_t* test = (int8_t*)&temp_cat;
-        for (int i = 0; i < 16; i++) {
-         printf("%d", test[i]);
-        }
-
-        __m256i cat_lower = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 0)));
-        __m256i cat_upper = _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(_mm_extract_epi64(temp_cat, 1)));
-
-        __m256i v_offset_v = load_5_offsets(sao->offsets + offset_v);
-        __m256i v_new_data = _mm256_permutevar8x32_epi32(v_offset_v, cat_lower);
-        v_new_data = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
-
-        __m256i v_new_data_2 = _mm256_permutevar8x32_epi32(v_offset_v, cat_upper);
-        v_new_data_2 = _mm256_permutevar8x32_epi32(v_offset_v, cat_upper);
-        v_new_data_2 = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
-
-        __m256i v_new_data_256 = _mm256_packus_epi32(v_new_data, v_new_data_2);
-
-        v_new_data_256 = _mm256_packus_epi16(v_new_data_256, v_new_data_256);
-
-        __m128i v_new_data_128 = _mm256_castsi256_si128(v_new_data_256);
-        v_new_data_128 = _mm_shuffle_epi32(v_new_data_128, _MM_SHUFFLE(3,1,2,0));
-        
-
-        /*
-        __m128i v_new_data_128 = _mm_packus_epi32(_mm256_castsi256_si128(v_new_data), _mm256_extracti128_si256(v_new_data, 1));
-        v_new_data_128 = _mm_packus_epi16(v_new_data_128, v_new_data_128);*/
-        
-        if ((block_width - x) >= 8) {
-         _mm_storeu_si128((__m128i*)new_data, v_new_data_128);
-
-        } else {
-          
-          kvz_pixel arr[8];
-          _mm_storeu_si128((__m128i*)arr, v_new_data_128);
-          for (int i = 0; i < block_width - x; ++i) new_data[i] = arr[i];
-        }
-      
-      }
-    }
-  }
 }
 
 
