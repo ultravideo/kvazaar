@@ -706,9 +706,10 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
   //   1
   // 2 0 3
   //   4
-  static const vector2d_t small_hexbs[5] = {
+  static const vector2d_t small_hexbs[9] = {
       { 0, 0 },
-      { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }
+      { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 },
+      { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 }
   };
 
   info->best_cost = UINT32_MAX;
@@ -771,7 +772,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
   //mv.y += large_hexbs[best_index].y;
 
   // Do the final step of the search with a small pattern.
-  for (int i = 1; i < 5; ++i) {
+  for (int i = 1; i < 9; ++i) {
     check_mv_cost(info, mv.x + small_hexbs[i].x, mv.y + small_hexbs[i].y);
   }
 }
