@@ -395,8 +395,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
   if (encoder->scaling_list.enable) {
-    WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encoder_state_write_bitstream_scaling_list(stream, state);
+    // Signal scaling list data for custom lists
+    WRITE_U(stream, (encoder->cfg.scaling_list == KVZ_SCALING_LIST_CUSTOM) ? 1 : 0, 1, "sps_scaling_list_data_present_flag");
+    if (encoder->cfg.scaling_list == KVZ_SCALING_LIST_CUSTOM) {
+      encoder_state_write_bitstream_scaling_list(stream, state);
+    }
   }
 
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");

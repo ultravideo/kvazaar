@@ -119,6 +119,10 @@ Video structure:
                                      (e.g. lp-g8d4t2, see README)
       --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
+      --scaling-list <string>: Set scaling list mode. [off]\n"
+                                   - off: Disable scaling lists.\n"
+                                   - custom: use custom list (with --cqmfile).\n"
+                                   - default: Use default lists.\n"
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.
                                    - N: Target N bits per second.

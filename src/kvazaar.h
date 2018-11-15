@@ -207,6 +207,12 @@ enum kvz_sao {
   KVZ_SAO_FULL = 3
 };
 
+enum kvz_scalinglist {
+  KVZ_SCALING_LIST_OFF = 0,
+  KVZ_SCALING_LIST_CUSTOM = 1,
+  KVZ_SCALING_LIST_DEFAULT = 2,  
+};
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -374,6 +380,9 @@ typedef struct kvz_config
 
   /** \brief Flag to enable/disable open GOP configuration */
   int8_t open_gop;
+
+  /** \brief Type of scaling lists to use */
+  int8_t scaling_list;
 
 } kvz_config;
 

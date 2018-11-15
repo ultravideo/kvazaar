@@ -136,6 +136,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->me_max_steps = (uint32_t)-1;
 
+  cfg->scaling_list = KVZ_SCALING_LIST_OFF;
+
   return 1;
 }
 
@@ -378,6 +380,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
+
+  static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
   static const char * const preset_values[11][23*2] = {
       {
@@ -758,6 +762,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     FREE_POINTER(cfg->cqmfile);
     cfg->cqmfile = cqmfile;
+    cfg->scaling_list = KVZ_SCALING_LIST_CUSTOM;
+  }
+  else if OPT("scaling-list") {    
+    int8_t scaling_list = KVZ_SCALING_LIST_OFF;
+    int result = parse_enum(value, scaling_list_names, &scaling_list);
+    cfg->scaling_list = scaling_list;
+    return result;
   }
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
@@ -1514,6 +1525,11 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->wpp) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
+    error = 1;
+  }
+
+  if ((cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM) && !cfg->cqmfile) {
+    fprintf(stderr, "Input error: --scaling-list=custom does not work without --cqmfile=<FILE>.\n");
     error = 1;
   }
 

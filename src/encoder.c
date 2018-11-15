@@ -305,7 +305,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   kvz_scalinglist_init(&encoder->scaling_list);
 
   // CQM
-  if (cfg->cqmfile) {
+  if (cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM && cfg->cqmfile) {
     FILE* cqmfile = fopen(cfg->cqmfile, "rb");
     if (cqmfile) {
       kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
@@ -314,7 +314,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       fprintf(stderr, "Could not open CQM file.\n");
       goto init_failed;
     }
+  } else if (cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT) {
+    // Enable scaling lists if default lists are used
+    encoder->scaling_list.enable = 1;
+    encoder->scaling_list.use_default_list = 1;
   }
+
   kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
 
   kvz_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);

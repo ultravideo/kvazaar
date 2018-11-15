@@ -133,6 +133,7 @@ static const struct option long_options[] = {
   { "set-qp-in-cu",             no_argument, NULL, 0 },
   { "open-gop",                 no_argument, NULL, 0 },
   { "no-open-gop",              no_argument, NULL, 0 },
+  { "scaling-list",       required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -399,6 +400,10 @@ void print_help(void)
     "                                     (e.g. lp-g8d4t2, see README)\n"
     "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
+    "      --scaling-list <string>: Set scaling list mode. [off]\n"
+    "                                   - off: Disable scaling lists.\n"
+    "                                   - custom: use custom list (with --cqmfile).\n"
+    "                                   - default: Use default lists.\n"
     "      --bitrate <integer>    : Target bitrate [0]\n"
     "                                   - 0: Disable rate control.\n"
     "                                   - N: Target N bits per second.\n"
