@@ -1473,10 +1473,10 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     range[3] = ((range[3] + margin) / LCU_WIDTH) + 1;//(range[3] + margin + LCU_WIDTH - 1) / LCU_WIDTH;
 
     //TODO: Figure out correct dependency.
-    range[2] = 0;//MAX(0, range[2] - 1); //0;
-    range[3] = MIN(range[3]+100, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
-    range[0] = 0; //MAX(0, range[0] - 1); //0;
-    range[1] = MIN(range[1]+100, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
+    //range[2] = 0;//MAX(0, range[2] - 1); //0;
+    range[3] = MIN(range[3], state->ILR_state->tile->frame->height_in_lcu);  //state->ILR_state->tile->frame->height_in_lcu;//MIN(range[3]+3, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
+    //range[0] = 0; //MAX(0, range[0] - 1); //0;
+    range[1] = MIN(range[1], state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
     //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
     //Add dependencies to ilr states
     for (int j = range[2]; j < range[3]; j++) {
