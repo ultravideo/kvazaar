@@ -88,13 +88,10 @@ static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t
 // (abcd|efgh) (ijkl|mnop) => (aceg|ikmo) (bdfh|jlnp)
 static INLINE void rearrange_512(__m256i *hi, __m256i *lo)
 {
-  __m256i tmphi, tmplo;
+  const __m256i perm8x32mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
 
-  tmphi = _mm256_shuffle_epi32(*hi, _MM_SHUFFLE(3, 1, 2, 0));
-  tmplo = _mm256_shuffle_epi32(*lo, _MM_SHUFFLE(3, 1, 2, 0));
-
-  tmphi = _mm256_permute4x64_epi64(tmphi, _MM_SHUFFLE(3, 1, 2, 0));
-  tmplo = _mm256_permute4x64_epi64(tmplo, _MM_SHUFFLE(3, 1, 2, 0));
+  __m256i tmphi = _mm256_permutevar8x32_epi32(*hi, perm8x32mask);
+  __m256i tmplo = _mm256_permutevar8x32_epi32(*lo, perm8x32mask);
 
   *hi = _mm256_permute2x128_si256(tmplo, tmphi, 0x31);
   *lo = _mm256_permute2x128_si256(tmplo, tmphi, 0x20);
@@ -116,6 +113,7 @@ static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
   // Interleave ns and lo into 32-bit variables and to two 256-bit wide vecs,
   // to have the same data layout as in costs. Zero extend to 32b width, shift
   // changes 16 bits to the left, and store them into the same vectors.
+  // TODO: unpack instead of this
   tmp1 = _mm256_cvtepu16_epi32(nslo);
   tmp2 = _mm256_cvtepu16_epi32(chlo);
   tmp2 = _mm256_bslli_epi128(tmp2, 2);
