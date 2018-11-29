@@ -190,7 +190,9 @@ libavx2_la_SOURCES = \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
 	strategies/avx2/sao-avx2.c \
-	strategies/avx2/sao-avx2.h
+	strategies/avx2/sao-avx2.h \
+	strategies/avx2/encode_coding_tree-avx2.c \
+	strategies/avx2/encode_coding_tree-avx2.h
 
 libsse2_la_SOURCES = \
 	strategies/sse2/picture-sse2.c \
