@@ -1134,11 +1134,9 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
         }
         return true;
       }
-      return false;
+      continue;
       // ***********************************************
     }
-
-
 
     if (cand->inter.mv_dir & (1 << cand_list) &&
         state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
