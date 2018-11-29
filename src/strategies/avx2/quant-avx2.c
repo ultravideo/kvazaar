@@ -375,8 +375,8 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   if (!encoder->cfg.signhide_enable || ac_sum < 2)
     return;
 
-  coeff_t coef_reord[LCU_WIDTH * LCU_WIDTH >> 2] ALIGNED(32);
-  coeff_t q_coef_reord[LCU_WIDTH * LCU_WIDTH >> 2] ALIGNED(32);
+  ALIGNED(64) coeff_t coef_reord[LCU_WIDTH * LCU_WIDTH >> 2];
+  ALIGNED(64) coeff_t q_coef_reord[LCU_WIDTH * LCU_WIDTH >> 2];
 
   // Reorder coef and q_coef for sequential access
   for (int32_t n = 0; n < width * height; n++) {
