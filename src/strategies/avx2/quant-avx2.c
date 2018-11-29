@@ -40,7 +40,7 @@
 #include "tables.h"
 #include "transform.h"
 
-static INLINE int32_t reduce_mm256i(__m256i src)
+static INLINE int32_t hsum32_8x32i(__m256i src)
 {
   __m128i a = _mm256_extracti128_si256(src, 0);
   __m128i b = _mm256_extracti128_si256(src, 1);
@@ -55,7 +55,7 @@ static INLINE int32_t reduce_mm256i(__m256i src)
   return _mm_cvtsi128_si32(a);
 }
 
-static INLINE int32_t reduce_16x_i16(__m256i src)
+static INLINE int32_t hsum32_16x16i(__m256i src)
 {
   __m128i a = _mm256_extracti128_si256(src, 0);
   __m128i b = _mm256_extracti128_si256(src, 1);
@@ -63,7 +63,7 @@ static INLINE int32_t reduce_16x_i16(__m256i src)
   __m256i d = _mm256_cvtepi16_epi32(b);
 
   c = _mm256_add_epi32(c, d);
-  return reduce_mm256i(c);
+  return hsum32_8x32i(c);
 }
 
 // If ints is completely zero, returns 16 in *first and -1 in *last
@@ -185,7 +185,7 @@ static INLINE int32_t hide_block_sign(__m256i coefs, const coeff_t * __restrict 
   get_first_last_nz_int16(q_coefs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
 
   // Sum all kvz_quant coeffs between first and last
-  abssum = reduce_16x_i16(q_coefs);
+  abssum = hsum32_16x16i(q_coefs);
 
   if (last_nz_pos_in_cg >= 0 && last_cg == -1) {
     last_cg = 1;
