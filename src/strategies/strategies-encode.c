@@ -1,6 +1,3 @@
-#ifndef ENCODE_CODING_TREE_H_
-#define ENCODE_CODING_TREE_H_
-
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -21,22 +18,25 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \file
- * Functions for writing the coding quadtree and related syntax.
- */
+#include "strategies/strategies-encode.h"
 
-#include "encoderstate.h"
-#include "global.h"
+#include "strategies/generic/encode_coding_tree-generic.h"
+#include "strategyselector.h"
 
-void kvz_encode_coding_tree(encoder_state_t * const state,
-                            uint16_t x_ctb,
-                            uint16_t y_ctb,
-                            uint8_t depth);
 
-void kvz_encode_mvd(encoder_state_t * const state,
-                    cabac_data_t *cabac,
-                    int32_t mvd_hor,
-                    int32_t mvd_ver);
+// Define function pointers.
+encode_coeff_nxn_func *kvz_encode_coeff_nxn;
 
-#endif // ENCODE_CODING_TREE_H_
+
+int kvz_strategy_register_encode(void* opaque, uint8_t bitdepth) {
+  bool success = true;
+
+  success &= kvz_strategy_register_encode_generic(opaque, bitdepth);
+
+  /*
+  if (kvz_g_hardware_flags.intel_flags.avx2) {
+    success &= kvz_strategy_register_quant_avx2(opaque, bitdepth);
+  }
+  */
+  return success;
+}

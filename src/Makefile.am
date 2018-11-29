@@ -124,6 +124,8 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/quant-generic.h \
 	strategies/generic/sao-generic.c \
 	strategies/generic/sao-generic.h \
+	strategies/generic/encode_coding_tree-generic.c \
+	strategies/generic/encode_coding_tree-generic.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -139,6 +141,8 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-quant.h \
 	strategies/strategies-sao.c \
 	strategies/strategies-sao.h \
+	strategies/strategies-encode.c \
+	strategies/strategies-encode.h \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
