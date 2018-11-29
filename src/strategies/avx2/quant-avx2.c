@@ -312,12 +312,12 @@ static INLINE int32_t hide_block_sign(__m256i coefs, const coeff_t * __restrict 
  * \brief quantize transformed coefficents
  *
  */
-void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
+void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
-  const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t * const  __restrict scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
@@ -327,6 +327,31 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
+
+  // For vectorized reordering of coef and q_coef
+  const __m128i low128_shuffle_masks[3] = {
+    _mm_setr_epi8(10,11,  4, 5, 12,13,  0, 1,  6, 7, 14,15,  8, 9,  2, 3),
+    _mm_setr_epi8( 0, 1,  2, 3,  4, 5,  6, 7,  8, 9, 10,11, 12,13, 14,15),
+    _mm_setr_epi8( 4, 5,  6, 7,  0, 1,  2, 3, 12,13, 14,15,  8, 9, 10,11),
+  };
+
+  const __m128i blend_masks[3] = {
+    _mm_setr_epi16( 0,  0,  0, -1,  0,  0, -1, -1),
+    _mm_setr_epi16( 0,  0,  0,  0,  0,  0,  0,  0),
+    _mm_setr_epi16( 0,  0, -1, -1,  0,  0, -1, -1),
+  };
+
+  const __m128i invec_rearr_masks_upper[3] = {
+    _mm_setr_epi8( 0, 1,  8, 9,  2, 3,  6, 7, 10,11,  4, 5, 12,13, 14,15),
+    _mm_setr_epi8( 0, 1,  2, 3,  4, 5,  6, 7,  8, 9, 10,11, 12,13, 14,15),
+    _mm_setr_epi8( 0, 1,  8, 9,  4, 5, 12,13,  2, 3, 10,11,  6, 7, 14,15),
+  };
+
+  const __m128i invec_rearr_masks_lower[3] = {
+    _mm_setr_epi8(12,13,  6, 7,  0, 1,  2, 3, 14,15,  4, 5,  8, 9, 10,11),
+    _mm_setr_epi8( 0, 1,  2, 3,  4, 5,  6, 7,  8, 9, 10,11, 12,13, 14,15),
+    _mm_setr_epi8( 4, 5, 12,13,  0, 1,  8, 9,  6, 7, 14,15,  2, 3, 10,11),
+  };
 
   assert(quant_coeff[0] <= (1 << 15) - 1 && quant_coeff[0] >= -(1 << 15)); //Assuming flat values to fit int16_t
 
@@ -378,10 +403,74 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   ALIGNED(64) coeff_t coef_reord[LCU_WIDTH * LCU_WIDTH >> 2];
   ALIGNED(64) coeff_t q_coef_reord[LCU_WIDTH * LCU_WIDTH >> 2];
 
-  // Reorder coef and q_coef for sequential access
-  for (int32_t n = 0; n < width * height; n++) {
-    coef_reord[n] = coef[scan[n]];
-    q_coef_reord[n] = q_coef[scan[n]];
+  /*
+   * Reorder coef and q_coef for sequential access
+   * Fun fact: Once upon a time, this loop looked like this:
+   * for (int32_t n = 0; n < width * height; n++) {
+   *   coef_reord[n] = coef[scan[n]];
+   *   q_coef_reord[n] = q_coef[scan[n]];
+   * }
+   */
+  for (int32_t i = 0; i < width * height; i += SCAN_SET_SIZE) {
+    const size_t row_offsets[4] = {
+      scan[i] + width * 0,
+      scan[i] + width * 1,
+      scan[i] + width * 2,
+      scan[i] + width * 3,
+    };
+
+    __m128d   coefs_d_upper;
+    __m128d   coefs_d_lower;
+    __m128d q_coefs_d_upper;
+    __m128d q_coefs_d_lower;
+
+    __m128i   coefs_upper;
+    __m128i   coefs_lower;
+    __m128i q_coefs_upper;
+    __m128i q_coefs_lower;
+
+    __m128i   coefs_rearr1_upper;
+    __m128i   coefs_rearr1_lower;
+    __m128i q_coefs_rearr1_upper;
+    __m128i q_coefs_rearr1_lower;
+
+    __m128i   coefs_rearr2_upper;
+    __m128i   coefs_rearr2_lower;
+    __m128i q_coefs_rearr2_upper;
+    __m128i q_coefs_rearr2_lower;
+
+    coefs_d_upper   = _mm_loadl_pd(coefs_d_upper,   (double *)(coef   + row_offsets[0]));
+    coefs_d_upper   = _mm_loadh_pd(coefs_d_upper,   (double *)(coef   + row_offsets[1]));
+    q_coefs_d_upper = _mm_loadl_pd(q_coefs_d_upper, (double *)(q_coef + row_offsets[0]));
+    q_coefs_d_upper = _mm_loadh_pd(q_coefs_d_upper, (double *)(q_coef + row_offsets[1]));
+
+    coefs_d_lower   = _mm_loadl_pd(coefs_d_lower,   (double *)(coef   + row_offsets[2]));
+    coefs_d_lower   = _mm_loadh_pd(coefs_d_lower,   (double *)(coef   + row_offsets[3]));
+    q_coefs_d_lower = _mm_loadl_pd(q_coefs_d_lower, (double *)(q_coef + row_offsets[2]));
+    q_coefs_d_lower = _mm_loadh_pd(q_coefs_d_lower, (double *)(q_coef + row_offsets[3]));
+
+    coefs_upper     = _mm_castpd_si128(coefs_d_upper);
+    coefs_lower     = _mm_castpd_si128(coefs_d_lower);
+    q_coefs_upper   = _mm_castpd_si128(q_coefs_d_upper);
+    q_coefs_lower   = _mm_castpd_si128(q_coefs_d_lower);
+
+    coefs_lower     = _mm_shuffle_epi8(coefs_lower,   low128_shuffle_masks[scan_idx]);
+    q_coefs_lower   = _mm_shuffle_epi8(q_coefs_lower, low128_shuffle_masks[scan_idx]);
+
+    coefs_rearr1_upper   = _mm_blendv_epi8(coefs_upper,   coefs_lower,   blend_masks[scan_idx]);
+    coefs_rearr1_lower   = _mm_blendv_epi8(coefs_lower,   coefs_upper,   blend_masks[scan_idx]);
+    q_coefs_rearr1_upper = _mm_blendv_epi8(q_coefs_upper, q_coefs_lower, blend_masks[scan_idx]);
+    q_coefs_rearr1_lower = _mm_blendv_epi8(q_coefs_lower, q_coefs_upper, blend_masks[scan_idx]);
+
+    coefs_rearr2_upper   = _mm_shuffle_epi8(coefs_rearr1_upper,   invec_rearr_masks_upper[scan_idx]);
+    coefs_rearr2_lower   = _mm_shuffle_epi8(coefs_rearr1_lower,   invec_rearr_masks_lower[scan_idx]);
+    q_coefs_rearr2_upper = _mm_shuffle_epi8(q_coefs_rearr1_upper, invec_rearr_masks_upper[scan_idx]);
+    q_coefs_rearr2_lower = _mm_shuffle_epi8(q_coefs_rearr1_lower, invec_rearr_masks_lower[scan_idx]);
+
+    _mm_store_si128((__m128i *)(coef_reord   + i    ),   coefs_rearr2_upper);
+    _mm_store_si128((__m128i *)(coef_reord   + i + 8),   coefs_rearr2_lower);
+    _mm_store_si128((__m128i *)(q_coef_reord + i    ), q_coefs_rearr2_upper);
+    _mm_store_si128((__m128i *)(q_coef_reord + i + 8), q_coefs_rearr2_lower);
   }
 
   assert(VEC_WIDTH == SCAN_SET_SIZE);
