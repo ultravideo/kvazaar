@@ -101,28 +101,14 @@ static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
     __m256i ns, __m256i changes,
     int16_t *final_change, int32_t *min_pos)
 {
-  __m128i nslo, nshi, chlo, chhi;
-  __m256i pllo, plhi; // Payload
-  __m256i tmp1, tmp2;
-
-  nshi = _mm256_extracti128_si256(ns, 1);
-  nslo = _mm256_extracti128_si256(ns, 0);
-  chhi = _mm256_extracti128_si256(changes, 1);
-  chlo = _mm256_extracti128_si256(changes, 0);
-
   // Interleave ns and lo into 32-bit variables and to two 256-bit wide vecs,
   // to have the same data layout as in costs. Zero extend to 32b width, shift
   // changes 16 bits to the left, and store them into the same vectors.
-  // TODO: unpack instead of this
-  tmp1 = _mm256_cvtepu16_epi32(nslo);
-  tmp2 = _mm256_cvtepu16_epi32(chlo);
-  tmp2 = _mm256_bslli_epi128(tmp2, 2);
-  pllo = _mm256_or_si256(tmp1, tmp2);
+  __m256i tmphi = _mm256_unpackhi_epi16(ns, changes);
+  __m256i tmplo = _mm256_unpacklo_epi16(ns, changes);
 
-  tmp1 = _mm256_cvtepu16_epi32(nshi);
-  tmp2 = _mm256_cvtepu16_epi32(chhi);
-  tmp2 = _mm256_bslli_epi128(tmp2, 2);
-  plhi = _mm256_or_si256(tmp1, tmp2);
+  __m256i plhi = _mm256_permute2x128_si256(tmplo, tmphi, 0x31);
+  __m256i pllo = _mm256_permute2x128_si256(tmplo, tmphi, 0x20);
 
   // Reorder to afford result stability (if multiple atoms tie for cheapest,
   // rightmost ie. the highest is the wanted one)
