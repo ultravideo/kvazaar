@@ -98,75 +98,55 @@ static INLINE void rearrange_512(__m256i *hi, __m256i *lo)
 }
 
 static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
-    __m256i ns, __m256i changes, __m256i q_coefs,
-    int16_t *final_change, int32_t *min_pos, int16_t *cheapest_q)
+    __m256i ns, __m256i changes,
+    int16_t *final_change, int32_t *min_pos)
 {
-  const __m256i zero = _mm256_set1_epi8(0);
-
   // Interleave ns and lo into 32-bit variables and to two 256-bit wide vecs,
   // to have the same data layout as in costs. Zero extend to 32b width, shift
   // changes 16 bits to the left, and store them into the same vectors.
   __m256i tmp1hi = _mm256_unpackhi_epi16(ns, changes);
   __m256i tmp1lo = _mm256_unpacklo_epi16(ns, changes);
 
-  __m256i tmp2hi = _mm256_unpackhi_epi16(q_coefs, zero);
-  __m256i tmp2lo = _mm256_unpacklo_epi16(q_coefs, zero);
-
   __m256i pl1hi = _mm256_permute2x128_si256(tmp1lo, tmp1hi, 0x31);
   __m256i pl1lo = _mm256_permute2x128_si256(tmp1lo, tmp1hi, 0x20);
-
-  __m256i pl2hi = _mm256_permute2x128_si256(tmp2lo, tmp2hi, 0x31);
-  __m256i pl2lo = _mm256_permute2x128_si256(tmp2lo, tmp2hi, 0x20);
 
   // Reorder to afford result stability (if multiple atoms tie for cheapest,
   // rightmost ie. the highest is the wanted one)
   rearrange_512(&costs_hi, &costs_lo);
   rearrange_512(&pl1hi, &pl1lo);
-  rearrange_512(&pl2hi, &pl2lo);
 
   // 0: pick hi, 1: pick lo (equality evaluates as 0)
   __m256i cmpmask1 = _mm256_cmpgt_epi32(costs_hi, costs_lo);
   __m256i cost1    = _mm256_blendv_epi8(costs_hi, costs_lo, cmpmask1);
   __m256i pl1_1    = _mm256_blendv_epi8(pl1hi,    pl1lo,    cmpmask1);
-  __m256i pl2_1    = _mm256_blendv_epi8(pl2hi,    pl2lo,    cmpmask1);
 
   __m256i cost2    = _mm256_shuffle_epi32(cost1, _MM_SHUFFLE(2, 3, 0, 1));
   __m256i pl1_2    = _mm256_shuffle_epi32(pl1_1, _MM_SHUFFLE(2, 3, 0, 1));
-  __m256i pl2_2    = _mm256_shuffle_epi32(pl2_1, _MM_SHUFFLE(2, 3, 0, 1));
 
   __m256i cmpmask2 = _mm256_cmpgt_epi32(cost2, cost1);
   __m256i cost3    = _mm256_blendv_epi8(cost2, cost1, cmpmask2);
   __m256i pl1_3    = _mm256_blendv_epi8(pl1_2, pl1_1, cmpmask2);
-  __m256i pl2_3    = _mm256_blendv_epi8(pl2_2, pl2_1, cmpmask2);
 
   __m256i cost4    = _mm256_shuffle_epi32(cost3, _MM_SHUFFLE(1, 0, 3, 2));
   __m256i pl1_4    = _mm256_shuffle_epi32(pl1_3, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i pl2_4    = _mm256_shuffle_epi32(pl2_3, _MM_SHUFFLE(1, 0, 3, 2));
 
   __m256i cmpmask3 = _mm256_cmpgt_epi32(cost4, cost3);
   __m256i cost5    = _mm256_blendv_epi8(cost4, cost3, cmpmask3);
   __m256i pl1_5    = _mm256_blendv_epi8(pl1_4, pl1_3, cmpmask3);
-  __m256i pl2_5    = _mm256_blendv_epi8(pl2_4, pl2_3, cmpmask3);
 
   __m256i cost6    = _mm256_permute4x64_epi64(cost5, _MM_SHUFFLE(1, 0, 3, 2));
   __m256i pl1_6    = _mm256_permute4x64_epi64(pl1_5, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i pl2_6    = _mm256_permute4x64_epi64(pl2_5, _MM_SHUFFLE(1, 0, 3, 2));
 
   __m256i cmpmask4 = _mm256_cmpgt_epi32(cost6, cost5);
   __m256i pl1_7    = _mm256_blendv_epi8(pl1_6, pl1_5, cmpmask4);
-  __m256i pl2_7    = _mm256_blendv_epi8(pl2_6, pl2_5, cmpmask4);
 
   __m128i res1_128 = _mm256_castsi256_si128(pl1_7);
-  __m128i res2_128 = _mm256_castsi256_si128(pl2_7);
   uint32_t tmp1 = (uint32_t)_mm_extract_epi32(res1_128, 0);
-  uint32_t tmp2 = (uint32_t)_mm_extract_epi32(res2_128, 0);
   uint16_t n = (uint16_t)(tmp1 & 0xffff);
   uint16_t chng = (uint16_t)(tmp1 >> 16);
-  uint16_t chpst = (uint16_t)(tmp2 & 0xffff);
 
   *final_change = (int16_t)chng;
   *min_pos = (int32_t)n;
-  *cheapest_q = (int16_t)chpst;
 }
 
 #define VEC_WIDTH 16
@@ -287,8 +267,10 @@ static INLINE int32_t hide_block_sign(__m256i coefs, __m256i q_coefs, __m256i de
       __m256i costs_l = _mm256_or_si256(cost_neg_l, _mm256_or_si256(cost_pos_l, cost_max_l));
       __m256i costs_h = _mm256_or_si256(cost_neg_h, _mm256_or_si256(cost_pos_h, cost_max_h));
 
-      get_cheapest_alternative(costs_h, costs_l, ns, changes, q_coefs, &final_change, &min_pos, &cheapest_q);
+      get_cheapest_alternative(costs_h, costs_l, ns, changes, &final_change, &min_pos);
+      const int32_t best_id = scan[min_pos + subpos];
 
+      cheapest_q = q_coef[best_id];
       if (cheapest_q == 32767 || cheapest_q == -32768)
         final_change = -1;
 
@@ -300,7 +282,7 @@ static INLINE int32_t hide_block_sign(__m256i coefs, __m256i q_coefs, __m256i de
       else
         cheapest_q -= final_change;
 
-      q_coef[scan[min_pos + subpos]] = cheapest_q;
+      q_coef[best_id] = cheapest_q;
     } // Hide
   }
   if (last_cg == 1)
@@ -475,6 +457,8 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t * __restri
     __m256i q_coefs = _mm256_insertf128_si256(_mm256_castsi128_si256(q_coefs_rearr2_upper),
                                               q_coefs_rearr2_lower, 
                                               1);
+
+    // Reordering done
 
     __m256i v_level = _mm256_abs_epi16(v_coef);
     __m256i low_a = _mm256_unpacklo_epi16(v_level, _mm256_set1_epi16(0));
