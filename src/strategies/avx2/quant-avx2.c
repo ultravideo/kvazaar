@@ -400,6 +400,10 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t * __restri
       scan[subpos] + width * 3,
     };
 
+    // NOTE: Upper means "higher in pixel order inside block", which implies
+    // lower addresses (note the difference: HIGH and LOW vs UPPER and LOWER),
+    // so upper 128b vector actually becomes the lower part of a 256-bit coeff
+    // vector and lower vector the higher part!
     __m128d   coefs_d_upper;
     __m128d   coefs_d_lower;
     __m128d q_coefs_d_upper;
