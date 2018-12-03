@@ -24,6 +24,7 @@
 #include "context.h"
 #include "encode_coding_tree-avx2.h"
 #include "kvz_math.h"
+#include <immintrin.h>
 
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
@@ -119,6 +120,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
+  const __m256i zero = _mm256_set1_epi8(0);
+
   // Init base contexts according to block type
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
@@ -127,27 +130,45 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
 
-  unsigned sig_cg_cnt = 0;
-  for (int cg_y = 0; cg_y < width / 4; ++cg_y) {
-    for (int cg_x = 0; cg_x < width / 4; ++cg_x) {
-      unsigned cg_pos = cg_y * width * 4 + cg_x * 4;
-      for (int coeff_row = 0; coeff_row < 4; ++coeff_row) {
-        // Load four 16-bit coeffs and see if any of them are non-zero.
-        unsigned coeff_pos = cg_pos + coeff_row * width;
-        uint64_t four_coeffs = *(uint64_t*)(&coeff[coeff_pos]);
-        if (four_coeffs) {
-          ++sig_cg_cnt;
-          unsigned cg_pos_y = (cg_pos >> log2_block_size) >> TR_MIN_LOG2_SIZE;
-          unsigned cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
-          sig_coeffgroup_flag[cg_pos_x + cg_pos_y * num_blk_side] = 1;
-          break;
-        }
-      }
+  // NOTE: Modified the functionality a bit, sig_coeffgroup_flag used to be
+  // 1 if true and 0 if false, now it's "undefined but nonzero" if true and
+  // 0 if false (not actually undefined, it's a bitmask representing the
+  // significant coefficients' position in the group which in itself could
+  // be useful information)
+  uint32_t any_sig_cgs = 0;
+  for (int32_t cg_y = 0; cg_y < width / 4; ++cg_y) {
+    for (int32_t cg_x = 0; cg_x < width / 4; ++cg_x) {
+      uint32_t cg_pos = cg_y * width * 4 + cg_x * 4;
+      uint32_t cg_pos_y = (cg_pos >> log2_block_size) >> TR_MIN_LOG2_SIZE;
+      uint32_t cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
+
+      __m128d coeffs_d_upper;
+      __m128d coeffs_d_lower;
+      __m128i coeffs_upper;
+      __m128i coeffs_lower;
+      __m256i cur_coeffs;
+
+      coeffs_d_upper = _mm_loadl_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 0 * width));
+      coeffs_d_upper = _mm_loadh_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 1 * width));
+      coeffs_d_lower = _mm_loadl_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 2 * width));
+      coeffs_d_lower = _mm_loadh_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 3 * width));
+
+      coeffs_upper = _mm_castpd_si128(coeffs_d_upper);
+      coeffs_lower = _mm_castpd_si128(coeffs_d_lower);
+
+      cur_coeffs = _mm256_insertf128_si256(_mm256_castsi128_si256(coeffs_upper),
+                                           coeffs_lower,
+                                           1);
+
+      __m256i coeffs_zero = _mm256_cmpeq_epi16(cur_coeffs, zero);
+      uint32_t nz_coeffs_2b = ~((uint32_t)_mm256_movemask_epi8(coeffs_zero));
+      any_sig_cgs |= nz_coeffs_2b;
+      sig_coeffgroup_flag[cg_pos_x + cg_pos_y * num_blk_side] = nz_coeffs_2b;
     }
   }
 
   // Rest of the code assumes at least one non-zero coeff.
-  assert(sig_cg_cnt > 0);
+  assert(any_sig_cgs != 0);
 
   // Find the last coeff group by going backwards in scan order.
   unsigned scan_cg_last = num_blk_side * num_blk_side - 1;
