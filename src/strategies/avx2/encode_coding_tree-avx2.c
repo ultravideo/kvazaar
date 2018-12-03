@@ -202,30 +202,24 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
                              type,
                              scan_mode);
 
-  scan_pos_sig  = scan_pos_last;
+  scan_pos_sig = scan_pos_last;
+
+  int32_t abs_coeff[16];
+  abs_coeff[0] = abs(coeff[pos_last]);
+  uint32_t coeff_signs  = (coeff[pos_last] < 0);
+  int32_t num_non_zero = 1;
+  int32_t last_nz_pos_in_cg  = scan_pos_sig;
+  int32_t first_nz_pos_in_cg = scan_pos_sig;
+  scan_pos_sig--;
 
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
     int32_t sub_pos        = i << 4; // LOG2_SCAN_SET_SIZE;
-    int32_t abs_coeff[16];
     int32_t cg_blk_pos     = scan_cg[i];
     int32_t cg_pos_y       = cg_blk_pos / num_blk_side;
     int32_t cg_pos_x       = cg_blk_pos - (cg_pos_y * num_blk_side);
 
-    uint32_t coeff_signs   = 0;
-    int32_t last_nz_pos_in_cg = -1;
-    int32_t first_nz_pos_in_cg = 16;
-    int32_t num_non_zero = 0;
     go_rice_param = 0;
-
-    if (scan_pos_sig == scan_pos_last) {
-      abs_coeff[0] = abs(coeff[pos_last]);
-      coeff_signs  = (coeff[pos_last] < 0);
-      num_non_zero = 1;
-      last_nz_pos_in_cg  = scan_pos_sig;
-      first_nz_pos_in_cg = scan_pos_sig;
-      scan_pos_sig--;
-    }
 
     if (i == scan_cg_last || i == 0) {
       sig_coeffgroup_flag[cg_blk_pos] = 1;
@@ -354,6 +348,10 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
         }
       }
     }
+    last_nz_pos_in_cg = -1;
+    first_nz_pos_in_cg = 16;
+    num_non_zero = 0;
+    coeff_signs = 0;
   }
 }
 
