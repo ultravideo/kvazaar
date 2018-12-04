@@ -11,6 +11,9 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 - Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 - Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
+[![Code Quality: Cpp](https://img.shields.io/lgtm/grade/cpp/g/ultravideo/kvazaar.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ultravideo/kvazaar/context:cpp)
+[![Total Alerts](https://img.shields.io/lgtm/alerts/g/ultravideo/kvazaar.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ultravideo/kvazaar/alerts)
+
 ## Table of Contents
 
 - [Using Kvazaar](#using-kvazaar)
