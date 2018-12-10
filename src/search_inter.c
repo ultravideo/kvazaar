@@ -1308,7 +1308,6 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
   const image_list_t *const ref = info->state->frame->ref;
   uint8_t (*ref_LX)[16] = info->state->frame->ref_LX;
   const videoframe_t * const frame = info->state->tile->frame;
-  const int cu_width = LCU_WIDTH >> depth;
   const int x         = info->origin.x;
   const int y         = info->origin.y;
   const int width     = info->width;
@@ -1361,7 +1360,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
     const kvz_pixel *src = &frame->source->y[x + y * frame->source->width];
     uint32_t cost =
-      kvz_satd_any_size(cu_width, cu_width, rec, LCU_WIDTH, src, frame->source->width);
+      kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->width);
 
     uint32_t bitcost[2] = { 0, 0 };
 
