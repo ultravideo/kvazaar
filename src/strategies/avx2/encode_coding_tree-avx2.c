@@ -26,6 +26,23 @@
 #include "kvz_math.h"
 #include <immintrin.h>
 
+// If ints is completely zero, returns 16 in *first and -1 in *last
+static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t *last)
+{
+  // Note that nonzero_bytes will always have both bytes set for a set word
+  // even if said word only had one of its bytes set, because we're doing 16
+  // bit wide comparisons. No big deal, just shift results to the right by one
+  // bit to have the results represent indexes of first set words, not bytes.
+  // Another note, it has to use right shift instead of division to preserve
+  // behavior on an all-zero vector (-1 / 2 == 0, but -1 >> 1 == -1)
+  const __m256i zero = _mm256_setzero_si256();
+
+  __m256i zeros = _mm256_cmpeq_epi16(ints, zero);
+  uint32_t nonzero_bytes = ~((uint32_t)_mm256_movemask_epi8(zeros));
+  *first = (    (int32_t)_tzcnt_u32(nonzero_bytes)) >> 1;
+  *last = (31 - (int32_t)_lzcnt_u32(nonzero_bytes)) >> 1;
+}
+
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
  *
@@ -254,7 +271,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       // TODO: reorder coeff and vectorize?
       const __m256i ns = _mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
-      __m256i coeffs = _mm256_load_si256((__m256i *)coeff_reord);
+      __m256i coeffs = _mm256_load_si256((__m256i *)(coeff_reord + sub_pos));
       __m256i sigs_inv = _mm256_cmpeq_epi16(coeffs, zero);
       __m256i is = _mm256_set1_epi16(i);
       __m256i is_zero = _mm256_cmpeq_epi16(is, zero);
@@ -275,17 +292,14 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
         }
 
         if (sig) {
-          abs_coeff[num_non_zero] = abs(coeff[blk_pos]);
+          abs_coeff[num_non_zero] = abs(coeff_reord[scan_pos_sig]);
           coeff_signs              = 2 * coeff_signs + (coeff[blk_pos] < 0);
           num_non_zero++;
-
-          if (last_nz_pos_in_cg == -1) {
-            last_nz_pos_in_cg = scan_pos_sig;
-          }
-
-          first_nz_pos_in_cg  = scan_pos_sig;
         }
       }
+    __m256i masked_coeffs = _mm256_andnot_si256(sigs_inv, coeffs);
+    get_first_last_nz_int16(masked_coeffs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
+
     } else {
       scan_pos_sig = sub_pos - 1;
     }
