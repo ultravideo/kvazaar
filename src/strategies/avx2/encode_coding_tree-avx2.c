@@ -202,7 +202,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   int8_t be_valid = encoder->cfg.signhide_enable;
   int32_t scan_pos_sig;
   uint32_t go_rice_param = 0;
-  uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
+  uint32_t ctx_sig;
 
   // CONSTANTS
   const uint32_t num_blk_side    = width >> TR_MIN_LOG2_SIZE;
@@ -340,38 +340,67 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
                                                              cg_pos_x, cg_pos_y, width);
 
-      // TODO: reorder coeff and vectorize?
-      const __m256i ns = _mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+      ALIGNED(64) int16_t abs_coeff_buf[16];
+      ALIGNED(32) int16_t pos_ys_buf[16];
+      ALIGNED(32) int16_t pos_xs_buf[16];
+
+      const __m256i coeff_pos_zero = _mm256_castsi128_si256(_mm_cvtsi32_si128(0xffff));
+      const __m128i log2_block_size_128 = _mm_cvtsi32_si128(log2_block_size);
 
       __m256i coeffs = _mm256_load_si256((__m256i *)(coeff_reord + sub_pos));
       __m256i sigs_inv = _mm256_cmpeq_epi16(coeffs, zero);
       __m256i is = _mm256_set1_epi16(i);
       __m256i is_zero = _mm256_cmpeq_epi16(is, zero);
-      // TODO!
+      __m256i coeffs_subzero = _mm256_cmpgt_epi16(zero, coeffs);
 
-      // TODO: get first and last nz
+      __m256i masked_coeffs = _mm256_andnot_si256(sigs_inv, coeffs);
+      __m256i abs_coeffs = _mm256_abs_epi16(masked_coeffs);
+
+      // TODO: obtain 16-bit block positions, maybe? :P
+      __m256i blk_poses_hi = _mm256_loadu_si256((__m256i *)(scan + sub_pos + 8));
+      __m256i blk_poses_lo = _mm256_loadu_si256((__m256i *)(scan + sub_pos + 0));
+      __m256i blk_poses_tmp = _mm256_packs_epi32(blk_poses_lo, blk_poses_hi);
+      __m256i blk_poses = _mm256_permute4x64_epi64(blk_poses_tmp, _MM_SHUFFLE(3, 1, 2, 0));
+
+      __m256i pos_ys = _mm256_srl_epi16(blk_poses, log2_block_size_128);
+      __m256i pos_xs = _mm256_sub_epi16(blk_poses, _mm256_sll_epi16(pos_ys, log2_block_size_128));
+
+      _mm256_store_si256((__m256i *)pos_ys_buf, pos_ys);
+      _mm256_store_si256((__m256i *)pos_xs_buf, pos_xs);
+
+      __m256i encode_sig_coeff_flags_inv = _mm256_andnot_si256(is_zero, coeff_pos_zero);
+
+      get_first_last_nz_int16(masked_coeffs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
+      _mm256_store_si256((__m256i *)abs_coeff_buf, abs_coeffs);
+
+      uint32_t esc_flags = ~(_mm256_movemask_epi8(encode_sig_coeff_flags_inv));
+      uint32_t sigs = ~(_mm256_movemask_epi8(sigs_inv));
+      uint32_t coeff_sign_buf = _mm256_movemask_epi8(coeffs_subzero);
+
       for (; scan_pos_sig >= sub_pos; scan_pos_sig--) {
-        blk_pos = scan[scan_pos_sig];
-        pos_y   = blk_pos >> log2_block_size;
-        pos_x   = blk_pos - (pos_y << log2_block_size);
-        sig    = (coeff_reord[scan_pos_sig] != 0) ? 1 : 0;
+        uint32_t id = scan_pos_sig - sub_pos;
+        uint32_t shamt = (id << 1) + 1;
 
-        if (scan_pos_sig > sub_pos || i == 0 || num_non_zero != 0) {
-          ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
+        uint32_t curr_sig = (sigs >> shamt) & 1;
+        uint32_t curr_esc_flag = (esc_flags >> shamt) & 1;
+        uint32_t curr_coeff_sign = (coeff_sign_buf >> shamt) & 1;
+
+        uint32_t curr_pos_x = pos_xs_buf[id];
+        uint32_t curr_pos_y = pos_ys_buf[id];
+
+        if (curr_esc_flag | num_non_zero) {
+          ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, curr_pos_x, curr_pos_y,
                                              log2_block_size, type);
           cabac->cur_ctx = &baseCtx[ctx_sig];
-          CABAC_BIN(cabac, sig, "sig_coeff_flag");
+          CABAC_BIN(cabac, curr_sig, "sig_coeff_flag");
         }
 
-        if (sig) {
-          abs_coeff[num_non_zero] = abs(coeff_reord[scan_pos_sig]);
-          coeff_signs              = 2 * coeff_signs + (coeff[blk_pos] < 0);
+        if (curr_sig) {
+          abs_coeff[num_non_zero] = abs_coeff_buf[id];
+          coeff_signs              = 2 * coeff_signs + curr_coeff_sign;
           num_non_zero++;
         }
       }
-    __m256i masked_coeffs = _mm256_andnot_si256(sigs_inv, coeffs);
-    get_first_last_nz_int16(masked_coeffs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
-
     } else {
       scan_pos_sig = sub_pos - 1;
     }
