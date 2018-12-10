@@ -119,6 +119,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   const uint32_t *scan           =
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
+  const uint32_t num_blocks = num_blk_side * num_blk_side;
 
   const __m256i zero = _mm256_set1_epi8(0);
 
@@ -135,52 +136,67 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   // 0 if false (not actually undefined, it's a bitmask representing the
   // significant coefficients' position in the group which in itself could
   // be useful information)
-  uint32_t any_sig_cgs = 0;
-  for (int32_t cg_y = 0; cg_y < width / 4; ++cg_y) {
-    for (int32_t cg_x = 0; cg_x < width / 4; ++cg_x) {
-      uint32_t cg_pos = cg_y * width * 4 + cg_x * 4;
-      uint32_t cg_pos_y = (cg_pos >> log2_block_size) >> TR_MIN_LOG2_SIZE;
-      uint32_t cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
+  uint32_t scan_cg_last = 0;
+  uint32_t scan_cg_last_not_found = -1;
 
-      __m128d coeffs_d_upper;
-      __m128d coeffs_d_lower;
-      __m128i coeffs_upper;
-      __m128i coeffs_lower;
-      __m256i cur_coeffs;
+  for (int32_t i = num_blocks - 1; i >= 0; i--) {
+    const uint32_t cg_id = scan_cg[i];
+    const uint32_t n_xbits = log2_block_size - 2; // How many lowest bits of scan_cg represent X coord
+    const uint32_t cg_x = cg_id & ((1 << n_xbits) - 1);
+    const uint32_t cg_y = cg_id >> n_xbits;
 
-      coeffs_d_upper = _mm_loadl_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 0 * width));
-      coeffs_d_upper = _mm_loadh_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 1 * width));
-      coeffs_d_lower = _mm_loadl_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 2 * width));
-      coeffs_d_lower = _mm_loadh_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 3 * width));
+    const uint32_t cg_pos = cg_y * width * 4 + cg_x * 4;
+    const uint32_t cg_pos_y = (cg_pos >> log2_block_size) >> TR_MIN_LOG2_SIZE;
+    const uint32_t cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
+    const uint32_t addr = cg_pos_x + cg_pos_y * num_blk_side;
 
-      coeffs_upper = _mm_castpd_si128(coeffs_d_upper);
-      coeffs_lower = _mm_castpd_si128(coeffs_d_lower);
+    __m128d coeffs_d_upper;
+    __m128d coeffs_d_lower;
+    __m128i coeffs_upper;
+    __m128i coeffs_lower;
+    __m256i cur_coeffs;
 
-      cur_coeffs = _mm256_insertf128_si256(_mm256_castsi128_si256(coeffs_upper),
-                                           coeffs_lower,
-                                           1);
+    coeffs_d_upper = _mm_loadl_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 0 * width));
+    coeffs_d_upper = _mm_loadh_pd(coeffs_d_upper, (double *)(coeff + cg_pos + 1 * width));
+    coeffs_d_lower = _mm_loadl_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 2 * width));
+    coeffs_d_lower = _mm_loadh_pd(coeffs_d_lower, (double *)(coeff + cg_pos + 3 * width));
 
-      __m256i coeffs_zero = _mm256_cmpeq_epi16(cur_coeffs, zero);
-      uint32_t nz_coeffs_2b = ~((uint32_t)_mm256_movemask_epi8(coeffs_zero));
-      any_sig_cgs |= nz_coeffs_2b;
-      sig_coeffgroup_flag[cg_pos_x + cg_pos_y * num_blk_side] = nz_coeffs_2b;
+    coeffs_upper = _mm_castpd_si128(coeffs_d_upper);
+    coeffs_lower = _mm_castpd_si128(coeffs_d_lower);
+
+    cur_coeffs = _mm256_insertf128_si256(_mm256_castsi128_si256(coeffs_upper),
+                                         coeffs_lower,
+                                         1);
+
+    __m256i coeffs_zero = _mm256_cmpeq_epi16(cur_coeffs, zero);
+
+    uint32_t nz_coeffs_2b = ~((uint32_t)_mm256_movemask_epi8(coeffs_zero));
+    sig_coeffgroup_flag[addr] = nz_coeffs_2b;
+
+    if (nz_coeffs_2b & scan_cg_last_not_found) {
+      scan_cg_last = i;
+      scan_cg_last_not_found = 0;
     }
   }
-
   // Rest of the code assumes at least one non-zero coeff.
-  assert(any_sig_cgs != 0);
+  assert(scan_cg_last_not_found == 0);
 
-  // Find the last coeff group by going backwards in scan order.
-  unsigned scan_cg_last = num_blk_side * num_blk_side - 1;
-  while (!sig_coeffgroup_flag[scan_cg[scan_cg_last]]) {
-    --scan_cg_last;
+  // TODO: reorder coeffs in the fast if painstaking way?
+  ALIGNED(64) int16_t coeff_reord[LCU_WIDTH * LCU_WIDTH];
+
+  for (int i = 0; i < width * width; i++) {
+    coeff_reord[i] = coeff[scan[i]];
   }
+
+  const uint32_t SCAN_WIDTH = 8;
 
   // Find the last coeff by going backwards in scan order.
-  unsigned scan_pos_last = scan_cg_last * 16 + 15;
-  while (!coeff[scan[scan_pos_last]]) {
-    --scan_pos_last;
-  }
+  uint32_t scan_pos_last;
+  uint32_t baseaddr = scan_cg_last * 16;
+  __m256i cur_coeffs = _mm256_loadu_si256((__m256i *)(coeff_reord + baseaddr));
+  __m256i cur_coeffs_zeros = _mm256_cmpeq_epi16(cur_coeffs, zero);
+  uint32_t nz_bytes = ~(_mm256_movemask_epi8(cur_coeffs_zeros));
+  scan_pos_last = baseaddr + ((31 - _lzcnt_u32(nz_bytes)) >> 1);
 
   int pos_last = scan[scan_pos_last];
 
@@ -235,13 +251,23 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
                                                              cg_pos_x, cg_pos_y, width);
 
+      // TODO: reorder coeff and vectorize?
+      const __m256i ns = _mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+
+      __m256i coeffs = _mm256_load_si256((__m256i *)coeff_reord);
+      __m256i sigs_inv = _mm256_cmpeq_epi16(coeffs, zero);
+      __m256i is = _mm256_set1_epi16(i);
+      __m256i is_zero = _mm256_cmpeq_epi16(is, zero);
+      // TODO!
+
+      // TODO: get first and last nz
       for (; scan_pos_sig >= sub_pos; scan_pos_sig--) {
         blk_pos = scan[scan_pos_sig];
         pos_y   = blk_pos >> log2_block_size;
         pos_x   = blk_pos - (pos_y << log2_block_size);
-        sig    = (coeff[blk_pos] != 0) ? 1 : 0;
+        sig    = (coeff_reord[scan_pos_sig] != 0) ? 1 : 0;
 
-        if (scan_pos_sig > sub_pos || i == 0 || num_non_zero) {
+        if (scan_pos_sig > sub_pos || i == 0 || num_non_zero != 0) {
           ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
           cabac->cur_ctx = &baseCtx[ctx_sig];
