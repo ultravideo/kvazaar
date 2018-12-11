@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -22,27 +22,28 @@
     <ProjectGuid>{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>kvazaar_lib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -83,13 +84,16 @@
     </Lib>
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
+      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
     </YASM>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories);$(SolutionDir)..\src\strategies;</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
+      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
@@ -98,12 +102,13 @@
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories);$(SolutionDir)..\src\strategies;</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
+      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
@@ -112,12 +117,13 @@
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories);$(SolutionDir)..\src\strategies;</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
+      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86_asm;</IncludePaths>
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
@@ -126,6 +132,7 @@
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories);$(SolutionDir)..\src\strategies;</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -293,7 +300,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </YASM>
-    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.asm" />
+    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.asm">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </YASM>
     <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -56,6 +56,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             int16_t mv_param[2][2],
                             lcu_t* lcu);
 
+
 void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t x,
                            int32_t y,

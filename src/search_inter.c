@@ -35,7 +35,6 @@
 #include "strategies/strategies-picture.h"
 #include "videoframe.h"
 
-
 typedef struct {
   encoder_state_t *state;
 

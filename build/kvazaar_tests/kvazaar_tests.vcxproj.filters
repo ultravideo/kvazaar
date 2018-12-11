@@ -42,6 +42,9 @@
     <ClCompile Include="..\..\tests\coeff_sum_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\inter_recon_bipred_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\sad_tests.h">
