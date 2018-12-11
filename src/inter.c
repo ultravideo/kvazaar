@@ -1470,33 +1470,13 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  int num_ref = state->frame->ref->used_size;
-
-  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
-    int j;
-    int ref_negative = 0;
-    int ref_positive = 0;
-    for (j = 0; j < state->frame->ref->used_size; j++) {
-      //*********************************************
-      //For scalable extension. Add ILR to ref_neg
-      if (state->frame->ref->pocs[j] <= state->frame->poc) {
-        ref_negative++;
-      } else {
-        ref_positive++;
-      }
-      //*********************************************
-    }
-    num_ref = MIN(ref_negative, ref_positive);
-  }
+  int num_ref = state->frame->slicetype == KVZ_SLICE_B ? MIN(state->frame->ref_LX_size[0], state->frame->ref_LX_size[1]) : state->frame->ref_LX_size[0];
 
   // Add (0,0) prediction
-  while (candidates != MRG_MAX_NUM_CANDS) {
+  while (candidates < MRG_MAX_NUM_CANDS) {
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
-    //*********************************************
-    //For scalable extension. TODO: zero_idx needs to go to num_ref-1?
-    mv_cand[candidates].ref[0] = (zero_idx > num_ref - 1) ? 0 : zero_idx;
-    //*********************************************
+    mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
     mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
     if (state->frame->slicetype == KVZ_SLICE_B) {
