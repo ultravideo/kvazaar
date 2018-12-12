@@ -26,6 +26,167 @@
 #include "kvz_math.h"
 #include <immintrin.h>
 
+/**
+ * \brief Context derivation process of coeff_abs_significant_flag,
+ *        parallelized to handle 16 coeffs at once
+ * \param pattern_sig_ctx pattern for current coefficient group
+ * \param scan_idx pixel scan type in use
+ * \param pos_xs column addresses of current scan positions
+ * \param pos_ys row addresses of current scan positions
+ * \param block_type log2 value of block size if square block, or 4 otherwise
+ * \param width width of the block
+ * \param texture_type texture type (TEXT_LUMA...)
+ * \returns ctx_inc for current scan position
+ */
+static INLINE __m256i kvz_context_get_sig_ctx_inc_16x16b(int32_t pattern_sig_ctx, uint32_t scan_idx, __m256i pos_xs,
+                                __m256i pos_ys, int32_t block_type, int8_t texture_type)
+{
+  const __m256i zero   = _mm256_set1_epi8(0);
+  const __m256i ff     = _mm256_set1_epi8(0xff);
+
+  const __m256i ones   = _mm256_set1_epi16(1);
+  const __m256i twos   = _mm256_set1_epi16(2);
+  const __m256i threes = _mm256_set1_epi16(3);
+
+  const __m256i ctx_ind_map[3] = {
+    _mm256_setr_epi16(
+        0, 2, 1, 6,
+        3, 4, 7, 6,
+        4, 5, 7, 8,
+        5, 8, 8, 8
+    ),
+    _mm256_setr_epi16(
+        0, 1, 4, 5,
+        2, 3, 4, 5,
+        6, 6, 8, 8,
+        7, 7, 8, 8
+    ),
+    _mm256_setr_epi16(
+        0, 2, 6, 7,
+        1, 3, 6, 7,
+        4, 4, 8, 8,
+        5, 5, 8, 8
+    ),
+  };
+
+  int16_t offset;
+  if (block_type == 3)
+    if (scan_idx == SCAN_DIAG)
+      offset = 9;
+    else
+      offset = 15;
+  else
+    if (texture_type == 0)
+      offset = 21;
+    else
+      offset = 12;
+
+  __m256i offsets = _mm256_set1_epi16(offset);
+
+  // This will only ever be compared to 0, 1 and 2, so it's fine to cast down
+  // to 16b (and it should never be above 3 anyways)
+  __m256i pattern_sig_ctxs = _mm256_set1_epi16((int16_t)(MIN(0xffff, pattern_sig_ctx)));
+  __m256i pattern_sig_ctxs_eq_zero = _mm256_cmpeq_epi16(pattern_sig_ctxs, zero);
+  __m256i pattern_sig_ctxs_eq_one  = _mm256_cmpeq_epi16(pattern_sig_ctxs, ones);
+  __m256i pattern_sig_ctxs_eq_two  = _mm256_cmpeq_epi16(pattern_sig_ctxs, twos);
+
+  __m256i pattern_sig_ctxs_eq_1or2 = _mm256_or_si256 (pattern_sig_ctxs_eq_one,
+                                                      pattern_sig_ctxs_eq_two);
+  __m256i pattern_sig_ctxs_lt3     = _mm256_or_si256 (pattern_sig_ctxs_eq_1or2,
+                                                      pattern_sig_ctxs_eq_zero);
+  __m256i pattern_sig_ctxs_other   = _mm256_xor_si256(pattern_sig_ctxs_lt3,
+                                                      ff);
+  __m256i x_plus_y        = _mm256_add_epi16  (pos_xs,   pos_ys);
+  __m256i x_plus_y_zero   = _mm256_cmpeq_epi16(x_plus_y, zero);   // All these should be 0, preempts block_type_two rule
+
+  __m256i texture_types = _mm256_set1_epi16((int16_t)texture_type);
+
+  __m256i block_types     = _mm256_set1_epi16((int16_t)block_type);
+  __m256i block_type_two  = _mm256_cmpeq_epi16(block_types, twos);   // All these should be ctx_ind_map[4 * pos_y + pos_x];
+  __m256i bt2_vals        = ctx_ind_map[scan_idx];
+  __m256i bt2_vals_masked = _mm256_and_si256(bt2_vals, block_type_two);
+
+  __m256i pos_xs_in_subset = _mm256_and_si256(pos_xs, threes);
+  __m256i pos_ys_in_subset = _mm256_and_si256(pos_ys, threes);
+
+  __m256i cg_pos_xs        = _mm256_srli_epi16(pos_xs, 2);
+  __m256i cg_pos_ys        = _mm256_srli_epi16(pos_ys, 2);
+  __m256i cg_pos_xysums    = _mm256_add_epi16 (cg_pos_xs, cg_pos_ys);
+
+  __m256i pos_xy_sums_in_subset = _mm256_add_epi16(pos_xs_in_subset, pos_ys_in_subset);
+
+  /*
+   * if (pattern_sig_ctx == 0) {
+   *   switch (pos_x_in_subset + pos_y_in_subset) {
+   *   case 0:
+   *     cnt = 2;
+   *     break;
+   *   case 1:
+   *   case 2:
+   *     cnt = 1;
+   *     break;
+   *   default:
+   *     cnt = 0;
+   *   }
+   * }
+   *
+   * Equivalent to:
+   *
+   * if (pattern_sig_ctx == 0) {
+   *   subamt = cnt <= 1 ? 1 : 0;
+   *   pxyis_max3 = min(3, pos_x_in_subset + pos_y_in_subset);
+   *   cnt = (3 - pxyis_max3) - subamt;
+   * }
+   */
+  __m256i pxyis_lte_1     = _mm256_cmpgt_epi16(twos,                  pos_xy_sums_in_subset);
+  __m256i subamts         = _mm256_and_si256  (pxyis_lte_1,           ones);
+  __m256i pxyis_max3      = _mm256_min_epu16  (pos_xy_sums_in_subset, threes);
+  __m256i cnts_tmp        = _mm256_sub_epi16  (threes,                pxyis_max3);
+  __m256i cnts_sig_ctx_0  = _mm256_sub_epi16  (cnts_tmp,              subamts);
+  __m256i cnts_sc0_masked = _mm256_and_si256  (cnts_sig_ctx_0,        pattern_sig_ctxs_eq_zero);
+
+  /*
+   * if (pattern_sig_ctx == 1 || pattern_sig_ctx == 2) {
+   *   if (pattern_sig_ctx == 1)
+   *     subtrahend = pos_y_in_subset;
+   *   else
+   *     subtrahend = pos_x_in_subset;
+   *   cnt = 2 - min(2, subtrahend);
+   * }
+   */
+  __m256i pos_operands_ctx_1or2 = _mm256_blendv_epi8(pos_ys_in_subset,
+                                                     pos_xs_in_subset,
+                                                     pattern_sig_ctxs_eq_two);
+
+  __m256i pos_operands_max2     = _mm256_min_epu16  (pos_operands_ctx_1or2, twos);
+  __m256i cnts_sig_ctx_1or2     = _mm256_sub_epi16  (twos,                  pos_operands_max2);
+  __m256i cnts_sc12_masked      = _mm256_and_si256  (cnts_sig_ctx_1or2,     pattern_sig_ctxs_eq_1or2);
+
+  /*
+   * if (pattern_sig_ctx > 2)
+   *   cnt = 2;
+   */
+  __m256i cnts_scother_masked = _mm256_and_si256(twos, pattern_sig_ctxs_other);
+
+  // Select correct count
+  __m256i cnts_sc012_masked   = _mm256_or_si256 (cnts_sc0_masked,     cnts_sc12_masked);
+  __m256i cnts                = _mm256_or_si256 (cnts_scother_masked, cnts_sc012_masked);
+
+  // Compute final values
+  __m256i textype_eq_0     = _mm256_cmpeq_epi16(texture_types, zero);
+  __m256i cg_pos_sums_gt_0 = _mm256_cmpgt_epi16(cg_pos_xysums, zero);
+  __m256i tmpcond          = _mm256_and_si256  (textype_eq_0,  cg_pos_sums_gt_0);
+  __m256i tmp              = _mm256_and_si256  (tmpcond,       threes);
+  __m256i tmp_with_offsets = _mm256_add_epi16  (tmp,           offsets);
+  __m256i rv_noshortcirc   = _mm256_add_epi16  (cnts,          tmp_with_offsets);
+
+  // Ol' sprite mask method works here!
+  __m256i rv1 = _mm256_andnot_si256(block_type_two, rv_noshortcirc);
+  __m256i rv2 = _mm256_or_si256    (rv1,            bt2_vals_masked);
+  __m256i rv  = _mm256_andnot_si256(x_plus_y_zero,  rv2);
+  return rv;
+}
+
 static INLINE __m256i scanord_read_vector(const int16_t *coeff, const uint32_t *scan, int8_t scan_mode, int32_t subpos, int32_t width)
 {
   // For vectorized reordering of coef and q_coef
@@ -312,6 +473,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   ALIGNED(32) uint16_t abs_coeff_buf_sb[16];
   ALIGNED(32) int16_t pos_ys_buf[16];
   ALIGNED(32) int16_t pos_xs_buf[16];
+  ALIGNED(32) int16_t ctx_sig_buf[16];
 
   abs_coeff[0] = abs(coeff[pos_last]);
   uint32_t coeff_signs  = (coeff[pos_last] < 0);
@@ -372,6 +534,11 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       get_first_last_nz_int16(masked_coeffs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
       _mm256_store_si256((__m256i *)abs_coeff_buf_sb, abs_coeffs);
 
+      __m256i ctx_sigs = kvz_context_get_sig_ctx_inc_16x16b(pattern_sig_ctx, scan_mode, pos_xs, pos_ys,
+                                             log2_block_size, type);
+
+      _mm256_store_si256((__m256i *)ctx_sig_buf, ctx_sigs);
+
       uint32_t esc_flags = ~(_mm256_movemask_epi8(encode_sig_coeff_flags_inv));
       uint32_t sigs = ~(_mm256_movemask_epi8(sigs_inv));
       uint32_t coeff_sign_buf = _mm256_movemask_epi8(coeffs_subzero);
@@ -384,12 +551,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
         uint32_t curr_esc_flag = (esc_flags >> shamt) & 1;
         uint32_t curr_coeff_sign = (coeff_sign_buf >> shamt) & 1;
 
-        uint32_t curr_pos_x = pos_xs_buf[id];
-        uint32_t curr_pos_y = pos_ys_buf[id];
-
         if (curr_esc_flag | num_non_zero) {
-          ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, curr_pos_x, curr_pos_y,
-                                             log2_block_size, type);
+          ctx_sig = ctx_sig_buf[id];
           cabac->cur_ctx = &baseCtx[ctx_sig];
           CABAC_BIN(cabac, curr_sig, "sig_coeff_flag");
         }
