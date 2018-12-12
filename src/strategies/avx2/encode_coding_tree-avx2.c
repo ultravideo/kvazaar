@@ -227,10 +227,9 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   // 0 if false (not actually undefined, it's a bitmask representing the
   // significant coefficients' position in the group which in itself could
   // be useful information)
-  uint32_t scan_cg_last = 0;
-  uint32_t scan_cg_last_not_found = -1;
+  int32_t scan_cg_last = -1;
 
-  for (int32_t i = num_blocks - 1; i >= 0; i--) {
+  for (int32_t i = 0; i < num_blocks; i++) {
     const uint32_t cg_id = scan_cg[i];
     const uint32_t n_xbits = log2_block_size - 2; // How many lowest bits of scan_cg represent X coord
     const uint32_t cg_x = cg_id & ((1 << n_xbits) - 1);
@@ -264,13 +263,11 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     uint32_t nz_coeffs_2b = ~((uint32_t)_mm256_movemask_epi8(coeffs_zero));
     sig_coeffgroup_flag[addr] = nz_coeffs_2b;
 
-    if (nz_coeffs_2b & scan_cg_last_not_found) {
+    if (nz_coeffs_2b)
       scan_cg_last = i;
-      scan_cg_last_not_found = 0;
-    }
   }
   // Rest of the code assumes at least one non-zero coeff.
-  assert(scan_cg_last_not_found == 0);
+  assert(scan_cg_last >= 0);
 
   ALIGNED(64) int16_t coeff_reord[LCU_WIDTH * LCU_WIDTH];
   for (int32_t i = scan_cg_last; i >= 0; i--) {
