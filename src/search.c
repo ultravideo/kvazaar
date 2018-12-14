@@ -538,6 +538,26 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
     }
 
+#if LOW_DELAY==1
+    if (cur_cu->type == CU_INTRA) {
+      assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
+      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+      if (!(x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400)) {
+        kvz_intra_recon_cu(state,
+          x, y,
+          depth,
+          cur_cu->intra.mode, -1, // skip chroma
+          NULL, lcu);
+      } else {
+        kvz_intra_recon_cu(state,
+          x, y,
+          depth,
+          cur_cu->intra.mode, cur_cu->intra.mode_chroma,
+          NULL, lcu);
+      }
+    }
+#else
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
@@ -603,7 +623,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       lcu_set_inter(lcu, x_local, y_local, cu_width);
       lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
     }
+#endif //LOW_DELAY==1
   }
+
+#if LOW_DELAY!=1
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
@@ -641,6 +664,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
+#endif //LOW_DELAY!=1
 
   bool can_split_cu =
     // If the CU is partially outside the frame, we need to split it even
@@ -689,6 +713,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
+#if LOW_DELAY!=1
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame->width && y + cu_width <= frame->height)
     {
@@ -728,6 +753,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost += mode_bits * state->lambda;
       }
     }
+#endif //LOW_DELAY!=1
 
     if (split_cost < cost) {
       // Copy split modes to this depth.

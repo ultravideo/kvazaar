@@ -328,6 +328,12 @@ int main(int argc, char *argv[])
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
 
+  clock_t frame_times[20];
+  uint8_t timer_last_index = 0;
+  uint64_t min_frame_time = MAX_INT64;
+  uint64_t max_frame_time = 0;
+  uint64_t sum_frame_times = 0;
+
   // PTS of the reconstructed picture that should be output next.
   // Only used with --debug.
   uint64_t next_recon_pts = 0;
@@ -500,6 +506,8 @@ int main(int argc, char *argv[])
       kvz_picture *img_src = NULL;
       uint32_t len_out = 0;
       kvz_frame_info info_out;
+      frame_times[timer_last_index] = clock();
+      timer_last_index++;
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
@@ -518,6 +526,14 @@ int main(int argc, char *argv[])
       }
 
       if (chunks_out != NULL) {
+        int64_t frame_time = clock() - frame_times[0];
+        for (int i = 0; i < timer_last_index-1; i++) {
+          frame_times[i] = frame_times[i + 1];
+        }
+        timer_last_index--;
+        if (frame_time > max_frame_time) max_frame_time = frame_time;
+        if (frame_time < min_frame_time) min_frame_time = frame_time;
+        sum_frame_times += frame_time;
         uint64_t written = 0;
         // Write data into the output file.
         for (kvz_data_chunk *chunk = chunks_out;
@@ -602,7 +618,7 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr);
+        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr, frame_time);
       }
 
       api->picture_free(cur_in_img);
@@ -638,6 +654,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
+      fprintf(stderr, " Average latency: %lli ms Max latency: %lli ms Min latency: %lli ms", sum_frame_times / frames_done, max_frame_time, min_frame_time);
     }
     pthread_join(input_thread, NULL);
   }

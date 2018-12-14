@@ -104,6 +104,9 @@ typedef int16_t coeff_t;
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
 
+// Low delay configuration
+#define LOW_DELAY 1
+
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0
 #define PU_DEPTH_INTER_MAX 3

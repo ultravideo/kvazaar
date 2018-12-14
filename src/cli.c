@@ -555,7 +555,8 @@ void print_help(void)
 void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
-                      const bool print_psnr)
+                      const bool print_psnr,
+                      const int64_t frame_time)
 {
   fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits",
           info->poc,
@@ -566,6 +567,8 @@ void print_frame_info(const kvz_frame_info *const info,
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
   }
+
+  fprintf(stderr, " %lli ms", frame_time);
 
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists

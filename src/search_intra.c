@@ -431,7 +431,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   int8_t modes_selected = 0;
   unsigned min_cost = UINT_MAX;
   unsigned max_cost = 0;
-  
+
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.
   int offset;
@@ -801,6 +801,11 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          const int depth, lcu_t *lcu,
                          int8_t *mode_out, double *cost_out)
 {
+#if LOW_DELAY==1
+  * mode_out = 0;
+  * cost_out = 10;
+  return;
+#else
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
@@ -875,10 +880,11 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                       candidate_modes,
                       num_modes_to_check,
                       modes, costs, lcu);
+    
   }
-
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
 
   *mode_out = modes[best_mode_i];
   *cost_out = costs[best_mode_i];
+#endif //LOW_DELAY==1
 }

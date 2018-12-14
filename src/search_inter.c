@@ -767,8 +767,8 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
   }
 
   // Move the center to the best match.
-  //mv.x += large_hexbs[best_index].x;
-  //mv.y += large_hexbs[best_index].y;
+  mv.x += large_hexbs[best_index].x;
+  mv.y += large_hexbs[best_index].y;
 
   // Do the final step of the search with a small pattern.
   for (int i = 1; i < 9; ++i) {
