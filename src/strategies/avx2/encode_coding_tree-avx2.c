@@ -584,29 +584,34 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
         ctx_set++;
       }
 
-      c1 = 1;
-
       base_ctx_mod     = (type == 0) ? &(cabac->ctx.cu_one_model_luma[4 * ctx_set]) :
                          &(cabac->ctx.cu_one_model_chroma[4 * ctx_set]);
       num_c1_flag      = MIN(num_non_zero, C1FLAG_NUMBER);
       first_c2_flag_idx = -1;
 
+
+      /*
+       * c1s_pattern is 16 base-4 numbers: 3, 3, 3, ... , 3, 2 (c1 will never
+       * be less than 0 or greater than 3, so two bits per iter are enough).
+       * It's essentially the values that c1 will be for the next iteration as
+       * long as we have not encountered any >1 symbols. Count how long run of
+       * such symbols there is in the beginning of this CG, and zero all c1's
+       * that are located at or after the first >1 symbol.
+       */
+      const uint32_t c1s_pattern = 0xfffffffe;
+      uint32_t n_nongt1_bits = _tzcnt_u32(coeffs_gt1_bits);
+      uint32_t c1s_nextiter = _bzhi_u32(c1s_pattern, n_nongt1_bits);
+      first_c2_flag_idx = n_nongt1_bits >> 1;
+
+      c1 = 1;
       for (idx = 0; idx < num_c1_flag; idx++) {
-        uint32_t shamt = (idx << 1) + 1;
+        uint32_t shamt = idx << 1;
         uint32_t symbol = (coeffs_gt1_bits >> shamt) & 1;
 
         cabac->cur_ctx = &base_ctx_mod[c1];
         CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
 
-        if (symbol) {
-          c1 = 0;
-
-          if (first_c2_flag_idx == -1) {
-            first_c2_flag_idx = idx;
-          }
-        } else if ((c1 < 3) && (c1 > 0)) {
-          c1++;
-        }
+        c1 = (c1s_nextiter >> shamt) & 3;
       }
 
       if (c1 == 0) {
