@@ -213,7 +213,7 @@ endif #HAVE_PPC
 if HAVE_X86
 
 if HAVE_AVX2
-libavx2_la_CFLAGS = -mavx2 -mbmi -mabm
+libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mbmi2
 endif
 if HAVE_SSE4_1
 libsse41_la_CFLAGS = -msse4.1
