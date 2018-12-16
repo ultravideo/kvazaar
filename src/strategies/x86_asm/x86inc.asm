@@ -1454,3 +1454,13 @@ FMA4_INSTR fnmsubss, fnmsub132ss, fnmsub213ss, fnmsub231ss
 %endif
 %endmacro
 %endif
+
+%ifidn __OUTPUT_FORMAT__,elf
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif
+%ifidn __OUTPUT_FORMAT__,elf32
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif
+%ifidn __OUTPUT_FORMAT__,elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif
