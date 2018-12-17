@@ -759,6 +759,7 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
   switch (num_layers) {
     case 0:
     case 1:
+      encoder->gop_layer_weights[0] = 1;
       break;
 
     // Use the first layers of the 4-layer weights.
