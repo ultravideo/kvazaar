@@ -365,7 +365,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     __m256i coeffs_r;
     for (int32_t i = 0; i <= scan_cg_last; i++) {
       int32_t subpos = i * 16;
-      coeffs_r = scanord_read_vector(coeff, scan, scan_mode, subpos, width);
+      scanord_read_vector(&coeff, scan, scan_mode, subpos, width, &coeffs_r, 1);
       _mm256_store_si256((__m256i *)(coeff_reord + subpos), coeffs_r);
     }
 
