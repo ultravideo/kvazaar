@@ -478,9 +478,9 @@ int main(int argc, char *argv[])
       assert(0);
       return 0;
     }
-    kvz_picture *cur_in_img;
+    kvz_picture *cur_in_img = NULL;
     for (;;) {
-
+      
       // Skip mutex locking if the input thread does not exist.
       if (in_args.retval == RETVAL_RUNNING) {
         // Increase available_input_slots so that the input thread can
@@ -508,6 +508,7 @@ int main(int argc, char *argv[])
       kvz_frame_info info_out;
       frame_times[timer_last_index] = clock();
       timer_last_index++;
+
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
@@ -526,14 +527,6 @@ int main(int argc, char *argv[])
       }
 
       if (chunks_out != NULL) {
-        int64_t frame_time = clock() - frame_times[0];
-        for (int i = 0; i < timer_last_index-1; i++) {
-          frame_times[i] = frame_times[i + 1];
-        }
-        timer_last_index--;
-        if (frame_time > max_frame_time) max_frame_time = frame_time;
-        if (frame_time < min_frame_time) min_frame_time = frame_time;
-        sum_frame_times += frame_time;
         uint64_t written = 0;
         // Write data into the output file.
         for (kvz_data_chunk *chunk = chunks_out;
@@ -586,6 +579,7 @@ int main(int argc, char *argv[])
         }
 
         // Compute and print stats.
+        
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
@@ -617,6 +611,15 @@ int main(int argc, char *argv[])
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
+
+        int64_t frame_time = clock() - frame_times[0];
+        for (int i = 0; i < timer_last_index - 1; i++) {
+          frame_times[i] = frame_times[i + 1];
+        }
+        timer_last_index--;
+        if (frame_time > max_frame_time) max_frame_time = frame_time;
+        if (frame_time < min_frame_time) min_frame_time = frame_time;
+        sum_frame_times += frame_time;
 
         print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr, frame_time);
       }
@@ -654,7 +657,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
-      fprintf(stderr, " Average latency: %lli ms Max latency: %lli ms Min latency: %lli ms", sum_frame_times / frames_done, max_frame_time, min_frame_time);
+      fprintf(stderr, " Average latency: %.2f ms Max latency: %lli ms Min latency: %lli ms\n", (double)((double)sum_frame_times / (double)frames_done), max_frame_time, min_frame_time);
     }
     pthread_join(input_thread, NULL);
   }

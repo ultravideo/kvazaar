@@ -106,6 +106,8 @@ typedef int16_t coeff_t;
 
 // Low delay configuration
 #define LOW_DELAY 1
+// When enabled, recommended parameters: 
+// --preset=ultrafast --no-psnr --pu-intra-depth 1-1 -p 1 --no-sao --no-deblock --rd 0 --owf 0 --tiles <int>x<int>
 
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0

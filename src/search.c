@@ -455,6 +455,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (x + cu_width <= frame->width &&
       y + cu_width <= frame->height)
   {
+#if LOW_DELAY!=1
     int cu_width_inter_min = LCU_WIDTH >> ctrl->cfg.pu_depth_inter.max;
     bool can_use_inter =
       state->frame->slicetype != KVZ_SLICE_I &&
@@ -512,9 +513,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
+#endif // LOW_DELAY!=1
     bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
                       && cost / (cu_width * cu_width) < INTRA_THRESHOLD;
+
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
@@ -666,6 +669,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 #endif //LOW_DELAY!=1
 
+#if LOW_DELAY!=1
   bool can_split_cu =
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
@@ -673,6 +677,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     depth < ctrl->cfg.pu_depth_intra.max ||
     (state->frame->slicetype != KVZ_SLICE_I &&
       depth < ctrl->cfg.pu_depth_inter.max);
+#else
+  bool can_split_cu = cur_cu->type == CU_NOTSET ||
+    depth < ctrl->cfg.pu_depth_intra.max;
+#endif //LOW_DELAY!=1
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
@@ -935,6 +943,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // Start search from depth 0.
   double cost = search_cu(state, x, y, 0, work_tree);
 
+
   // Save squared cost for rate control.
   kvz_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight = cost * cost;
 
@@ -946,4 +955,5 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);
   copy_coeffs(work_tree[0].coeff.u, state->coeff->u, LCU_WIDTH_C);
   copy_coeffs(work_tree[0].coeff.v, state->coeff->v, LCU_WIDTH_C);
+
 }
