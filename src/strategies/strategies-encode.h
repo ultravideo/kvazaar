@@ -42,8 +42,6 @@ typedef unsigned (encode_coeff_nxn_func)(encoder_state_t * const state,
                                          int8_t scan_mode,
                                          int8_t tr_skip);
 
-typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
-
 // Declare function pointers.
 extern encode_coeff_nxn_func *kvz_encode_coeff_nxn;
 

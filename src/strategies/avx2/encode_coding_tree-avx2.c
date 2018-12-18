@@ -27,6 +27,11 @@
 #include "kvz_math.h"
 #include <immintrin.h>
 
+// GCC headers apparently won't have this at all.. sigh
+#ifndef _andn_u32
+#define _andn_u32(x, y) (__andn_u32((x), (y)))
+#endif
+
 /*
  * NOTE: Returns 10, not 11 like SSE and AVX comparisons do, as the bit pattern
  * implying greaterness
@@ -35,10 +40,10 @@ static INLINE uint32_t _mm32_cmpgt_epu2(uint32_t a, uint32_t b)
 {
   const uint32_t himask = 0xaaaaaaaa;
 
-  uint32_t a_gt_b          = __andn_u32(b, a);
+  uint32_t a_gt_b          = _andn_u32(b, a);
   uint32_t a_ne_b          = a ^ b;
   uint32_t a_gt_b_sh       = a_gt_b << 1;
-  uint32_t lobit_tiebrk_hi = __andn_u32(a_ne_b, a_gt_b_sh);
+  uint32_t lobit_tiebrk_hi = _andn_u32(a_ne_b, a_gt_b_sh);
   uint32_t res             = (a_gt_b | lobit_tiebrk_hi) & himask;
   return res;
 }
@@ -329,8 +334,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     const uint32_t cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
     const uint32_t addr = cg_pos_x + cg_pos_y * num_blk_side;
 
-    __m128d coeffs_d_upper;
-    __m128d coeffs_d_lower;
+    __m128d coeffs_d_upper = _mm_setzero_pd();
+    __m128d coeffs_d_lower = _mm_setzero_pd();
     __m128i coeffs_upper;
     __m128i coeffs_lower;
     __m256i cur_coeffs;
