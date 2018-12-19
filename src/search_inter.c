@@ -996,6 +996,8 @@ static void search_frac(inter_search_info_t *info)
   vector2d_t orig = info->origin;
   const int width = info->width;
   const int height = info->height;
+  const int internal_width  = ((width  + 7) >> 3) << 3; // Round up to closest 8
+  const int internal_height = ((height + 7) >> 3) << 3;
 
   const encoder_state_t *state = info->state;
   int fme_level = state->encoder_control->cfg.fme_level;
@@ -1006,7 +1008,7 @@ static void search_frac(inter_search_info_t *info)
                 state->tile->offset_x,
                 state->tile->offset_y,
                 ref->y, ref->width, ref->height, KVZ_LUMA_FILTER_TAPS,
-                width+1, height+1,
+                internal_width+1, internal_height+1,
                 &src);
 
   kvz_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
@@ -1047,8 +1049,8 @@ static void search_frac(inter_search_info_t *info)
     filter_steps[step](state->encoder_control,
       src.orig_topleft,
       src.stride,
-      width,
-      height,
+      internal_width,
+      internal_height,
       filtered,
       intermediate,
       fme_level,
@@ -1070,7 +1072,7 @@ static void search_frac(inter_search_info_t *info)
     filtered_pos[2] = &filtered[2][0];
     filtered_pos[3] = &filtered[3][0];
 
-    kvz_satd_any_size_quad(width, height, (const kvz_pixel **)filtered_pos, width, tmp_pic, tmp_stride, 4, costs, within_tile);
+    kvz_satd_any_size_quad(width, height, (const kvz_pixel **)filtered_pos, LCU_WIDTH, tmp_pic, tmp_stride, 4, costs, within_tile);
 
     for (int j = 0; j < 4; j++) {
       if (within_tile[j]) {
@@ -1235,7 +1237,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       break;
   }
 
-  if (cfg->fme_level > 0 && info->best_cost < *inter_cost && info->width % 8 == 0 && info->height % 8 == 0) {
+  if (cfg->fme_level > 0 && info->best_cost < *inter_cost) {
     search_frac(info);
 
   } else if (info->best_cost < UINT32_MAX) {

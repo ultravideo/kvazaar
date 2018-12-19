@@ -633,8 +633,8 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int8_t *fir0 = kvz_g_luma_filter[0];
   int8_t *fir2 = kvz_g_luma_filter[2];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   int16_t *hor_pos0 = hor_intermediate[0];
   int16_t *hor_pos2 = hor_intermediate[1];
@@ -734,11 +734,12 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Bottom
   // Copy what can be copied from the top filtered values.
   // Then filter the last row from horizontal intermediate buffer.
-  for (int i = 0; i + 7 < width * (height - 1); i += 8) {
-      *(int64_t*)&out_b[i] = *(int64_t*)&out_t[i + dst_stride];
+  for (y = 0; y < height - 1; ++y) {
+    for (x = 0; x + 7 < width; x += 8) {
+      *(int64_t*)&out_b[(y + 0) * dst_stride + x] = *(int64_t*)&out_t[(y + 1) * dst_stride + x];
+    }
   }
 
-  y = height - 1;
   for (x = 0; x + 7 < width; x += 8) {
     kvz_eight_tap_filter_ver_16bit_1x8_avx2(fir2, &hor_pos0[(y + 1) * hor_stride + x], hor_stride, &out_b[y * dst_stride + x]);
   }
@@ -766,8 +767,8 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 
   int8_t *fir2 = kvz_g_luma_filter[2];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   int16_t *hor_pos2 = hor_intermediate[1];
   int16_t *col_pos2 = hor_first_cols[2];
@@ -863,8 +864,8 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int16_t *col_pos_l = hor_first_cols[1];
   int16_t *col_pos_r = hor_first_cols[3];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   int16_t *hor_hpel_pos = hpel_off_x != 0 ? hor_pos2 : hor_pos0;
   int16_t *col_pos_hor = hpel_off_x != 0 ? hor_first_cols[2] : hor_first_cols[0];
@@ -1083,8 +1084,8 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int16_t *col_pos_l = hor_first_cols[1];
   int16_t *col_pos_r = hor_first_cols[3];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   // VERTICAL STEP
   kvz_pixel *out_tl = filtered[0];
@@ -1234,7 +1235,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
 
-  int16_t hor_stride = width;
+  int16_t hor_stride = LCU_WIDTH;
   int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
 
   // HORIZONTAL STEP
@@ -1288,7 +1289,7 @@ static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * cons
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
 
-  int16_t hor_stride = width;
+  int16_t hor_stride = LCU_WIDTH;
   int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
 
   // HORIZONTAL STEP
@@ -1342,7 +1343,7 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encode
   int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
 
-  int16_t hor_stride = width;
+  int16_t hor_stride = LCU_WIDTH_C;
   int16_t hor_intermediate[KVZ_EXT_BLOCK_W_CHROMA * LCU_WIDTH_C];
 
   // HORIZONTAL STEP
@@ -1405,7 +1406,7 @@ static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t * const 
   int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
 
-  int16_t hor_stride = width;
+  int16_t hor_stride = LCU_WIDTH_C;
   int16_t hor_intermediate[KVZ_EXT_BLOCK_W_CHROMA * LCU_WIDTH_C];
 
   // HORIZONTAL STEP

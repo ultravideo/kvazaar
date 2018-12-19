@@ -212,8 +212,8 @@ void kvz_filter_hpel_blocks_hor_ver_luma_generic(const encoder_control_t * encod
   int8_t *fir0 = kvz_g_luma_filter[0];
   int8_t *fir2 = kvz_g_luma_filter[2];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
   int32_t first_row_offset = (KVZ_LUMA_FILTER_OFFSET + 1) * hor_stride;
 
   int16_t *col_pos0 = hor_first_cols[0];
@@ -326,8 +326,8 @@ void kvz_filter_hpel_blocks_diag_luma_generic(const encoder_control_t * encoder,
 
   int8_t *fir2 = kvz_g_luma_filter[2];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   // Horizontal positions
   int16_t *col_pos2 = hor_first_cols[2];
@@ -421,8 +421,8 @@ void kvz_filter_qpel_blocks_hor_ver_luma_generic(const encoder_control_t * encod
   int16_t *col_pos_l = hor_first_cols[1];
   int16_t *col_pos_r = hor_first_cols[3];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   int16_t *hor_hpel_pos = hpel_off_x != 0 ? hor_pos2 : hor_pos0;
   int16_t *col_pos_hor  = hpel_off_x != 0 ? hor_first_cols[2] : hor_first_cols[0];
@@ -575,8 +575,8 @@ void kvz_filter_qpel_blocks_diag_luma_generic(const encoder_control_t * encoder,
   int16_t *col_pos_l = hor_first_cols[1];
   int16_t *col_pos_r = hor_first_cols[3];
 
-  int16_t dst_stride = width;
-  int16_t hor_stride = width;
+  int16_t dst_stride = LCU_WIDTH;
+  int16_t hor_stride = LCU_WIDTH;
 
   // VERTICAL STEP
   int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
