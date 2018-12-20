@@ -48,6 +48,28 @@ static INLINE uint32_t _mm32_cmpgt_epu2(uint32_t a, uint32_t b)
   return res;
 }
 
+static INLINE uint32_t pack_16x16b_to_16x2b(__m256i src)
+{
+  /*
+   * For each 16-bit element in src:
+   * Clip it to max. 3 (assuming the numbers to be unsigned)
+   * Shift
+   * 0000 0000 0000 00XY Clip to [0, 3]
+   * 0000 000X Y000 0000 Shift word to align LSBs across byte boundary
+   * 0000 0001 1000 0000 cmpmask to be compared against
+   * XXXX XXXX YYYY YYYY Comparison result, for movemask
+   */
+  const __m256i threes  = _mm256_set1_epi16(3);
+  const __m256i cmpmask = _mm256_set1_epi16(0x0180);
+
+  __m256i  clipped      = _mm256_min_epu16    (src, threes);
+  __m256i  shifted      = _mm256_slli_epi16   (clipped, 7);
+  __m256i  cmpres       = _mm256_cmpeq_epi8   (shifted, cmpmask);
+  uint32_t result       = _mm256_movemask_epi8(cmpres);
+
+  return result;
+}
+
 /**
  * \brief Context derivation process of coeff_abs_significant_flag,
  *        parallelized to handle 16 coeffs at once
@@ -572,25 +594,12 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       if (c1 == 0 || num_non_zero > C1FLAG_NUMBER) {
 
         const __m256i ones        = _mm256_set1_epi16(1);
-        const __m256i threes      = _mm256_set1_epi16(3);
 
         __m256i abs_coeffs_gt1    = _mm256_cmpgt_epi16  (abs_coeffs, ones);
         uint32_t acgt1_bits       = _mm256_movemask_epi8(abs_coeffs_gt1);
         uint32_t first_acgt1_bpos = _tzcnt_u32(acgt1_bits);
 
-        /*
-         * Extract low two bits (X and Y) from each coeff clipped at 3:
-         * abs_coeffs_max3: 0000 0000 0000 00XY
-         * abs_coeffs_tmp1: 0000 000X Y000 0000
-         * abs_coeffs_tmp2: XXXX XXXX YYYY YYYY inverted
-         *
-         * abs_coeffs can be clipped to [0, 3] for this because it will only
-         * be compared whether it's >= X, where X is between 0 and 3
-         */
-        __m256i abs_coeffs_max3   =   _mm256_min_epu16    (abs_coeffs,      threes);
-        __m256i abs_coeffs_tmp1   =   _mm256_slli_epi16   (abs_coeffs_max3, 7);
-        __m256i abs_coeffs_tmp2   =   _mm256_cmpeq_epi8   (abs_coeffs_tmp1, zero);
-        uint32_t abs_coeffs_base4 = ~(_mm256_movemask_epi8(abs_coeffs_tmp2));
+        uint32_t abs_coeffs_base4 = pack_16x16b_to_16x2b(abs_coeffs);
 
         const uint32_t ones_base4 = 0x55555555;
         const uint32_t twos_base4 = 0xaaaaaaaa;
