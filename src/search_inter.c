@@ -33,6 +33,7 @@
 #include "search.h"
 #include "strategies/strategies-ipol.h"
 #include "strategies/strategies-picture.h"
+#include "transform.h"
 #include "videoframe.h"
 
 typedef struct {
@@ -1554,6 +1555,13 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   }
   kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
   kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth));
+
+  const bool reconstruct_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
+    x, y, depth,
+    NULL,
+    lcu);
+
   *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
     *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
