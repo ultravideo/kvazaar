@@ -34,6 +34,64 @@
 #include "strategyselector.h"
 #include "strategies/generic/picture-generic.h"
 
+unsigned kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                          const int width, const int height, const unsigned stride1, const unsigned stride2)
+{
+  int y, x;
+  unsigned sad = 0;
+  __m128i sse_inc = _mm_setzero_si128 ();
+  long long int sse_inc_array[2];
+
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x <= width-16; x+=16) {
+      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
+      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a,b));
+    }
+
+    {
+      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
+      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      switch (((width - (width%2)) - x)/2) {
+        case 0:
+          break;
+        case 1:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x01)));
+          break;
+        case 2:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x03)));
+          break;
+        case 3:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x07)));
+          break;
+        case 4:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x0f)));
+          break;
+        case 5:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x1f)));
+          break;
+        case 6:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x3f)));
+          break;
+        case 7:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x7f)));
+          break;
+        default:
+          //Should not happen
+          assert(0);
+      }
+      x = (width - (width%2));
+    }
+
+    for (; x < width; ++x) {
+      sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
+    }
+  }
+  _mm_storeu_si128((__m128i*) sse_inc_array, sse_inc);
+  sad += sse_inc_array[0] + sse_inc_array[1];
+
+  return sad;
+}
 
 /**
 * \brief Calculate SAD for 8x8 bytes in continuous memory.
@@ -1230,6 +1288,8 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
   // simplest code to look at for anyone interested in doing more
   // optimizations, so it's worth it to keep this maintained.
   if (bitdepth == 8){
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 40, &kvz_reg_sad_avx2);
+
     success &= kvz_strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
@@ -1250,7 +1310,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
     success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
-	   success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
+	  success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
 
   }
 #endif
