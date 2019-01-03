@@ -52,15 +52,14 @@ static INLINE uint32_t pack_16x16b_to_16x2b(__m256i src)
 {
   /*
    * For each 16-bit element in src:
-   * Clip it to max. 3 (assuming the numbers to be unsigned)
-   * Shift
-   * 0000 0000 0000 00XY Clip to [0, 3]
+   * ABCD EFGH IJKL MNOP Original elements
+   * 0000 0000 0000 00XY Element clipped to [0, 3] using _mm256_min_epu16
    * 0000 000X Y000 0000 Shift word to align LSBs across byte boundary
-   * 0000 0001 1000 0000 cmpmask to be compared against
+   * 0000 0001 1000 0000 Comparison mask to be compared against
    * XXXX XXXX YYYY YYYY Comparison result, for movemask
    */
-  const __m256i threes  = _mm256_set1_epi16(3);
-  const __m256i cmpmask = _mm256_set1_epi16(0x0180);
+  const __m256i threes  = _mm256_set1_epi16   (3);
+  const __m256i cmpmask = _mm256_set1_epi16   (0x0180);
 
   __m256i  clipped      = _mm256_min_epu16    (src, threes);
   __m256i  shifted      = _mm256_slli_epi16   (clipped, 7);
