@@ -34,61 +34,73 @@
 #include "strategyselector.h"
 #include "strategies/generic/picture-generic.h"
 
-unsigned kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
+/**
+ * \brief Calculate Sum of Absolute Differences (SAD)
+ *
+ * Calculate Sum of Absolute Differences (SAD) between two rectangular regions
+ * located in arbitrary points in the picture.
+ *
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param stride  Width of the pixel array.
+ *
+ * \returns Sum of Absolute Differences
+ */
+
+uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
-  int y, x;
-  unsigned sad = 0;
-  __m128i sse_inc = _mm_setzero_si128 ();
-  long long int sse_inc_array[2];
+  int32_t y, x;
+  uint32_t sad = 0;
+  __m256i avx_inc = _mm256_setzero_si256();
+
+  // 256-bit blocks, bytes after them, 32-bit blocks after the large blocks
+  const int largeblock_bytes = width         & ~31;
+  const int any_residuals    = width         &  31;
+  const int residual_128bs   = any_residuals >> 4;
+  const int residual_dwords  = any_residuals >> 2;
+
+  const __m256i ns     = _mm256_setr_epi32 (0, 1, 2, 3, 4, 5, 6, 7);
+  const __m256i rds    = _mm256_set1_epi32 (residual_dwords);
+  const __m256i rdmask = _mm256_cmpgt_epi32(rds, ns);
 
   for (y = 0; y < height; ++y) {
-    for (x = 0; x <= width-16; x+=16) {
-      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
-      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
-      sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a,b));
+
+    for (x = 0; x < largeblock_bytes; x += 32) {
+      __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y * stride1 + x)));
+      __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y * stride2 + x)));
+      __m256i curr_sads = _mm256_sad_epu8(a, b);
+      avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
     }
 
-    {
-      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
-      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
-      switch (((width - (width%2)) - x)/2) {
-        case 0:
-          break;
-        case 1:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x01)));
-          break;
-        case 2:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x03)));
-          break;
-        case 3:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x07)));
-          break;
-        case 4:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x0f)));
-          break;
-        case 5:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x1f)));
-          break;
-        case 6:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x3f)));
-          break;
-        case 7:
-          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x7f)));
-          break;
-        default:
-          //Should not happen
-          assert(0);
-      }
-      x = (width - (width%2));
-    }
+    /*
+     * If there are no residual values, it does not matter what bogus values
+     * we use here since it will be masked away anyway
+     */
+    if (any_residuals) {
+      __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y * stride1 + x)));
+      __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y * stride2 + x)));
 
-    for (; x < width; ++x) {
-      sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
+      __m256i b_masked  = _mm256_blendv_epi8(a, b, rdmask);
+      __m256i curr_sads = _mm256_sad_epu8   (a, b_masked);
+      avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
+      x = width & ~(uint32_t)3;
+
+      for (; x < width; x++)
+        sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
     }
   }
-  _mm_storeu_si128((__m128i*) sse_inc_array, sse_inc);
-  sad += sse_inc_array[0] + sse_inc_array[1];
+  __m256i avx_inc_2 = _mm256_permute4x64_epi64(avx_inc,   _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i avx_inc_3 = _mm256_add_epi64        (avx_inc,   avx_inc_2);
+  __m256i avx_inc_4 = _mm256_shuffle_epi32    (avx_inc_3, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i avx_inc_5 = _mm256_add_epi64        (avx_inc_3, avx_inc_4);
+
+  // 32 bits should always be enough for even the largest blocks with a SAD of
+  // 255 in each pixel, even though the SAD results themselves are 64 bits
+  __m128i avx_inc_128 = _mm256_castsi256_si128(avx_inc_5);
+  sad += _mm_cvtsi128_si32(avx_inc_128);
 
   return sad;
 }
