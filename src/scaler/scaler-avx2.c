@@ -1638,6 +1638,99 @@ static void resample2resampleBlockStep_alt2_avx2(const pic_buffer_t* const buffe
   kvz_deallocatePictureBuffer(tmp);
 }
 
+
+
+//Takes in six vectors of data and filter coeffs. Apply filter and return results for eight pixels at a time.
+//Data layout:
+//  data0[X]:=|D3X|D2X|D1X|D0X|
+//  data1[X]:=|D7X|D6X|D5X|D4X|
+//  where DYX:={d_(Y,X+0), d_(Y,X+1), d_(Y,X+2), d_(Y,X+3)} and d_(x,y) is the yth sample for the xth pixel given as a 16-bit value
+//
+//  filter0[X]:=|F3X|F2X|F1X|F0X|
+//  filter1[X]:=|F7X|F6X|F5X|F4X|
+//  where FYX:={f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 16-bit value
+//
+//Returns:
+//  |r_7|r_6|r_5|r_4|r_3|r_2|r_1|r_0|
+//  where r_x = is the filterd pixel value of the xth pixel given as a 32-bit value
+//
+//Only dataX[i], where 0 < i < filter_rounds, is used. Data and filter values should be given as 
+static __m256i apply_filter_4x4_dual(const __m256i data0[3], const __m256i data1[3], const __m256i filter0[3], const __m256i filter1[3], const unsigned filter_rounds)
+{
+  __m256i tmp0 = _mm256_setzero_si256();
+  __m256i tmp1 = _mm256_setzero_si256();
+  __m256i res;
+  const __m256i perm = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
+
+  //Filtering done four taps at a time for four pixels, so repeate until desired number of taps performed
+  for (size_t i = 0; i < filter_rounds; i++)
+  {
+    //Do multiplication and first sum
+    tmp0 = _mm256_add_epi32(tmp0, _mm256_madd_epi16(data0[i], filter0[i]));
+    tmp1 = _mm256_add_epi32(tmp1, _mm256_madd_epi16(data1[i], filter1[i]));
+  }
+
+  //Need to do one more round of additions to get final values
+  //  Blend to get |ddcc bbaa|, |hhgg ffee| => |hdgc fbea|, |dhcg bfae| for the sum (need suffle to get the latter vector to the correct order)
+  res = _mm256_add_epi32(_mm256_blend_epi32(tmp0, tmp1, /*1010 1010*/0xAA), _mm256_shuffle_epi32(_mm256_blend_epi32(tmp0, tmp1, /*0101 0101*/0x55), /*1011 0001*/0xB1));
+
+  //Finally permute to get the order right
+  return _mm256_permutevar8x32_epi32(res, perm);
+}
+
+static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
+{
+  //TODO: Add cropping etc.
+
+  //Choose best filter to use when downsampling
+  //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+  int filter_phase = 0;
+
+  const int src_size = is_vertical ? param->src_height + param->src_padding_y : param->src_width + param->src_padding_x;
+  const int trgt_size = is_vertical ? param->rnd_trgt_height : param->rnd_trgt_width;
+
+  if (!is_upscaling) {
+    int crop_size = src_size - (is_vertical ? param->bottom_offset : param->right_offset); //- param->left_offset/top_offset;
+    if (4 * crop_size > 15 * trgt_size)
+      filter_phase = 7;
+    else if (7 * crop_size > 20 * trgt_size)
+      filter_phase = 6;
+    else if (2 * crop_size > 5 * trgt_size)
+      filter_phase = 5;
+    else if (1 * crop_size > 2 * trgt_size)
+      filter_phase = 4;
+    else if (3 * crop_size > 5 * trgt_size)
+      filter_phase = 3;
+    else if (4 * crop_size > 5 * trgt_size)
+      filter_phase = 2;
+    else if (19 * crop_size > 20 * trgt_size)
+      filter_phase = 1;
+  }
+
+  const int shift = (is_vertical ? param->shift_y : param->shift_x) - 4;
+  const int scale = is_vertical ? param->scale_y : param->scale_x;
+  const int add = is_vertical ? param->add_y : param->add_x;
+  const int delta = is_vertical ? param->delta_y : param->delta_x;
+
+  //Set loop parameters based on the resampling dir
+  const int *filter;
+  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+
+
+  //Vertical scaling
+  for (size_t j = 0; j < 2; j++)
+  {
+    __m256i res1 = _mm256_setzero_si256();
+    __m256i data, filt;
+    for (size_t i = 0; i < filter_size >> 2; i++)
+    {
+      res1 = _mm256_add_epi32(res1, _mm256_madd_epi16(data, filt));
+    }
+  }
+
+
+}
+
 //static __m256i _mm256_gather_n_epi32_v2(const int *src, unsigned idx[8], unsigned n)
 //{
 //  __m256i dst = _mm256_setzero_si256();
