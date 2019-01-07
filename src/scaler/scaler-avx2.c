@@ -1655,17 +1655,19 @@ static void resample2resampleBlockStep_alt2_avx2(const pic_buffer_t* const buffe
 //  where r_x = is the filterd pixel value of the xth pixel given as a 32-bit value
 //
 //Only dataX[i], where 0 < i < filter_rounds, is used. Data and filter values should be given as 
-static __m256i apply_filter_4x4_dual(const __m256i data0[3], const __m256i data1[3], const __m256i filter0[3], const __m256i filter1[3], const unsigned filter_rounds)
+static __m256i apply_filter_4x4_dual(const __m256i* data0, const __m256i* data1, const __m256i* filter0, const __m256i* filter1, const unsigned filter_rounds)
 {
-  __m256i tmp0 = _mm256_setzero_si256();
-  __m256i tmp1 = _mm256_setzero_si256();
+  
   __m256i res;
   const __m256i perm = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
 
   //Filtering done four taps at a time for four pixels, so repeate until desired number of taps performed
-  for (size_t i = 0; i < filter_rounds; i++)
+  __m256i tmp0 = _mm256_madd_epi16(data0[0], filter0[0]);
+  __m256i tmp1 = _mm256_madd_epi16(data1[0], filter1[0]);
+
+  for (size_t i = 1; i < filter_rounds; i++)
   {
-    //Do multiplication and first sum
+    //Do multiplication and sum with results for previous taps
     tmp0 = _mm256_add_epi32(tmp0, _mm256_madd_epi16(data0[i], filter0[i]));
     tmp1 = _mm256_add_epi32(tmp1, _mm256_madd_epi16(data1[i], filter1[i]));
   }
