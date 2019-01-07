@@ -53,18 +53,18 @@ uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int32_t y, x;
-  uint32_t sad = 0;
-  __m256i avx_inc = _mm256_setzero_si256();
 
-  // 256-bit blocks, bytes after them, 32-bit blocks after the large blocks
-  const int largeblock_bytes = width         & ~31;
-  const int any_residuals    = width         &  31;
-  const int residual_128bs   = any_residuals >> 4;
-  const int residual_dwords  = any_residuals >> 2;
+  // Bytes in block in 256-bit blocks per each scanline, and remainder
+  const int largeblock_bytes = width & ~31;
+  const int residual_bytes   = width &  31;
 
-  const __m256i ns     = _mm256_setr_epi32 (0, 1, 2, 3, 4, 5, 6, 7);
-  const __m256i rds    = _mm256_set1_epi32 (residual_dwords);
-  const __m256i rdmask = _mm256_cmpgt_epi32(rds, ns);
+  const __m256i rds    = _mm256_set1_epi8(residual_bytes);
+  const __m256i ns     = _mm256_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                          8,  9,  10, 11, 12, 13, 14, 15,
+                                          16, 17, 18, 19, 20, 21, 22, 23,
+                                          24, 25, 26, 27, 28, 29, 30, 31);
+  const __m256i rdmask = _mm256_cmpgt_epi8(rds, ns);
+  __m256i avx_inc      = _mm256_setzero_si256();
 
   for (y = 0; y < height; ++y) {
 
@@ -74,22 +74,13 @@ uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const
       __m256i curr_sads = _mm256_sad_epu8(a, b);
       avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
     }
-
-    /*
-     * If there are no residual values, it does not matter what bogus values
-     * we use here since it will be masked away anyway
-     */
-    if (any_residuals) {
+    if (residual_bytes) {
       __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y * stride1 + x)));
       __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y * stride2 + x)));
 
       __m256i b_masked  = _mm256_blendv_epi8(a, b, rdmask);
       __m256i curr_sads = _mm256_sad_epu8   (a, b_masked);
       avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
-      x = width & ~(uint32_t)3;
-
-      for (; x < width; x++)
-        sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
     }
   }
   __m256i avx_inc_2 = _mm256_permute4x64_epi64(avx_inc,   _MM_SHUFFLE(1, 0, 3, 2));
@@ -100,9 +91,7 @@ uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const
   // 32 bits should always be enough for even the largest blocks with a SAD of
   // 255 in each pixel, even though the SAD results themselves are 64 bits
   __m128i avx_inc_128 = _mm256_castsi256_si128(avx_inc_5);
-  sad += _mm_cvtsi128_si32(avx_inc_128);
-
-  return sad;
+  return _mm_cvtsi128_si32(avx_inc_128);
 }
 
 /**
