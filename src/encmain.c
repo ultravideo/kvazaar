@@ -506,7 +506,11 @@ int main(int argc, char *argv[])
       kvz_picture *img_src = NULL;
       uint32_t len_out = 0;
       kvz_frame_info info_out;
+#ifdef _WIN32
       frame_times[timer_last_index] = clock();
+#else
+      frame_times[timer_last_index] = clock_gettime();
+#endif
       timer_last_index++;
 
       if (!api->encoder_encode(enc,
@@ -612,7 +616,11 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
+#ifdef _WIN32
         int64_t frame_time = clock() - frame_times[0];
+#else
+        int64_t frame_time = clock_gettime() - frame_times[0];
+#endif
         for (int i = 0; i < timer_last_index - 1; i++) {
           frame_times[i] = frame_times[i + 1];
         }
