@@ -1301,7 +1301,10 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
   // simplest code to look at for anyone interested in doing more
   // optimizations, so it's worth it to keep this maintained.
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 40, &kvz_reg_sad_avx2);
+
+    // It currently appears that this is actually slower than the SSE4.1
+    // version.. Go figure
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 19, &kvz_reg_sad_avx2);
 
     success &= kvz_strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
