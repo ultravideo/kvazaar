@@ -28,15 +28,16 @@
 #include "strategyselector.h"
 
 
-unsigned kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,
-                           const int width, const int height, const unsigned stride1, const unsigned stride2)
+uint32_t kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                           const int32_t width, const int32_t height, const uint32_t stride1,
+                           const uint32_t stride2)
 {
-  int y, x;
+  int32_t y, x;
   __m128i sse_inc = _mm_setzero_si128();
   
   // Bytes in block in 128-bit blocks per each scanline, and remainder
-  const int largeblock_bytes = width & ~15;
-  const int residual_bytes   = width &  15;
+  const int32_t largeblock_bytes = width & ~15;
+  const int32_t residual_bytes   = width &  15;
 
   const __m128i rds    = _mm_set1_epi8 (residual_bytes);
   const __m128i ns     = _mm_setr_epi8 (0,  1,  2,  3,  4,  5,  6,  7,
