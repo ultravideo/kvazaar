@@ -1732,8 +1732,6 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
-  //  If filter_size is 12, need to limit f_step to 8
-  //  If filter_size is 4, can use 4 vector registers to hold eight pixels' filters
   const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
   const int f_step = 4;//SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
 
@@ -1827,11 +1825,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
       for (unsigned filter_part = 0; filter_part < num_filter_parts; filter_part++) {
 
         const int f_ind = filter_part * f_step; //Filter index
-
-        //lane can hold 8 integers. f/t_num determines how many elements can be processed this loop (without going out of bounds)
-        const unsigned f_num = SCALER_CLIP(filter_size - f_ind, 0, f_step);
-        const int fm = f_num == 4 ? 2 : 1; //How many filter inds can be fit in one ymm
-
+        
         //Load filter
         if (filter_size <= 4) {
           filter0[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[phase[3] >> 2], phase_map[0][phase[3] % 4]),
