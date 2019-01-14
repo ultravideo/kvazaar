@@ -1680,7 +1680,7 @@ static __m256i apply_filter_4x4_dual(const __m256i* data0, const __m256i* data1,
   return _mm256_permutevar8x32_epi32(res, perm);
 }
 
-static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
+static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
 {
   //TODO: Add cropping etc.
 
@@ -1880,7 +1880,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
         } else {
           //Get src row corresponding to cur filter index i
           const int s_ind = SCALER_CLIP(ref_pos[0] + (int)i - (filter_size >> 1) + 1, 0, src_size - 1);
-          *temp_mem = _mm256_loadu_n_epi32(&src[s_ind * s_stride + x], t_num);
+          *temp_mem = _mm256_loadu_si256((__m256i *)&src[s_ind * s_stride + x]);
 
           *temp_filter = _mm256_set1_epi32(getFilterCoeff(filter, filter_size, *phase, i));
 
@@ -1898,7 +1898,9 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
       if (is_vertical) {
         filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
         filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
-        filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
+        //filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
+        //Might be slightly faster to use saturation to clip to [0,255]
+        filter_res_epi32 = _mm256_cvtepu8_epi32(_mm_packus_epi16(_mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1)), _mm_setzero_si128()));
       }
 
       //Write back the new values for the current t_num pixels
