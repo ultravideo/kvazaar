@@ -86,6 +86,8 @@ typedef struct
 
 /*==========================================================================*/
 
+#define SCALER_BUFFER_PADDING 32 //Defines padding added to picture buffers. Keeps avx2 optimizations from accessing pad memory.
+
 /*===========================Scaling parameter utility functions=================================*/
 /**
 * \brief Returns the appropriate chroma format for the given parameters

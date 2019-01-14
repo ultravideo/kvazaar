@@ -39,7 +39,7 @@ pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
   }
 
   //Allocate enough memory to fit a width-by-height picture
-  buffer->data = (pic_data_t*)malloc(sizeof(pic_data_t) * width * height);
+  buffer->data = (pic_data_t*)malloc(sizeof(pic_data_t) * width * height + SCALER_BUFFER_PADDING);
 
   buffer->width = width;
   buffer->height = height;
@@ -443,27 +443,15 @@ yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const u
 */
 static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
 {
-  pic_buffer_t* ret = malloc(sizeof(pic_buffer_t));
+  pic_buffer_t* ret = kvz_newPictureBuffer(pic->width, pic->height, pic->tmp_row != NULL);
   if (ret == NULL) {
-    return NULL; //TODO: Add error message?
+    return NULL;
   }
-  int size = pic->width * pic->height;
 
-  *ret = *pic;
-  ret->data = malloc(sizeof(pic_data_t) * size);
-  if (ret->data == NULL) {
-    free(ret);
-    return NULL; //TODO: Add error message?
-  }
-  memcpy(ret->data, pic->data, size * sizeof(pic_data_t));
+  memcpy(ret->data, pic->data, pic->width * pic->height * sizeof(pic_data_t));
 
   if (pic->tmp_row) {
     int tmp_size = SCALER_MAX(pic->width, pic->height);
-    ret->tmp_row = malloc(sizeof(pic_buffer_t) * tmp_size);
-    if (ret->tmp_row == NULL) {
-      kvz_deallocatePictureBuffer(ret);
-      return NULL; //TODO: Add error message?
-    }
     memcpy(ret->tmp_row, pic->tmp_row, tmp_size);
   }
 
