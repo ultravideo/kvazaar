@@ -1755,6 +1755,9 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   const __m256i delta_epi32 = _mm256_set1_epi32(delta);
   const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i max_src_ind = _mm256_set1_epi32(src_size - 1);
+
   __m256i filters_epi16[12]; //Contain preloaded filters. Data layouts: |Ph(X+3) Ph(X+1)|Ph(X+2) Ph(X)| or |Ph(X+1)_1 Ph(X)_1|Ph(X+1)_0 Ph(X)_0| or |Ph(X+1)_0 Ph(X)_1|Ph(X)_2 Ph(X)_0| and |Ph(X+2)_1 Ph(X+1)_2|Ph(X+2)_0 Ph(X+1)_1| and |Ph(X+3)_2 Ph(X+3)_0|Ph(X+3)_1 Ph(X+2)_2|
   __m256i temp_mem[12], temp_filter[12];
   __m256i filter_res_epi32;
@@ -1801,19 +1804,34 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
       const int *ref_pos;
       int ref_pos_tmp;
       unsigned phase_tmp;
+      int max_under, max_over;
 
       const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
 
       //Calculate reference position in src pic
       if (!is_vertical) {
-        const __m256i t_ind_epi32 = clip_add_avx2(x, adderr, 0, x_bound - 1);
-
+        const __m256i t_ind_epi32 = _mm256_add_epi32(adderr, _mm256_set1_epi32(x));//clip_add_avx2(x, adderr, 0, x_bound - 1);
         const __m256i ref_pos_16_epi32 = _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(t_ind_epi32, scale_epi32), add_epi32), shift), delta_epi32);
         phase_epi32 = _mm256_and_si256(ref_pos_16_epi32, phase_mask);
         ref_pos_epi32 = _mm256_srai_epi32(ref_pos_16_epi32, 4);
 
+        //Calculate the first sample ind based on the ref pos
+        ref_pos_epi32 = _mm256_sub_epi32(ref_pos_epi32, _mm256_set1_epi32((filter_size >> 1) - 1));
+
         phase = (unsigned*)&phase_epi32;
         ref_pos = (int*)&ref_pos_epi32;
+
+        //Need to handle start/end where sample inds are out of bounds
+        //  Get the max amount under/over the bounds
+        max_under = ref_pos[0];
+        max_over = ref_pos[8] + (filter_size >> 1) + 1;
+        if (max_under < 0) {
+          _mm256_min_epi32(ref_pos_epi32, zero);
+        }
+        /*if (max_over >= src_size) {
+          _mm256_max_epi32(ref_pos_epi32, max_src_ind);
+        }*/
+
       }
       else {
         const int ref_pos_16 = (int)((unsigned int)(y * scale + add) >> shift) - delta;
@@ -1861,6 +1879,14 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
         temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[ref_pos[3] + f_ind], (__m128i*)&src[ref_pos[2] + f_ind]);
         temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[ref_pos[5] + f_ind], (__m128i*)&src[ref_pos[4] + f_ind]);
         temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[ref_pos[7] + f_ind], (__m128i*)&src[ref_pos[6] + f_ind]);
+
+        //If we are at the start/end need to clip the value
+        if (max_under < 0) {
+          
+        }
+        if (max_over >= src_size) {
+          
+        }
 
         //Pack samples into 16-bit values. Data order will be |P3|P1|P2|P0| etc.
         data0[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 0], temp_mem[f_ind + 1]);
