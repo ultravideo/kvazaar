@@ -61,7 +61,7 @@ uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const
   if (width == 12)
     return reg_sad_w12(data1, data2, height, stride1, stride2);
   if (width == 16)
-    return reg_sad_w16_avx2(data1, data2, height, stride1, stride2);
+    return reg_sad_w16(data1, data2, height, stride1, stride2);
   if (width == 24)
     return reg_sad_w24(data1, data2, height, stride1, stride2);
   if (width == 32)
