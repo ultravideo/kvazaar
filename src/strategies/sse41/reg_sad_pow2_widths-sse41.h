@@ -108,10 +108,62 @@ static uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * con
   __m128i sse_inc = _mm_setzero_si128();
   int32_t y;
   for (y = 0; y < height; y++) {
-    __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1]);
-    __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2]);
+    __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1));
+    __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2));
     __m128i curr_sads = _mm_sad_epu8(a, b);
     sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+  }
+  __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
+  return _mm_cvtsi128_si32(sad);
+}
+
+static uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                            const int32_t height, const uint32_t stride1,
+                            const uint32_t stride2)
+{
+  __m128i sse_inc = _mm_setzero_si128();
+  int32_t y;
+
+  const int32_t height_doublelines = height & ~1;
+  const int32_t height_parity      = height &  1;
+
+  for (y = 0; y < height_doublelines; y += 2) {
+    __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1));
+    __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2));
+    __m128i c = _mm_loadu_si128((const __m128i *)(data1 + (y + 1) * stride1));
+    __m128i d = _mm_loadu_si128((const __m128i *)(data2 + (y + 1) * stride2));
+
+    __m128d e_d = _mm_setzero_pd();
+    __m128d f_d = _mm_setzero_pd();
+
+    e_d = _mm_loadl_pd(e_d, (const double *)(data1 + (y + 0) * stride1 + 16));
+    f_d = _mm_loadl_pd(f_d, (const double *)(data2 + (y + 0) * stride2 + 16));
+    e_d = _mm_loadh_pd(e_d, (const double *)(data1 + (y + 1) * stride1 + 16));
+    f_d = _mm_loadh_pd(f_d, (const double *)(data2 + (y + 1) * stride2 + 16));
+
+    __m128i e = _mm_castpd_si128(e_d);
+    __m128i f = _mm_castpd_si128(f_d);
+
+    __m128i curr_sads_1 = _mm_sad_epu8(a, b);
+    __m128i curr_sads_2 = _mm_sad_epu8(c, d);
+    __m128i curr_sads_3 = _mm_sad_epu8(e, f);
+
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_1);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_2);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_3);
+  }
+  if (height_parity) {
+    __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1]);
+    __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2]);
+    __m128i c = _mm_cvtsi64_si128(*(uint64_t *)(data1 + y * stride1 + 8));
+    __m128i d = _mm_cvtsi64_si128(*(uint64_t *)(data2 + y * stride2 + 8));
+
+    __m128i curr_sads_1 = _mm_sad_epu8(a, b);
+    __m128i curr_sads_2 = _mm_sad_epu8(c, d);
+
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_1);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_2);
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);

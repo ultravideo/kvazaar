@@ -42,6 +42,8 @@ uint32_t kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * cons
     return reg_sad_w12(data1, data2, height, stride1, stride2);
   if (width == 16)
     return reg_sad_w16(data1, data2, height, stride1, stride2);
+  if (width == 24)
+    return reg_sad_w24(data1, data2, height, stride1, stride2);
   else
     return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
 }
