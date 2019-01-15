@@ -4,6 +4,45 @@
 #include <immintrin.h>
 #include "kvazaar.h"
 
+static uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                           const int32_t height, const uint32_t stride1,
+                           const uint32_t stride2)
+{
+  __m128i sse_inc = _mm_setzero_si128();
+  int32_t y;
+
+  const int32_t height_xmm_bytes = height & ~3;
+  const int32_t height_residuals = height &  3;
+
+  for (y = 0; y < height_xmm_bytes; y += 4) {
+    __m128i a = _mm_cvtsi32_si128(*(uint32_t *)(data1 + y * stride1));
+    __m128i b = _mm_cvtsi32_si128(*(uint32_t *)(data2 + y * stride2));
+
+    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 1) * stride1), 1);
+    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 1) * stride2), 1);
+    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 2) * stride1), 2);
+    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 2) * stride2), 2);
+    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 3) * stride1), 3);
+    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 3) * stride2), 3);
+
+    __m128i curr_sads = _mm_sad_epu8(a, b);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+  }
+  if (height_residuals) {
+    for (; y < height; y++) {
+      __m128i a = _mm_cvtsi32_si128(*(uint32_t *)(data1 + y * stride1));
+      __m128i b = _mm_cvtsi32_si128(*(uint32_t *)(data2 + y * stride2));
+
+      __m128i curr_sads = _mm_sad_epu8(a, b);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+    }
+  }
+  __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
+
+  return _mm_cvtsi128_si32(sad);
+}
+
 static uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
@@ -41,6 +80,25 @@ static uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * cons
 
   result += _mm_cvtsi128_si32(sad);
   return result;
+}
+
+static uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                            const int32_t height, const uint32_t stride1,
+                            const uint32_t stride2)
+{
+  __m128i sse_inc = _mm_setzero_si128();
+  int32_t y;
+  for (y = 0; y < height; y++) {
+    __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1]);
+    __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2]);
+
+    __m128i b_masked  = _mm_blend_epi16(a, b, 0x3f);
+    __m128i curr_sads = _mm_sad_epu8   (a, b_masked);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+  }
+  __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
+  return _mm_cvtsi128_si32(sad);
 }
 
 static uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * const data2,

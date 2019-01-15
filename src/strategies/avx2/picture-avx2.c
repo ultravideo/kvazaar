@@ -52,12 +52,22 @@
 uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
+  if (width == 0)
+    return 0;
+  if (width == 4)
+    return reg_sad_w4(data1, data2, height, stride1, stride2);
   if (width == 8)
-      return reg_sad_w8(data1, data2, height, stride1, stride2);
+    return reg_sad_w8(data1, data2, height, stride1, stride2);
+  if (width == 12)
+    return reg_sad_w12(data1, data2, height, stride1, stride2);
   if (width == 16)
-      return reg_sad_w16(data1, data2, height, stride1, stride2);
+    return reg_sad_w16(data1, data2, height, stride1, stride2);
+  if (width == 32)
+    return reg_sad_w32(data1, data2, height, stride1, stride2);
+  if (width == 64)
+    return reg_sad_w64(data1, data2, height, stride1, stride2);
   else
-      return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
+    return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
 }
 
 /**

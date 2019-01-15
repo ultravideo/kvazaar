@@ -32,12 +32,18 @@ uint32_t kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * cons
                            const int32_t width, const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
+  if (width == 0)
+    return 0;
+  if (width == 4)
+    return reg_sad_w4(data1, data2, height, stride1, stride2);
   if (width == 8)
-      return reg_sad_w8(data1, data2, height, stride1, stride2);
+    return reg_sad_w8(data1, data2, height, stride1, stride2);
+  if (width == 12)
+    return reg_sad_w12(data1, data2, height, stride1, stride2);
   if (width == 16)
-      return reg_sad_w16(data1, data2, height, stride1, stride2);
+    return reg_sad_w16(data1, data2, height, stride1, stride2);
   else
-      return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
+    return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
 }
 
 #endif //COMPILE_INTEL_SSE41
