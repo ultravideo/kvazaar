@@ -22,6 +22,7 @@
  * \file
  */
 #include "strategies/avx2/picture-avx2.h"
+#include "strategies/avx2/reg_sad_pow2_widths-avx2.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
@@ -48,62 +49,15 @@
  *
  * \returns Sum of Absolute Differences
  */
-
 uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
-  int32_t y, x;
-
-  // Bytes in block in 256-bit blocks per each scanline, and remainder
-  const int largeblock_bytes = width & ~31;
-  const int residual_bytes_1 = width &  31;
-  const int residual_xmms    = residual_bytes_1 >> 4;
-  const int residual_bytes   = residual_bytes_1 &  15;
-
-  const __m128i rds    = _mm_set1_epi8(residual_bytes);
-  const __m128i ns     = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                       8,  9,  10, 11, 12, 13, 14, 15);
-  const __m128i rdmask = _mm_cmpgt_epi8(rds, ns);
-
-  __m256i avx_inc      = _mm256_setzero_si256();
-  __m128i sse_inc      = _mm_setzero_si128();
-
-  for (y = 0; y < height; ++y) {
-    for (x = 0; x < largeblock_bytes; x += 32) {
-      __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y * stride1 + x)));
-      __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y * stride2 + x)));
-      __m256i curr_sads = _mm256_sad_epu8(a, b);
-      avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
-    }
-    if (residual_xmms) {
-      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y * stride1 + x)));
-      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y * stride2 + x)));
-      __m128i curr_sads = _mm_sad_epu8   (a, b);
-      sse_inc = _mm_add_epi64(sse_inc, curr_sads);
-      x += 16;
-    }
-    if (residual_bytes) {
-      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y * stride1 + x)));
-      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y * stride2 + x)));
-
-      __m128i b_masked  = _mm_blendv_epi8(a, b, rdmask);
-      __m128i curr_sads = _mm_sad_epu8(a, b_masked);
-      sse_inc = _mm_add_epi64(sse_inc, curr_sads);
-    }
-  }
-  __m256i avx_inc_2   = _mm256_permute4x64_epi64(avx_inc,   _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i avx_inc_3   = _mm256_add_epi64        (avx_inc,   avx_inc_2);
-  __m256i avx_inc_4   = _mm256_shuffle_epi32    (avx_inc_3, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i avx_inc_5   = _mm256_add_epi64        (avx_inc_3, avx_inc_4);
-  __m128i avx_inc_128 = _mm256_castsi256_si128  (avx_inc_5);
-
-  __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
-  __m128i sse_sads  = _mm_add_epi64    (sse_inc, sse_inc_2);
-  __m128i sads      = _mm_add_epi64    (sse_sads, avx_inc_128);
-
-  // 32 bits should always be enough for even the largest blocks with a SAD of
-  // 255 in each pixel, even though the SAD results themselves are 64 bits
-  return _mm_cvtsi128_si32(sads);
+  if (width == 8)
+      return reg_sad_w8(data1, data2, height, stride1, stride2);
+  if (width == 16)
+      return reg_sad_w16(data1, data2, height, stride1, stride2);
+  else
+      return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
 }
 
 /**
@@ -1302,10 +1256,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
   // optimizations, so it's worth it to keep this maintained.
   if (bitdepth == 8){
 
-    // It currently appears that this is actually slower than the SSE4.1
-    // version.. Go figure
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 19, &kvz_reg_sad_avx2);
-
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 40, &kvz_reg_sad_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
