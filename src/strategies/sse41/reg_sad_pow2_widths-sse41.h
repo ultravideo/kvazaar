@@ -4,7 +4,7 @@
 #include <immintrin.h>
 #include "kvazaar.h"
 
-static uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
@@ -43,7 +43,7 @@ static uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * cons
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
@@ -82,7 +82,7 @@ static uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * cons
   return result;
 }
 
-static uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -101,7 +101,7 @@ static uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * con
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -118,7 +118,7 @@ static uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * con
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixel * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -170,7 +170,7 @@ static uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixel * con
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kvz_pixel * const data2,
                                   const int32_t width, const int32_t height, const uint32_t stride1,
                                   const uint32_t stride2)
 {

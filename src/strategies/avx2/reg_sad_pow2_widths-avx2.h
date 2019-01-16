@@ -4,7 +4,7 @@
 #include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
 #include "kvazaar.h"
 
-static uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixel * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -28,7 +28,7 @@ static uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixel * con
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t reg_sad_w64(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w64(const kvz_pixel * const data1, const kvz_pixel * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
