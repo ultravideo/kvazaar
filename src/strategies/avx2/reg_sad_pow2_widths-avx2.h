@@ -11,13 +11,39 @@ static INLINE uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixe
   __m256i avx_inc = _mm256_setzero_si256();
   int32_t y;
 
-  for (y = 0; y < height; y++) {
-    __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + y * stride1));
-    __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + y * stride2));
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
 
-    __m256i curr_sads = _mm256_sad_epu8(a, b);
-    avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
+  for (y = 0; y < height_fourline_groups; y += 4) {
+    __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y + 0) * stride1));
+    __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y + 0) * stride2));
+    __m256i c = _mm256_loadu_si256((const __m256i *)(data1 + (y + 1) * stride1));
+    __m256i d = _mm256_loadu_si256((const __m256i *)(data2 + (y + 1) * stride2));
+    __m256i e = _mm256_loadu_si256((const __m256i *)(data1 + (y + 2) * stride1));
+    __m256i f = _mm256_loadu_si256((const __m256i *)(data2 + (y + 2) * stride2));
+    __m256i g = _mm256_loadu_si256((const __m256i *)(data1 + (y + 3) * stride1));
+    __m256i h = _mm256_loadu_si256((const __m256i *)(data2 + (y + 3) * stride2));
+
+    __m256i curr_sads_ab = _mm256_sad_epu8(a, b);
+    __m256i curr_sads_cd = _mm256_sad_epu8(c, d);
+    __m256i curr_sads_ef = _mm256_sad_epu8(e, f);
+    __m256i curr_sads_gh = _mm256_sad_epu8(g, h);
+
+    avx_inc = _mm256_add_epi64(avx_inc, curr_sads_ab);
+    avx_inc = _mm256_add_epi64(avx_inc, curr_sads_cd);
+    avx_inc = _mm256_add_epi64(avx_inc, curr_sads_ef);
+    avx_inc = _mm256_add_epi64(avx_inc, curr_sads_gh);
   }
+  if (height_residual_lines) {
+    for (; y < height; y++) {
+      __m256i a = _mm256_loadu_si256((const __m256i *)(data1 + (y + 0) * stride1));
+      __m256i b = _mm256_loadu_si256((const __m256i *)(data2 + (y + 0) * stride2));
+
+      __m256i curr_sads = _mm256_sad_epu8(a, b);
+      avx_inc = _mm256_add_epi64(avx_inc, curr_sads);
+    }
+  }
+
   __m128i inchi = _mm256_extracti128_si256(avx_inc, 1);
   __m128i inclo = _mm256_castsi256_si128  (avx_inc);
 

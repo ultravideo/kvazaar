@@ -107,12 +107,40 @@ static INLINE uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixe
 {
   __m128i sse_inc = _mm_setzero_si128();
   int32_t y;
-  for (y = 0; y < height; y++) {
-    __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1));
-    __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2));
-    __m128i curr_sads = _mm_sad_epu8(a, b);
-    sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
+
+  for (y = 0; y < height_fourline_groups; y += 4) {
+    __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1));
+    __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2));
+    __m128i c = _mm_loadu_si128((const __m128i *)(data1 + (y + 1) * stride1));
+    __m128i d = _mm_loadu_si128((const __m128i *)(data2 + (y + 1) * stride2));
+    __m128i e = _mm_loadu_si128((const __m128i *)(data1 + (y + 2) * stride1));
+    __m128i f = _mm_loadu_si128((const __m128i *)(data2 + (y + 2) * stride2));
+    __m128i g = _mm_loadu_si128((const __m128i *)(data1 + (y + 3) * stride1));
+    __m128i h = _mm_loadu_si128((const __m128i *)(data2 + (y + 3) * stride2));
+
+    __m128i curr_sads_ab = _mm_sad_epu8(a, b);
+    __m128i curr_sads_cd = _mm_sad_epu8(c, d);
+    __m128i curr_sads_ef = _mm_sad_epu8(e, f);
+    __m128i curr_sads_gh = _mm_sad_epu8(g, h);
+
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_ef);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_gh);
   }
+  if (height_residual_lines) {
+    for (; y < height; y++) {
+      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1));
+      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2));
+
+      __m128i curr_sads = _mm_sad_epu8(a, b);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+    }
+  }
+
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
   return _mm_cvtsi128_si32(sad);
@@ -208,7 +236,5 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
 
   return _mm_cvtsi128_si32(sad);
 }
-
-
 
 #endif
