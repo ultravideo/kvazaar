@@ -11,10 +11,10 @@ static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel
   __m128i sse_inc = _mm_setzero_si128();
   int32_t y;
 
-  const int32_t height_xmm_bytes = height & ~3;
-  const int32_t height_residuals = height &  3;
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
 
-  for (y = 0; y < height_xmm_bytes; y += 4) {
+  for (y = 0; y < height_fourline_groups; y += 4) {
     __m128i a = _mm_cvtsi32_si128(*(uint32_t *)(data1 + y * stride1));
     __m128i b = _mm_cvtsi32_si128(*(uint32_t *)(data2 + y * stride2));
 
@@ -28,7 +28,7 @@ static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel
     __m128i curr_sads = _mm_sad_epu8(a, b);
     sse_inc = _mm_add_epi64(sse_inc, curr_sads);
   }
-  if (height_residuals) {
+  if (height_residual_lines) {
     for (; y < height; y++) {
       __m128i a = _mm_cvtsi32_si128(*(const uint32_t *)(data1 + y * stride1));
       __m128i b = _mm_cvtsi32_si128(*(const uint32_t *)(data2 + y * stride2));
@@ -219,18 +219,18 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
   __m128i sse_inc = _mm_setzero_si128();
   
   // Bytes in block in 128-bit blocks per each scanline, and remainder
-  const int32_t largeblock_bytes       = width  & ~15;
-  const int32_t residual_bytes         = width  &  15;
+  const int32_t width_xmms             = width  & ~15;
+  const int32_t width_residual_pixels  = width  &  15;
 
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
 
-  const __m128i rds    = _mm_set1_epi8 (residual_bytes);
+  const __m128i rds    = _mm_set1_epi8 (width_residual_pixels);
   const __m128i ns     = _mm_setr_epi8 (0,  1,  2,  3,  4,  5,  6,  7,
                                         8,  9,  10, 11, 12, 13, 14, 15);
   const __m128i rdmask = _mm_cmpgt_epi8(rds, ns);
 
-  for (x = 0; x < largeblock_bytes; x += 16) {
+  for (x = 0; x < width_xmms; x += 16) {
     for (y = 0; y < height_fourline_groups; y += 4) {
       __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1 + x));
       __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2 + x));
@@ -263,7 +263,7 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
     }
   }
 
-  if (residual_bytes) {
+  if (width_residual_pixels) {
     for (y = 0; y < height_fourline_groups; y += 4) {
       __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1 + x));
       __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2 + x));
