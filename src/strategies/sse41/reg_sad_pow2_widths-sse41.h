@@ -51,29 +51,42 @@ static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel
   uint64_t result = 0;
   int32_t y;
 
-  const int32_t height_xmm_bytes = height & ~1;
-  const int32_t height_parity    = height &  1;
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
 
-  for (y = 0; y < height_xmm_bytes; y += 2) {
+  for (y = 0; y < height_fourline_groups; y += 4) {
     __m128d a_d = _mm_setzero_pd();
     __m128d b_d = _mm_setzero_pd();
+    __m128d c_d = _mm_setzero_pd();
+    __m128d d_d = _mm_setzero_pd();
 
     a_d = _mm_loadl_pd(a_d, (const double *)(data1 + (y + 0) * stride1));
     b_d = _mm_loadl_pd(b_d, (const double *)(data2 + (y + 0) * stride2));
     a_d = _mm_loadh_pd(a_d, (const double *)(data1 + (y + 1) * stride1));
     b_d = _mm_loadh_pd(b_d, (const double *)(data2 + (y + 1) * stride2));
 
+    c_d = _mm_loadl_pd(c_d, (const double *)(data1 + (y + 2) * stride1));
+    d_d = _mm_loadl_pd(d_d, (const double *)(data2 + (y + 2) * stride2));
+    c_d = _mm_loadh_pd(c_d, (const double *)(data1 + (y + 3) * stride1));
+    d_d = _mm_loadh_pd(d_d, (const double *)(data2 + (y + 3) * stride2));
+
     __m128i a = _mm_castpd_si128(a_d);
     __m128i b = _mm_castpd_si128(b_d);
+    __m128i c = _mm_castpd_si128(c_d);
+    __m128i d = _mm_castpd_si128(d_d);
 
-    __m128i curr_sads = _mm_sad_epu8(a, b);
-    sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+    __m128i curr_sads_ab = _mm_sad_epu8(a, b);
+    __m128i curr_sads_cd = _mm_sad_epu8(c, d);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+    sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
   }
-  if (height_parity) {
-    __m64 a = *(__m64 *)(data1 + y * stride1);
-    __m64 b = *(__m64 *)(data2 + y * stride2);
-    __m64 sads = _mm_sad_pu8(a, b);
-    result = (uint64_t)sads;
+  if (height_residual_lines) {
+    for (; y < height; y++) {
+      __m64 a = *(__m64 *)(data1 + y * stride1);
+      __m64 b = *(__m64 *)(data2 + y * stride2);
+      __m64 sads = _mm_sad_pu8(a, b);
+      result += (uint64_t)sads;
+    }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
