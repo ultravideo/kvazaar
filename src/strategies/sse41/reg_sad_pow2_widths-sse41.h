@@ -18,20 +18,20 @@ static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel
     __m128i a = _mm_cvtsi32_si128(*(uint32_t *)(data1 + y * stride1));
     __m128i b = _mm_cvtsi32_si128(*(uint32_t *)(data2 + y * stride2));
 
-    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 1) * stride1), 1);
-    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 1) * stride2), 1);
-    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 2) * stride1), 2);
-    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 2) * stride2), 2);
-    a = _mm_insert_epi32(a, *(uint32_t *)(data1 + (y + 3) * stride1), 3);
-    b = _mm_insert_epi32(b, *(uint32_t *)(data2 + (y + 3) * stride2), 3);
+    a = _mm_insert_epi32(a, *(const uint32_t *)(data1 + (y + 1) * stride1), 1);
+    b = _mm_insert_epi32(b, *(const uint32_t *)(data2 + (y + 1) * stride2), 1);
+    a = _mm_insert_epi32(a, *(const uint32_t *)(data1 + (y + 2) * stride1), 2);
+    b = _mm_insert_epi32(b, *(const uint32_t *)(data2 + (y + 2) * stride2), 2);
+    a = _mm_insert_epi32(a, *(const uint32_t *)(data1 + (y + 3) * stride1), 3);
+    b = _mm_insert_epi32(b, *(const uint32_t *)(data2 + (y + 3) * stride2), 3);
 
     __m128i curr_sads = _mm_sad_epu8(a, b);
     sse_inc = _mm_add_epi64(sse_inc, curr_sads);
   }
   if (height_residuals) {
     for (; y < height; y++) {
-      __m128i a = _mm_cvtsi32_si128(*(uint32_t *)(data1 + y * stride1));
-      __m128i b = _mm_cvtsi32_si128(*(uint32_t *)(data2 + y * stride2));
+      __m128i a = _mm_cvtsi32_si128(*(const uint32_t *)(data1 + y * stride1));
+      __m128i b = _mm_cvtsi32_si128(*(const uint32_t *)(data2 + y * stride2));
 
       __m128i curr_sads = _mm_sad_epu8(a, b);
       sse_inc = _mm_add_epi64(sse_inc, curr_sads);
@@ -89,8 +89,8 @@ static INLINE uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixe
   __m128i sse_inc = _mm_setzero_si128();
   int32_t y;
   for (y = 0; y < height; y++) {
-    __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1]);
-    __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2]);
+    __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1));
+    __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2));
 
     __m128i b_masked  = _mm_blend_epi16(a, b, 0x3f);
     __m128i curr_sads = _mm_sad_epu8   (a, b_masked);
@@ -154,10 +154,10 @@ static INLINE uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixe
     sse_inc = _mm_add_epi64(sse_inc, curr_sads_3);
   }
   if (height_parity) {
-    __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1]);
-    __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2]);
-    __m128i c = _mm_cvtsi64_si128(*(uint64_t *)(data1 + y * stride1 + 8));
-    __m128i d = _mm_cvtsi64_si128(*(uint64_t *)(data2 + y * stride2 + 8));
+    __m128i a = _mm_loadu_si128   ((const __m128i *) (data1 + y * stride1));
+    __m128i b = _mm_loadu_si128   ((const __m128i *) (data2 + y * stride2));
+    __m128i c = _mm_cvtsi64_si128(*(const uint64_t *)(data1 + y * stride1 + 8));
+    __m128i d = _mm_cvtsi64_si128(*(const uint64_t *)(data2 + y * stride2 + 8));
 
     __m128i curr_sads_1 = _mm_sad_epu8(a, b);
     __m128i curr_sads_2 = _mm_sad_epu8(c, d);
@@ -188,15 +188,15 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
 
   for (y = 0; y < height; ++y) {
     for (x = 0; x < largeblock_bytes; x += 16) {
-      __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
-      __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
+      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
       __m128i curr_sads = _mm_sad_epu8(a, b);
       sse_inc = _mm_add_epi32(sse_inc, curr_sads);
     }
     
     if (residual_bytes) {
-      __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
-      __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
+      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
 
       __m128i b_masked  = _mm_blendv_epi8(a, b, rdmask);
       __m128i curr_sads = _mm_sad_epu8(a, b_masked);
