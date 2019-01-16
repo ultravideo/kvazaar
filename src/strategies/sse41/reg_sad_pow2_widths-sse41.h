@@ -206,29 +206,86 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
   __m128i sse_inc = _mm_setzero_si128();
   
   // Bytes in block in 128-bit blocks per each scanline, and remainder
-  const int32_t largeblock_bytes = width & ~15;
-  const int32_t residual_bytes   = width &  15;
+  const int32_t largeblock_bytes       = width  & ~15;
+  const int32_t residual_bytes         = width  &  15;
+
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
 
   const __m128i rds    = _mm_set1_epi8 (residual_bytes);
   const __m128i ns     = _mm_setr_epi8 (0,  1,  2,  3,  4,  5,  6,  7,
                                         8,  9,  10, 11, 12, 13, 14, 15);
   const __m128i rdmask = _mm_cmpgt_epi8(rds, ns);
 
-  for (y = 0; y < height; ++y) {
-    for (x = 0; x < largeblock_bytes; x += 16) {
-      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
-      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
-      __m128i curr_sads = _mm_sad_epu8(a, b);
-      sse_inc = _mm_add_epi32(sse_inc, curr_sads);
-    }
-    
-    if (residual_bytes) {
-      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
-      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
+  for (x = 0; x < largeblock_bytes; x += 16) {
+    for (y = 0; y < height_fourline_groups; y += 4) {
+      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1 + x));
+      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2 + x));
+      __m128i c = _mm_loadu_si128((const __m128i *)(data1 + (y + 1) * stride1 + x));
+      __m128i d = _mm_loadu_si128((const __m128i *)(data2 + (y + 1) * stride2 + x));
+      __m128i e = _mm_loadu_si128((const __m128i *)(data1 + (y + 2) * stride1 + x));
+      __m128i f = _mm_loadu_si128((const __m128i *)(data2 + (y + 2) * stride2 + x));
+      __m128i g = _mm_loadu_si128((const __m128i *)(data1 + (y + 3) * stride1 + x));
+      __m128i h = _mm_loadu_si128((const __m128i *)(data2 + (y + 3) * stride2 + x));
 
-      __m128i b_masked  = _mm_blendv_epi8(a, b, rdmask);
-      __m128i curr_sads = _mm_sad_epu8(a, b_masked);
-      sse_inc = _mm_add_epi32(sse_inc, curr_sads);
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b);
+      __m128i curr_sads_cd = _mm_sad_epu8(c, d);
+      __m128i curr_sads_ef = _mm_sad_epu8(e, f);
+      __m128i curr_sads_gh = _mm_sad_epu8(g, h);
+
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ef);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_gh);
+    }
+    if (height_residual_lines) {
+      for (; y < height; y++) {
+        __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
+        __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
+
+        __m128i curr_sads = _mm_sad_epu8(a, b);
+
+        sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+      }
+    }
+  }
+
+  if (residual_bytes) {
+    for (y = 0; y < height_fourline_groups; y += 4) {
+      __m128i a = _mm_loadu_si128((const __m128i *)(data1 + (y + 0) * stride1 + x));
+      __m128i b = _mm_loadu_si128((const __m128i *)(data2 + (y + 0) * stride2 + x));
+      __m128i c = _mm_loadu_si128((const __m128i *)(data1 + (y + 1) * stride1 + x));
+      __m128i d = _mm_loadu_si128((const __m128i *)(data2 + (y + 1) * stride2 + x));
+      __m128i e = _mm_loadu_si128((const __m128i *)(data1 + (y + 2) * stride1 + x));
+      __m128i f = _mm_loadu_si128((const __m128i *)(data2 + (y + 2) * stride2 + x));
+      __m128i g = _mm_loadu_si128((const __m128i *)(data1 + (y + 3) * stride1 + x));
+      __m128i h = _mm_loadu_si128((const __m128i *)(data2 + (y + 3) * stride2 + x));
+
+      __m128i b_masked     = _mm_blendv_epi8(a, b, rdmask);
+      __m128i d_masked     = _mm_blendv_epi8(c, d, rdmask);
+      __m128i f_masked     = _mm_blendv_epi8(e, f, rdmask);
+      __m128i h_masked     = _mm_blendv_epi8(g, h, rdmask);
+
+      __m128i curr_sads_ab = _mm_sad_epu8   (a, b_masked);
+      __m128i curr_sads_cd = _mm_sad_epu8   (c, d_masked);
+      __m128i curr_sads_ef = _mm_sad_epu8   (e, f_masked);
+      __m128i curr_sads_gh = _mm_sad_epu8   (g, h_masked);
+
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ef);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_gh);
+    }
+    if (height_residual_lines) {
+      for (; y < height; y++) {
+        __m128i a = _mm_loadu_si128((const __m128i *)(data1 + y * stride1 + x));
+        __m128i b = _mm_loadu_si128((const __m128i *)(data2 + y * stride2 + x));
+
+        __m128i b_masked  = _mm_blendv_epi8(a, b, rdmask);
+        __m128i curr_sads = _mm_sad_epu8   (a, b_masked);
+
+        sse_inc = _mm_add_epi64(sse_inc, curr_sads);
+      }
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
