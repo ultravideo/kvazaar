@@ -4,6 +4,13 @@
 #include <immintrin.h>
 #include "kvazaar.h"
 
+static INLINE uint32_t reg_sad_w0(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                           const int32_t height, const uint32_t stride1,
+                           const uint32_t stride2)
+{
+  return 0;
+}
+
 static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)

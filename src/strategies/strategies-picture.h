@@ -33,6 +33,19 @@
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];
 
+/**
+ * \param data1: Picture block pointer
+ * \param data2: Reference block pointer
+ * \param height: Scan block height
+ * \param stride1: Picture block stride
+ * \param stride2: Reference block stride
+ */
+typedef uint32_t (*optimized_sad_func_ptr_t)(const kvz_pixel * const,
+                                             const kvz_pixel * const,
+                                             const int32_t,
+                                             const uint32_t,
+                                             const uint32_t);
+
 
 // Function macro for defining hadamard calculating functions
 // for fixed size blocks. They calculate hadamard for integer
@@ -112,6 +125,7 @@ typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixe
 typedef void (cost_pixel_any_size_multi_func)(int width, int height, const kvz_pixel **preds, const int stride, const kvz_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
 
 typedef unsigned (pixels_calc_ssd_func)(const kvz_pixel *const ref, const kvz_pixel *const rec, const int ref_stride, const int rec_stride, const int width);
+typedef optimized_sad_func_ptr_t (get_optimized_sad_func)(int32_t);
 
 
 typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
@@ -165,6 +179,8 @@ extern pixels_calc_ssd_func *kvz_pixels_calc_ssd;
 
 extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
 
+extern get_optimized_sad_func *kvz_get_optimized_sad;
+
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
 cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n);
@@ -197,6 +213,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_any_size_quad", (void**) &kvz_satd_any_size_quad}, \
   {"pixels_calc_ssd", (void**) &kvz_pixels_calc_ssd}, \
   {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
+  {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
 
 
 

@@ -1255,8 +1255,29 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
   }
  }
 }
-#endif //COMPILE_INTEL_AVX2
 
+static optimized_sad_func_ptr_t get_optimized_sad_avx2(int32_t width)
+{
+  if (width == 0)
+    return reg_sad_w0;
+  if (width == 4)
+    return reg_sad_w4;
+  if (width == 8)
+    return reg_sad_w8;
+  if (width == 12)
+    return reg_sad_w12;
+  if (width == 16)
+    return reg_sad_w16;
+  if (width == 24)
+    return reg_sad_w24;
+  if (width == 32)
+    return reg_sad_w32;
+  if (width == 64)
+    return reg_sad_w64;
+  else
+    return NULL;
+}
+#endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
@@ -1290,6 +1311,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 
     success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
 	  success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
+    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
 
   }
 #endif

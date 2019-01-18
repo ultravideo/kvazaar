@@ -78,6 +78,13 @@ typedef struct {
    * \brief Bit cost of best_mv
    */
   uint32_t best_bitcost;
+
+  /**
+   * \brief Possible optimized SAD implementation for the width, leave as
+   *        NULL for arbitrary-width blocks
+   */
+  optimized_sad_func_ptr_t optimized_sad;
+
 } inter_search_info_t;
 
 
@@ -1433,7 +1440,6 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
   }
 }
 
-
 /**
  * \brief Update PU to have best modes at this depth.
  *
@@ -1486,6 +1492,7 @@ static void search_pu_inter(encoder_state_t * const state,
     .width          = width,
     .height         = height,
     .mvd_cost_func  = cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost,
+    .optimized_sad  = kvz_get_optimized_sad(width),
   };
 
   // Search for merge mode candidates
