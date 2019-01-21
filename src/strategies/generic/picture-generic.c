@@ -588,6 +588,10 @@ static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
 }
 
 
+static optimized_sad_func_ptr_t get_optimized_sad_generic(int32_t width)
+{
+  return NULL;
+}
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -624,6 +628,7 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
   success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "generic", 0, &inter_recon_bipred_generic);
 
+  success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
 
   return success;
 }
