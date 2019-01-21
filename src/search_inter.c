@@ -212,7 +212,8 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
       info->state->tile->offset_x + info->origin.x + x,
       info->state->tile->offset_y + info->origin.y + y,
       info->width,
-      info->height
+      info->height,
+      info->optimized_sad
   );
 
   if (cost >= info->best_cost) return false;

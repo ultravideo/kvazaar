@@ -459,7 +459,8 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
                             int ref_x,
                             int ref_y,
                             int block_width,
-                            int block_height)
+                            int block_height,
+                            optimized_sad_func_ptr_t optimized_sad)
 {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
@@ -471,7 +472,13 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
     // SAD directly. This is the most common case, which is why it's first.
     const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
     const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
-    return kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride)>>(KVZ_BIT_DEPTH-8);
+    uint32_t res;
+
+    if (optimized_sad != NULL)
+      res = optimized_sad(pic_data, ref_data, block_height, pic->stride, ref->stride);
+    else
+      res = kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
+    return res >> (KVZ_BIT_DEPTH - 8);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
     return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
