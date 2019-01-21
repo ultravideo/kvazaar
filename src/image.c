@@ -328,7 +328,8 @@ static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
  */
 static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
-                                 int block_width, int block_height)
+                                 int block_width, int block_height,
+                                 optimized_sad_func_ptr_t optimized_sad)
 {
   kvz_pixel *pic_data, *ref_data;
 
@@ -421,13 +422,15 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width, top, pic->stride);
-    result += kvz_reg_sad(&pic_data[top * pic->stride],
+    result += reg_sad_maybe_optimized(&pic_data[top * pic->stride],
                       &ref_data[top * ref->stride],
-                      block_width, block_height - top, pic->stride, ref->stride);
+                      block_width, block_height - top, pic->stride, ref->stride,
+                      optimized_sad);
   } else if (bottom) {
-    result += kvz_reg_sad(pic_data,
+    result += reg_sad_maybe_optimized(pic_data,
                       ref_data,
-                      block_width, block_height - bottom, pic->stride, ref->stride);
+                      block_width, block_height - bottom, pic->stride, ref->stride,
+                      optimized_sad);
     result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width, bottom, pic->stride);
@@ -446,12 +449,12 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       &ref_data[block_width - right - 1],
                       right, block_height, pic->stride, ref->stride);
   } else {
-    result += kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
+    result += reg_sad_maybe_optimized(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride,
+        optimized_sad);
   }
 
   return result;
 }
-
 
 /**
 * \brief Calculate interpolated SAD between two blocks.
