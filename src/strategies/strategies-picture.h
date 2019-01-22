@@ -116,6 +116,9 @@ typedef optimized_sad_func_ptr_t (get_optimized_sad_func)(int32_t);
 typedef uint32_t (ver_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                                 int32_t block_width, int32_t block_height,
                                 uint32_t pic_stride);
+typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                int32_t width, int32_t height, uint32_t pic_stride,
+                                uint32_t ref_stride, uint32_t left, uint32_t right);
 
 typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
 	const int hi_prec_luma_rec1,
@@ -170,6 +173,7 @@ extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
 
 extern get_optimized_sad_func *kvz_get_optimized_sad;
 extern ver_sad_func *kvz_ver_sad;
+extern hor_sad_func *kvz_hor_sad;
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
@@ -205,6 +209,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
   {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
   {"ver_sad", (void**) &kvz_ver_sad}, \
+  {"hor_sad", (void**) &kvz_hor_sad}, \
 
 
 

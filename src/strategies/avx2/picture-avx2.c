@@ -1295,6 +1295,25 @@ static uint32_t ver_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
     return ver_sad_arbitrary(pic_data, ref_data, width, height, stride);
 }
 
+static uint32_t hor_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                             int32_t width, int32_t height, uint32_t pic_stride,
+                             uint32_t ref_stride, uint32_t left, uint32_t right)
+{
+  if (width == 4)
+    return hor_sad_left_sse41_w4(pic_data, ref_data, width, height,
+                                 pic_stride, ref_stride, left);
+  if (width == 8)
+    return hor_sad_left_sse41_w8(pic_data, ref_data, width, height,
+                                 pic_stride, ref_stride, left);
+  if (width == 16)
+    return hor_sad_left_sse41_w16(pic_data, ref_data, width, height,
+                                  pic_stride, ref_stride, left);
+  if (width == 32)
+    return hor_sad_sse41_w32(pic_data, ref_data, width, height,
+                             pic_stride, ref_stride, left, right);
+  assert(0);
+}
+
 #endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
@@ -1331,6 +1350,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 	  success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "avx2", 40, &inter_recon_bipred_avx2);
     success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
     success &= kvz_strategyselector_register(opaque, "ver_sad", "avx2", 40, &ver_sad_avx2);
+    success &= kvz_strategyselector_register(opaque, "hor_sad", "avx2", 40, &hor_sad_avx2);
 
   }
 #endif

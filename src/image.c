@@ -413,19 +413,31 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width, bottom, pic->stride);
   } else if (left) {
-    result += hor_sad(pic_data,
-                      &ref_data[left],
-                      left, block_height, pic->stride, ref->stride);
-    result += kvz_reg_sad(&pic_data[left],
-                      &ref_data[left],
-                      block_width - left, block_height, pic->stride, ref->stride);
+    if (block_width == 16 || block_width == 8 || block_width == 4 || block_width == 32) {
+      result += kvz_hor_sad(pic_data, ref_data,
+                            block_width, block_height, pic->stride,
+                            ref->stride, left, right);
+    } else {
+      result += hor_sad(pic_data,
+                        &ref_data[left],
+                        left, block_height, pic->stride, ref->stride);
+      result += kvz_reg_sad(&pic_data[left],
+                        &ref_data[left],
+                        block_width - left, block_height, pic->stride, ref->stride);
+    }
   } else if (right) {
-    result += kvz_reg_sad(pic_data,
-                      ref_data,
-                      block_width - right, block_height, pic->stride, ref->stride);
-    result += hor_sad(&pic_data[block_width - right],
-                      &ref_data[block_width - right - 1],
-                      right, block_height, pic->stride, ref->stride);
+    if (block_width == 32) {
+      result += kvz_hor_sad(pic_data, ref_data,
+                            block_width, block_height, pic->stride,
+                            ref->stride, left, right);
+    } else {
+      result += kvz_reg_sad(pic_data,
+                        ref_data,
+                        block_width - right, block_height, pic->stride, ref->stride);
+      result += hor_sad(&pic_data[block_width - right],
+                        &ref_data[block_width - right - 1],
+                        right, block_height, pic->stride, ref->stride);
+    }
   } else {
     result += reg_sad_maybe_optimized(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride,
         optimized_sad);
