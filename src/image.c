@@ -261,32 +261,6 @@ static unsigned cor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
 }
 
 /**
- * \brief Vertically interpolate SAD outside the frame.
- *
- * \param data1   Starting point of the first picture.
- * \param data2   Starting point of the second picture.
- * \param width   Width of the region for which SAD is calculated.
- * \param height  Height of the region for which SAD is calculated.
- * \param width  Width of the pixel array.
- *
- * \returns Sum of Absolute Differences
- */
-static unsigned ver_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                        int block_width, int block_height, unsigned pic_stride)
-{
-  int x, y;
-  unsigned sad = 0;
-
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * pic_stride + x] - ref_data[x]);
-    }
-  }
-
-  return sad;
-}
-
-/**
  * \brief Horizontally interpolate SAD outside the frame.
  *
  * \param data1   Starting point of the first picture.
@@ -370,7 +344,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += cor_sad(pic_data,
                       &ref_data[top * ref->stride + left],
                       left, top, pic->stride);
-    result += ver_sad(&pic_data[left],
+    result += kvz_ver_sad(&pic_data[left],
                       &ref_data[top * ref->stride + left],
                       block_width - left, top, pic->stride);
     result += hor_sad(&pic_data[top * pic->stride],
@@ -380,7 +354,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       &ref_data[top * ref->stride + left],
                       block_width - left, block_height - top, pic->stride, ref->stride);
   } else if (top && right) {
-    result += ver_sad(pic_data,
+    result += kvz_ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width - right, top, pic->stride);
     result += cor_sad(&pic_data[block_width - right],
@@ -402,7 +376,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += cor_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride + left],
                       left, bottom, pic->stride);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride + left],
+    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride + left],
                       &ref_data[(block_height - bottom - 1) * ref->stride + left],
                       block_width - left, bottom, pic->stride);
   } else if (bottom && right) {
@@ -412,14 +386,14 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += hor_sad(&pic_data[block_width - right],
                       &ref_data[block_width - right - 1],
                       right, block_height - bottom, pic->stride, ref->stride);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width - right, bottom, pic->stride);
     result += cor_sad(&pic_data[(block_height - bottom) * pic->stride + block_width - right],
                       &ref_data[(block_height - bottom - 1) * ref->stride + block_width - right - 1],
                       right, bottom, pic->stride);
   } else if (top) {
-    result += ver_sad(pic_data,
+    result += kvz_ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width, top, pic->stride);
     result += reg_sad_maybe_optimized(&pic_data[top * pic->stride],
@@ -431,7 +405,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       ref_data,
                       block_width, block_height - bottom, pic->stride, ref->stride,
                       optimized_sad);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width, bottom, pic->stride);
   } else if (left) {

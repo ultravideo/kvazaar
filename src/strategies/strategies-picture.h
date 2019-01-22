@@ -113,7 +113,9 @@ typedef void (cost_pixel_any_size_multi_func)(int width, int height, const kvz_p
 
 typedef unsigned (pixels_calc_ssd_func)(const kvz_pixel *const ref, const kvz_pixel *const rec, const int ref_stride, const int rec_stride, const int width);
 typedef optimized_sad_func_ptr_t (get_optimized_sad_func)(int32_t);
-
+typedef uint32_t (ver_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                int32_t block_width, int32_t block_height,
+                                uint32_t pic_stride);
 
 typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
 	const int hi_prec_luma_rec1,
@@ -167,6 +169,7 @@ extern pixels_calc_ssd_func *kvz_pixels_calc_ssd;
 extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
 
 extern get_optimized_sad_func *kvz_get_optimized_sad;
+extern ver_sad_func *kvz_ver_sad;
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
@@ -201,6 +204,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"pixels_calc_ssd", (void**) &kvz_pixels_calc_ssd}, \
   {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
   {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
+  {"ver_sad", (void**) &kvz_ver_sad}, \
 
 
 

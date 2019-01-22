@@ -593,6 +593,32 @@ static optimized_sad_func_ptr_t get_optimized_sad_generic(int32_t width)
   return NULL;
 }
 
+/**
+ * \brief Vertically interpolate SAD outside the frame.
+ *
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width  Width of the pixel array.
+ *
+ * \returns Sum of Absolute Differences
+ */
+static uint32_t ver_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                int block_width, int block_height, unsigned pic_stride)
+{
+  int x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * pic_stride + x] - ref_data[x]);
+    }
+  }
+
+  return sad;
+}
+
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -629,6 +655,7 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "generic", 0, &inter_recon_bipred_generic);
 
   success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
+  success &= kvz_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);
 
   return success;
 }
