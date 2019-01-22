@@ -223,6 +223,15 @@ void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
   free(yuv);
 }
 
+static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                                  const int32_t width, const int32_t height, const uint32_t stride1,
+                                  const uint32_t stride2, optimized_sad_func_ptr_t optimized_sad)
+{
+  if (optimized_sad != NULL)
+    return optimized_sad(data1, data2, height, stride1, stride2);
+  else
+    return kvz_reg_sad(data1, data2, width, height, stride1, stride2);
+}
 
 /**
  * \brief Diagonally interpolate SAD outside the frame.
@@ -465,6 +474,8 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
 
+  uint32_t res;
+
   if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
       ref_y >= 0 && ref_y <= ref->height - block_height)
   {
@@ -472,17 +483,19 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
     // SAD directly. This is the most common case, which is why it's first.
     const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
     const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
-    uint32_t res;
 
-    if (optimized_sad != NULL)
-      res = optimized_sad(pic_data, ref_data, block_height, pic->stride, ref->stride);
-    else
-      res = kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
-    return res >> (KVZ_BIT_DEPTH - 8);
+    res = reg_sad_maybe_optimized(pic_data,
+                                  ref_data,
+                                  block_width,
+                                  block_height,
+                                  pic->stride,
+                                  ref->stride,
+                                  optimized_sad);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
-    return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
+    res = image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height, optimized_sad);
   }
+  return res >> (KVZ_BIT_DEPTH - 8);
 }
 
 
