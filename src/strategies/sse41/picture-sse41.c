@@ -48,6 +48,24 @@ uint32_t kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * cons
     return reg_sad_arbitrary(data1, data2, width, height, stride1, stride2);
 }
 
+static optimized_sad_func_ptr_t get_optimized_sad_sse41(int32_t width)
+{
+  if (width == 0)
+    return reg_sad_w0;
+  if (width == 4)
+    return reg_sad_w4;
+  if (width == 8)
+    return reg_sad_w8;
+  if (width == 12)
+    return reg_sad_w12;
+  if (width == 16)
+    return reg_sad_w16;
+  if (width == 24)
+    return reg_sad_w24;
+  else
+    return NULL;
+}
+
 #endif //COMPILE_INTEL_SSE41
 
 
@@ -56,6 +74,7 @@ int kvz_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
 #if COMPILE_INTEL_SSE41
   if (bitdepth == 8){
     success &= kvz_strategyselector_register(opaque, "reg_sad", "sse41", 20, &kvz_reg_sad_sse41);
+    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "sse41", 20, &get_optimized_sad_sse41);
   }
 #endif
   return success;
