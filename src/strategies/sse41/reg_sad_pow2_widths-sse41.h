@@ -204,8 +204,8 @@ static INLINE uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixe
   if (height_parity) {
     __m128i a = _mm_loadu_si128   ((const __m128i *) (data1 + y * stride1));
     __m128i b = _mm_loadu_si128   ((const __m128i *) (data2 + y * stride2));
-    __m128i c = _mm_cvtsi64_si128(*(const uint64_t *)(data1 + y * stride1 + 8));
-    __m128i d = _mm_cvtsi64_si128(*(const uint64_t *)(data2 + y * stride2 + 8));
+    __m128i c = _mm_cvtsi64_si128(*(const uint64_t *)(data1 + y * stride1 + 16));
+    __m128i d = _mm_cvtsi64_si128(*(const uint64_t *)(data2 + y * stride2 + 16));
 
     __m128i curr_sads_1 = _mm_sad_epu8(a, b);
     __m128i curr_sads_2 = _mm_sad_epu8(c, d);
