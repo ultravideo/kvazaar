@@ -48,6 +48,11 @@
 #define FALLTHROUGH
 #endif
 
+#ifndef _mm256_loadu2_m128i
+#define _mm256_loadu2_m128i(hi,low) _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((low))), _mm_loadu_si128((hi)), 0x1)
+#endif
+
+
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
 {
@@ -1210,7 +1215,7 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
   }
 }
 
-static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
+/*static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
 {
   //TODO: Add cropping etc.
 
@@ -1416,7 +1421,7 @@ static void resampleBlockStep_avx2_v2(const pic_buffer_t* const src_buffer, cons
       }
     }
   }
-}
+}*/
 
 static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, const pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical)
 {
@@ -1875,7 +1880,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
         temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[3]], (__m128i*)&src[sample_pos[2]]);
         temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[4]]);
         temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[6]]);
-
+        
         //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
         if (virtual_pos_start[0] < 0) {
           //Shuffle data from mem so that left bound values are correctly dublicated.
