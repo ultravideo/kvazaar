@@ -27,7 +27,7 @@
 #include <immintrin.h>
 
 #define DEFAULT_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2
-#define ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v2
+#define ALT1_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v4
 #define ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2 resampleBlockStep_avx2_v3
 #define DEFAULT_RESAMPLE_FUNC_AVX2 resample_avx2
 #define ALT_RESAMPLE_FUNC_AVX2 resample2resampleBlockStep_alt2_avx2
@@ -1659,7 +1659,7 @@ static __m256i apply_filter_4x4_dual(const __m256i* data0, const __m256i* data1,
 {
   
   __m256i res;
-  const __m256i perm = _mm256_set_epi32(7, 5, 3, 1, 6, 2, 4, 0);
+  const __m256i perm = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
 
   //Filtering done four taps at a time for four pixels, so repeate until desired number of taps performed
   __m256i tmp0 = _mm256_madd_epi16(data0[0], filter0[0]);
@@ -1749,9 +1749,9 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
   
   const __m256i adderr = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-  const __m256i adderr_2 = _mm256_setr_epi32(0, 1, 2, 3, 0, 1, 2, 3);
-  const __m256i adderr_hi = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
-  const __m256i shift_left = _mm256_setr_epi32(0, 0, 1, 2, 3, 4, 5, 6);
+  //const __m256i adderr_2 = _mm256_setr_epi32(0, 1, 2, 3, 0, 1, 2, 3);
+  //const __m256i adderr_hi = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
+  //const __m256i shift_left = _mm256_setr_epi32(0, 0, 1, 2, 3, 4, 5, 6);
 
   const __m256i scale_epi32 = _mm256_set1_epi32(scale);
   const __m256i add_epi32 = _mm256_set1_epi32(add);
@@ -1760,37 +1760,31 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
   const __m256i zero = _mm256_setzero_si256();
   const __m256i zero_four = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
-  const __m256i four_eight = _mm256_setr_epi32(4, 4, 4, 4, 8, 8, 8, 8);
-  const __m256i eight = _mm256_set1_epi32(8);
+  const __m256i three_seven = _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7);
+  //const __m256i eight = _mm256_set1_epi32(8);
   const __m256i max_src_ind = _mm256_set1_epi32(src_size - 1);
 
   __m256i filters_epi16[12]; //Contain preloaded filters. Data layouts: |Ph(X+3) Ph(X+1)|Ph(X+2) Ph(X)| or |Ph(X+1)_1 Ph(X)_1|Ph(X+1)_0 Ph(X)_0| or |Ph(X+1)_0 Ph(X)_1|Ph(X)_2 Ph(X)_0| and |Ph(X+2)_1 Ph(X+1)_2|Ph(X+2)_0 Ph(X+1)_1| and |Ph(X+3)_2 Ph(X+3)_0|Ph(X+3)_1 Ph(X+2)_2|
   __m256i temp_mem[12], temp_filter[12];
-  __m256i filter_res_epi32;
-  __m256i phase_epi32, ref_pos_epi32, ref_pos_diff_epi32;
   __m256i data0[3], data1[3], filter0[3], filter1[3];
   
-  const unsigned *ref_pos_diff = (unsigned *)&ref_pos_diff_epi32;
-
   const unsigned phase_map[4][4] = { { 0, 2, 1, 3 }, { 3, 0, 2, 1 }, { 1, 3, 0, 2 }, { 2, 1, 3, 0} }; //Phase map for 4 tap filter and 12 tap filter
   const unsigned filter_map[4][3] = { { 0, 0, 0 }, { 0, 1, 1 }, { 1, 1, 2 }, { 2, 2, 2 } }; //Filter array map for 12 tap
 
   //Pre-load filters
-  if (filter_size <= 4) {
-    
-    filters_epi16[0] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[0]), _mm256_loadu_si256((__m256i*)&filter[8]));
-    filters_epi16[1] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[16]), _mm256_loadu_si256((__m256i*)&filter[24]));
-    filters_epi16[2] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[32]), _mm256_loadu_si256((__m256i*)&filter[40]));
-    filters_epi16[3] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[48]), _mm256_loadu_si256((__m256i*)&filter[56]));
-  }
-  if (4 < filter_size && filter_size <= 8) {
+  filters_epi16[0] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[0]), _mm256_loadu_si256((__m256i*)&filter[8]));
+  filters_epi16[1] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[16]), _mm256_loadu_si256((__m256i*)&filter[24]));
+  filters_epi16[2] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[32]), _mm256_loadu_si256((__m256i*)&filter[40]));
+  filters_epi16[3] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[48]), _mm256_loadu_si256((__m256i*)&filter[56]));
+  
+  if (filter_size > 4) {
     
     filters_epi16[4] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[64]), _mm256_loadu_si256((__m256i*)&filter[72]));
     filters_epi16[5] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[80]), _mm256_loadu_si256((__m256i*)&filter[88]));
     filters_epi16[6] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[96]), _mm256_loadu_si256((__m256i*)&filter[104]));
     filters_epi16[7] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[112]), _mm256_loadu_si256((__m256i*)&filter[120]));
   }
-  if( 8 < filter_size ) {
+  if(filter_size > 8) {
 
     filters_epi16[8] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[128]), _mm256_loadu_si256((__m256i*)&filter[136]));
     filters_epi16[9] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[144]), _mm256_loadu_si256((__m256i*)&filter[152]));
@@ -1808,11 +1802,11 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
     // loop over x (target block width)
     for (int x = block_x; x < x_bound; x += t_step) {
 
-      const unsigned *phase;
-      const int *ref_pos;
-      int ref_pos_tmp;
+      __m256i filter_res_epi32, phase_epi32, ref_pos_epi32;
+
+      const unsigned *phase = (unsigned*)&phase_epi32;
+      int ref_pos;
       unsigned phase_tmp;
-      int max_under, max_over;
 
       const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
 
@@ -1825,28 +1819,11 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
         //Calculate the first sample ind based on the ref pos
         ref_pos_epi32 = _mm256_sub_epi32(ref_pos_epi32, _mm256_set1_epi32((filter_size >> 1) - 1));
-
-        ref_pos_diff_epi32 = _mm256_sub_epi32(ref_pos_epi32, _mm256_permutevar8x32_epi32(ref_pos_epi32, shift_left));
-
-        phase = (unsigned*)&phase_epi32;
-        ref_pos = (int*)&ref_pos_epi32;
-
-        //Need to handle start/end where sample inds are out of bounds
-        //  Get the max amount under/over the bounds
-        max_under = ref_pos[0];
-        max_over = ref_pos[7] - src_size + 1;
-        //if (max_under < 0) {
-        _mm256_min_epi32(ref_pos_epi32, zero);
-        //}
-        /*if (max_over >= src_size) {
-          _mm256_max_epi32(ref_pos_epi32, max_src_ind);
-        }*/
-
       }
       else {
         const int ref_pos_16 = (int)((unsigned int)(y * scale + add) >> shift) - delta;
         phase_tmp = ref_pos_16 & 15; phase = &phase_tmp;
-        ref_pos_tmp = ref_pos_16 >> 4; ref_pos = &ref_pos_tmp;
+        ref_pos = ref_pos_16 >> 4;
       }
 
       //Loop over filter segments and load needed data 
@@ -1854,38 +1831,43 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
         const int f_ind = filter_part * f_step; //Filter index
         
-        __m256i sample_pos_epi32 = _mm256_add_epi32(ref_pos_epi32, _mm256_set1_epi32(f_ind)); //Sample position
-        sample_pos_epi32 = _mm256_min_epi32(sample_pos_epi32, max_src_ind);  //Need to make sure that sample position does not go over src_size - 1 so we load at least one edge sample
-        unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
+        //Need to handle start/end where sample inds are out of bounds
+        const __m256i virtual_pos_start_epi32 = _mm256_add_epi32(ref_pos_epi32, _mm256_set1_epi32(f_ind)); //Virtual position of first sample processed here. May lie outside of image
+        const int *virtual_pos_start = (int *)&virtual_pos_start_epi32;
+        const __m256i num_over_epi32 = _mm256_add_epi32(virtual_pos_start_epi32, _mm256_set1_epi32(f_step - src_size)); //How much the virtual sample pos processed here are over src_size - 1
+        const int *num_over = (int *)&num_over_epi32;
+
+        const __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(virtual_pos_start_epi32, zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
+        const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
 
         //Load filter
         if (filter_size <= 4) {
-          filter0[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[phase[3] >> 2], phase_map[0][phase[3] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[1] >> 2], phase_map[0][phase[1] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[2] >> 2], phase_map[0][phase[2] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[0] >> 2], phase_map[0][phase[0] % 4]));
-          filter1[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[phase[7] >> 2], phase_map[0][phase[7] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[5] >> 2], phase_map[0][phase[5] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[6] >> 2], phase_map[0][phase[6] % 4]),
-                                                   _mm256_extract_epi64(filters_epi16[phase[4] >> 2], phase_map[0][phase[4] % 4]));
+          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[3] >> 2]))[phase_map[0][phase[3] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[1] >> 2]))[phase_map[0][phase[1] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[2] >> 2]))[phase_map[0][phase[2] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[0] >> 2]))[phase_map[0][phase[0] % 4]]);
+          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[7] >> 2]))[phase_map[0][phase[7] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[5] >> 2]))[phase_map[0][phase[5] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[6] >> 2]))[phase_map[0][phase[6] % 4]],
+                                                   ((long long*)(&filters_epi16[phase[4] >> 2]))[phase_map[0][phase[4] % 4]]);
         } else if (filter_size <= 8) {
-          filter0[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[phase[3] >> 1], (phase[3] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[1] >> 1], (phase[1] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[2] >> 1], (phase[2] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[0] >> 1], (phase[0] % 2) + filter_part));
-          filter1[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[phase[7] >> 1], (phase[7] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[5] >> 1], (phase[5] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[6] >> 1], (phase[6] % 2) + filter_part),
-                                                   _mm256_extract_epi64(filters_epi16[phase[4] >> 1], (phase[4] % 2) + filter_part));
+          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[3] >> 1]))[phase_map[(phase[3] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[1] >> 1]))[phase_map[(phase[1] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[2] >> 1]))[phase_map[(phase[2] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[0] >> 1]))[phase_map[(phase[0] % 2) << 1][filter_part]]);
+          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[7] >> 1]))[phase_map[(phase[7] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[5] >> 1]))[phase_map[(phase[5] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[6] >> 1]))[phase_map[(phase[6] % 2) << 1][filter_part]],
+                                                   ((long long*)(&filters_epi16[phase[4] >> 1]))[phase_map[(phase[4] % 2) << 1][filter_part]]);
         } else {
-          filter0[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[(phase[3] >> 2) + filter_map[phase[3] % 4][filter_part]], phase_map[phase[3] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[1] >> 2) + filter_map[phase[1] % 4][filter_part]], phase_map[phase[1] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[2] >> 2) + filter_map[phase[2] % 4][filter_part]], phase_map[phase[2] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[0] >> 2) + filter_map[phase[0] % 4][filter_part]], phase_map[phase[0] % 4][filter_part]));
-          filter1[filter_part] = _mm256_set_epi64x(_mm256_extract_epi64(filters_epi16[(phase[7] >> 2) + filter_map[phase[7] % 4][filter_part]], phase_map[phase[7] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[5] >> 2) + filter_map[phase[5] % 4][filter_part]], phase_map[phase[5] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[6] >> 2) + filter_map[phase[6] % 4][filter_part]], phase_map[phase[6] % 4][filter_part]),
-                                                   _mm256_extract_epi64(filters_epi16[(phase[4] >> 2) + filter_map[phase[4] % 4][filter_part]], phase_map[phase[4] % 4][filter_part]));
+          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[(phase[3] >> 2) + filter_map[phase[3] % 4][filter_part]]))[phase_map[phase[3] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[1] >> 2) + filter_map[phase[1] % 4][filter_part]]))[phase_map[phase[1] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[2] >> 2) + filter_map[phase[2] % 4][filter_part]]))[phase_map[phase[2] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[0] >> 2) + filter_map[phase[0] % 4][filter_part]]))[phase_map[phase[0] % 4][filter_part]]);
+          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[(phase[7] >> 2) + filter_map[phase[7] % 4][filter_part]]))[phase_map[phase[7] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[5] >> 2) + filter_map[phase[5] % 4][filter_part]]))[phase_map[phase[5] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[6] >> 2) + filter_map[phase[6] % 4][filter_part]]))[phase_map[phase[6] % 4][filter_part]],
+                                                   ((long long*)(&filters_epi16[(phase[4] >> 2) + filter_map[phase[4] % 4][filter_part]]))[phase_map[phase[4] % 4][filter_part]]);
         }
         
         //Load src samples in four pixel chunks into registers
@@ -1895,66 +1877,66 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
         temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[6]]);
 
         //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
-        if ((max_under + f_ind) < 0) {
+        if (virtual_pos_start[0] < 0) {
           //Shuffle data from mem so that left bound values are correctly dublicated.
-          __m128i perm_lo = _mm_set1_epi32(max_under + f_ind); //Set the amount inds are under
-          __m128i perm_hi = (max_under + ref_pos_diff[1] + f_ind) < 0 ? _mm_set1_epi32(max_under + ref_pos_diff[1] + f_ind) : _mm256_castsi256_si128(zero); //Only set if 2nd ref pos is under, permute fails if not
+          __m128i perm_lo = _mm_set1_epi32(virtual_pos_start[0]); //Set the amount inds are under
+          __m128i perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[1], 0)); //Perm should be <= 0, permute fails if not
           __m256i perm = _mm256_max_epi32(_mm256_add_epi32(adderr, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
           
           temp_mem[f_ind + 0] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], perm);
 
-          if ((max_under + ref_pos_diff[2] + f_ind) < 0) {
-            perm_lo = _mm_set1_epi32(max_under + ref_pos_diff[2] + f_ind);
-            perm_hi = (max_under + ref_pos_diff[3] + f_ind) < 0 ? _mm_set1_epi32(max_under + ref_pos_diff[3] + f_ind) : _mm256_castsi256_si128(zero);
-            perm = _mm256_max_epi32(_mm256_add_epi32(adderr_2, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
+          if (virtual_pos_start[2] < 0) {
+            perm_lo = _mm_set1_epi32(virtual_pos_start[2]);
+            perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[3], 0));
+            perm = _mm256_max_epi32(_mm256_add_epi32(adderr, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
 
             temp_mem[f_ind + 1] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], perm);
 
-            if ((max_under + ref_pos_diff[4] + f_ind) < 0) {
-              perm_lo = _mm_set1_epi32(max_under + ref_pos_diff[4] + f_ind);
-              perm_hi = (max_under + ref_pos_diff[5] + f_ind) < 0 ? _mm_set1_epi32(max_under + ref_pos_diff[5] + f_ind) : _mm256_castsi256_si128(zero);
-              perm = _mm256_max_epi32(_mm256_add_epi32(adderr_2, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
+            if (virtual_pos_start[4] < 0) {
+              perm_lo = _mm_set1_epi32(virtual_pos_start[4]);
+              perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[5], 0));
+              perm = _mm256_max_epi32(_mm256_add_epi32(adderr, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
 
               temp_mem[f_ind + 2] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 2], perm);
 
-              if ((max_under + ref_pos_diff[6] + f_ind) < 0) {
-                perm_lo = _mm_set1_epi32(max_under + ref_pos_diff[6] + f_ind);
-                perm_hi = (max_under + ref_pos_diff[7] + f_ind) < 0 ? _mm_set1_epi32(max_under + ref_pos_diff[7] + f_ind) : _mm256_castsi256_si128(zero);
-                perm = _mm256_max_epi32(_mm256_add_epi32(adderr_2, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
+              if (virtual_pos_start[6] < 0) {
+                perm_lo = _mm_set1_epi32(virtual_pos_start[6]);
+                perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[7], 0));
+                perm = _mm256_max_epi32(_mm256_add_epi32(adderr, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
 
                 temp_mem[f_ind + 3] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 3], perm);
               }
             }
           }
         }
-        if ((max_over + f_ind + f_step) > 0) {
+        if (num_over[7] > 0) {
           //Shuffle data from mem so that right bound values are correctly dublicated.
-          __m128i perm_lo = (max_over - ref_pos_diff[7] + f_ind + f_step) < 0 ? _mm_set1_epi32(max_over - ref_pos_diff[7] + f_ind + f_step) : _mm256_castsi256_si128(zero); //Set the amount inds are over. Only set if 1st ref pos is over, permute fails if not
-          __m128i perm_hi = _mm_set1_epi32(max_over + f_ind + f_step); //Set the amount ids are over
-          __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(four_eight, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
+          __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[6], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
+          __m128i perm_hi = _mm_set1_epi32(num_over[7]); //Set the amount ids are over
+          __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
 
-          temp_mem[f_ind + 0] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], perm);
+          temp_mem[f_ind + 3] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 3], perm);
 
-          if ((max_over - ref_pos_diff[6] + f_ind + f_step) > 0) {
-            perm_lo = (max_over - ref_pos_diff[5] + f_ind + f_step) < 0 ? _mm_set1_epi32(max_over - ref_pos_diff[5] + f_ind + f_step) : _mm256_castsi256_si128(zero);
-            perm_hi = _mm_set1_epi32(max_over - ref_pos_diff[6] + f_ind + f_step);
-            perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(four_eight, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
+          if (num_over[5] > 0) {
+            perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[4], 0));
+            perm_hi = _mm_set1_epi32(num_over[5]);
+            perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
 
-            temp_mem[f_ind + 1] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], perm);
+            temp_mem[f_ind + 2] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 2], perm);
 
-            if ((max_over - ref_pos_diff[4] + f_ind + f_step) > 0) {
-              perm_lo = (max_over - ref_pos_diff[3] + f_ind + f_step) < 0 ? _mm_set1_epi32(max_over - ref_pos_diff[5] + f_ind + f_step) : _mm256_castsi256_si128(zero);
-              perm_hi = _mm_set1_epi32(max_over - ref_pos_diff[4] + f_ind + f_step);
-              perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(four_eight, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
+            if (num_over[3] > 0) {
+              perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[2], 0));
+              perm_hi = _mm_set1_epi32(num_over[3]);
+              perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
 
-              temp_mem[f_ind + 2] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 2], perm);
+              temp_mem[f_ind + 1] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], perm);
 
-              if ((max_over - ref_pos_diff[2] + f_ind + f_step) > 0) {
-                perm_lo = (max_over - ref_pos_diff[1] + f_ind + f_step) < 0 ? _mm_set1_epi32(max_over - ref_pos_diff[1] + f_ind + f_step) : _mm256_castsi256_si128(zero);
-                perm_hi = _mm_set1_epi32(max_over - ref_pos_diff[2] + f_ind + f_step);
-                perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(four_eight, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
+              if (num_over[1] > 0) {
+                perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[0], 0));
+                perm_hi = _mm_set1_epi32(num_over[1]);
+                perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), adderr), zero_four);
 
-                temp_mem[f_ind + 3] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 3], perm);
+                temp_mem[f_ind + 0] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], perm);
               }
             }
           }
@@ -1977,7 +1959,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
         } else {
           //Get src row corresponding to cur filter index i
-          const int s_ind = SCALER_CLIP(ref_pos[0] + (int)i - (filter_size >> 1) + 1, 0, src_size - 1);
+          const int s_ind = SCALER_CLIP(ref_pos + (int)i - (filter_size >> 1) + 1, 0, src_size - 1);
           *temp_mem = _mm256_loadu_si256((__m256i *)&src[s_ind * s_stride + x]);
 
           *temp_filter = _mm256_set1_epi32(getFilterCoeff(filter, filter_size, *phase, i));

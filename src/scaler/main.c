@@ -1080,7 +1080,7 @@ static void validate_test4()
 int main()
 {
   //vscaling();
-  validate_test4();
+  validate_test3();
   //int r = test_avx();
   //printf("%d", r);
 
