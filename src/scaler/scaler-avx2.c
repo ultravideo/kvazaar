@@ -1082,7 +1082,7 @@ static __m256i _mm256_loadu_n_epi32(const int *src, const unsigned n)
 }
 
 //Read n (max 8) epi32i values from src specified by idx
-static __m256i _mm256_gather_n_epi32(const int *src, const unsigned idx[8], const unsigned n)
+/*static __m256i _mm256_gather_n_epi32(const int *src, const unsigned idx[8], const unsigned n)
 {
   __m256i dst = _mm256_setzero_si256();
 
@@ -1137,7 +1137,7 @@ static __m256i _mm256_gather_n_epi32(const int *src, const unsigned idx[8], cons
   }//END Switch
 
   return dst;
-}
+}*/
 
 //Avx store n epi32 from src to dst
 static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
@@ -1772,6 +1772,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   __m256i filters_epi16[12]; //Contain preloaded filters. Data layouts: |Ph(X+3) Ph(X+1)|Ph(X+2) Ph(X)| or |Ph(X+1)_1 Ph(X)_1|Ph(X+1)_0 Ph(X)_0| or |Ph(X+1)_0 Ph(X)_1|Ph(X)_2 Ph(X)_0| and |Ph(X+2)_1 Ph(X+1)_2|Ph(X+2)_0 Ph(X+1)_1| and |Ph(X+3)_2 Ph(X+3)_0|Ph(X+3)_1 Ph(X+2)_2|
   __m256i temp_mem[12], temp_filter[12];
   __m256i data0[3], data1[3], filter0[3], filter1[3];
+  __m256i ref_pos_epi32 = zero;
   
   const unsigned phase_map[4][4] = { { 0, 2, 1, 3 }, { 3, 0, 2, 1 }, { 1, 3, 0, 2 }, { 2, 1, 3, 0} }; //Phase map for 4 tap filter and 12 tap filter
   const unsigned filter_map[4][3] = { { 0, 0, 0 }, { 0, 1, 1 }, { 1, 1, 2 }, { 2, 2, 2 } }; //Filter array map for 12 tap
@@ -1807,7 +1808,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
     // loop over x (target block width)
     for (int x = block_x; x < x_bound; x += t_step) {
 
-      __m256i filter_res_epi32, phase_epi32, ref_pos_epi32;
+      __m256i filter_res_epi32, phase_epi32;
 
       const unsigned *phase = (unsigned*)&phase_epi32;
       int ref_pos;
