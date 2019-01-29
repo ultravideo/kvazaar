@@ -239,8 +239,10 @@ typedef int16_t coeff_t;
 #ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) (type *)malloc(sizeof(type) * (num) + (padding))
 #else
   #define MALLOC(type, num) malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) malloc(sizeof(type) * (num) + (padding))
 #endif
 
 // Use memset through FILL and FILL_ARRAY when appropriate, such as when

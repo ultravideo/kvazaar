@@ -47,6 +47,8 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   assert((width % 2) == 0);
   assert((height % 2) == 0);
 
+  const size_t simd_padding_width = 64;
+
   kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
@@ -56,12 +58,13 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
 
   im->chroma_format = chroma_format;
 
-  //Allocate memory
-  im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size));
-  if (!im->fulldata) {
+  //Allocate memory, pad the full data buffer from both ends
+  im->fulldata_buf = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
+  if (!im->fulldata_buf) {
     free(im);
     return NULL;
   }
+  im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
   im->base_image = im;
   im->refcount = 1; //We give a reference to caller
@@ -110,11 +113,12 @@ void kvz_image_free(kvz_picture *const im)
     // Free our reference to the base image.
     kvz_image_free(im->base_image);
   } else {
-    free(im->fulldata);
+    free(im->fulldata_buf);
   }
 
   // Make sure freed data won't be used.
   im->base_image = NULL;
+  im->fulldata_buf = NULL;
   im->fulldata = NULL;
   im->y = im->u = im->v = NULL;
   im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;

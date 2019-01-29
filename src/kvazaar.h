@@ -392,7 +392,8 @@ typedef struct kvz_config
  * Function picture_alloc in kvz_api must be used for allocation.
  */
 typedef struct kvz_picture {
-  kvz_pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+  kvz_pixel *fulldata_buf;     //!< \brief Allocated buffer with padding (only used in the base_image)
+  kvz_pixel *fulldata;         //!< \brief Allocated buffer portion that's actually used
 
   kvz_pixel *y;                //!< \brief Pointer to luma pixel array.
   kvz_pixel *u;                //!< \brief Pointer to chroma U pixel array.
