@@ -726,8 +726,8 @@ static uint32_t hor_sad_left_sse41_w16(const kvz_pixel *pic_data, const kvz_pixe
 }
 
 static uint32_t hor_sad_sse41_w32(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                       int32_t width, int32_t height, uint32_t pic_stride,
-                                       uint32_t ref_stride, uint32_t left, uint32_t right)
+                                  int32_t width, int32_t height, uint32_t pic_stride,
+                                  uint32_t ref_stride, uint32_t left, uint32_t right)
 {
   const int32_t height_twoline_groups = height & ~1;
   const int32_t height_residual_lines = height &  1;
@@ -799,6 +799,84 @@ static uint32_t hor_sad_sse41_w32(const kvz_pixel *pic_data, const kvz_pixel *re
     sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
   }
 
+  __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
+  return _mm_cvtsi128_si32(sad);
+}
+
+static uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                        int32_t width, int32_t height, uint32_t pic_stride,
+                                        uint32_t ref_stride, uint32_t left, uint32_t right)
+{
+  const size_t xmm_width = 16;
+  const __m128i xmm_widths = _mm_set1_epi8(xmm_width);
+
+  // Bytes in block in 128-bit blocks per each scanline, and remainder
+  const int32_t width_xmms             = width  & ~(xmm_width - 1);
+  const int32_t width_residual_pixels  = width  &  (xmm_width - 1);
+
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
+
+  __m128i ns = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                             8,  9,  10, 11, 12, 13, 14, 15);
+
+  const __m128i rds    = _mm_set1_epi8 (width_residual_pixels);
+  const __m128i rdmask = _mm_cmpgt_epi8(rds, ns);
+
+  int32_t border_idx;
+  __m128i is_right_border = _mm_setzero_si128();
+  if (left) {
+    border_idx = left;
+  } else {
+    border_idx = width - (right + 1);
+    is_right_border = _mm_cmpeq_epi8(is_right_border, is_right_border);
+  }
+  const __m128i epol_src_idx = _mm_set1_epi8(border_idx);
+
+  int32_t x, y;
+  __m128i sse_inc = _mm_setzero_si128();
+  __m128i epol_mask;
+  for (x = 0; x < width_xmms; x += xmm_width) {
+
+    // This is a dirty hack, but it saves us an easily predicted branch! It
+    // also marks the first or last valid pixel (the border one) for
+    // extrapolating, but that makes no difference since the pixels marked
+    // for extrapolation will always be written over with that exact pixel's
+    // value.
+    epol_mask = _mm_cmpgt_epi8(epol_src_idx, ns);
+    epol_mask = _mm_xor_si128 (epol_mask,    is_right_border);
+
+    for (y = 0; y < height; y++) {
+      __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
+      __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+
+      __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+      __m128i b_epol       = _mm_blendv_epi8(b, border_px_b, epol_mask);
+
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol);
+
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+    }
+    ns = _mm_add_epi8(ns, xmm_widths);
+  }
+  if (width_residual_pixels) {
+    epol_mask = _mm_cmpgt_epi8(epol_src_idx, ns);
+    epol_mask = _mm_xor_si128 (epol_mask,    is_right_border);
+
+    for (y = 0; y < height; y++) {
+      __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
+      __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+
+      __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+      __m128i b_epol_1     = _mm_blendv_epi8(b, border_px_b, epol_mask);
+      __m128i b_epol_2     = _mm_blendv_epi8(a, b_epol_1,    rdmask);
+
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol_2);
+
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+    }
+  }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
   return _mm_cvtsi128_si32(sad);

@@ -87,6 +87,7 @@ static uint32_t hor_sad_sse41(const kvz_pixel *pic_data, const kvz_pixel *ref_da
                               int32_t width, int32_t height, uint32_t pic_stride,
                               uint32_t ref_stride, uint32_t left, uint32_t right)
 {
+  /*
   if (width == 4)
     return hor_sad_left_sse41_w4(pic_data, ref_data, width, height,
                                  pic_stride, ref_stride, left);
@@ -99,7 +100,9 @@ static uint32_t hor_sad_sse41(const kvz_pixel *pic_data, const kvz_pixel *ref_da
   if (width == 32)
     return hor_sad_sse41_w32(pic_data, ref_data, width, height,
                              pic_stride, ref_stride, left, right);
+  */
   assert(0);
+  return 0;
 }
 
 #endif //COMPILE_INTEL_SSE41
