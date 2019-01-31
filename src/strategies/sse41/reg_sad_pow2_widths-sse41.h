@@ -665,22 +665,53 @@ static uint32_t hor_sad_left_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel
 }
 
 /*
- * overhang is a measure of how many pixels the intended starting X coordinate
- * is right from the one pointed to by pic_data, ie. abs(x0). We can read
- * starting from X = 0, and to preserve pixel alignment, shift all the bytes
- * right "left" places while duplicating the leftmost pixel (extrapolating it
- * to the left of the image buffer).
+ * left and right measure how many pixels of one horizontal scanline will be
+ * outside either the left or the right screen border. For blocks straddling
+ * the left border, read the scanlines starting from the left border instead,
+ * and use the extrapolation mask to essentially move the pixels right while
+ * copying the left border pixel to the vector positions that logically point
+ * outside of the buffer.
+ *
+ * For blocks straddling the right border, just read over the right border,
+ * and extrapolate all pixels beyond the border idx to copy the value of the
+ * border pixel. An exception is right == width (leftmost reference pixel is
+ * one place right from the right border, it's ugly because the pixel to
+ * extrapolate from is located at relative X offset -1), abuse the left border
+ * aligning functionality instead to actually read starting from the valid
+ * border pixel, and use a suitable mask to fill all the other pixels with
+ * that value.
  */
-static uint32_t hor_sad_left_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                       int32_t width, int32_t height, uint32_t pic_stride,
-                                       uint32_t ref_stride, uint32_t overhang)
+static uint32_t hor_sad_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                  int32_t width, int32_t height, uint32_t pic_stride,
+                                  uint32_t ref_stride, uint32_t left, uint32_t right)
 {
-  const __m128i excess    = _mm_set1_epi8(overhang);
-  const __m128i ns        = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                          8,  9,  10, 11, 12, 13, 14, 15);
-  const __m128i mask1     = _mm_sub_epi8 (ns, excess);
-  const __m128i epol_mask = _mm_max_epi8 (mask1, _mm_setzero_si128());
+  int32_t leftoff = left;
+  int8_t border_idx;
+  if (left)
+    border_idx = left;
+  else
+    border_idx = 15 - right;
 
+  const __m128i border_idxs = _mm_set1_epi8(border_idx);
+  const __m128i ns          = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                            8,  9,  10, 11, 12, 13, 14, 15);
+  __m128i epol_mask;
+  if (left) {
+    __m128i mask1     = _mm_sub_epi8(ns,    border_idxs);
+    epol_mask         = _mm_max_epi8(mask1, _mm_setzero_si128());
+  } else {
+    // Dirty hack alert! If right == block_width (ie. the entire vector is
+    // outside the frame), move the block offset one pixel to the left (so
+    // that the leftmost pixel in vector is actually the valid border pixel
+    // from which we want to extrapolate), and use an epol mask that will
+    // simply stretch the pixel all over the vector.
+    if (right != 16) {
+      epol_mask = _mm_min_epi8(ns, border_idxs);
+    } else {
+      epol_mask = _mm_setzero_si128();
+      leftoff = -1;
+    }
+  }
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
 
@@ -688,13 +719,13 @@ static uint32_t hor_sad_left_sse41_w16(const kvz_pixel *pic_data, const kvz_pixe
   int32_t y;
   for (y = 0; y < height_fourline_groups; y += 4) {
     __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride));
-    __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + overhang));
+    __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + leftoff));
     __m128i c = _mm_loadu_si128((__m128i *)(pic_data + (y + 1) * pic_stride));
-    __m128i d = _mm_loadu_si128((__m128i *)(ref_data + (y + 1) * ref_stride + overhang));
+    __m128i d = _mm_loadu_si128((__m128i *)(ref_data + (y + 1) * ref_stride + leftoff));
     __m128i e = _mm_loadu_si128((__m128i *)(pic_data + (y + 2) * pic_stride));
-    __m128i f = _mm_loadu_si128((__m128i *)(ref_data + (y + 2) * ref_stride + overhang));
+    __m128i f = _mm_loadu_si128((__m128i *)(ref_data + (y + 2) * ref_stride + leftoff));
     __m128i g = _mm_loadu_si128((__m128i *)(pic_data + (y + 3) * pic_stride));
-    __m128i h = _mm_loadu_si128((__m128i *)(ref_data + (y + 3) * ref_stride + overhang));
+    __m128i h = _mm_loadu_si128((__m128i *)(ref_data + (y + 3) * ref_stride + leftoff));
 
     __m128i b_epol = _mm_shuffle_epi8(b, epol_mask);
     __m128i d_epol = _mm_shuffle_epi8(d, epol_mask);
@@ -714,7 +745,7 @@ static uint32_t hor_sad_left_sse41_w16(const kvz_pixel *pic_data, const kvz_pixe
   if (height_residual_lines) {
     for (; y < height; y++) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride));
-      __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + overhang));
+      __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + leftoff));
       __m128i b_epol = _mm_shuffle_epi8(b, epol_mask);
       __m128i curr_sads = _mm_sad_epu8(a, b_epol);
       sse_inc = _mm_add_epi64(sse_inc, curr_sads);
