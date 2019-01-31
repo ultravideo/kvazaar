@@ -1306,11 +1306,10 @@ static uint32_t hor_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
   if (width == 8 && left)
     return hor_sad_left_sse41_w8(pic_data, ref_data, width, height,
                                  pic_stride, ref_stride, left);
-  if (width == 16) {
+  if (width == 16)
     return hor_sad_sse41_w16(pic_data, ref_data, width, height,
                              pic_stride, ref_stride, left, right);
-  }
-  if (width == 32 && left)
+  if (width == 32)
     return hor_sad_sse41_w32(pic_data, ref_data, width, height,
                              pic_stride, ref_stride, left, right);
   else
