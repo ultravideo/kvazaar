@@ -847,16 +847,47 @@ static uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const kvz_pix
     epol_mask = _mm_cmpgt_epi8(epol_src_idx, ns);
     epol_mask = _mm_xor_si128 (epol_mask,    is_right_border);
 
-    for (y = 0; y < height; y++) {
+    for (y = 0; y < height_fourline_groups; y += 4) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
       __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+      __m128i c = _mm_loadu_si128((__m128i *)(pic_data + (y + 1) * pic_stride + x));
+      __m128i d = _mm_loadu_si128((__m128i *)(ref_data + (y + 1) * ref_stride + x));
+      __m128i e = _mm_loadu_si128((__m128i *)(pic_data + (y + 2) * pic_stride + x));
+      __m128i f = _mm_loadu_si128((__m128i *)(ref_data + (y + 2) * ref_stride + x));
+      __m128i g = _mm_loadu_si128((__m128i *)(pic_data + (y + 3) * pic_stride + x));
+      __m128i h = _mm_loadu_si128((__m128i *)(ref_data + (y + 3) * ref_stride + x));
 
       __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+      __m128i border_px_d  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 1) * ref_stride + border_idx));
+      __m128i border_px_f  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 2) * ref_stride + border_idx));
+      __m128i border_px_h  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 3) * ref_stride + border_idx));
       __m128i b_epol       = _mm_blendv_epi8(b, border_px_b, epol_mask);
+      __m128i d_epol       = _mm_blendv_epi8(d, border_px_d, epol_mask);
+      __m128i f_epol       = _mm_blendv_epi8(f, border_px_f, epol_mask);
+      __m128i h_epol       = _mm_blendv_epi8(h, border_px_h, epol_mask);
 
       __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol);
+      __m128i curr_sads_cd = _mm_sad_epu8(c, d_epol);
+      __m128i curr_sads_ef = _mm_sad_epu8(e, f_epol);
+      __m128i curr_sads_gh = _mm_sad_epu8(g, h_epol);
 
       sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ef);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_gh);
+    }
+    if (height_residual_lines) {
+      for (; y < height; y++) {
+        __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
+        __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+
+        __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+        __m128i b_epol       = _mm_blendv_epi8(b, border_px_b, epol_mask);
+
+        __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol);
+
+        sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      }
     }
     ns = _mm_add_epi8(ns, xmm_widths);
   }
@@ -864,17 +895,54 @@ static uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const kvz_pix
     epol_mask = _mm_cmpgt_epi8(epol_src_idx, ns);
     epol_mask = _mm_xor_si128 (epol_mask,    is_right_border);
 
-    for (y = 0; y < height; y++) {
+    for (y = 0; y < height_fourline_groups; y += 4) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
       __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+      __m128i c = _mm_loadu_si128((__m128i *)(pic_data + (y + 1) * pic_stride + x));
+      __m128i d = _mm_loadu_si128((__m128i *)(ref_data + (y + 1) * ref_stride + x));
+      __m128i e = _mm_loadu_si128((__m128i *)(pic_data + (y + 2) * pic_stride + x));
+      __m128i f = _mm_loadu_si128((__m128i *)(ref_data + (y + 2) * ref_stride + x));
+      __m128i g = _mm_loadu_si128((__m128i *)(pic_data + (y + 3) * pic_stride + x));
+      __m128i h = _mm_loadu_si128((__m128i *)(ref_data + (y + 3) * ref_stride + x));
 
       __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+      __m128i border_px_d  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 1) * ref_stride + border_idx));
+      __m128i border_px_f  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 2) * ref_stride + border_idx));
+      __m128i border_px_h  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 3) * ref_stride + border_idx));
+
       __m128i b_epol_1     = _mm_blendv_epi8(b, border_px_b, epol_mask);
+      __m128i d_epol_1     = _mm_blendv_epi8(d, border_px_d, epol_mask);
+      __m128i f_epol_1     = _mm_blendv_epi8(f, border_px_f, epol_mask);
+      __m128i h_epol_1     = _mm_blendv_epi8(h, border_px_h, epol_mask);
+
       __m128i b_epol_2     = _mm_blendv_epi8(a, b_epol_1,    rdmask);
+      __m128i d_epol_2     = _mm_blendv_epi8(c, d_epol_1,    rdmask);
+      __m128i f_epol_2     = _mm_blendv_epi8(e, f_epol_1,    rdmask);
+      __m128i h_epol_2     = _mm_blendv_epi8(g, h_epol_1,    rdmask);
 
       __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol_2);
+      __m128i curr_sads_cd = _mm_sad_epu8(c, d_epol_2);
+      __m128i curr_sads_ef = _mm_sad_epu8(e, f_epol_2);
+      __m128i curr_sads_gh = _mm_sad_epu8(g, h_epol_2);
 
       sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ef);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_gh);
+    }
+    if (height_residual_lines) {
+      for (; y < height; y++) {
+        __m128i a = _mm_loadu_si128((__m128i *)(pic_data + (y + 0) * pic_stride + x));
+        __m128i b = _mm_loadu_si128((__m128i *)(ref_data + (y + 0) * ref_stride + x));
+
+        __m128i border_px_b  = _mm_set1_epi8  (*(uint8_t *)(ref_data + (y + 0) * ref_stride + border_idx));
+        __m128i b_epol_1     = _mm_blendv_epi8(b, border_px_b, epol_mask);
+        __m128i b_epol_2     = _mm_blendv_epi8(a, b_epol_1,    rdmask);
+
+        __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol_2);
+
+        sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
+      }
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
