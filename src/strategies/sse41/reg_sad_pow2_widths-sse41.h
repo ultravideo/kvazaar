@@ -594,23 +594,39 @@ static uint32_t hor_sad_left_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t hor_sad_left_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                      int32_t width, int32_t height, uint32_t pic_stride,
-                                      uint32_t ref_stride, uint32_t overhang)
+static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                 int32_t width, int32_t height, uint32_t pic_stride,
+                                 uint32_t ref_stride, uint32_t left, uint32_t right)
 {
+  int32_t leftoff = left;
+  int8_t border_idx;
+  if (left)
+    border_idx = left;
+  else
+    border_idx = 7 - right;
+
   // Quadword (ie. line) base indexes, ie. the edges the lines read will be
   // clamped towards; higher qword (lower line) bytes tend towards 8 and lower
   // qword (higher line) bytes towards 0
-  const __m128i qwbaseids = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0,
-                                          8, 8, 8, 8, 8, 8, 8, 8);
+  const __m128i qwbaseids   = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0,
+                                            8, 8, 8, 8, 8, 8, 8, 8);
 
-  const __m128i ns        = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                          8,  9,  10, 11, 12, 13, 14, 15);
-
-  const __m128i excess     = _mm_set1_epi8(overhang);
-  const __m128i mask1      = _mm_sub_epi8 (ns, excess);
-  const __m128i epol_mask  = _mm_max_epi8 (mask1, qwbaseids);
-
+  const __m128i border_idxs = _mm_set1_epi8(border_idx);
+  const __m128i ns          = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                            8,  9,  10, 11, 12, 13, 14, 15);
+  __m128i epol_mask;
+  if (left) {
+    __m128i mask1     = _mm_sub_epi8(ns,    border_idxs);
+    epol_mask         = _mm_max_epi8(mask1, qwbaseids);
+  } else {
+    if (right != 8) {
+      __m128i border_idxs_linewise = _mm_add_epi8(border_idxs, qwbaseids);
+      epol_mask = _mm_min_epi8(ns, border_idxs_linewise);
+    } else {
+      epol_mask = qwbaseids;
+      leftoff = -1;
+    }
+  }
   const __m64 epol_mask_64 = (__m64)_mm_cvtsi128_si64(epol_mask);
 
   const int32_t height_fourline_groups = height & ~3;
@@ -626,14 +642,14 @@ static uint32_t hor_sad_left_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel
     __m128d d_d = _mm_setzero_pd();
 
     a_d = _mm_loadl_pd(a_d, (const double *)(pic_data + (y + 0) * pic_stride));
-    b_d = _mm_loadl_pd(b_d, (const double *)(ref_data + (y + 0) * ref_stride + overhang));
+    b_d = _mm_loadl_pd(b_d, (const double *)(ref_data + (y + 0) * ref_stride + leftoff));
     a_d = _mm_loadh_pd(a_d, (const double *)(pic_data + (y + 1) * pic_stride));
-    b_d = _mm_loadh_pd(b_d, (const double *)(ref_data + (y + 1) * ref_stride + overhang));
+    b_d = _mm_loadh_pd(b_d, (const double *)(ref_data + (y + 1) * ref_stride + leftoff));
 
     c_d = _mm_loadl_pd(c_d, (const double *)(pic_data + (y + 2) * pic_stride));
-    d_d = _mm_loadl_pd(d_d, (const double *)(ref_data + (y + 2) * ref_stride + overhang));
+    d_d = _mm_loadl_pd(d_d, (const double *)(ref_data + (y + 2) * ref_stride + leftoff));
     c_d = _mm_loadh_pd(c_d, (const double *)(pic_data + (y + 3) * pic_stride));
-    d_d = _mm_loadh_pd(d_d, (const double *)(ref_data + (y + 3) * ref_stride + overhang));
+    d_d = _mm_loadh_pd(d_d, (const double *)(ref_data + (y + 3) * ref_stride + leftoff));
 
     __m128i a = _mm_castpd_si128(a_d);
     __m128i b = _mm_castpd_si128(b_d);
@@ -651,7 +667,7 @@ static uint32_t hor_sad_left_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel
   if (height_residual_lines) {
     for (; y < height; y++) {
       __m64 a = *(__m64 *)(pic_data + y * pic_stride);
-      __m64 b = *(__m64 *)(ref_data + y * ref_stride + overhang);
+      __m64 b = *(__m64 *)(ref_data + y * ref_stride + leftoff);
 
       __m64 b_epol = _mm_shuffle_pi8(b, epol_mask_64);
       __m64 sads = _mm_sad_pu8(a, b_epol);
