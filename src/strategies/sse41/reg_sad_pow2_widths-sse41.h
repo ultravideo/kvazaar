@@ -543,8 +543,8 @@ static uint32_t ver_sad_arbitrary(const kvz_pixel *pic_data, const kvz_pixel *re
 }
 
 static uint32_t hor_sad_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                 int32_t width, int32_t height, uint32_t pic_stride,
-                                 uint32_t ref_stride, uint32_t left, uint32_t right)
+                                 int32_t height, uint32_t pic_stride, uint32_t ref_stride,
+                                 uint32_t left, uint32_t right)
 {
   int32_t leftoff = left;
   int8_t border_idx;
@@ -611,8 +611,8 @@ static uint32_t hor_sad_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel *ref
 }
 
 static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                 int32_t width, int32_t height, uint32_t pic_stride,
-                                 uint32_t ref_stride, uint32_t left, uint32_t right)
+                                 int32_t height, uint32_t pic_stride, uint32_t ref_stride,
+                                 uint32_t left, uint32_t right)
 {
   int32_t leftoff = left;
   int8_t border_idx;
@@ -714,8 +714,8 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
  * that value.
  */
 static uint32_t hor_sad_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                  int32_t width, int32_t height, uint32_t pic_stride,
-                                  uint32_t ref_stride, uint32_t left, uint32_t right)
+                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
+                                  uint32_t left, uint32_t right)
 {
   int32_t leftoff = left;
   int8_t border_idx;

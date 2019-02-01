@@ -110,8 +110,8 @@ static INLINE uint32_t reg_sad_w64(const kvz_pixel * const data1, const kvz_pixe
 }
 
 static uint32_t hor_sad_avx2_w32(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                 int32_t width, int32_t height, uint32_t pic_stride,
-                                 uint32_t ref_stride, uint32_t left, uint32_t right)
+                                 int32_t height, uint32_t pic_stride, uint32_t ref_stride,
+                                 uint32_t left, uint32_t right)
 {
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
@@ -129,7 +129,7 @@ static uint32_t hor_sad_avx2_w32(const kvz_pixel *pic_data, const kvz_pixel *ref
 
     epol_mask = _mm256_cmpgt_epi8(first_valid_idx, ns);
   } else {
-    border_pix_off          = width - (right + 1);
+    border_pix_off          = 31 - right;
     __m256i last_valid_idx  = _mm256_set1_epi8(border_pix_off);
 
     epol_mask = _mm256_cmpgt_epi8(ns, last_valid_idx);

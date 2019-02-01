@@ -84,8 +84,8 @@ static uint32_t ver_sad_sse41(const kvz_pixel *pic_data, const kvz_pixel *ref_da
 }
 
 static uint32_t hor_sad_sse41_w32(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
-                                  int32_t width, int32_t height, uint32_t pic_stride,
-                                  uint32_t ref_stride, uint32_t left, uint32_t right)
+                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
+                                  uint32_t left, uint32_t right)
 {
   const int32_t height_twoline_groups = height & ~1;
   const int32_t height_residual_lines = height &  1;
@@ -104,7 +104,7 @@ static uint32_t hor_sad_sse41_w32(const kvz_pixel *pic_data, const kvz_pixel *re
     epol_masklo = _mm_cmpgt_epi8(first_valid_idx, nslo);
     epol_maskhi = _mm_cmpgt_epi8(first_valid_idx, nshi);
   } else {
-    border_pix_off          = width - (right + 1);
+    border_pix_off          = 31 - right;
     __m128i last_valid_idx  = _mm_set1_epi8(border_pix_off);
 
     epol_masklo = _mm_cmpgt_epi8(nslo, last_valid_idx);
@@ -167,16 +167,16 @@ static uint32_t hor_sad_sse41(const kvz_pixel *pic_data, const kvz_pixel *ref_da
                               uint32_t ref_stride, uint32_t left, uint32_t right)
 {
   if (width == 4)
-    return hor_sad_sse41_w4(pic_data, ref_data, width, height,
+    return hor_sad_sse41_w4(pic_data, ref_data, height,
                             pic_stride, ref_stride, left, right);
   if (width == 8)
-    return hor_sad_sse41_w8(pic_data, ref_data, width, height,
+    return hor_sad_sse41_w8(pic_data, ref_data, height,
                             pic_stride, ref_stride, left, right);
   if (width == 16)
-    return hor_sad_sse41_w16(pic_data, ref_data, width, height,
+    return hor_sad_sse41_w16(pic_data, ref_data, height,
                              pic_stride, ref_stride, left, right);
   if (width == 32)
-    return hor_sad_sse41_w32(pic_data, ref_data, width, height,
+    return hor_sad_sse41_w32(pic_data, ref_data, height,
                              pic_stride, ref_stride, left, right);
   else
     return hor_sad_sse41_arbitrary(pic_data, ref_data, width, height,
