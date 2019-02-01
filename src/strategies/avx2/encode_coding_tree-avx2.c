@@ -29,8 +29,13 @@
 
 // GCC headers apparently won't have this at all.. sigh
 #ifndef _andn_u32
+// VS2015 headers apparently won't have this at all.. sigh
+#ifdef __andn_u32
 #define _andn_u32(x, y) (__andn_u32((x), (y)))
-#endif
+#else
+#define _andn_u32(x, y) ((~(x)) & (y))
+#endif // __andn_u32
+#endif // _andn_u32
 
 /*
  * NOTE: Returns 10, not 11 like SSE and AVX comparisons do, as the bit pattern
