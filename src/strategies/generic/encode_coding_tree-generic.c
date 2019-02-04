@@ -23,74 +23,7 @@
 #include "cabac.h"
 #include "context.h"
 #include "encode_coding_tree-generic.h"
-#include "kvz_math.h"
-
-/**
- * \brief Encode (X,Y) position of the last significant coefficient
- *
- * \param lastpos_x   X component of last coefficient
- * \param lastpos_y   Y component of last coefficient
- * \param width       Block width
- * \param height      Block height
- * \param type        plane type / luminance or chrominance
- * \param scan        scan type (diag, hor, ver)
- *
- * This method encodes the X and Y component within a block of the last
- * significant coefficient.
- */
-static void encode_last_significant_xy(cabac_data_t * const cabac,
-                                       uint8_t lastpos_x, uint8_t lastpos_y,
-                                       uint8_t width, uint8_t height,
-                                       uint8_t type, uint8_t scan)
-{
-  const int index = kvz_math_floor_log2(width) - 2;
-  uint8_t ctx_offset = type ? 0 : (index * 3 + (index + 1) / 4);
-  uint8_t shift = type ? index : (index + 3) / 4;
-
-  cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
-  cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
-
-  if (scan == SCAN_VER) {
-    SWAP(lastpos_x, lastpos_y, uint8_t);
-  }
-
-  const int group_idx_x = g_group_idx[lastpos_x];
-  const int group_idx_y = g_group_idx[lastpos_y];
-
-  // x prefix
-  for (int last_x = 0; last_x < group_idx_x; last_x++) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
-  }
-  if (group_idx_x < g_group_idx[width - 1]) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (group_idx_x >> shift)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
-  }
-
-  // y prefix
-  for (int last_y = 0; last_y < group_idx_y; last_y++) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
-  }
-  if (group_idx_y < g_group_idx[height - 1]) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (group_idx_y >> shift)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
-  }
-
-  // last_sig_coeff_x_suffix
-  if (group_idx_x > 3) {
-    const int suffix = lastpos_x - g_min_in_group[group_idx_x];
-    const int bits = (group_idx_x - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_x_suffix");
-  }
-
-  // last_sig_coeff_y_suffix
-  if (group_idx_y > 3) {
-    const int suffix = lastpos_y - g_min_in_group[group_idx_y];
-    const int bits = (group_idx_y - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_y_suffix");
-  }
-}
+#include "encode_coding_tree.h"
 
 void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
                                   cabac_data_t * const cabac,
@@ -173,13 +106,13 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  encode_last_significant_xy(cabac,
-                             last_coeff_x,
-                             last_coeff_y,
-                             width,
-                             width,
-                             type,
-                             scan_mode);
+  kvz_encode_last_significant_xy(cabac,
+                                 last_coeff_x,
+                                 last_coeff_y,
+                                 width,
+                                 width,
+                                 type,
+                                 scan_mode);
 
   scan_pos_sig  = scan_pos_last;
 

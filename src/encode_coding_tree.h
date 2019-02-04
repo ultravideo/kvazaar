@@ -39,4 +39,9 @@ void kvz_encode_mvd(encoder_state_t * const state,
                     int32_t mvd_hor,
                     int32_t mvd_ver);
 
+void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
+                                    uint8_t lastpos_x, uint8_t lastpos_y,
+                                    uint8_t width, uint8_t height,
+                                    uint8_t type, uint8_t scan);
+
 #endif // ENCODE_CODING_TREE_H_
