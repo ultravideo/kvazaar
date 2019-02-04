@@ -255,7 +255,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
   int32_t i;
-  uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
+  uint32_t sig_coeffgroup_nzs[8 * 8] = { 0 };
 
   int8_t be_valid = encoder->cfg.signhide_enable;
   int32_t scan_pos_sig;
@@ -280,7 +280,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
                                  &(cabac->ctx.cu_sig_model_chroma[0]);
 
   // Scan all coeff groups to find out which of them have coeffs.
-  // Populate sig_coeffgroup_flag with that info.
+  // Populate sig_coeffgroup_nzs with that info.
 
   // NOTE: Modified the functionality a bit, sig_coeffgroup_flag used to be
   // 1 if true and 0 if false, now it's "undefined but nonzero" if true and
@@ -298,7 +298,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     const uint32_t cg_pos = cg_y * width * 4 + cg_x * 4;
     const uint32_t cg_pos_y = (cg_pos >> log2_block_size) >> TR_MIN_LOG2_SIZE;
     const uint32_t cg_pos_x = (cg_pos & (width - 1)) >> TR_MIN_LOG2_SIZE;
-    const uint32_t addr = cg_pos_x + cg_pos_y * num_blk_side;
+    const uint32_t idx = cg_pos_x + cg_pos_y * num_blk_side;
 
     __m128d coeffs_d_upper = _mm_setzero_pd();
     __m128d coeffs_d_lower = _mm_setzero_pd();
@@ -321,7 +321,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     __m256i coeffs_zero = _mm256_cmpeq_epi16(cur_coeffs, zero);
 
     uint32_t nz_coeffs_2b = ~((uint32_t)_mm256_movemask_epi8(coeffs_zero));
-    sig_coeffgroup_flag[addr] = nz_coeffs_2b;
+    sig_coeffgroup_nzs[idx] = nz_coeffs_2b;
 
     if (nz_coeffs_2b)
       scan_cg_last = i;
@@ -340,7 +340,13 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       _mm256_store_si256((__m256i *)(coeff_reord + subpos), coeffs_r);
     }
 
-    // Find the last coeff by going backwards in scan order.
+    // Find the last coeff by going backwards in scan order. With cmpeq_epi16
+    // and movemask, we can generate a dword with 16 2-bit masks that are 11
+    // for zero words in the coeff vector, and 00 for nonzero words. By
+    // inverting the bits and counting leading zeros, we can determine the
+    // number of zero bytes in the vector counting from high to low memory
+    // addresses; subtract that from 31 and divide by 2 to get the offset of
+    // the last nonzero word.
     uint32_t baseaddr = scan_cg_last * 16;
     __m256i cur_coeffs_zeros = _mm256_cmpeq_epi16(coeffs_r, zero);
     uint32_t nz_bytes = ~(_mm256_movemask_epi8(cur_coeffs_zeros));
@@ -391,20 +397,22 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     go_rice_param = 0;
 
     if (i == scan_cg_last || i == 0) {
-      sig_coeffgroup_flag[cg_blk_pos] = 1;
+      sig_coeffgroup_nzs[cg_blk_pos] = 1;
     } else {
-      uint32_t sig_coeff_group   = (sig_coeffgroup_flag[cg_blk_pos] != 0);
-      uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
+      uint32_t sig_coeff_group   = (sig_coeffgroup_nzs[cg_blk_pos] != 0);
+      uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_nzs, cg_pos_x,
                                                       cg_pos_y, width);
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
 
-    if (sig_coeffgroup_flag[cg_blk_pos]) {
-      int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
+    if (sig_coeffgroup_nzs[cg_blk_pos]) {
+      int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_nzs,
                                                              cg_pos_x, cg_pos_y, width);
 
+      // A mask with the first 16-bit word unmasked (bits set ie. 0xffff)
       const __m256i coeff_pos_zero = _mm256_castsi128_si256(_mm_cvtsi32_si128(0xffff));
+
       const __m128i log2_block_size_128 = _mm_cvtsi32_si128(log2_block_size);
 
       __m256i coeffs = _mm256_load_si256((__m256i *)(coeff_reord + sub_pos));
