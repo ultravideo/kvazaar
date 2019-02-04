@@ -419,7 +419,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       __m256i sigs_inv = _mm256_cmpeq_epi16(coeffs, zero);
       __m256i is = _mm256_set1_epi16(i);
       __m256i is_zero = _mm256_cmpeq_epi16(is, zero);
-      __m256i coeffs_subzero = _mm256_cmpgt_epi16(zero, coeffs);
+      __m256i coeffs_negative = _mm256_cmpgt_epi16(zero, coeffs);
 
       __m256i masked_coeffs = _mm256_andnot_si256(sigs_inv, coeffs);
       __m256i abs_coeffs = _mm256_abs_epi16(masked_coeffs);
@@ -448,15 +448,15 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
       uint32_t esc_flags = ~(_mm256_movemask_epi8(encode_sig_coeff_flags_inv));
       uint32_t sigs = ~(_mm256_movemask_epi8(sigs_inv));
-      uint32_t coeff_sign_buf = _mm256_movemask_epi8(coeffs_subzero);
+      uint32_t coeff_sign_buf = _mm256_movemask_epi8(coeffs_negative);
 
       for (; scan_pos_sig >= sub_pos; scan_pos_sig--) {
         uint32_t id = scan_pos_sig - sub_pos;
-        uint32_t shamt = (id << 1) + 1;
+        uint32_t shift = (id << 1) + 1;
 
-        uint32_t curr_sig = (sigs >> shamt) & 1;
-        uint32_t curr_esc_flag = (esc_flags >> shamt) & 1;
-        uint32_t curr_coeff_sign = (coeff_sign_buf >> shamt) & 1;
+        uint32_t curr_sig = (sigs >> shift) & 1;
+        uint32_t curr_esc_flag = (esc_flags >> shift) & 1;
+        uint32_t curr_coeff_sign = (coeff_sign_buf >> shift) & 1;
 
         if (curr_esc_flag | num_non_zero) {
           ctx_sig = ctx_sig_buf[id];
@@ -512,13 +512,13 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
       c1 = 1;
       for (idx = 0; idx < num_c1_flag; idx++) {
-        uint32_t shamt = idx << 1;
-        uint32_t symbol = (coeffs_gt1_bits >> shamt) & 1;
+        uint32_t shift = idx << 1;
+        uint32_t symbol = (coeffs_gt1_bits >> shift) & 1;
 
         cabac->cur_ctx = &base_ctx_mod[c1];
         CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
 
-        c1 = (c1s_nextiter >> shamt) & 3;
+        c1 = (c1s_nextiter >> shift) & 3;
       }
 
       if (c1 == 0) {
@@ -526,8 +526,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
                        &(cabac->ctx.cu_abs_model_chroma[ctx_set]);
 
         if (first_c2_flag_idx != -1) {
-          uint32_t shamt = (first_c2_flag_idx << 1) + 1;
-          uint8_t symbol = (coeffs_gt2_bits >> shamt) & 1;
+          uint32_t shift = (first_c2_flag_idx << 1) + 1;
+          uint8_t symbol = (coeffs_gt2_bits >> shift) & 1;
           cabac->cur_ctx = &base_ctx_mod[0];
 
           CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
@@ -571,9 +571,9 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
         for (idx = 0; idx < num_non_zero; idx++) {
 
-          uint32_t shamt = idx << 1;
-          uint32_t dont_encode_curr = (encode_decisions >> shamt);
-          int16_t base_level        = (base_levels      >> shamt) & 3;
+          uint32_t shift = idx << 1;
+          uint32_t dont_encode_curr = (encode_decisions >> shift);
+          int16_t base_level        = (base_levels      >> shift) & 3;
 
           uint16_t curr_abs_coeff = abs_coeff[idx];
 
