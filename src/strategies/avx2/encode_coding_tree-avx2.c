@@ -600,14 +600,15 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
     coeff_signs = 0;
   }
 }
+#endif // COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
+#if COMPILE_INTEL_AVX2
   success &= kvz_strategyselector_register(opaque, "encode_coeff_nxn", "avx2", 40, &kvz_encode_coeff_nxn_avx2);
+#endif
 
   return success;
 }
-
-#endif
