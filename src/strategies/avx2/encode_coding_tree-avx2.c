@@ -71,7 +71,7 @@ static INLINE uint32_t pack_16x16b_to_16x2b(__m256i src)
    * XXXX XXXX YYYY YYYY Comparison result, for movemask
    */
   const __m256i threes  = _mm256_set1_epi16   (3);
-  const __m256i cmpmask = _mm256_set1_epi16   (0x0180);
+  const __m256i cmpmask = _mm256_slli_epi16   (threes, 7); // 0x0180 (avoid set1)
 
   __m256i  clipped      = _mm256_min_epu16    (src, threes);
   __m256i  shifted      = _mm256_slli_epi16   (clipped, 7);
