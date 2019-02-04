@@ -221,6 +221,15 @@
     </ClCompile>
     <ClCompile Include="..\..\src\extras\libmd5.c" />
     <ClCompile Include="..\..\src\extras\crypto.cpp" />
+    <ClCompile Include="..\..\src\strategies\avx2\encode_coding_tree-avx2.c">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\encode_coding_tree-generic.c">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-encode.c">
+      <Filter>Optimization\strategies</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -411,6 +420,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\extras\libmd5.h" />
     <ClInclude Include="..\..\src\extras\crypto.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\encode_coding_tree-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\encode_coding_tree-generic.h">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\avx2_common_functions.h">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-encode.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

@@ -1,6 +1,5 @@
-#ifndef ENCODE_CODING_TREE_H_
-#define ENCODE_CODING_TREE_H_
-
+#ifndef STRATEGIES_ENCODE_H_
+#define STRATEGIES_ENCODE_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -22,26 +21,36 @@
  ****************************************************************************/
 
 /**
+ * \ingroup Optimization
  * \file
- * Functions for writing the coding quadtree and related syntax.
+ * Interface for quantization functions.
  */
 
+#include "cu.h"
 #include "encoderstate.h"
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+#include "tables.h"
 
-void kvz_encode_coding_tree(encoder_state_t * const state,
-                            uint16_t x_ctb,
-                            uint16_t y_ctb,
-                            uint8_t depth);
 
-void kvz_encode_mvd(encoder_state_t * const state,
-                    cabac_data_t *cabac,
-                    int32_t mvd_hor,
-                    int32_t mvd_ver);
+// Declare function pointers.
+typedef unsigned (encode_coeff_nxn_func)(encoder_state_t * const state,
+                                         cabac_data_t * const cabac,
+                                         const coeff_t *coeff,
+                                         uint8_t width,
+                                         uint8_t type,
+                                         int8_t scan_mode,
+                                         int8_t tr_skip);
 
-void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
-                                    uint8_t lastpos_x, uint8_t lastpos_y,
-                                    uint8_t width, uint8_t height,
-                                    uint8_t type, uint8_t scan);
+// Declare function pointers.
+extern encode_coeff_nxn_func *kvz_encode_coeff_nxn;
 
-#endif // ENCODE_CODING_TREE_H_
+int kvz_strategy_register_encode(void* opaque, uint8_t bitdepth);
+
+
+#define STRATEGIES_ENCODE_EXPORTS \
+  {"encode_coeff_nxn", (void**) &kvz_encode_coeff_nxn}, \
+
+
+
+#endif //STRATEGIES_ENCODE_H_

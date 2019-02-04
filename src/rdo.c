@@ -30,6 +30,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "scalinglist.h"
+#include "strategyselector.h"
 #include "tables.h"
 #include "transform.h"
 
