@@ -20,6 +20,7 @@
 
 #include "strategyselector.h"
 
+#if COMPILE_INTEL_AVX2
 #include "avx2_common_functions.h"
 #include "cabac.h"
 #include "context.h"
@@ -608,3 +609,5 @@ int kvz_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth)
 
   return success;
 }
+
+#endif
