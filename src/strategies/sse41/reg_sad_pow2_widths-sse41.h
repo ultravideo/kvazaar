@@ -715,35 +715,43 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
  */
 static uint32_t hor_sad_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                                   int32_t height, uint32_t pic_stride, uint32_t ref_stride,
-                                  uint32_t left, uint32_t right)
+                                  const uint32_t left, const uint32_t right)
 {
-  int32_t leftoff = left;
-  int8_t border_idx;
-  if (left)
-    border_idx = left;
-  else
-    border_idx = 15 - right;
+  // right is the number of overhanging pixels in the vector, so it has to be
+  // handled this way to produce the index of last valid (border) pixel
+  const int32_t right_border_idx = 15 - right;
+  const int32_t border_idx       = left ? left : right_border_idx;
 
-  const __m128i border_idxs = _mm_set1_epi8(border_idx);
-  const __m128i ns          = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                            8,  9,  10, 11, 12, 13, 14, 15);
-  __m128i epol_mask;
-  if (left) {
-    __m128i mask1     = _mm_sub_epi8(ns,    border_idxs);
-    epol_mask         = _mm_max_epi8(mask1, _mm_setzero_si128());
-  } else {
-    // Dirty hack alert! If right == block_width (ie. the entire vector is
-    // outside the frame), move the block offset one pixel to the left (so
-    // that the leftmost pixel in vector is actually the valid border pixel
-    // from which we want to extrapolate), and use an epol mask that will
-    // simply stretch the pixel all over the vector.
-    if (right != 16) {
-      epol_mask = _mm_min_epi8(ns, border_idxs);
-    } else {
-      epol_mask = _mm_setzero_si128();
-      leftoff = -1;
-    }
-  }
+  const __m128i ns               = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                                 8,  9,  10, 11, 12, 13, 14, 15);
+  const __m128i zero             = _mm_setzero_si128();
+
+  // Dirty hack alert! If right == block_width (ie. the entire vector is
+  // outside the frame), move the block offset one pixel to the left (so
+  // that the leftmost pixel in vector is actually the valid border pixel
+  // from which we want to extrapolate), and use an epol mask that will
+  // simply stretch the pixel all over the vector.
+  //
+  // To avoid a branch here:
+  // The mask will be -1 (0xffffffff) for border_idx -1 and 0 for >= 0
+  const int32_t border_idx_negative = border_idx >> 31;
+  const int32_t leftoff             = border_idx_negative | left;
+
+  __m128i right_border_idxs = _mm_set1_epi8((int8_t)right_border_idx);
+  __m128i left_128          = _mm_set1_epi8((int8_t)left);
+
+  // If we're straddling the left border, right_border_idx is 15 and the first
+  // operation does nothing. If right border, left is 0 and the second
+  // operation does nothing.
+  __m128i mask_right        = _mm_min_epi8 (ns,         right_border_idxs);
+  __m128i mask1             = _mm_sub_epi8 (mask_right, left_128);
+
+  // If right == 16 (we're completely outside the frame), right_border_idx is
+  // -1 and so is mask1. Clamp negative values to zero and as discussed
+  // earlier, adjust the load offset instead to load the "-1'st" pixel and
+  // using an all-zero shuffle mask, broadcast it all over the vector.
+  const __m128i epol_mask = _mm_max_epi8(mask1, zero);
+
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
 
