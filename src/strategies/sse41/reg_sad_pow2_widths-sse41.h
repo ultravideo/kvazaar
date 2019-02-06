@@ -546,34 +546,30 @@ static uint32_t hor_sad_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel *ref
                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                  uint32_t left, uint32_t right)
 {
-  int32_t leftoff = left;
-  int8_t border_idx;
-  if (left)
-    border_idx = left;
-  else
-    border_idx = 3 - right;
+  const int32_t right_border_idx = 3 - right;
+  const int32_t border_idx       = left ? left : right_border_idx;
+
+  const __m128i ns               = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                                 8,  9,  10, 11, 12, 13, 14, 15);
+
+  const int32_t border_idx_negative = border_idx >> 31;
+  const int32_t leftoff             = border_idx_negative | left;
 
   // Dualword (ie. line) base indexes, ie. the edges the lines read will be
   // clamped towards
   const __m128i dwbaseids   = _mm_setr_epi8(0, 0, 0, 0, 4, 4, 4, 4,
                                             8, 8, 8, 8, 12, 12, 12, 12);
 
-  const __m128i border_idxs = _mm_set1_epi8(border_idx);
-  const __m128i ns          = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                            8,  9,  10, 11, 12, 13, 14, 15);
-  __m128i epol_mask;
-  if (left) {
-    __m128i mask1 = _mm_sub_epi8(ns,    border_idxs);
-    epol_mask     = _mm_max_epi8(mask1, dwbaseids);
-  } else {
-    if (right != 4) {
-      __m128i border_idxs_linewise = _mm_add_epi8(border_idxs, dwbaseids);
-      epol_mask = _mm_min_epi8(ns, border_idxs_linewise);
-    } else {
-      epol_mask = dwbaseids;
-      leftoff = -1;
-    }
-  }
+  __m128i right_border_idxs = _mm_set1_epi8((int8_t)right_border_idx);
+  __m128i left_128          = _mm_set1_epi8((int8_t)left);
+
+  right_border_idxs         = _mm_add_epi8 (right_border_idxs, dwbaseids);
+
+  __m128i mask_right        = _mm_min_epi8 (ns,         right_border_idxs);
+  __m128i mask1             = _mm_sub_epi8 (mask_right, left_128);
+
+  const __m128i epol_mask   = _mm_max_epi8(mask1, dwbaseids);
+
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
 
@@ -614,12 +610,13 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                  uint32_t left, uint32_t right)
 {
-  int32_t leftoff = left;
-  int8_t border_idx;
-  if (left)
-    border_idx = left;
-  else
-    border_idx = 7 - right;
+  // right is the number of overhanging pixels in the vector, so it has to be
+  // handled this way to produce the index of last valid (border) pixel
+  const int32_t right_border_idx = 7 - right;
+  const int32_t border_idx       = left ? left : right_border_idx;
+
+  const __m128i ns               = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
+                                                 8,  9,  10, 11, 12, 13, 14, 15);
 
   // Quadword (ie. line) base indexes, ie. the edges the lines read will be
   // clamped towards; higher qword (lower line) bytes tend towards 8 and lower
@@ -627,22 +624,34 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
   const __m128i qwbaseids   = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0,
                                             8, 8, 8, 8, 8, 8, 8, 8);
 
-  const __m128i border_idxs = _mm_set1_epi8(border_idx);
-  const __m128i ns          = _mm_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
-                                            8,  9,  10, 11, 12, 13, 14, 15);
-  __m128i epol_mask;
-  if (left) {
-    __m128i mask1     = _mm_sub_epi8(ns,    border_idxs);
-    epol_mask         = _mm_max_epi8(mask1, qwbaseids);
-  } else {
-    if (right != 8) {
-      __m128i border_idxs_linewise = _mm_add_epi8(border_idxs, qwbaseids);
-      epol_mask = _mm_min_epi8(ns, border_idxs_linewise);
-    } else {
-      epol_mask = qwbaseids;
-      leftoff = -1;
-    }
-  }
+  // Dirty hack alert! If right == block_width (ie. the entire vector is
+  // outside the frame), move the block offset one pixel to the left (so
+  // that the leftmost pixel in vector is actually the valid border pixel
+  // from which we want to extrapolate), and use an epol mask that will
+  // simply stretch the pixel all over the vector.
+  //
+  // To avoid a branch here:
+  // The mask will be -1 (0xffffffff) for border_idx -1 and 0 for >= 0
+  const int32_t border_idx_negative = border_idx >> 31;
+  const int32_t leftoff             = border_idx_negative | left;
+
+  __m128i right_border_idxs = _mm_set1_epi8((int8_t)right_border_idx);
+  __m128i left_128          = _mm_set1_epi8((int8_t)left);
+
+  right_border_idxs         = _mm_add_epi8 (right_border_idxs, qwbaseids);
+
+  // If we're straddling the left border, right_border_idx is 7 and the first
+  // operation does nothing. If right border, left is 0 and the second
+  // operation does nothing.
+  __m128i mask_right        = _mm_min_epi8 (ns,         right_border_idxs);
+  __m128i mask1             = _mm_sub_epi8 (mask_right, left_128);
+
+  // If right == 8 (we're completely outside the frame), right_border_idx is
+  // -1 and so is mask1. Clamp negative values to qwbaseid and as discussed
+  // earlier, adjust the load offset instead to load the "-1'st" pixels and
+  // using qwbaseids as the shuffle mask, broadcast it all over the rows.
+  const __m128i epol_mask = _mm_max_epi8(mask1, qwbaseids);
+
   const __m64 epol_mask_64 = (__m64)_mm_cvtsi128_si64(epol_mask);
 
   const int32_t height_fourline_groups = height & ~3;
