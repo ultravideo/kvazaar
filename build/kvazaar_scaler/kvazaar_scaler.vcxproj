@@ -34,7 +34,7 @@
     <ProjectGuid>{42F395F1-58A3-4A03-A425-7F7440EC6A6D}</ProjectGuid>
     <RootNamespace>kvazaar_scaler</RootNamespace>
     <ProjectName>scaler_lib</ProjectName>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
