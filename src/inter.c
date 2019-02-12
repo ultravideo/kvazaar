@@ -1325,7 +1325,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   int8_t zero_idx = 0;
 
   merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
-  uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
+  const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,
