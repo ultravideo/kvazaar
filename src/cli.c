@@ -134,6 +134,7 @@ static const struct option long_options[] = {
   { "open-gop",                 no_argument, NULL, 0 },
   { "no-open-gop",              no_argument, NULL, 0 },
   { "scaling-list",       required_argument, NULL, 0 },
+  { "max-merge",          required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

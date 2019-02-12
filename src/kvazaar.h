@@ -384,6 +384,9 @@ typedef struct kvz_config
   /** \brief Type of scaling lists to use */
   int8_t scaling_list;
 
+  /** \brief Maximum number of merge cadidates */
+  uint8_t max_merge;
+
 } kvz_config;
 
 /**

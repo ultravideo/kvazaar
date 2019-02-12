@@ -1280,11 +1280,14 @@ static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
 static bool add_merge_candidate(const cu_info_t *cand,
                                 const cu_info_t *possible_duplicate1,
                                 const cu_info_t *possible_duplicate2,
-                                inter_merge_cand_t *merge_cand_out)
+                                inter_merge_cand_t *merge_cand_out,
+                                uint8_t candidates,
+                                uint8_t max_num_cands)
 {
   if (!cand ||
       is_duplicate_candidate(cand, possible_duplicate1) ||
-      is_duplicate_candidate(cand, possible_duplicate2)) {
+      is_duplicate_candidate(cand, possible_duplicate2) ||
+      candidates >= max_num_cands) {
     return false;
   }
 
@@ -1322,7 +1325,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   int8_t zero_idx = 0;
 
   merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
-
+  uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,
@@ -1335,16 +1338,16 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (!use_a1) a[1] = NULL;
   if (!use_b1) b[1] = NULL;
 
-  if (add_merge_candidate(a[1], NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(b[1], a[1], NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(b[0], b[1], NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(a[0], a[1], NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(a[1], NULL, NULL, &mv_cand[candidates], candidates, max_num_cands)) candidates++;
+  if (add_merge_candidate(b[1], a[1], NULL, &mv_cand[candidates], candidates, max_num_cands)) candidates++;
+  if (add_merge_candidate(b[0], b[1], NULL, &mv_cand[candidates], candidates, max_num_cands)) candidates++;
+  if (add_merge_candidate(a[0], a[1], NULL, &mv_cand[candidates], candidates, max_num_cands)) candidates++;
   if (candidates < 4 &&
-      add_merge_candidate(b[2], a[1], b[1], &mv_cand[candidates])) candidates++;
+      add_merge_candidate(b[2], a[1], b[1], &mv_cand[candidates], candidates, max_num_cands)) candidates++;
 
   bool can_use_tmvp =
     state->encoder_control->cfg.tmvp_enable &&
-    candidates < MRG_MAX_NUM_CANDS &&
+    candidates < max_num_cands &&
     state->frame->ref->used_size;
 
   if (can_use_tmvp) {
@@ -1375,12 +1378,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     if (mv_cand[candidates].dir != 0) candidates++;
   }
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
+  if (candidates < max_num_cands && state->frame->slicetype == KVZ_SLICE_B) {
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
     uint8_t cutoff = candidates;
-    for (int32_t idx = 0; idx<cutoff*(cutoff - 1) && candidates != MRG_MAX_NUM_CANDS; idx++) {
+    for (int32_t idx = 0; idx<cutoff*(cutoff - 1) && candidates != max_num_cands; idx++) {
       uint8_t i = priorityList0[idx];
       uint8_t j = priorityList1[idx];
       if (i >= candidates || j >= candidates) break;
@@ -1412,7 +1415,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
   int num_ref = state->frame->ref->used_size;
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
+  if (candidates < max_num_cands && state->frame->slicetype == KVZ_SLICE_B) {
     int j;
     int ref_negative = 0;
     int ref_positive = 0;
@@ -1427,7 +1430,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   }
 
   // Add (0,0) prediction
-  while (candidates != MRG_MAX_NUM_CANDS) {
+  while (candidates != max_num_cands) {
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
     mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
