@@ -2,9 +2,13 @@
 /bin
 /build/*
 !/build/kvazaar_lib
+!/build/kvazaar_scaler
 /build/kvazaar_lib/*
 !/build/kvazaar_lib/kvazaar_lib.vcxproj
 !/build/kvazaar_lib/kvazaar_lib.vcxproj.filters
+/build/kvazaar_scaler/*
+!/build/kvazaar_scaler/kvazaar_scaler.vcxproj
+!/build/kvazaar_scaler/kvazaar_scaler.vcxproj.filters
 /scons_build_*
 
 # Generated documentation
