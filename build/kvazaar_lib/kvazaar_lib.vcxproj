@@ -243,10 +243,12 @@
     <ClInclude Include="..\..\src\strategies\avx2\avx2_common_functions.h" />
     <ClInclude Include="..\..\src\strategies\avx2\encode_coding_tree-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\reg_sad_pow2_widths-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\encode_coding_tree-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
+    <ClInclude Include="..\..\src\strategies\sse41\reg_sad_pow2_widths-sse41.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
