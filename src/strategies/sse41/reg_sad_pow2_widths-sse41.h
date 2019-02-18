@@ -75,7 +75,6 @@ static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel
                            const uint32_t stride2)
 {
   __m128i sse_inc = _mm_setzero_si128();
-  uint64_t result = 0;
   int32_t y;
 
   const int32_t height_fourline_groups = height & ~3;
@@ -109,17 +108,17 @@ static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel
   }
   if (height_residual_lines) {
     for (; y < height; y++) {
-      __m64 a = *(__m64 *)(data1 + y * stride1);
-      __m64 b = *(__m64 *)(data2 + y * stride2);
-      __m64 sads = _mm_sad_pu8(a, b);
-      result += (uint64_t)sads;
+      __m128i a = _mm_cvtsi64_si128(*(int64_t *)(data1 + y * stride1));
+      __m128i b = _mm_cvtsi64_si128(*(int64_t *)(data2 + y * stride2));
+
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
 
-  result += _mm_cvtsi128_si32(sad);
-  return result;
+  return _mm_cvtsi128_si32(sad);
 }
 
 static INLINE uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * const data2,
@@ -376,7 +375,6 @@ static uint32_t ver_sad_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
 {
   const __m128i ref_row = _mm_set1_epi64x(*(const uint64_t *)ref_data);
   __m128i sse_inc = _mm_setzero_si128();
-  uint64_t result = 0;
   int32_t y;
 
   const int32_t height_fourline_groups = height & ~3;
@@ -401,19 +399,19 @@ static uint32_t ver_sad_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
     sse_inc = _mm_add_epi64(sse_inc, curr_sads_cd);
   }
   if (height_residual_lines) {
-    __m64 b = (__m64)_mm_cvtsi128_si64(ref_row);
+    __m128i b = _mm_move_epi64(ref_row);
 
     for (; y < height; y++) {
-      __m64 a = *(__m64 *)(pic_data + y * stride);
-      __m64 sads = _mm_sad_pu8(a, b);
-      result += (uint64_t)sads;
+      __m128i a = _mm_cvtsi64_si128(*(int64_t *)(pic_data + y * stride));
+
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
 
-  result += _mm_cvtsi128_si32(sad);
-  return result;
+  return _mm_cvtsi128_si32(sad);
 }
 
 static uint32_t ver_sad_w12(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
@@ -672,12 +670,9 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
   // using qwbaseids as the shuffle mask, broadcast it all over the rows.
   const __m128i epol_mask = _mm_max_epi8(mask1, qwbaseids);
 
-  const __m64 epol_mask_64 = (__m64)_mm_cvtsi128_si64(epol_mask);
-
   const int32_t height_fourline_groups = height & ~3;
   const int32_t height_residual_lines  = height &  3;
 
-  uint64_t result = 0;
   __m128i sse_inc = _mm_setzero_si128();
   int32_t y;
   for (y = 0; y < height_fourline_groups; y += 4) {
@@ -711,18 +706,18 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
   }
   if (height_residual_lines) {
     for (; y < height; y++) {
-      __m64 a = *(__m64 *)(pic_data + y * pic_stride);
-      __m64 b = *(__m64 *)(ref_data + y * ref_stride + leftoff);
+      __m128i a = _mm_cvtsi64_si128(*(int64_t *)(pic_data + y * pic_stride));
+      __m128i b = _mm_cvtsi64_si128(*(int64_t *)(ref_data + y * ref_stride + leftoff));
 
-      __m64 b_epol = _mm_shuffle_pi8(b, epol_mask_64);
-      __m64 sads = _mm_sad_pu8(a, b_epol);
-      result += (uint64_t)sads;
+      __m128i b_epol = _mm_shuffle_epi8(b, epol_mask);
+
+      __m128i curr_sads_ab = _mm_sad_epu8(a, b_epol);
+      sse_inc = _mm_add_epi64(sse_inc, curr_sads_ab);
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
-  result += _mm_cvtsi128_si32(sad);
-  return result;
+  return _mm_cvtsi128_si32(sad);
 }
 
 /*
