@@ -1228,8 +1228,14 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("fast-residual-cost"))
     cfg->fast_residual_cost_limit = atoi(value);
-  else if (OPT("max-merge"))
-    cfg->max_merge = atoi(value);
+  else if (OPT("max-merge")) {
+    int max_merge = atoi(value);
+    if (max_merge < 1 || max_merge > 5) {
+      fprintf(stderr, "max-merge needs to be between 1 and 5\n");
+      return 0;
+    }
+    cfg->max_merge = (uint8_t)max_merge;
+  }
   else {
     return 0;
   }
