@@ -926,8 +926,8 @@ static void validate_test3()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t out_width = in_width >> 1;//264;
+  int32_t out_height = in_height >> 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;

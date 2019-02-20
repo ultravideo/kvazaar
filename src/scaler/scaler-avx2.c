@@ -2005,7 +2005,28 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             data0[0] = _mm256_packus_epi16(temp_mem[8], temp_mem[9]);
             data1[0] = _mm256_packus_epi16(temp_mem[10], temp_mem[11]);
 
-            //Pack filters and re-order as needed.
+            //Load filters and re-order as needed.
+            filter0[0] = _mm256_packs_epi16(
+              _mm256_packs_epi32(
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[0], f_ind)),
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[1], f_ind))
+              ),
+              _mm256_packs_epi32(
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[2], f_ind)),
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[3], f_ind))
+              )
+            );
+            filter1[0] = _mm256_packs_epi16(
+              _mm256_packs_epi32(
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[4], f_ind)),
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[5], f_ind))
+              ),
+              _mm256_packs_epi32(
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[6], f_ind)),
+                _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[7], f_ind))
+              )
+            );
+            /*
             filter0[0] = _mm256_packs_epi16(
                            _mm256_setr_epi64x(
                              ((long long*)(&filters_epi16[phase[0] >> 1]))[phase_map[(phase[0] % 2) << 1][filter_part]],
@@ -2033,7 +2054,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
                             ((long long*)(&filters_epi16[phase[6] >> 1]))[phase_map[(phase[6] % 2) << 1][filter_part + 1]],
                             ((long long*)(&filters_epi16[phase[7] >> 1]))[phase_map[(phase[7] % 2) << 1][filter_part + 1]]
                           )
-                        );
+                        );*/
           } else {
             //Load src samples in four pixel chunks into registers
             //temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[1]], (__m128i*)&src[sample_pos[0]]);
