@@ -2041,80 +2041,33 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             //temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[4]]);
             //temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[6]]);
             temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[4]], (__m128i*)&src[sample_pos[0]]);
-            temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[1]]);
-            temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[6]], (__m128i*)&src[sample_pos[2]]);
+            temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[1]]);
+            temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[6]], (__m128i*)&src[sample_pos[2]]);
             temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[3]]);
 
-
             //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
-            if (virtual_pos_start[0] < 0) {
+            for (unsigned i = 0; virtual_pos_start[i] < 0 && i < 4; i++)
+            {
               //Shuffle data from mem so that left bound values are correctly dublicated.
-              __m128i perm_lo = _mm_set1_epi32(virtual_pos_start[0]); //Set the amount inds are under
-              __m128i perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[4], 0)); //Perm should be <= 0, permute fails if not
+              __m128i perm_lo = _mm_set1_epi32(virtual_pos_start[i]); //Set the amount inds are under
+              __m128i perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[i + 4], 0)); //Perm should be <= 0, permute fails if not
               __m256i perm = _mm256_max_epi32(_mm256_add_epi32(seq, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
-
-              temp_mem[f_ind + 0] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], perm);
-
-              if (virtual_pos_start[1] < 0) {
-                perm_lo = _mm_set1_epi32(virtual_pos_start[1]);
-                perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[5], 0));
-                perm = _mm256_max_epi32(_mm256_add_epi32(seq, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
-
-                temp_mem[f_ind + 2] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 2], perm);
-
-                if (virtual_pos_start[2] < 0) {
-                  perm_lo = _mm_set1_epi32(virtual_pos_start[2]);
-                  perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[6], 0));
-                  perm = _mm256_max_epi32(_mm256_add_epi32(seq, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
-
-                  temp_mem[f_ind + 1] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], perm);
-
-                  if (virtual_pos_start[3] < 0) {
-                    perm_lo = _mm_set1_epi32(virtual_pos_start[3]);
-                    perm_hi = _mm_set1_epi32(SCALER_MIN(virtual_pos_start[7], 0));
-                    perm = _mm256_max_epi32(_mm256_add_epi32(seq, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), zero_four);
-
-                    temp_mem[f_ind + 3] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 3], perm);
-                  }
-                }
-              }
+              
+              temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
             }
-            if (num_over[7] > 0) {
+            for (unsigned i = 7; num_over[i] > 0 && i >= 4; i--)
+            {
               //Shuffle data from mem so that right bound values are correctly dublicated.
-              __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[3], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
-              __m128i perm_hi = _mm_set1_epi32(num_over[7]); //Set the amount ids are over
+              __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i - 4], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
+              __m128i perm_hi = _mm_set1_epi32(num_over[i]); //Set the amount ids are over
               __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
 
-              temp_mem[f_ind + 3] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 3], perm);
-
-              if (num_over[6] > 0) {
-                perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[2], 0));
-                perm_hi = _mm_set1_epi32(num_over[6]);
-                perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four);
-
-                temp_mem[f_ind + 1] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], perm);
-
-                if (num_over[5] > 0) {
-                  perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[1], 0));
-                  perm_hi = _mm_set1_epi32(num_over[5]);
-                  perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four);
-
-                  temp_mem[f_ind + 2] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 2], perm);
-
-                  if (num_over[4] > 0) {
-                    perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[0], 0));
-                    perm_hi = _mm_set1_epi32(num_over[4]);
-                    perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four);
-
-                    temp_mem[f_ind + 0] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], perm);
-                  }
-                }
-              }
+              temp_mem[f_ind + i - 4] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i - 4], perm);
             }
 
             //Pack samples into 16-bit values. Data order will be |P6 P4|P2 P0| and |P7 P5|P3 P1|
-            data0[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 0], temp_mem[f_ind + 1]);
-            data1[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 2], temp_mem[f_ind + 3]);
+            data0[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 0], temp_mem[f_ind + 2]);
+            data1[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 1], temp_mem[f_ind + 3]);
           }
         } else {
           
@@ -2145,7 +2098,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
         filter_res_epi32 = is_vertical ? apply_filter_2x8_dual(data0, data1, filter0, filter1, num_filter_parts)
                                        : (f_step == 8 ? apply_filter_4x8_dual(data0, data1, filter0, filter1, num_filter_parts)
-                                                     : apply_filter_4x4_dual_interleaved(data0, data1, filter0, filter1, num_filter_parts));
+                                                      : apply_filter_4x4_dual_interleaved(data0, data1, filter0, filter1, num_filter_parts));
       } else {
 
         // if is_vertical -> loop over k (filter inds)
