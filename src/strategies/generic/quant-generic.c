@@ -53,17 +53,19 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   uint32_t ac_sum = 0;
 
   for (int32_t n = 0; n < width * height; n++) {
-    int32_t level;
+    int32_t level = coef[n];
+    int64_t abs_level = (int64_t)abs(level);
     int32_t  sign;
 
-    level = coef[n];
     sign = (level < 0 ? -1 : 1);
 
-    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
+    int32_t curr_quant_coeff = quant_coeff[n];
+    level = (abs_level * curr_quant_coeff + add) >> q_bits;
     ac_sum += level;
 
     level *= sign;
     q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
+
   }
 
   if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
@@ -71,10 +73,12 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
 
   for (int32_t n = 0; n < width * height; n++) {
-    int32_t level;
-    level = coef[n];
-    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
-    delta_u[n] = (int32_t)(((int64_t)abs(coef[n]) * quant_coeff[n] - (level << q_bits)) >> q_bits8);
+    int32_t level = coef[n];
+    int64_t abs_level = (int64_t)abs(level);
+    int32_t curr_quant_coeff = quant_coeff[n];
+
+    level = (abs_level * curr_quant_coeff + add) >> q_bits;
+    delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
   }
 
   if (ac_sum >= 2) {
