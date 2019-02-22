@@ -52,6 +52,10 @@
 #define _mm256_loadu2_m128i(hi,low) _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((low))), _mm_loadu_si128((hi)), 0x1)
 #endif
 
+//Define macros for avx ref pos calcs
+#define avx2_calc_ref_pos_16_epi32(ind, scale, add, shift, delta) _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(ind, scale), add), shift), delta)
+#define avx2_get_phase_epi32(ref_pos_16) _mm256_and_si256(ref_pos_16, _mm256_set1_epi32(SELECT_LOW_4_BITS))
+#define avx2_get_ref_pos_epi32(ref_pos_16) _mm256_srai_epi32(ref_pos_16, 4)
 
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
@@ -1843,12 +1847,14 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   const __m256i scale_epi32 = _mm256_set1_epi32(scale);
   const __m256i add_epi32 = _mm256_set1_epi32(add);
   const __m256i delta_epi32 = _mm256_set1_epi32(delta);
-  const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
+  //const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
   const __m256i zero = _mm256_setzero_si256();
   const __m256i zero_four = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
   const __m256i three_seven = _mm256_setr_epi32(3, 3, 3, 3, 7, 7, 7, 7);
   const __m256i seven = _mm256_set1_epi32(7);
+  const __m256i t_step_epi32 = _mm256_set1_epi32(t_step);
+  const __m256i block_x_epi32 = _mm256_set1_epi32(block_x);
   const __m256i max_src_ind = _mm256_set1_epi32(src_size - 1);
   const __m256i ref_stride_epi32 = _mm256_set1_epi32(s_stride);
   const __m256i epi16_interleave_mask = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
@@ -1856,7 +1862,6 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   //__m256i filters_epi16[12]; //Contain preloaded filters. Data layouts: |Ph(X+3) Ph(X+1)|Ph(X+2) Ph(X)| or |Ph(X+1)_1 Ph(X)_1|Ph(X+1)_0 Ph(X)_0| or |Ph(X+1)_0 Ph(X)_1|Ph(X)_2 Ph(X)_0| and |Ph(X+2)_1 Ph(X+1)_2|Ph(X+2)_0 Ph(X+1)_1| and |Ph(X+3)_2 Ph(X+3)_0|Ph(X+3)_1 Ph(X+2)_2|
   __m256i temp_mem[12], temp_filter[12];
   __m256i data0[3], data1[3], filter0[3], filter1[3];
-  __m256i ref_pos_epi32 = zero;
   
   //const unsigned phase_map[4][4] = { { 0, 2, 1, 3 }, { 3, 0, 2, 1 }, { 1, 3, 0, 2 }, { 2, 1, 3, 0} }; //Phase map for 4 tap filter and 12 tap filter
   //const unsigned filter_map[4][3] = { { 0, 0, 0 }, { 0, 1, 1 }, { 1, 1, 2 }, { 2, 2, 2 } }; //Filter array map for 12 tap
@@ -1888,59 +1893,73 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
     pic_data_t* src = is_vertical ? src_buffer->data + src_offset : &src_buffer->data[y * src_buffer->width + src_offset];
     pic_data_t* trgt_row = &trgt_buffer->data[y * trgt_buffer->width + trgt_offset];
 
-    //Outer loop:
-    // loop over x (target block width)
-    for (int x = block_x; x < x_bound; x += t_step) {
-      
-      __m256i filter_res_epi32, phase_epi32;
+    __m256i filter_res_epi32 = zero;
+    __m256i phase_epi32 = zero;
+    __m256i ref_pos_epi32 = zero;
 
-      const unsigned *phase = (unsigned*)&phase_epi32;
-      int ref_pos = 0;
-      unsigned phase_tmp = 0;
+    const unsigned *phase = (unsigned*)&phase_epi32;
+    int ref_pos = 0;
+    unsigned phase_tmp = 0;
+
+    //Calculate reference position in src pic (vertical resampling)
+    if (is_vertical && filter_size <= 8) {
+
+      const __m256i t_ind_epi32 = _mm256_set1_epi32(y);
+      const __m256i ref_pos_16_epi32 = avx2_calc_ref_pos_16_epi32(t_ind_epi32, scale_epi32, add_epi32, shift, delta_epi32);
+      phase_epi32 = avx2_get_phase_epi32(ref_pos_16_epi32);
+      ref_pos_epi32 = avx2_get_ref_pos_epi32(ref_pos_16_epi32);
+
+      //Calculate the first sample ind based on the ref pos
+      ref_pos_epi32 = _mm256_sub_epi32(ref_pos_epi32, _mm256_set1_epi32((filter_size >> 1) - 1));
+
+      ref_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(ref_pos_epi32, seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
+
+      ref_pos_epi32 = _mm256_add_epi32(_mm256_mullo_epi32(ref_pos_epi32, ref_stride_epi32), block_x_epi32); //Transform y-pos to indice and position to the start of the block
+
+      //Pre-processing step
+      //  Load filter coeffs (vertical)
+      temp_filter[0] = _mm256_load_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[0], 0));
+
+      filter0[0] = _mm256_permute4x64_epi64(temp_filter[0], /*0000 0000*/0x0);
+      filter0[0] = _mm256_packs_epi32(filter0[0], filter0[0]);
+      filter1[0] = _mm256_permute4x64_epi64(temp_filter[0], /*0101 0101*/0x55);
+      filter1[0] = _mm256_packs_epi32(filter1[0], filter1[0]);
+
+      if (filter_size > 4) {
+        filter0[1] = _mm256_permute4x64_epi64(temp_filter[0], /*1010 1010*/0xAA);
+        filter0[1] = _mm256_packs_epi32(filter0[1], filter0[1]);
+        filter1[1] = _mm256_permute4x64_epi64(temp_filter[0], /*1111 1111*/0xFF);
+        filter1[1] = _mm256_packs_epi32(filter1[1], filter1[1]);
+      }
+      
+    } else if (is_vertical) {
+      const int ref_pos_16 = (int)((unsigned int)(y * scale + add) >> shift) - delta;
+      phase_tmp = ref_pos_16 & 15; phase = &phase_tmp;
+      ref_pos = ref_pos_16 >> 4;
+    }
+
+    //loop over x (target block width)
+    for (int x = block_x; x < x_bound; x += t_step) {
 
       const unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
 
-      //Calculate reference position in src pic
-      if (!is_vertical || filter_size <= 8) {
-        const __m256i base = is_vertical ? zero : seq;
-        const int offset = is_vertical ? y : x;
+      //Calculate reference position in src pic (vertical scaling)
+      if (!is_vertical) {
         
-        const __m256i t_ind_epi32 = _mm256_add_epi32(base, _mm256_set1_epi32(offset));//clip_add_avx2(x, adderr, 0, x_bound - 1);
-        const __m256i ref_pos_16_epi32 = _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(t_ind_epi32, scale_epi32), add_epi32), shift), delta_epi32);
-        phase_epi32 = _mm256_and_si256(ref_pos_16_epi32, phase_mask);
-        ref_pos_epi32 = _mm256_srai_epi32(ref_pos_16_epi32, 4);
+        const __m256i t_ind_epi32 = _mm256_add_epi32(_mm256_set1_epi32(x), seq);
+        const __m256i ref_pos_16_epi32 = avx2_calc_ref_pos_16_epi32(t_ind_epi32, scale_epi32, add_epi32, shift, delta_epi32);
+        phase_epi32 = avx2_get_phase_epi32(ref_pos_16_epi32);
+        ref_pos_epi32 = avx2_get_ref_pos_epi32(ref_pos_16_epi32);
 
         //Calculate the first sample ind based on the ref pos
         ref_pos_epi32 = _mm256_sub_epi32(ref_pos_epi32, _mm256_set1_epi32((filter_size >> 1) - 1));
-
-        if (is_vertical) {
-          ref_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(ref_pos_epi32, seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
-          ref_pos_epi32 = _mm256_add_epi32(_mm256_mullo_epi32(ref_pos_epi32, ref_stride_epi32), _mm256_set1_epi32(x));
-        }
-
-      } else {
-        const int ref_pos_16 = (int)((unsigned int)(y * scale + add) >> shift) - delta;
-        phase_tmp = ref_pos_16 & 15; phase = &phase_tmp;
-        ref_pos = ref_pos_16 >> 4;
+      } else if (filter_size <= 8 && x > block_x) {
+        ref_pos_epi32 = _mm256_add_epi32(ref_pos_epi32, t_step_epi32); //increment to get correct x-pos in vertical resampling
       }
 
-      //Pre-processing steps
-      //  Load filter coeffs
-      if (is_vertical && filter_size <= 8) {
-        temp_filter[0] = _mm256_load_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[0], 0));
-
-        filter0[0] = _mm256_permute4x64_epi64(temp_filter[0], /*0000 0000*/0x0);
-        filter0[0] = _mm256_packs_epi32(filter0[0], filter0[0]);
-        filter1[0] = _mm256_permute4x64_epi64(temp_filter[0], /*0101 0101*/0x55);
-        filter1[0] = _mm256_packs_epi32(filter1[0], filter1[0]);
-
-        if (filter_size > 4) {
-          filter0[1] = _mm256_permute4x64_epi64(temp_filter[0], /*1010 1010*/0xAA);
-          filter0[1] = _mm256_packs_epi32(filter0[1], filter0[1]);
-          filter1[1] = _mm256_permute4x64_epi64(temp_filter[0], /*1111 1111*/0xFF);
-          filter1[1] = _mm256_packs_epi32(filter1[1], filter1[1]);
-        }
-      } else if (!is_vertical && f_step == 8) {
+      //Pre-processing step
+      //  Load filter coeffs (horizontal)
+      if (!is_vertical && f_step == 8) {
         filter0[0] = _mm256_packs_epi16(
           _mm256_packs_epi32(
             _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
