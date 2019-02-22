@@ -415,7 +415,7 @@ static const int lumaUpFilter1D[16 * 8] = {
   0, 1, -2, 4, 63, -3, 1, 0
 };
 
-static const int chromaUpFilter1D[16 * 4] = {
+static const int chromaUpFilter1D[17 * 4] = {
   0, 64, 0, 0,
   -2, 62, 4, 0,
   -2, 58, 10, -2,
@@ -431,7 +431,8 @@ static const int chromaUpFilter1D[16 * 4] = {
   -2, 16, 54, -4,
   -2, 14, 56, -4,
   -2, 10, 58, -2,
-  0, 4, 62, -2
+  0, 4, 62, -2,
+  0, 0, 0, 0 //Padding for avx2
 };
 
 //Helper function for choosing the correct filter
