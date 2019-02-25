@@ -1983,7 +1983,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
       } else if (!is_vertical) {
         for (unsigned i = 0; i < 8; i++)
         {
-          temp_filter[i] = _mm256_loadu_si256((__m256*)&getFilterCoeff(filter, filter_size, phase[i], 0));
+          temp_filter[i] = _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[i], 0));
         }
         //Re-order filters to |F6 F4|F2 F0| and |F7 F5|F3 F1|
         temp_filter[0] = _mm256_packs_epi32(temp_filter[0], temp_filter[2]);
