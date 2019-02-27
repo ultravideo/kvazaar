@@ -390,6 +390,7 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
       high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
                                          v_quant_coeff_hi,
                                          0x31);
+    }
 
 // TODO: do we need to have this?
 // #define CHECK_QUANT_COEFFS
@@ -405,7 +406,6 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
 
       assert(!(over_16b_mask_lo || over_16b_mask_hi));
 #endif
-    }
 
     v_level = _mm256_abs_epi16(v_level);
     __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
