@@ -345,7 +345,7 @@ static INLINE int32_t hide_block_sign(__m256i coefs, __m256i q_coefs, __m256i de
  * \brief quantize transformed coefficents
  *
  */
-void kvz_quant_flat_avx2(const encoder_state_t * const state, const coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
+void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -700,12 +700,6 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   }
 
   return has_coeffs;
-}
-
-void kvz_quant_avx2(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
-{
-  kvz_quant_flat_avx2(state, coef, q_coef, width, height, type, scan_idx, block_type);
 }
 
 /**
