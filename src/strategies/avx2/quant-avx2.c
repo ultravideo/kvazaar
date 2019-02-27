@@ -361,12 +361,17 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, const coeff_t * __
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
-  assert(quant_coeff[0] <= (1 << 15) - 1 && quant_coeff[0] >= -(1 << 15)); //Assuming flat values to fit int16_t
-
   uint32_t ac_sum = 0;
   int32_t last_cg = -1;
 
   __m256i v_ac_sum = _mm256_setzero_si256();
+
+  // Loading once is enough if scaling lists are not off
+  __m256i low_b = _mm256_setzero_si256(), high_b = _mm256_setzero_si256();
+  if (!(state->encoder_control->scaling_list.enable)) {
+    low_b  = _mm256_set1_epi32(quant_coeff[0]);
+    high_b = low_b;
+  }
 
   for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
 
@@ -374,31 +379,33 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, const coeff_t * __
     __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
     v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
 
-    __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
-    __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
+    if (state->encoder_control->scaling_list.enable) {
+      __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
+      __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
 
-    __m256i low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                               v_quant_coeff_hi,
-                                               0x20);
+      low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                         v_quant_coeff_hi,
+                                         0x20);
 
-    __m256i high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                               v_quant_coeff_hi,
-                                               0x31);
+      high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                         v_quant_coeff_hi,
+                                         0x31);
 
-      // TODO: do we need to have this?
+// TODO: do we need to have this?
 // #define CHECK_QUANT_COEFFS
 #ifdef CHECK_QUANT_COEFFS
-    __m256i abs_vq_lo = _mm256_abs_epi32(v_quant_coeff_lo);
-    __m256i abs_vq_hi = _mm256_abs_epi32(v_quant_coeff_hi);
+      __m256i abs_vq_lo = _mm256_abs_epi32(v_quant_coeff_lo);
+      __m256i abs_vq_hi = _mm256_abs_epi32(v_quant_coeff_hi);
 
-    __m256i vq_over_16b_lo = _mm256_cmpgt_epi32(abs_vq_lo, _mm256_set1_epi32(0x7fff));
-    __m256i vq_over_16b_hi = _mm256_cmpgt_epi32(abs_vq_hi, _mm256_set1_epi32(0x7fff));
+      __m256i vq_over_16b_lo = _mm256_cmpgt_epi32(abs_vq_lo, _mm256_set1_epi32(0x7fff));
+      __m256i vq_over_16b_hi = _mm256_cmpgt_epi32(abs_vq_hi, _mm256_set1_epi32(0x7fff));
 
-    uint32_t over_16b_mask_lo = _mm256_movemask_epi8(vq_over_16b_lo);
-    uint32_t over_16b_mask_hi = _mm256_movemask_epi8(vq_over_16b_hi);
+      uint32_t over_16b_mask_lo = _mm256_movemask_epi8(vq_over_16b_lo);
+      uint32_t over_16b_mask_hi = _mm256_movemask_epi8(vq_over_16b_hi);
 
-    assert(!(over_16b_mask_lo || over_16b_mask_hi));
+      assert(!(over_16b_mask_lo || over_16b_mask_hi));
 #endif
+    }
 
     v_level = _mm256_abs_epi16(v_level);
     __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
@@ -444,22 +451,24 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, const coeff_t * __
     v_coef  = result_coeffs[0];
     q_coefs = result_coeffs[1];
 
-    scanord_read_vector_32(quant_coeff, scan, scan_idx, subpos, width, v_quant_coeffs);
+    if (state->encoder_control->scaling_list.enable) {
+      scanord_read_vector_32(quant_coeff, scan, scan_idx, subpos, width, v_quant_coeffs);
 
-    v_quant_coeff_lo = v_quant_coeffs[0];
-    v_quant_coeff_hi = v_quant_coeffs[1];
+      v_quant_coeff_lo = v_quant_coeffs[0];
+      v_quant_coeff_hi = v_quant_coeffs[1];
+
+      low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                         v_quant_coeff_hi,
+                                         0x20);
+
+      high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                         v_quant_coeff_hi,
+                                         0x31);
+    }
 
     __m256i v_level = _mm256_abs_epi16(v_coef);
     __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
     __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_setzero_si256());
-
-    __m256i low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                               v_quant_coeff_hi,
-                                               0x20);
-
-    __m256i high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                               v_quant_coeff_hi,
-                                               0x31);
 
     __m256i v_quant_coeff_a = _mm256_or_si256(low_b,  _mm256_setzero_si256());
     __m256i v_quant_coeff_b = _mm256_or_si256(high_b, _mm256_setzero_si256());
