@@ -1647,46 +1647,40 @@ static void resample2resampleBlockStep_alt2_avx2(const pic_buffer_t* const buffe
   kvz_deallocatePictureBuffer(tmp);
 }
 
-
-
 //Takes in vectors of data and filter coeffs. Apply filter and return results for eight pixels at a time.
+//Internal precision 16-bits
 //Data layout:
-//  data0[X]:=|D6X D4X|D2X D0X|
-//  data1[X]:=|D7X D5X|D3X D1X|
-//  where DYX:={d_(Y,X+3), d_(Y,X+2), d_(Y,X+1), d_(Y,X+0)} and d_(x,y) is the yth sample for the xth pixel given as a 16-bit value
+//  data0[X]:=|D7X D5X D6X D4X|D3X D1X D2X D0X|
+//  where DYX:={d_(Y,X+3), d_(Y,X+2), d_(Y,X+1), d_(Y,X+0)} and d_(x,y) is the yth sample for the xth pixel given as a 8-bit value
 //
-//  filter0[X]:=|F6X F4X|F2X F0X|
-//  filter1[X]:=|F7X F5X|F3X F1X|
-//  where FYX:={f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 16-bit value
+//  filter0[X]:=|F7X F5X F6X F4X|F3X F1X F2X F0X|
+//  where FYX:={f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 8-bit value
 //
 //Returns:
 //  |r_7 r_6 r_5 r_4|r_3 r_2 r_1 r_0|
 //  where r_x = is the filterd pixel value of the xth pixel given as a 32-bit value
 //
 //Only dataX[i], where 0 < i < filter_rounds, is used.
-static __m256i apply_filter_4x4_dual_interleaved_epi16(const __m256i* data0, const __m256i* data1, const __m256i* filter0, const __m256i* filter1, const unsigned filter_rounds)
+static __m256i apply_filter_8x4_epi8(const __m256i* data0, const __m256i* filter0, const unsigned filter_rounds)
 {
-  
-  //__m256i res;
-  //const __m256i perm = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
+  const __m256i shuffle_mask = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
+  const __m256i permute_mask = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
 
-  //Filtering done four taps at a time for four pixels, so repeate until desired number of taps performed
-  __m256i tmp0 = _mm256_madd_epi16(data0[0], filter0[0]);
-  __m256i tmp1 = _mm256_madd_epi16(data1[0], filter1[0]);
+  //Filtering done four taps at a time for eight pixels, so repeate until desired number of taps performed
+  __m256i tmp0 = _mm256_maddubs_epi16(data0[0], filter0[0]);
 
   for (size_t i = 1; i < filter_rounds; i++)
   {
     //Do multiplication and sum with results for previous taps
-    tmp0 = _mm256_add_epi32(tmp0, _mm256_madd_epi16(data0[i], filter0[i]));
-    tmp1 = _mm256_add_epi32(tmp1, _mm256_madd_epi16(data1[i], filter1[i]));
+    tmp0 = _mm256_add_epi16(tmp0, _mm256_madd_epi16(data0[i], filter0[i]));
   }
 
-  //Need to do one more round of additions to get final values
-  //  Blend to get |gg ee|cc aa|, |hh ff|dd bb| => |hg fe|dc ba|, |gh ef|cd ab| for the sum (need suffle to get the latter vector to the correct order)
-  return _mm256_add_epi32(_mm256_blend_epi32(tmp0, tmp1, /*1010 1010*/0xAA), _mm256_shuffle_epi32(_mm256_blend_epi32(tmp0, tmp1, /*0101 0101*/0x55), /*1011 0001*/0xB1));
+  //Permute to get the proper data layout for final sum
+  tmp0 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(tmp0, shuffle_mask), permute_mask);
+  //Data layout: |gh fe dc ba|gh fe dc ba|
 
-  //Finally permute to get the order right
-  //return _mm256_permutevar8x32_epi32(res, perm);
+  //Need to do one more round of additions to get final values
+  return _mm256_add_epi32(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(tmp0)), _mm256_cvtepi16_epi32(_mm256_extracti128_si256(tmp0, 1)));
 }
 
 //Takes in vectors of data and filter coeffs. Apply filter and return results for eight pixels at a time.
@@ -1735,6 +1729,46 @@ static __m256i apply_filter_4x8_dual_epi8(const __m256i* data0, const __m256i* d
   
   //Need to do one more round of additions to get final values
   return _mm256_add_epi32(tmp0, tmp1);
+}
+
+//Takes in vectors of data and filter coeffs. Apply filter and return results for eight pixels at a time.
+//Data layout:
+//  data0[X]:=|D6X D4X|D2X D0X|
+//  data1[X]:=|D7X D5X|D3X D1X|
+//  where DYX:={d_(Y,X+3), d_(Y,X+2), d_(Y,X+1), d_(Y,X+0)} and d_(x,y) is the yth sample for the xth pixel given as a 16-bit value
+//
+//  filter0[X]:=|F6X F4X|F2X F0X|
+//  filter1[X]:=|F7X F5X|F3X F1X|
+//  where FYX:={f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 16-bit value
+//
+//Returns:
+//  |r_7 r_6 r_5 r_4|r_3 r_2 r_1 r_0|
+//  where r_x = is the filterd pixel value of the xth pixel given as a 32-bit value
+//
+//Only dataX[i], where 0 < i < filter_rounds, is used.
+static __m256i apply_filter_4x4_dual_interleaved_epi16(const __m256i* data0, const __m256i* data1, const __m256i* filter0, const __m256i* filter1, const unsigned filter_rounds)
+{
+  
+  //__m256i res;
+  //const __m256i perm = _mm256_set_epi32(7, 3, 5, 1, 6, 2, 4, 0);
+
+  //Filtering done four taps at a time for four pixels, so repeate until desired number of taps performed
+  __m256i tmp0 = _mm256_madd_epi16(data0[0], filter0[0]);
+  __m256i tmp1 = _mm256_madd_epi16(data1[0], filter1[0]);
+
+  for (size_t i = 1; i < filter_rounds; i++)
+  {
+    //Do multiplication and sum with results for previous taps
+    tmp0 = _mm256_add_epi32(tmp0, _mm256_madd_epi16(data0[i], filter0[i]));
+    tmp1 = _mm256_add_epi32(tmp1, _mm256_madd_epi16(data1[i], filter1[i]));
+  }
+
+  //Need to do one more round of additions to get final values
+  //  Blend to get |gg ee|cc aa|, |hh ff|dd bb| => |hg fe|dc ba|, |gh ef|cd ab| for the sum (need suffle to get the latter vector to the correct order)
+  return _mm256_add_epi32(_mm256_blend_epi32(tmp0, tmp1, /*1010 1010*/0xAA), _mm256_shuffle_epi32(_mm256_blend_epi32(tmp0, tmp1, /*0101 0101*/0x55), /*1011 0001*/0xB1));
+
+  //Finally permute to get the order right
+  //return _mm256_permutevar8x32_epi32(res, perm);
 }
 
 //Takes in vectors of data and filter coeffs. Apply filter and return results for eight pixels at a time.
@@ -2004,6 +2038,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
       //Pre-processing step
       //  Load filter coeffs (horizontal)
       if (!is_vertical && f_step == 8) {
+        //Filter data layout: |F3_1 F2_1 F1_1 F0_1|F3_0 F2_0 F1_0 F0_0| and |F7_1 F6_1 F5_1 F4_1|F7_0 F6_0 F5_0 F4_0|
         filter0[0] = _mm256_packs_epi16(
           _mm256_packs_epi32(
             _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
@@ -2024,7 +2059,20 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[7], 0))
           )
         );
+      } else if (!is_vertical && filter_size < 8) {
+        //Filter data layout: |F7 F5 F6 F4|F3 F1 F2 F0|
+        filter0[0] = _mm256_packs_epi16(
+          _mm256_packs_epi32(
+            _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[4], 0), (__m128i*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
+            _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[6], 0), (__m128i*)&getFilterCoeff(filter, filter_size, phase[2], 0))
+          ),
+          _mm256_packs_epi32(
+            _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[5], 0), (__m128i*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
+            _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[7], 0), (__m128i*)&getFilterCoeff(filter, filter_size, phase[3], 0))
+          )
+        );
       } else if (!is_vertical) {
+        
         for (unsigned i = 0; i < 8; i++)
         {
           temp_filter[i] = _mm256_loadu_si256((__m256i*)&getFilterCoeff(filter, filter_size, phase[i], 0));
@@ -2201,6 +2249,12 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             //Pack samples into 16-bit values. Data order will be |P6 P4|P2 P0| and |P7 P5|P3 P1|
             data0[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 0], temp_mem[f_ind + 2]);
             data1[filter_part] = _mm256_packus_epi32(temp_mem[f_ind + 1], temp_mem[f_ind + 3]);
+
+            //For 4-tap pack further into 8-bit
+            if (filter_size < 8) {
+              data0[filter_part] = _mm256_packus_epi16(data0[filter_part], data1[filter_part]);
+              //Data order: |P7 P5 P6 P4|P3 P1 P2 P0|
+            }
           }
         } else {
           
@@ -2241,7 +2295,8 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
       filter_res_epi32 = is_vertical ? (filter_size <= 8 ? apply_filter_2x8_dual_epi16(data0, data1, filter0, filter1, num_filter_parts)
                                                          : apply_filter_1x8_dual_epi32(data0, data1, filter0, filter1, num_filter_parts << 1))
                                      : (f_step == 8 ? apply_filter_4x8_dual_epi8(data0, data1, filter0, filter1, num_filter_parts)
-                                                    : apply_filter_4x4_dual_interleaved_epi16(data0, data1, filter0, filter1, num_filter_parts));
+                                                    : (filter_size < 8 ? apply_filter_8x4_epi8(data0, filter0, num_filter_parts)
+                                                                       : apply_filter_4x4_dual_interleaved_epi16(data0, data1, filter0, filter1, num_filter_parts)));
 
       //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
       if (is_vertical) {
