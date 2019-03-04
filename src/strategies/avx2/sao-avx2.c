@@ -394,56 +394,6 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 }
 
 
-static void sao_reconstruct_color_avx(const encoder_control_t * const encoder,
- const kvz_pixel *rec_data,
- kvz_pixel *new_rec_data,
- const sao_info_t *sao,
- int stride,
- int new_stride,
- int block_width,
- int block_height,
- color_t color_i)
-{
- // Arrays orig_data and rec_data are quarter size for chroma.
- int offset_v = color_i == COLOR_V ? 5 : 0;
-
- if (sao->type == SAO_TYPE_BAND) {
-  int offsets[1 << KVZ_BIT_DEPTH];
-  kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
-  for (int y = 0; y < block_height; ++y) {
-   for (int x = 0; x < block_width; ++x) {
-    new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
-   }
-  }
- }
- else {
-  // Don't sample the edge pixels because this function doesn't have access to
-  // their neighbours.
-  for (int y = 0; y < block_height; ++y) {
-   for (int x = 0; x < block_width; x += 8) {
-
-    for (int i = 0; i < 8; ++i) {
-
-     int test = x + i;
-     vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-     vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
-     const kvz_pixel *c_data = &rec_data[y * stride + test];
-     kvz_pixel *new_data = &new_rec_data[y * new_stride + test];
-     kvz_pixel a = c_data[a_ofs.y * stride + a_ofs.x];
-     kvz_pixel c = c_data[0];
-     kvz_pixel b = c_data[b_ofs.y * stride + b_ofs.x];
-
-     int eo_cat = sao_calc_eo_cat(a, b, c);
-
-     new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
-
-    }
-
-   }
-  }
- }
-}
-
 static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  const kvz_pixel *rec_data,
  kvz_pixel *new_rec_data,
@@ -458,11 +408,15 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  int offset_v = color_i == COLOR_V ? 5 : 0;
  
 
+
+ /* Optimate this
+ */
  if (sao->type == SAO_TYPE_BAND) {
   int offsets[1 << KVZ_BIT_DEPTH];
   kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
   for (int y = 0; y < block_height; ++y) {
    for (int x = 0; x < block_width; ++x) {
+
     new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
    }
   }
@@ -502,33 +456,20 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
     __m256i vector_sao_offsets_epi32 = _mm256_set_epi32(sao->offsets[temp[7]], sao->offsets[temp[6]], sao->offsets[temp[5]], sao->offsets[temp[4]], sao->offsets[temp[3]], sao->offsets[temp[2]], sao->offsets[temp[1]], sao->offsets[temp[0]]);
     vector_sao_offsets_epi32 = _mm256_add_epi32(vector_sao_offsets_epi32, vector_c_data0_epi32);
 
+
+    // Convert int to int8_t
     __m256i temp_epi16 = _mm256_packus_epi32(vector_sao_offsets_epi32, vector_sao_offsets_epi32);
+    temp_epi16 = _mm256_permute4x64_epi64(temp_epi16, _MM_SHUFFLE(3, 1, 2, 0));
     __m256i temp_epi8 = _mm256_packus_epi16(temp_epi16, temp_epi16);
 
+    // Store 64-bits from vector to memory
+    _mm_storel_epi64((__m128i*)&(new_rec_data[y * new_stride + x]), _mm256_castsi256_si128(temp_epi8));
 
-
-    int*temp2 = (int*)&vector_sao_offsets_epi32;
-    
-    for (int i = 0; i < 8; ++i) {
-
-     const kvz_pixel *c_data = &rec_data[y * stride + x + i];
-
-     kvz_pixel *new_data = &new_rec_data[y * new_stride + x + i];
-
-     //printf("%d ", c_data[0] + sao->offsets[temp[i]]);
-     //printf("%d \n", temp2[i]);
-
-
-     new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, temp2[i]);//c_data[0] + sao->offsets[temp[i]]);
-     test = x;
-    }
-    //Low = 0
-    //High = (1 << KVZ_BIT_DEPTH)
-    //Value = c_data[0] + sao->offsets[eo_cat + offset_v]
-    //new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
+    test = x;
    }
 
-
+   /* Some optimation still need to be done, because this function uses only 6 pixels
+   */
    for (int i = 0; i < (block_width - test); ++i) {
 
     const kvz_pixel *c_data = &rec_data[y * stride + test + i];
@@ -550,7 +491,8 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  }
 }
 
-
+//--------------------------------------------------------------------------------------
+// Remove when done
 static int sao_band_ddistortion_avx2(const encoder_state_t * const state,
  const kvz_pixel *orig_data,
  const kvz_pixel *rec_data,
@@ -577,6 +519,68 @@ static int sao_band_ddistortion_avx2(const encoder_state_t * const state,
    }
   }
  }
+
+ return sum;
+}
+//--------------------------------------------------------------------------------------
+static int sao_band_ddistortion_avx(const encoder_state_t * const state,
+ const kvz_pixel *orig_data,
+ const kvz_pixel *rec_data,
+ int block_width,
+ int block_height,
+ int band_pos,
+ int sao_bands[4])
+{
+ int y, x;
+ int shift = state->encoder_control->bitdepth - 5;
+ int sum = 0;
+
+ __m256i sum_epi32 = _mm256_setzero_si256();
+
+ __m256i band_pos_epi32 = _mm256_set1_epi32(band_pos);
+
+ for (y = 0; y < block_height; ++y) {
+  for (x = 0; x < block_width; x += 8) {
+
+   //int band = (rec_data[y * block_width + x] >> shift) - band_pos;
+
+   __m256i band_epi32 = _mm256_loadu_si256((__m256i*)&rec_data[y * block_width + x]);
+   band_epi32 = _mm256_srli_epi32(band_epi32, shift);
+   band_epi32 = _mm256_sub_epi32(band_epi32, band_pos_epi32);
+
+   __m256i offset_epi32 = _mm256_setzero_si256();
+   __m256i temp1 = _mm256_cmpeq_epi32(offset_epi32, band_epi32);
+   temp1 = _mm256_or_si256(temp1, _mm256_cmpgt_epi32(band_epi32, offset_epi32));
+   __m256i temp2 = _mm256_cmpgt_epi32(_mm256_set1_epi32(4), band_epi32);
+
+   __m256i mask_epi32 = _mm256_andnot_si256(temp2, temp1);
+   int*band = (int*)&band_epi32;
+
+   offset_epi32 = _mm256_setr_epi32(band[0], band[1], band[2], band[3], band[4], band[5], band[6], band[7]);
+
+
+   __m256i orig_data_epi32 = _mm256_loadu_si256((__m256i*)&orig_data[y * block_width + x]);
+   __m256i rec_data_epi32 = _mm256_loadu_si256((__m256i*)&rec_data[y * block_width + x]);
+   __m256i diff_epi32 = _mm256_sub_epi32(orig_data_epi32, rec_data_epi32);
+
+   temp1 = _mm256_sub_epi32(diff_epi32, offset_epi32);
+   temp1 = _mm256_mullo_epi32(temp1, temp1);
+
+   temp2 = _mm256_mullo_epi32(diff_epi32, diff_epi32);
+
+   temp1 = _mm256_sub_epi32(temp1, temp2);
+   temp1 = _mm256_and_si256(temp1, mask_epi32);
+
+   sum_epi32 = _mm256_add_epi32(sum_epi32, temp1);
+  }
+ }
+
+ sum_epi32 = _mm256_hadd_epi32(sum_epi32, sum_epi32);
+ sum_epi32 = _mm256_hadd_epi32(sum_epi32, sum_epi32);
+ 
+ int*temp = (int*)&sum_epi32;
+
+ sum = temp[0] + temp[3];
 
  return sum;
 }
