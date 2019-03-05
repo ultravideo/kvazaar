@@ -802,6 +802,7 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
   __m256i tmp20, tmp21;
   __m256i tmp30, tmp31;
   __m256i add3, add2, add1, add0;
+  add3 = add2 = add1 = add0 = _mm256_setzero_si256();
 
 
   //Set unused vals to zero
@@ -1494,7 +1495,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
   const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
   __m256i temp_mem[8], temp_filter[8];
-  __m256i filter_res_epi32;
+  __m256i filter_res_epi32 = _mm256_setzero_si256();
   __m256i phase_epi32, ref_pos_epi32;
 
 
