@@ -806,8 +806,8 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
           WRITE_UE(stream, 0, "collocated_ref_idx");
         }
       }
-
-      WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
+      const uint8_t max_merge_cands = state->encoder_control->cfg.max_merge;
+      WRITE_UE(stream, 5- max_merge_cands, "five_minus_max_num_merge_cand");
   }
 
   {
