@@ -830,6 +830,9 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const 
   const size_t vecwid_bitmask = 15;
   const size_t vec_width_log2 = 4;
 
+  const int32_t height_fourline_groups = height & ~3;
+  const int32_t height_residual_lines  = height &  3;
+
   const __m128i rights     = _mm_set1_epi8((uint8_t)right);
   const __m128i blk_widths = _mm_set1_epi8((uint8_t)width);
   const __m128i vec_widths = _mm_set1_epi8((uint8_t)vec_width);
@@ -882,10 +885,17 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const 
 
   const int32_t outvec_offset = (~is_left_bm) & inside_width;
   int32_t x, y;
-  for (y = 0; y < height; y++) {
-    __m128i borderpx_vec = _mm_set1_epi8(ref_data[(int32_t)((y + 0) * ref_stride + border_off)]);
+  for (y = 0; y < height_fourline_groups; y += 4) {
+    __m128i borderpx_vec_b = _mm_set1_epi8(ref_data[(int32_t)((y + 0) * ref_stride + border_off)]);
+    __m128i borderpx_vec_d = _mm_set1_epi8(ref_data[(int32_t)((y + 1) * ref_stride + border_off)]);
+    __m128i borderpx_vec_f = _mm_set1_epi8(ref_data[(int32_t)((y + 2) * ref_stride + border_off)]);
+    __m128i borderpx_vec_h = _mm_set1_epi8(ref_data[(int32_t)((y + 3) * ref_stride + border_off)]);
+
     for (x = 0; x < outside_vecs; x++) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + outvec_offset));
+      __m128i c = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 1) * pic_stride + outvec_offset));
+      __m128i e = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 2) * pic_stride + outvec_offset));
+      __m128i g = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 3) * pic_stride + outvec_offset));
 
       __m128i startoffs  = _mm_set1_epi8  ((x + inside_vecs) << vec_width_log2);
       __m128i ns         = _mm_add_epi8   (startoffs, nslo);
@@ -894,33 +904,118 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const 
       __m128i unrd_imask = _mm_cmpgt_epi8 (blk_widths, ns);
               unrd_imask = _mm_or_si128   (unrd_imask, is_left);
       __m128i unrd_mask  = _mm_cmpeq_epi8 (unrd_imask, _mm_setzero_si128());
-      __m128i b_unread   = _mm_blendv_epi8(borderpx_vec, a, unrd_mask);
+
+      __m128i b_unread   = _mm_blendv_epi8(borderpx_vec_b, a, unrd_mask);
+      __m128i d_unread   = _mm_blendv_epi8(borderpx_vec_d, c, unrd_mask);
+      __m128i f_unread   = _mm_blendv_epi8(borderpx_vec_f, e, unrd_mask);
+      __m128i h_unread   = _mm_blendv_epi8(borderpx_vec_h, g, unrd_mask);
 
       __m128i sad_ab     = _mm_sad_epu8   (a, b_unread);
+      __m128i sad_cd     = _mm_sad_epu8   (c, d_unread);
+      __m128i sad_ef     = _mm_sad_epu8   (e, f_unread);
+      __m128i sad_gh     = _mm_sad_epu8   (g, h_unread);
+
       sse_inc = _mm_add_epi64(sse_inc, sad_ab);
+      sse_inc = _mm_add_epi64(sse_inc, sad_cd);
+      sse_inc = _mm_add_epi64(sse_inc, sad_ef);
+      sse_inc = _mm_add_epi64(sse_inc, sad_gh);
     }
     int32_t a_off = outside_width & is_left_bm;
     int32_t leftoff_with_sign_neg = (left_offset ^ is_left_bm) - is_left_bm;
 
-    __m128i old_b = borderpx_vec;
+    __m128i old_b = borderpx_vec_b;
+    __m128i old_d = borderpx_vec_d;
+    __m128i old_f = borderpx_vec_f;
+    __m128i old_h = borderpx_vec_h;
+
     for (x = invec_lstart; x != invec_lend; x += invec_linc) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + a_off));
+      __m128i c = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 1) * pic_stride + a_off));
+      __m128i e = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 2) * pic_stride + a_off));
+      __m128i g = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 3) * pic_stride + a_off));
       __m128i b = _mm_loadu_si128((__m128i *)(ref_data + x * vec_width + (y + 0) * ref_stride + a_off - leftoff_with_sign_neg));
+      __m128i d = _mm_loadu_si128((__m128i *)(ref_data + x * vec_width + (y + 1) * ref_stride + a_off - leftoff_with_sign_neg));
+      __m128i f = _mm_loadu_si128((__m128i *)(ref_data + x * vec_width + (y + 2) * ref_stride + a_off - leftoff_with_sign_neg));
+      __m128i h = _mm_loadu_si128((__m128i *)(ref_data + x * vec_width + (y + 3) * ref_stride + a_off - leftoff_with_sign_neg));
 
       __m128i b_shifted    = _mm_shuffle_epi8(b,     shufmask1);
+      __m128i d_shifted    = _mm_shuffle_epi8(d,     shufmask1);
+      __m128i f_shifted    = _mm_shuffle_epi8(f,     shufmask1);
+      __m128i h_shifted    = _mm_shuffle_epi8(h,     shufmask1);
+
       __m128i b_with_old   = _mm_blendv_epi8 (old_b, b_shifted, move_old_to_b_imask);
+      __m128i d_with_old   = _mm_blendv_epi8 (old_d, d_shifted, move_old_to_b_imask);
+      __m128i f_with_old   = _mm_blendv_epi8 (old_f, f_shifted, move_old_to_b_imask);
+      __m128i h_with_old   = _mm_blendv_epi8 (old_h, h_shifted, move_old_to_b_imask);
 
       uint8_t startoff     = (x << vec_width_log2) + a_off;
       __m128i startoffs    = _mm_set1_epi8   (startoff);
       __m128i curr_ns      = _mm_add_epi8    (startoffs,    nslo);
       __m128i unrd_imask   = _mm_cmpgt_epi8  (blk_widths,   curr_ns);
       __m128i unrd_mask    = _mm_cmpeq_epi8  (unrd_imask,   _mm_setzero_si128());
+
       __m128i b_unread     = _mm_blendv_epi8 (b_with_old,   a, unrd_mask);
+      __m128i d_unread     = _mm_blendv_epi8 (d_with_old,   c, unrd_mask);
+      __m128i f_unread     = _mm_blendv_epi8 (f_with_old,   e, unrd_mask);
+      __m128i h_unread     = _mm_blendv_epi8 (h_with_old,   g, unrd_mask);
 
       old_b = b_shifted;
+      old_d = d_shifted;
+      old_f = f_shifted;
+      old_h = h_shifted;
 
       __m128i sad_ab     = _mm_sad_epu8(a, b_unread);
+      __m128i sad_cd     = _mm_sad_epu8(c, d_unread);
+      __m128i sad_ef     = _mm_sad_epu8(e, f_unread);
+      __m128i sad_gh     = _mm_sad_epu8(g, h_unread);
+
       sse_inc = _mm_add_epi64(sse_inc, sad_ab);
+      sse_inc = _mm_add_epi64(sse_inc, sad_cd);
+      sse_inc = _mm_add_epi64(sse_inc, sad_ef);
+      sse_inc = _mm_add_epi64(sse_inc, sad_gh);
+    }
+  }
+  if (height_residual_lines) {
+    for (; y < height; y++) {
+      __m128i borderpx_vec = _mm_set1_epi8(ref_data[(int32_t)((y + 0) * ref_stride + border_off)]);
+      for (x = 0; x < outside_vecs; x++) {
+        __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + outvec_offset));
+
+        __m128i startoffs  = _mm_set1_epi8  ((x + inside_vecs) << vec_width_log2);
+        __m128i ns         = _mm_add_epi8   (startoffs, nslo);
+
+        // Unread imask is (is_left NOR unrd_imask_for_right), do the maths etc
+        __m128i unrd_imask = _mm_cmpgt_epi8 (blk_widths, ns);
+                unrd_imask = _mm_or_si128   (unrd_imask, is_left);
+        __m128i unrd_mask  = _mm_cmpeq_epi8 (unrd_imask, _mm_setzero_si128());
+        __m128i b_unread   = _mm_blendv_epi8(borderpx_vec, a, unrd_mask);
+
+        __m128i sad_ab     = _mm_sad_epu8   (a, b_unread);
+        sse_inc = _mm_add_epi64(sse_inc, sad_ab);
+      }
+      int32_t a_off = outside_width & is_left_bm;
+      int32_t leftoff_with_sign_neg = (left_offset ^ is_left_bm) - is_left_bm;
+
+      __m128i old_b = borderpx_vec;
+      for (x = invec_lstart; x != invec_lend; x += invec_linc) {
+        __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + a_off));
+        __m128i b = _mm_loadu_si128((__m128i *)(ref_data + x * vec_width + (y + 0) * ref_stride + a_off - leftoff_with_sign_neg));
+
+        __m128i b_shifted    = _mm_shuffle_epi8(b,     shufmask1);
+        __m128i b_with_old   = _mm_blendv_epi8 (old_b, b_shifted, move_old_to_b_imask);
+
+        uint8_t startoff     = (x << vec_width_log2) + a_off;
+        __m128i startoffs    = _mm_set1_epi8   (startoff);
+        __m128i curr_ns      = _mm_add_epi8    (startoffs,    nslo);
+        __m128i unrd_imask   = _mm_cmpgt_epi8  (blk_widths,   curr_ns);
+        __m128i unrd_mask    = _mm_cmpeq_epi8  (unrd_imask,   _mm_setzero_si128());
+        __m128i b_unread     = _mm_blendv_epi8 (b_with_old,   a, unrd_mask);
+
+        old_b = b_shifted;
+
+        __m128i sad_ab     = _mm_sad_epu8(a, b_unread);
+        sse_inc = _mm_add_epi64(sse_inc, sad_ab);
+      }
     }
   }
   __m128i sse_inc_2 = _mm_shuffle_epi32(sse_inc, _MM_SHUFFLE(1, 0, 3, 2));
