@@ -1873,15 +1873,6 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   const int *filter;
   const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
 
-  //Check that scaling ratio is not too large for pre-loading to fail
-  //Need to have four pixel positions worth of samples at any time, so the reference/sample pixel position distance between x_i and x_i+3 cannot exceed 32 (the max number of continous samples that are pre-loaded)
-  //if ((((int)((unsigned int)(4 * scale + add) >> shift) - delta) >> 4) + (filter_size >> 1) + 1 > 32)
-  //{
-  //  //Fallback on another resampling function
-  //  resampleBlockStep_avx2_v3(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
-  //  return;
-  //}
-
   //Only filter size of max 12 supported
   assert(filter_size <= 12);
 
@@ -1906,14 +1897,10 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   
   const __m256i seq = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
   const __m256i eight_seq = _mm256_add_epi32(_mm256_set1_epi32(8), seq);
-  //const __m256i adderr_2 = _mm256_setr_epi32(0, 1, 2, 3, 0, 1, 2, 3);
-  //const __m256i adderr_hi = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
-  //const __m256i shift_left = _mm256_setr_epi32(0, 0, 1, 2, 3, 4, 5, 6);
 
   const __m256i scale_epi32 = _mm256_set1_epi32(scale);
   const __m256i add_epi32 = _mm256_set1_epi32(add);
   const __m256i delta_epi32 = _mm256_set1_epi32(delta);
-  //const __m256i phase_mask = _mm256_set1_epi32(SELECT_LOW_4_BITS);
 
   const __m256i zero = _mm256_setzero_si256();
   const __m256i zero_four = _mm256_setr_epi32(0, 0, 0, 0, 4, 4, 4, 4);
@@ -1926,33 +1913,9 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   const __m256i ref_pos_filt_offset = _mm256_set1_epi32((filter_size >> 1) - 1);
   const __m256i epi16_interleave_mask = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
   
-  //__m256i filters_epi16[12]; //Contain preloaded filters. Data layouts: |Ph(X+3) Ph(X+1)|Ph(X+2) Ph(X)| or |Ph(X+1)_1 Ph(X)_1|Ph(X+1)_0 Ph(X)_0| or |Ph(X+1)_0 Ph(X)_1|Ph(X)_2 Ph(X)_0| and |Ph(X+2)_1 Ph(X+1)_2|Ph(X+2)_0 Ph(X+1)_1| and |Ph(X+3)_2 Ph(X+3)_0|Ph(X+3)_1 Ph(X+2)_2|
   __m256i temp_mem[12], temp_filter[12];
   __m256i data0[6], data1[6], filter0[6], filter1[6];
   
-  //const unsigned phase_map[4][4] = { { 0, 2, 1, 3 }, { 3, 0, 2, 1 }, { 1, 3, 0, 2 }, { 2, 1, 3, 0} }; //Phase map for 4 tap filter and 12 tap filter
-  //const unsigned filter_map[4][3] = { { 0, 0, 0 }, { 0, 1, 1 }, { 1, 1, 2 }, { 2, 2, 2 } }; //Filter array map for 12 tap
-
-  //Pre-load filters
-  /*filters_epi16[0] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[0]), _mm256_loadu_si256((__m256i*)&filter[8]));
-  filters_epi16[1] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[16]), _mm256_loadu_si256((__m256i*)&filter[24]));
-  filters_epi16[2] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[32]), _mm256_loadu_si256((__m256i*)&filter[40]));
-  filters_epi16[3] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[48]), _mm256_loadu_si256((__m256i*)&filter[56]));
-  
-  if (filter_size > 4) {
-    
-    filters_epi16[4] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[64]), _mm256_loadu_si256((__m256i*)&filter[72]));
-    filters_epi16[5] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[80]), _mm256_loadu_si256((__m256i*)&filter[88]));
-    filters_epi16[6] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[96]), _mm256_loadu_si256((__m256i*)&filter[104]));
-    filters_epi16[7] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[112]), _mm256_loadu_si256((__m256i*)&filter[120]));
-  }
-  if(filter_size > 8) {
-
-    filters_epi16[8] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[128]), _mm256_loadu_si256((__m256i*)&filter[136]));
-    filters_epi16[9] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[144]), _mm256_loadu_si256((__m256i*)&filter[152]));
-    filters_epi16[10] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[160]), _mm256_loadu_si256((__m256i*)&filter[168]));
-    filters_epi16[11] = _mm256_packs_epi32(_mm256_loadu_si256((__m256i*)&filter[176]), _mm256_loadu_si256((__m256i*)&filter[184]));
-  }*/
 
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < y_bound; y++) {
@@ -2111,36 +2074,6 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
         const int f_ind = filter_part * f_step; //Filter index
 
-        //Load filter in |F6 F4|F2 F0| and |F7 F5|F3 F1|
-        /*if (filter_size <= 4) {
-          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[6] >> 2]))[phase_map[0][phase[6] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[4] >> 2]))[phase_map[0][phase[4] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[2] >> 2]))[phase_map[0][phase[2] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[0] >> 2]))[phase_map[0][phase[0] % 4]]);
-          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[7] >> 2]))[phase_map[0][phase[7] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[5] >> 2]))[phase_map[0][phase[5] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[3] >> 2]))[phase_map[0][phase[3] % 4]],
-                                                   ((long long*)(&filters_epi16[phase[1] >> 2]))[phase_map[0][phase[1] % 4]]);
-        } else if (filter_size <= 8) {
-          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[6] >> 1]))[phase_map[(phase[6] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[4] >> 1]))[phase_map[(phase[4] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[2] >> 1]))[phase_map[(phase[2] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[0] >> 1]))[phase_map[(phase[0] % 2) << 1][filter_part]]);
-          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[phase[7] >> 1]))[phase_map[(phase[7] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[5] >> 1]))[phase_map[(phase[5] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[3] >> 1]))[phase_map[(phase[3] % 2) << 1][filter_part]],
-                                                   ((long long*)(&filters_epi16[phase[1] >> 1]))[phase_map[(phase[1] % 2) << 1][filter_part]]);
-        } else {
-          filter0[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[(phase[6] >> 2) + filter_map[phase[6] % 4][filter_part]]))[phase_map[phase[6] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[4] >> 2) + filter_map[phase[4] % 4][filter_part]]))[phase_map[phase[4] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[2] >> 2) + filter_map[phase[2] % 4][filter_part]]))[phase_map[phase[2] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[0] >> 2) + filter_map[phase[0] % 4][filter_part]]))[phase_map[phase[0] % 4][filter_part]]);
-          filter1[filter_part] = _mm256_set_epi64x(((long long*)(&filters_epi16[(phase[7] >> 2) + filter_map[phase[7] % 4][filter_part]]))[phase_map[phase[7] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[5] >> 2) + filter_map[phase[5] % 4][filter_part]]))[phase_map[phase[5] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[3] >> 2) + filter_map[phase[3] % 4][filter_part]]))[phase_map[phase[3] % 4][filter_part]],
-                                                   ((long long*)(&filters_epi16[(phase[1] >> 2) + filter_map[phase[1] % 4][filter_part]]))[phase_map[phase[1] % 4][filter_part]]);
-        }*/
-
         //Load data
         if (!is_vertical)
         {
@@ -2186,42 +2119,8 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             data0[0] = _mm256_packus_epi16(temp_mem[8], temp_mem[9]);
             data1[0] = _mm256_packus_epi16(temp_mem[10], temp_mem[11]);
 
-            //Load filters and re-order as needed.
-            /*
-            filter0[0] = _mm256_packs_epi16(
-                           _mm256_setr_epi64x(
-                             ((long long*)(&filters_epi16[phase[0] >> 1]))[phase_map[(phase[0] % 2) << 1][filter_part]],
-                             ((long long*)(&filters_epi16[phase[1] >> 1]))[phase_map[(phase[1] % 2) << 1][filter_part]],
-                             ((long long*)(&filters_epi16[phase[0] >> 1]))[phase_map[(phase[0] % 2) << 1][filter_part + 1]],
-                             ((long long*)(&filters_epi16[phase[1] >> 1]))[phase_map[(phase[1] % 2) << 1][filter_part + 1]]
-                           ), 
-                           _mm256_setr_epi64x(
-                            ((long long*)(&filters_epi16[phase[2] >> 1]))[phase_map[(phase[2] % 2) << 1][filter_part]],
-                            ((long long*)(&filters_epi16[phase[3] >> 1]))[phase_map[(phase[3] % 2) << 1][filter_part]],
-                            ((long long*)(&filters_epi16[phase[2] >> 1]))[phase_map[(phase[2] % 2) << 1][filter_part + 1]],
-                            ((long long*)(&filters_epi16[phase[3] >> 1]))[phase_map[(phase[3] % 2) << 1][filter_part + 1]]
-                          )
-                        );
-            filter1[0] = _mm256_packs_epi16(
-                           _mm256_setr_epi64x(
-                             ((long long*)(&filters_epi16[phase[4] >> 1]))[phase_map[(phase[4] % 2) << 1][filter_part]],
-                             ((long long*)(&filters_epi16[phase[5] >> 1]))[phase_map[(phase[5] % 2) << 1][filter_part]],
-                             ((long long*)(&filters_epi16[phase[4] >> 1]))[phase_map[(phase[4] % 2) << 1][filter_part + 1]],
-                             ((long long*)(&filters_epi16[phase[5] >> 1]))[phase_map[(phase[5] % 2) << 1][filter_part + 1]]
-                           ), 
-                           _mm256_setr_epi64x(
-                            ((long long*)(&filters_epi16[phase[6] >> 1]))[phase_map[(phase[6] % 2) << 1][filter_part]],
-                            ((long long*)(&filters_epi16[phase[7] >> 1]))[phase_map[(phase[7] % 2) << 1][filter_part]],
-                            ((long long*)(&filters_epi16[phase[6] >> 1]))[phase_map[(phase[6] % 2) << 1][filter_part + 1]],
-                            ((long long*)(&filters_epi16[phase[7] >> 1]))[phase_map[(phase[7] % 2) << 1][filter_part + 1]]
-                          )
-                        );*/
           } else {
             //Load src samples in four pixel chunks into registers
-            //temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[1]], (__m128i*)&src[sample_pos[0]]);
-            //temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[3]], (__m128i*)&src[sample_pos[2]]);
-            //temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[4]]);
-            //temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[6]]);
             temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[4]], (__m128i*)&src[sample_pos[0]]);
             temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[5]], (__m128i*)&src[sample_pos[1]]);
             temp_mem[f_ind + 2] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[6]], (__m128i*)&src[sample_pos[2]]);
@@ -2282,12 +2181,6 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             data1[(filter_part << 1) + 1] = temp_mem[f_ind + 3];
 
           }
-
-          //Need to reorder filters to the correct order
-          //temp_filter[f_ind + 0] = _mm256_blend_epi32(filter0[filter_part], filter1[filter_part], /*1010 1010*/0xAA);
-          //temp_filter[f_ind + 1] = _mm256_shuffle_epi32(_mm256_blend_epi32(filter0[filter_part], filter1[filter_part], /*0101 0101*/0x55), /*1011 0001*/0xB1);
-          //filter0[filter_part] = _mm256_blend_epi32(temp_filter[f_ind + 0], temp_filter[f_ind + 1], /*1010 1010*/0xAA);
-          //filter1[filter_part] = _mm256_blend_epi32(temp_filter[f_ind + 0], temp_filter[f_ind + 1], /*0101 0101*/0x55);
         }
       }
 
@@ -2313,7 +2206,6 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
     }
   }
-
 }
 
 //static __m256i _mm256_gather_n_epi32_v2(const int *src, unsigned idx[8], unsigned n)
