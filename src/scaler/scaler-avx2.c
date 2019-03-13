@@ -2098,12 +2098,12 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             temp_mem[7] = _mm256_loadu_si256((__m256i*)&src[sample_pos[7]]);
 
             //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
-            for (unsigned i = 0; virtual_pos_start[i] < 0 && i < 8; i++) {
+            for (unsigned i = 0; i < 8 && virtual_pos_start[i] < 0; i++) {
               //Shuffle data from mem so that left bound values are correctly dublicated.
               __m256i perm = _mm256_max_epi32(_mm256_add_epi32(seq, _mm256_set1_epi32(virtual_pos_start[i])), zero);
               temp_mem[i] = _mm256_permutevar8x32_epi32(temp_mem[i], perm);
             }
-            for (int i = 7; num_over[i] > 0 && i >= 0; i--) {
+            for (int i = 7; i >= 0 && num_over[i] > 0; i--) {
               //Shuffle data from mem so that right bound values are correctly dublicated.
               __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(seven, _mm256_set1_epi32(num_over[i])), seq), zero);
               temp_mem[i] = _mm256_permutevar8x32_epi32(temp_mem[i], perm);
@@ -2127,7 +2127,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
             temp_mem[f_ind + 3] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[7]], (__m128i*)&src[sample_pos[3]]);
 
             //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
-            for (unsigned i = 0; virtual_pos_start[i] < 0 && i < 4; i++)
+            for (unsigned i = 0; i < 4 && virtual_pos_start[i] < 0 ; i++)
             {
               //Shuffle data from mem so that left bound values are correctly dublicated.
               __m128i perm_lo = _mm_set1_epi32(virtual_pos_start[i]); //Set the amount inds are under
@@ -2136,7 +2136,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
               
               temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
             }
-            for (unsigned i = 7; num_over[i] > 0 && i >= 4; i--)
+            for (unsigned i = 7; i >= 4 && num_over[i] > 0; i--)
             {
               //Shuffle data from mem so that right bound values are correctly dublicated.
               __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i - 4], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
