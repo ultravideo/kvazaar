@@ -1162,13 +1162,14 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     }
 
     //Map the pixel range to LCU row
-    ver_range[0] = ver_range[0] / LCU_WIDTH; //First LCU that is needed
+    //ver_range[0] = ver_range[0] / LCU_WIDTH; //First LCU that is needed
     ver_range[1] = ((ver_range[1] + margin) / LCU_WIDTH) + 1;//(ver_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
     ver_range[1] = MIN(ver_range[1], state->num_ILR_states);
     
     //Create hor job for each row that does not have one yet and add dep
     int id_offset = lcu->index; //Offset the hor job index by the column number of the current lcu
-    for (int row = ver_range[0]; row < ver_range[1]; row++) {
+    //for (int row = ver_range[0]; row < ver_range[1]; row++) {
+    const int row = ver_range[1] - 1;
       int hor_ind = row + id_offset * state->num_ILR_states;//row * state->encoder_control->in.width_in_lcu + id_offset;
 
       if (row >= set_job_row) {
@@ -1204,16 +1205,17 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         kvz_blockScalingSrcWidthRange(hor_range, state_param->param, param_hor->block_x, param_hor->block_width);
 
         //Map the pixel range to LCU pos.
-        hor_range[0] = hor_range[0] / LCU_WIDTH; //First LCU that is needed
+        //hor_range[0] = hor_range[0] / LCU_WIDTH; //First LCU that is needed
         hor_range[1] = ((hor_range[1] + margin) / LCU_WIDTH) + 1;//(hor_range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
         hor_range[1] = MIN(hor_range[1], ilr_state->lcu_order_count);
         
         //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
 
         //Add ilr state dependencies to hor job
-        for (int k = hor_range[0]; k < hor_range[1]; k++) {
-          kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
-        }
+        //for (int k = hor_range[0]; k < hor_range[1]; k++) {
+        const int k = hor_range[1] - 1;
+        kvz_threadqueue_job_dep_add(state->layer->image_hor_scaling_jobs[hor_ind], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
+        //}
 
         //Add dependency to left lcu so that copying to src_buffer is not an issue
         if (lcu->left != NULL) {
@@ -1226,7 +1228,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
       //Add hor step dependency to ver step
       kvz_threadqueue_job_dep_add(state->layer->image_ver_scaling_jobs[lcu->id], state->layer->image_hor_scaling_jobs[hor_ind]);
-    }
+    //}
 
     //Dependencies added so submit the ver job
     kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->image_ver_scaling_jobs[lcu->id]);
