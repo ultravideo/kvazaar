@@ -209,6 +209,7 @@ Compression tools:
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
+	  --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]
@@ -314,6 +315,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | fast-residual-cost   | 28    | 28    | 28    | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| max-merge            | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     |
 
 
 ## Kvazaar library
