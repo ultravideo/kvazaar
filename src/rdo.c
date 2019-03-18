@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "cabac.h"
 #include "context.h"
@@ -194,6 +195,26 @@ static INLINE uint32_t get_coeff_cabac_cost(
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
+static INLINE void save_ccc(const coeff_t *coeff, int32_t size, uint32_t ccc)
+{
+  const uint64_t flush_count = 4096;
+
+  static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+  static uint64_t count = 0;
+  pthread_mutex_lock(&mtx);
+
+  assert(sizeof(coeff_t) == sizeof(int16_t));
+
+  fwrite(&size,  sizeof(size),     1,    stdout);
+  fwrite(&ccc,   sizeof(ccc),      1,    stdout);
+  fwrite( coeff, sizeof(coeff_t),  size, stdout);
+
+  if (((++count) % flush_count) == 0)
+    fflush(stdout);
+
+  pthread_mutex_unlock(&mtx);
+}
+
 /**
  * \brief Estimate bitcost for coding coefficients.
  *
@@ -209,13 +230,21 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
+  int save_cccs = 1; // TODO!
   if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
       state->qp < MAX_FAST_COEFF_COST_QP) {
-
-    uint64_t weights = kvz_fast_coeff_get_weights(state);
-    return kvz_fast_coeff_cost(coeff, width, weights);
+    if (save_cccs) {
+      assert(0 && "Plz no fast-residual-cost");
+    } else {
+      uint64_t weights = kvz_fast_coeff_get_weights(state);
+      return kvz_fast_coeff_cost(coeff, width, weights);
+    }
   } else {
-    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+    if (save_cccs) {
+      save_ccc(coeff, width * width, ccc);
+    }
+    return ccc;
   }
 }
 
