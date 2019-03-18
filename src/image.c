@@ -752,6 +752,15 @@ void kvz_block_scaler_worker(void * opaque_param)
 
 }
 
+//Debug stuff for printing thread info
+#if 1 && defined(linux)
+#include <sys/types.h>
+#include <sys/syscall.h>
+#define PRINT_TID_JOB_INFO(x,y,w,h,dir) fprintf(stderr, "TID: %ld, pos: (%d,%d), size: (%d,%d), dir: %d\n", syscall(SYS_gettid), x, y, w, h, dir)
+#else
+#define PRINT_TID_JOB_INFO(x,y,w,h,dir)
+#endif
+
 /** \brief Handle hor/ver scaling steps
 *  If tiles not used:
 *    If pic_in is given, copy relevant block to src_buffer and run horizontal scaling step
@@ -772,6 +781,8 @@ void kvz_block_step_scaler_worker(void * opaque_param)
   //TODO: account for chroma format properly
   int w_factor = -1;
   int h_factor = -1;
+
+  PRINT_TID_JOB_INFO(in_param->block_x, in_param->block_y, in_param->block_width, in_param->block_height, pic_in != NULL ? 1 : 0);
 
   //Hor Scaling
   if (pic_in != NULL) {
