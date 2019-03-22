@@ -242,11 +242,9 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   for (x = 1; x < block_width - 8; x += 8) {
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   kvz_pixel c = c_data[0];
-
-   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i*)&c_data[a_ofs.y * block_width + a_ofs.x]);
-   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i*)&c);
-   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i*)&c_data[b_ofs.y * block_width + b_ofs.x]);
+   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[a_ofs.y * block_width + a_ofs.x]);
+   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i* __restrict)c_data);
+   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[b_ofs.y * block_width + b_ofs.x]);
 
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
@@ -260,7 +258,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
    __m256i mask_epi32 = _mm256_cmpeq_epi32(zeros_epi32, v_cat_epi32);
    int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
    cat_sum_cnt[1][0] += temp_cnt;
-   temp_mem_epi32 = _mm256_load_si256((__m256i*)&orig_data[y * block_width + x] - c);
+   temp_mem_epi32 = _mm256_load_si256((__m256i*)&orig_data[y * block_width + x] - c_data[0]);
    temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
    tmp_zero_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
    //--------------------------------------------------------------------------
@@ -332,16 +330,14 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   kvz_pixel c = c_data[0];
-
    __m128i vector_a_epi8 = load_6_pixels(&c_data[a_ofs.y * block_width + a_ofs.x]);
    __m128i vector_c_epi8 = load_6_pixels(c_data);
    __m128i vector_b_epi8 = load_6_pixels(&c_data[b_ofs.y * block_width + b_ofs.x]);
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
 
-   __m256i temp_mem_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
-   __m128i temp_mem_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
+   __m256i temp_mem_epi32 =  _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c_data[0]));
+   __m128i temp_mem_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c_data[0]);
    _mm256_inserti128_si256(temp_mem_epi32, temp_mem_upper_epi32, 1);
 
    // Check wich values are right for specific cat amount.
