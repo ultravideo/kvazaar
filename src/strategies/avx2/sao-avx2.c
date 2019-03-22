@@ -123,45 +123,72 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
    tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_andnot_si256(offset_zeros_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32)));
   }
-  tmp_diff_epi32 = _mm256_setzero_si256();
-  // Load the last 6 pixels to use
 
-  const kvz_pixel *c_data = &rec_data[y * block_width + x];
-  const kvz_pixel *c_data2 = &rec_data[y * block_width + x +2];
-  const kvz_pixel *c_data4 = &rec_data[y * block_width + x + 4];
+  bool use_6_elements = block_width - x - 1 == 6;
 
-  kvz_pixel c = c_data[0];
+  switch (use_6_elements)
+  {
+  case true:;
+   // Load the last 6 pixels to use
 
-  __m128i vector_a_epi8 = _mm_setr_epi16(c_data[a_ofs.y * block_width + a_ofs.x], c_data2[a_ofs.y * block_width + a_ofs.x], c_data4[a_ofs.y * block_width + a_ofs.x], 0, 0, 0, 0, 0);
-  __m128i vector_c_epi8 = _mm_setr_epi16(c_data[0], c_data2[0], c_data4[0], 0, 0, 0, 0, 0);
-  __m128i vector_b_epi8 = _mm_setr_epi16(c_data[b_ofs.y * block_width + b_ofs.x], c_data2[b_ofs.y * block_width + b_ofs.x], c_data4[b_ofs.y * block_width + b_ofs.x], 0, 0, 0, 0, 0);
+   const kvz_pixel *c_data = &rec_data[y * block_width + x];
+   const kvz_pixel *c_data2 = &rec_data[y * block_width + x + 2];
+   const kvz_pixel *c_data4 = &rec_data[y * block_width + x + 4];
 
-  __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(vector_a_epi8, vector_b_epi8, vector_c_epi8);
-  
-  tmp_diff_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
+   kvz_pixel c = c_data[0];
 
-  __m128i diff_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
-  _mm256_insertf128_si256(tmp_diff_epi32, diff_upper_epi32, 0x1);
-  
-  tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
+   __m128i vector_a_epi8 = _mm_setr_epi16(c_data[a_ofs.y * block_width + a_ofs.x], c_data2[a_ofs.y * block_width + a_ofs.x], c_data4[a_ofs.y * block_width + a_ofs.x], 0, 0, 0, 0, 0);
+   __m128i vector_c_epi8 = _mm_setr_epi16(c_data[0], c_data2[0], c_data4[0], 0, 0, 0, 0, 0);
+   __m128i vector_b_epi8 = _mm_setr_epi16(c_data[b_ofs.y * block_width + b_ofs.x], c_data2[b_ofs.y * block_width + b_ofs.x], c_data4[b_ofs.y * block_width + b_ofs.x], 0, 0, 0, 0, 0);
 
-  offset_zeros_epi32 = _mm256_cmpeq_epi32(zeros_epi32, tmp_offset_epi32);
+   __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(vector_a_epi8, vector_b_epi8, vector_c_epi8);
 
-  // (diff - offset) * (diff - offset)
-  tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+   tmp_diff_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
 
-  // diff * diff
-  tmp2_vec_epi32 = _mm256_mul_epi32(tmp_diff_epi32, tmp_diff_epi32);
+   __m128i diff_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
+   _mm256_insertf128_si256(tmp_diff_epi32, diff_upper_epi32, 0x1);
 
-  // Offset is applied to reconstruction, so it is subtracted from diff.
-  // sum += (diff - offset) * (diff - offset) - diff * diff;
+   tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
-  tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_andnot_si256(offset_zeros_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32)));
+   offset_zeros_epi32 = _mm256_cmpeq_epi32(zeros_epi32, tmp_offset_epi32);
 
-  tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
-  tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
+   // (diff - offset) * (diff - offset)
+   tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
 
-  sum += (_mm256_extract_epi32(tmp_sum_epi32, 0) + _mm256_extract_epi32(tmp_sum_epi32, 4));
+   // diff * diff
+   tmp2_vec_epi32 = _mm256_mul_epi32(tmp_diff_epi32, tmp_diff_epi32);
+
+   // Offset is applied to reconstruction, so it is subtracted from diff.
+   // sum += (diff - offset) * (diff - offset) - diff * diff;
+
+   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_andnot_si256(offset_zeros_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32)));
+
+   tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
+   tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
+
+   sum += (_mm256_extract_epi32(tmp_sum_epi32, 0) + _mm256_extract_epi32(tmp_sum_epi32, 4));
+
+  default:
+
+   // Only if theres odd number of pixels left
+   for (int i = x; i < block_width - 1; ++i) {
+    const kvz_pixel *c_data = &rec_data[y * block_width + i];
+    kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+    kvz_pixel c = c_data[0];
+    kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+
+    int offset = offsets[sao_calc_eo_cat(a, b, c)];
+
+    if (offset != 0) {
+     int diff = orig_data[y * block_width + i] - c;
+     // Offset is applied to reconstruction, so it is subtracted from diff.
+     sum += (diff - offset) * (diff - offset) - diff * diff;
+    }
+   }
+   break;
+  }
+
+
   
  }
 
@@ -226,7 +253,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
    //--------------------------------------------------------------------------
    // v_cat == 0
    __m256i mask_epi32 = _mm256_cmpeq_epi32(zeros_epi32, v_cat_epi32);
-   int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32))/4;
+   int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
    cat_sum_cnt[1][0] += temp_cnt;
    temp_mem_epi32 = _mm256_load_si256((__m256i*)&orig_data[y * block_width + x] - c);
    temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
@@ -292,89 +319,110 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   temp = (int*)&tmp_four_values_epi32_sum;
   cat_sum_cnt[0][4] += (temp[0] + temp[1]);
 
-  // Load the last 6 pixels to use
+  bool use_6_elements = block_width - x - 1 == 6;
+  switch (use_6_elements) {
+  case true:;
 
-  const kvz_pixel *c_data = &rec_data[y * block_width + x];
-  const kvz_pixel *c_data2 = &rec_data[y * block_width + x + 2];
-  const kvz_pixel *c_data4 = &rec_data[y * block_width + x + 4];
+   // Load the last 6 pixels to use
 
-  kvz_pixel c = c_data[0];
+   const kvz_pixel *c_data = &rec_data[y * block_width + x];
+   const kvz_pixel *c_data2 = &rec_data[y * block_width + x + 2];
+   const kvz_pixel *c_data4 = &rec_data[y * block_width + x + 4];
 
-  __m128i vector_a_epi8 = _mm_setr_epi16(c_data[a_ofs.y * block_width + a_ofs.x], c_data2[a_ofs.y * block_width + a_ofs.x], c_data4[a_ofs.y * block_width + a_ofs.x], 0, 0, 0, 0, 0);
-  __m128i vector_c_epi8 = _mm_setr_epi16(c_data[0], c_data2[0], c_data4[0], 0, 0, 0, 0, 0);
-  __m128i vector_b_epi8 = _mm_setr_epi16(c_data[b_ofs.y * block_width + b_ofs.x], c_data2[b_ofs.y * block_width + b_ofs.x], c_data4[b_ofs.y * block_width + b_ofs.x], 0, 0, 0, 0, 0);
+   kvz_pixel c = c_data[0];
 
-  __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(vector_a_epi8, vector_b_epi8, vector_c_epi8);
+   __m128i vector_a_epi8 = _mm_setr_epi16(c_data[a_ofs.y * block_width + a_ofs.x], c_data2[a_ofs.y * block_width + a_ofs.x], c_data4[a_ofs.y * block_width + a_ofs.x], 0, 0, 0, 0, 0);
+   __m128i vector_c_epi8 = _mm_setr_epi16(c_data[0], c_data2[0], c_data4[0], 0, 0, 0, 0, 0);
+   __m128i vector_b_epi8 = _mm_setr_epi16(c_data[b_ofs.y * block_width + b_ofs.x], c_data2[b_ofs.y * block_width + b_ofs.x], c_data4[b_ofs.y * block_width + b_ofs.x], 0, 0, 0, 0, 0);
 
-  __m256i temp_mem_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
-  __m128i temp_mem_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
-  _mm256_insertf128_si256(temp_mem_epi32, temp_mem_upper_epi32, 0x1);
+   __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(vector_a_epi8, vector_b_epi8, vector_c_epi8);
 
-  // Check wich values are right for specific cat amount.
-  // It's done for every single value that cat could get {1, 2, 0, 3, 4}
-  //--------------------------------------------------------------------------
-  __m256i mask_epi32 = _mm256_cmpeq_epi32(zeros_epi32, v_cat_epi32);
-  int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4 - 2;
-  cat_sum_cnt[1][0] += temp_cnt;
-  temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
-  tmp_zero_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
-  //--------------------------------------------------------------------------
+   __m256i temp_mem_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
+   __m128i temp_mem_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
+   _mm256_insertf128_si256(temp_mem_epi32, temp_mem_upper_epi32, 0x1);
 
-  mask_epi32 = _mm256_cmpeq_epi32(ones_epi32, v_cat_epi32);
-  temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
-  cat_sum_cnt[1][1] += temp_cnt;
-  temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
-  tmp_one_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
-  //--------------------------------------------------------------------------
+   // Check wich values are right for specific cat amount.
+   // It's done for every single value that cat could get {1, 2, 0, 3, 4}
+   //--------------------------------------------------------------------------
+   __m256i mask_epi32 = _mm256_cmpeq_epi32(zeros_epi32, v_cat_epi32);
+   int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4 - 2;
+   cat_sum_cnt[1][0] += temp_cnt;
+   temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
+   tmp_zero_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
+   //--------------------------------------------------------------------------
 
-  mask_epi32 = _mm256_cmpeq_epi32(twos_epi32, v_cat_epi32);
-  temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
-  cat_sum_cnt[1][2] += temp_cnt;
-  temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
-  tmp_two_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
-  //--------------------------------------------------------------------------
+   mask_epi32 = _mm256_cmpeq_epi32(ones_epi32, v_cat_epi32);
+   temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
+   cat_sum_cnt[1][1] += temp_cnt;
+   temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
+   tmp_one_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
+   //--------------------------------------------------------------------------
 
-  mask_epi32 = _mm256_cmpeq_epi32(threes_epi32, v_cat_epi32);
-  temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
-  cat_sum_cnt[1][3] += temp_cnt;
-  temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
-  tmp_three_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
-  //--------------------------------------------------------------------------
+   mask_epi32 = _mm256_cmpeq_epi32(twos_epi32, v_cat_epi32);
+   temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
+   cat_sum_cnt[1][2] += temp_cnt;
+   temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
+   tmp_two_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
+   //--------------------------------------------------------------------------
 
-  mask_epi32 = _mm256_cmpeq_epi32(fours_epi32, v_cat_epi32);
-  temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
-  cat_sum_cnt[1][4] += temp_cnt;
-  temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
-  tmp_four_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
-  //--------------------------------------------------------------------------
+   mask_epi32 = _mm256_cmpeq_epi32(threes_epi32, v_cat_epi32);
+   temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
+   cat_sum_cnt[1][3] += temp_cnt;
+   temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
+   tmp_three_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
+   //--------------------------------------------------------------------------
 
-  temp_epi32 = _mm256_hadd_epi32(tmp_zero_values_epi32, tmp_one_values_epi32);
+   mask_epi32 = _mm256_cmpeq_epi32(fours_epi32, v_cat_epi32);
+   temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
+   cat_sum_cnt[1][4] += temp_cnt;
+   temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
+   tmp_four_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
+   //--------------------------------------------------------------------------
 
-  temp_mem_epi32 = _mm256_hadd_epi32(tmp_two_values_epi32, tmp_three_values_epi32);
-  temp_mem_epi32 = _mm256_hadd_epi32(temp_epi32, temp_mem_epi32);
+   temp_epi32 = _mm256_hadd_epi32(tmp_zero_values_epi32, tmp_one_values_epi32);
 
-  temp_epi32_lower = _mm256_castsi256_si128(temp_epi32);
-  temp_epi32_upper = _mm256_extracti128_si256(temp_epi32, 1);
+   temp_mem_epi32 = _mm256_hadd_epi32(tmp_two_values_epi32, tmp_three_values_epi32);
+   temp_mem_epi32 = _mm256_hadd_epi32(temp_epi32, temp_mem_epi32);
 
-  temp_epi32_sum = _mm_add_epi32(temp_epi32_lower, temp_epi32_upper);
-  temp = (int*)&temp_epi32_sum;
+   temp_epi32_lower = _mm256_castsi256_si128(temp_epi32);
+   temp_epi32_upper = _mm256_extracti128_si256(temp_epi32, 1);
 
-  cat_sum_cnt[0][0] += temp[0];
-  cat_sum_cnt[0][1] += temp[1];
-  cat_sum_cnt[0][2] += temp[2];
-  cat_sum_cnt[0][3] += temp[3];
+   temp_epi32_sum = _mm_add_epi32(temp_epi32_lower, temp_epi32_upper);
+   temp = (int*)&temp_epi32_sum;
 
-  tmp_four_values_epi32_lower = _mm256_castsi256_si128(tmp_four_values_epi32);
-  tmp_four_values_epi32_upper = _mm256_extracti128_si256(tmp_four_values_epi32, 1);
-  tmp_four_values_epi32_sum = _mm_add_epi32(tmp_four_values_epi32_lower, tmp_four_values_epi32_upper);
-  tmp_four_values_epi32_sum = _mm_add_epi64(tmp_four_values_epi32_sum, tmp_four_values_epi32_sum);
+   cat_sum_cnt[0][0] += temp[0];
+   cat_sum_cnt[0][1] += temp[1];
+   cat_sum_cnt[0][2] += temp[2];
+   cat_sum_cnt[0][3] += temp[3];
 
-  temp = (int*)&tmp_four_values_epi32_sum;
-  cat_sum_cnt[0][4] += (temp[0] + temp[1]);
+   tmp_four_values_epi32_lower = _mm256_castsi256_si128(tmp_four_values_epi32);
+   tmp_four_values_epi32_upper = _mm256_extracti128_si256(tmp_four_values_epi32, 1);
+   tmp_four_values_epi32_sum = _mm_add_epi32(tmp_four_values_epi32_lower, tmp_four_values_epi32_upper);
+   tmp_four_values_epi32_sum = _mm_add_epi64(tmp_four_values_epi32_sum, tmp_four_values_epi32_sum);
 
+   temp = (int*)&tmp_four_values_epi32_sum;
+   cat_sum_cnt[0][4] += (temp[0] + temp[1]);
+   break;
+
+  default:
+   // Use when theres odd number of pixels left
+   for (int i = x; i < block_width - 1; ++i) {
+    const kvz_pixel *c_data = &rec_data[y * block_width + i];
+    kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+    kvz_pixel c = c_data[0];
+    kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+
+    int eo_cat = sao_calc_eo_cat(a, b, c);
+
+    cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + i] - c;
+    cat_sum_cnt[1][eo_cat] += 1;
+   }
+
+
+   break;
+  }
  }
 }
-
 
 static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  const kvz_pixel *rec_data,
