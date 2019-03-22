@@ -242,9 +242,9 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   for (x = 1; x < block_width - 8; x += 8) {
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[a_ofs.y * block_width + a_ofs.x]);
-   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i* __restrict)c_data);
-   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[b_ofs.y * block_width + b_ofs.x]);
+   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i*)&c_data[a_ofs.y * block_width + a_ofs.x]);
+   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i*)c_data);
+   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i*)&c_data[b_ofs.y * block_width + b_ofs.x]);
 
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
