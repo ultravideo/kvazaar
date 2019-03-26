@@ -23,6 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TO DO TODO TODO TO DO
+#include <immintrin.h>
+
 #include "cabac.h"
 #include "context.h"
 #include "encode_coding_tree.h"
@@ -41,9 +44,6 @@
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
-
-static const double COEFF_COST_QP_FACTOR = 0.044407704;
-static const double COEFF_COST_BIAS      = 0.557323653;
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
@@ -212,13 +212,18 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
-  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit) {
+  //       |
+  // TODO \|/
+  //       *
+#define FAST_RESIDUAL_LOWER_LIMIT 10
+  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit || state->qp <= FAST_RESIDUAL_LOWER_LIMIT) {
     return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
 
   } else {
     // Estimate coeff coding cost based on QP and sum of absolute coeffs.
-    const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
-    return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
+    // const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
+    // return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
+    return kvz_fast_coeff_cost(coeff, width, state->qp);
   }
 }
 

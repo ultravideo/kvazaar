@@ -786,6 +786,82 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
+static INLINE int16_t to_q88(float f)
+{
+  return (int16_t)(f * 256.0f);
+}
+
+static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t qp)
+{
+  // TODO!
+#define NUM_BUCKETS 5
+  const int16_t wt_m[NUM_BUCKETS] = {
+    to_q88(-0.004916),
+    to_q88(0.010806),
+    to_q88(0.055562),
+    to_q88(0.033436),
+    to_q88(-0.007690),
+  };
+  const int16_t wt_c[NUM_BUCKETS] = {
+    to_q88(0.172024),
+    to_q88(3.421462),
+    to_q88(2.879506),
+    to_q88(5.585471),
+    to_q88(0.256772),
+  };
+
+  const __m256i zero   = _mm256_setzero_si256();
+  const __m256i threes = _mm256_set1_epi16(3);
+  const __m256i ones   = _mm256_srli_epi16(threes, 1);
+  const __m256i twos   = _mm256_slli_epi16(ones,   1);
+
+  __m256i wt[NUM_BUCKETS - 1];
+  for (int32_t i = 0; i < NUM_BUCKETS - 1; i++)
+    wt[i] = _mm256_set1_epi16(wt_m[i] * qp + wt_c[i]);
+
+  uint32_t wid_wt = width * (wt_m[NUM_BUCKETS - 1] * qp + wt_c[NUM_BUCKETS - 1]);
+  __m256i avx_inc = _mm256_setzero_si256();
+
+  for (int32_t i = 0; i < width * width; i += 16) {
+    __m256i curr      = _mm256_loadu_si256((__m256i *)(coeff + i));
+    __m256i curr_abs  = _mm256_abs_epi16  (curr);
+    __m256i curr_max3 = _mm256_min_epi16  (curr_abs, threes);
+
+    __m256i curr_eq_0 = _mm256_cmpeq_epi16(curr_max3, zero);
+    __m256i curr_eq_1 = _mm256_cmpeq_epi16(curr_max3, ones);
+    __m256i curr_eq_2 = _mm256_cmpeq_epi16(curr_max3, twos);
+    __m256i curr_eq_3 = _mm256_cmpeq_epi16(curr_max3, threes);
+
+    __m256i curr_0_wt = _mm256_and_si256  (curr_eq_0, wt[0]);
+    __m256i curr_1_wt = _mm256_and_si256  (curr_eq_1, wt[1]);
+    __m256i curr_2_wt = _mm256_and_si256  (curr_eq_2, wt[2]);
+    __m256i curr_3_wt = _mm256_and_si256  (curr_eq_3, wt[3]);
+
+    // Use madd to horizontally sum 16-bit weights into 32-bit atoms
+    __m256i wt_0_32b  = _mm256_madd_epi16(curr_0_wt, ones);
+    __m256i wt_1_32b  = _mm256_madd_epi16(curr_1_wt, ones);
+    __m256i wt_2_32b  = _mm256_madd_epi16(curr_2_wt, ones);
+    __m256i wt_3_32b  = _mm256_madd_epi16(curr_3_wt, ones);
+
+    avx_inc           = _mm256_add_epi32(avx_inc, wt_0_32b);
+    avx_inc           = _mm256_add_epi32(avx_inc, wt_1_32b);
+    avx_inc           = _mm256_add_epi32(avx_inc, wt_2_32b);
+    avx_inc           = _mm256_add_epi32(avx_inc, wt_3_32b);
+  }
+  __m128i inchi = _mm256_extracti128_si256(avx_inc, 1);
+  __m128i inclo = _mm256_castsi256_si128  (avx_inc);
+
+  __m128i sum_1 = _mm_add_epi32    (inclo, inchi);
+  __m128i sum_2 = _mm_shuffle_epi32(sum_1, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sum_3 = _mm_add_epi32    (sum_1, sum_2);
+  __m128i sum_4 = _mm_shuffle_epi32(sum_3, _MM_SHUFFLE(2, 3, 0, 1));
+  __m128i sum   = _mm_add_epi32    (sum_3, sum_4);
+
+  uint32_t sum_u32 = _mm_cvtsi128_si32(sum);
+  uint32_t sum_total = sum_u32 + wid_wt;
+  return sum_total >> 8;
+}
+
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
@@ -799,6 +875,7 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
   }
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
+  success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
