@@ -220,7 +220,6 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
  // Don't sample the edge pixels because this function doesn't have access to
  // their neighbours.
-
  __m256i zeros_epi32 = _mm256_setzero_si256();
  __m256i ones_epi32 = _mm256_set1_epi32(1);
  __m256i twos_epi32 = _mm256_set1_epi32(2);
@@ -242,9 +241,9 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   for (x = 1; x < block_width - 8; x += 8) {
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i*)&c_data[a_ofs.y * block_width + a_ofs.x]);
-   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i*)c_data);
-   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i*)&c_data[b_ofs.y * block_width + b_ofs.x]);
+   __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[a_ofs.y * block_width + a_ofs.x]);
+   __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i* __restrict)c_data);
+   __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i* __restrict)&c_data[b_ofs.y * block_width + b_ofs.x]);
 
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
@@ -258,7 +257,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
    __m256i mask_epi32 = _mm256_cmpeq_epi32(zeros_epi32, v_cat_epi32);
    int temp_cnt = _mm_popcnt_u32(_mm256_movemask_epi8(mask_epi32)) / 4;
    cat_sum_cnt[1][0] += temp_cnt;
-   temp_mem_epi32 = _mm256_sub_epi32(_mm256_load_si256((__m256i*)&orig_data[y * block_width + x]), _mm256_cvtepu8_epi32(vector_c_epi8));
+   temp_mem_epi32 = _mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i* __restrict)&(orig_data[y * block_width + x]))), _mm256_cvtepu8_epi32(vector_c_epi8));
    temp_epi32 = _mm256_and_si256(mask_epi32, temp_mem_epi32);
    tmp_zero_values_epi32 = _mm256_add_epi32(tmp_zero_values_epi32, temp_epi32);
    //--------------------------------------------------------------------------
@@ -336,9 +335,9 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
 
-   __m256i temp_mem_epi32 =  _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x]));
-   __m128i temp_mem_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4]);
-   _mm256_inserti128_si256(temp_mem_epi32, temp_mem_upper_epi32, 1);
+   const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
+
+   __m256i temp_mem_epi32 = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
    
    temp_mem_epi32 = _mm256_sub_epi32(temp_mem_epi32, _mm256_cvtepu8_epi32(vector_c_epi8));
 
