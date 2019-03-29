@@ -85,7 +85,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  int offsets[NUM_SAO_EDGE_CATEGORIES])
 {
  int y, x;
- int sum = 0;
+ unsigned int sum = 0;
  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
