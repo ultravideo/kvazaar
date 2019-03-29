@@ -587,23 +587,19 @@ static int sao_band_ddistortion_avx2(const encoder_state_t * const state,
 
    //int band = (rec_data[y * block_width + x] >> shift) - band_pos;
 
-   __m256i band_epi32 = _mm256_loadu_si256((__m256i*)&rec_data[y * block_width + x]);
+   __m256i band_epi32 = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(rec_data[y * block_width + x])));
    band_epi32 = _mm256_srli_epi32(band_epi32, shift);
    band_epi32 = _mm256_sub_epi32(band_epi32, band_pos_epi32);
 
-   __m256i offset_epi32 = _mm256_setzero_si256();
+   __m256i offset_epi32 = _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*)sao_bands)), band_epi32);
    __m256i temp1 = _mm256_cmpeq_epi32(offset_epi32, band_epi32);
    temp1 = _mm256_or_si256(temp1, _mm256_cmpgt_epi32(band_epi32, offset_epi32));
    __m256i temp2 = _mm256_cmpgt_epi32(_mm256_set1_epi32(4), band_epi32);
 
    __m256i mask_epi32 = _mm256_andnot_si256(temp2, temp1);
-   int*band = (int*)&band_epi32;
 
-   offset_epi32 = _mm256_setr_epi32(band[0], band[1], band[2], band[3], band[4], band[5], band[6], band[7]);
-
-
-   __m256i orig_data_epi32 = _mm256_loadu_si256((__m256i*)&orig_data[y * block_width + x]);
-   __m256i rec_data_epi32 = _mm256_loadu_si256((__m256i*)&rec_data[y * block_width + x]);
+   __m256i orig_data_epi32 = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
+   __m256i rec_data_epi32 = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(rec_data[y * block_width + x])));
    __m256i diff_epi32 = _mm256_sub_epi32(orig_data_epi32, rec_data_epi32);
 
    temp1 = _mm256_sub_epi32(diff_epi32, offset_epi32);
