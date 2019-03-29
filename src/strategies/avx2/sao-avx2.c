@@ -167,7 +167,8 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
 
-   sum += (_mm256_extract_epi32(tmp_sum_epi32, 0) + _mm256_extract_epi32(tmp_sum_epi32, 4));
+   sum += _mm256_extract_epi32(tmp_sum_epi32, 0);
+   sum += _mm256_extract_epi32(tmp_sum_epi32, 4);
    break;
 
   default:
