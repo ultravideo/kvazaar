@@ -85,7 +85,6 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  int offsets[NUM_SAO_EDGE_CATEGORIES])
 {
  int y, x;
- unsigned int sum = 0;
  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
@@ -123,73 +122,41 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
   }
 
-  bool use_6_elements = block_width - x - 1 == 6;
+  // Load the last 6 pixels to use
 
-  switch (use_6_elements)
-  {
-  case true:;
-   // Load the last 6 pixels to use
+  const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   const kvz_pixel *c_data = &rec_data[y * block_width + x];
+  __m128i vector_a_epi8 = load_6_pixels(&c_data[a_ofs.y * block_width + a_ofs.x]);
+  __m128i vector_c_epi8 = load_6_pixels(c_data);
+  __m128i vector_b_epi8 = load_6_pixels(&c_data[b_ofs.y * block_width + b_ofs.x]);
 
-   __m128i vector_a_epi8 = load_6_pixels(&c_data[a_ofs.y * block_width + a_ofs.x]);
-   __m128i vector_c_epi8 = load_6_pixels(c_data);
-   __m128i vector_b_epi8 = load_6_pixels(&c_data[b_ofs.y * block_width + b_ofs.x]);
+  __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
 
-   __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
+  const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
 
-   const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
+  tmp_diff_epi32 = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
 
-   tmp_diff_epi32 = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
+  tmp_diff_epi32 = _mm256_sub_epi32(tmp_diff_epi32, _mm256_cvtepu8_epi32(vector_c_epi8));
 
-   tmp_diff_epi32 = _mm256_sub_epi32(tmp_diff_epi32, _mm256_cvtepu8_epi32(vector_c_epi8));
+  tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
-   tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
+  // (diff - offset) * (diff - offset)
+  tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
 
-   // (diff - offset) * (diff - offset)
-   tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+  // diff * diff
+  tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
 
-   // diff * diff
-   tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
+  // Offset is applied to reconstruction, so it is subtracted from diff.
+  // sum += (diff - offset) * (diff - offset) - diff * diff;
 
-   // Offset is applied to reconstruction, so it is subtracted from diff.
-   // sum += (diff - offset) * (diff - offset) - diff * diff;
+  tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
 
-   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
+  tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
+  tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
 
-   tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
-   tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
-
-   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_shuffle_epi32(tmp_sum_epi32, _MM_SHUFFLE(0, 1, 0, 1)));
-
-   sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(tmp_sum_epi32));
-   break;
-
-  default:
-
-   // Only if theres odd number of pixels left
-   for (int i = x; i < block_width - 1; ++i) {
-    const kvz_pixel *c_data = &rec_data[y * block_width + i];
-    kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-    kvz_pixel c = c_data[0];
-    kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
-
-    int offset = offsets[sao_calc_eo_cat(a, b, c)];
-
-    if (offset != 0) {
-     int diff = orig_data[y * block_width + i] - c;
-     // Offset is applied to reconstruction, so it is subtracted from diff.
-     sum += (diff - offset) * (diff - offset) - diff * diff;
-    }
-   }
-   break;
-  }
-
-
-  
+  tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_shuffle_epi32(tmp_sum_epi32, _MM_SHUFFLE(0, 1, 0, 1)));
  }
-
- return sum;
+ return (_mm_cvtsi128_si32(_mm256_castsi256_si128(tmp_sum_epi32)));
 }
 
 /**
