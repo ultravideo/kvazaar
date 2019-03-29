@@ -101,8 +101,6 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  for (y = 1; y < block_height - 1; ++y) {
   for (x = 1; x < block_width - 8; x+=8) {
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
-
-   kvz_pixel c = c_data[0];
    
    __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i*)&c_data[a_ofs.y * block_width + a_ofs.x]);
    __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i*)&c_data[0]);
@@ -111,7 +109,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
 
-   tmp_diff_epi32 = _mm256_load_si256((__m256i*)&orig_data[y * block_width + x] - c);
+   tmp_diff_epi32 = _mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i* __restrict)&(orig_data[y * block_width + x]))), _mm256_cvtepu8_epi32(vector_c_epi8));
 
    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
@@ -139,18 +137,17 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
 
-   kvz_pixel c = c_data[0];
-
    __m128i vector_a_epi8 = load_6_pixels(&c_data[a_ofs.y * block_width + a_ofs.x]);
    __m128i vector_c_epi8 = load_6_pixels(c_data);
    __m128i vector_b_epi8 = load_6_pixels(&c_data[b_ofs.y * block_width + b_ofs.x]);
 
    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
 
-   tmp_diff_epi32 = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&orig_data[y * block_width + x] - c));
+   const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
 
-   __m128i diff_upper_epi32 = _mm_loadl_epi64((__m128i*)&orig_data[y * block_width + x + 4] - c);
-   _mm256_inserti128_si256(tmp_diff_epi32, diff_upper_epi32, 1);
+   tmp_diff_epi32 = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
+
+   tmp_diff_epi32 = _mm256_sub_epi32(tmp_diff_epi32, _mm256_cvtepu8_epi32(vector_c_epi8));
 
    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
