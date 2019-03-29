@@ -95,8 +95,6 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  __m256i tmp_offset_epi32;
  __m256i tmp1_vec_epi32;
  __m256i tmp2_vec_epi32;
- __m256i zeros_epi32 = _mm256_setzero_si256();
- __m256i offset_zeros_epi32;
 
  for (y = 1; y < block_height - 1; ++y) {
   for (x = 1; x < block_width - 8; x+=8) {
@@ -111,10 +109,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
    tmp_diff_epi32 = _mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i* __restrict)&(orig_data[y * block_width + x]))), _mm256_cvtepu8_epi32(vector_c_epi8));
 
-   tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
-
-   offset_zeros_epi32 = _mm256_cmpeq_epi32(zeros_epi32, tmp_offset_epi32);
-   
+   tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);   
 
    // (diff - offset) * (diff - offset)
    tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
@@ -125,7 +120,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    // Offset is applied to reconstruction, so it is subtracted from diff.
    // sum += (diff - offset) * (diff - offset) - diff * diff;
 
-   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_andnot_si256(offset_zeros_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32)));
+   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
   }
 
   bool use_6_elements = block_width - x - 1 == 6;
@@ -151,8 +146,6 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
-   offset_zeros_epi32 = _mm256_cmpeq_epi32(zeros_epi32, tmp_offset_epi32);
-
    // (diff - offset) * (diff - offset)
    tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
 
@@ -162,7 +155,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    // Offset is applied to reconstruction, so it is subtracted from diff.
    // sum += (diff - offset) * (diff - offset) - diff * diff;
 
-   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_andnot_si256(offset_zeros_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32)));
+   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
 
    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
