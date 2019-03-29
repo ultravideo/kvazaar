@@ -112,10 +112,10 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);   
 
    // (diff - offset) * (diff - offset)
-   tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+   tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
 
    // diff * diff
-   tmp2_vec_epi32 = _mm256_mul_epi32(tmp_diff_epi32, tmp_diff_epi32);
+   tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
 
    // Offset is applied to reconstruction, so it is subtracted from diff.
    // sum += (diff - offset) * (diff - offset) - diff * diff;
@@ -147,10 +147,10 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
 
    // (diff - offset) * (diff - offset)
-   tmp1_vec_epi32 = _mm256_mul_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+   tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
 
    // diff * diff
-   tmp2_vec_epi32 = _mm256_mul_epi32(tmp_diff_epi32, tmp_diff_epi32);
+   tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
 
    // Offset is applied to reconstruction, so it is subtracted from diff.
    // sum += (diff - offset) * (diff - offset) - diff * diff;
