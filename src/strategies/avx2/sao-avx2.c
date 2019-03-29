@@ -95,6 +95,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  __m256i tmp1_vec_epi32;
  __m256i tmp2_vec_epi32;
 
+ int sum = 0;
  for (y = 1; y < block_height - 1; ++y) {
   for (x = 1; x < block_width - 8; x+=8) {
    const kvz_pixel *c_data = &rec_data[y * block_width + x];
@@ -155,8 +156,11 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
   tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
 
   tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_shuffle_epi32(tmp_sum_epi32, _MM_SHUFFLE(0, 1, 0, 1)));
+  sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(tmp_sum_epi32));
+
+  tmp_sum_epi32 = _mm256_setzero_si256();
  }
- return (_mm_cvtsi128_si32(_mm256_castsi256_si128(tmp_sum_epi32)));
+ return sum;
 }
 
 /**
