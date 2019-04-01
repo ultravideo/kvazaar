@@ -375,39 +375,12 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 
 #if COMPILE_POWERPC
 #  if defined(__linux__)
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/auxvec.h>
 #include <asm/cputable.h>
+#include <sys/auxv.h>
 
-//Source: http://freevec.org/function/altivec_runtime_detection_linux
 static int altivec_available(void)
 {
-    int result = 0;
-    unsigned long buf[64];
-    ssize_t count;
-    int fd, i;
- 
-    fd = open("/proc/self/auxv", O_RDONLY);
-    if (fd < 0) {
-        return 0;
-    }
-    // loop on reading
-    do {
-        count = read(fd, buf, sizeof(buf));
-        if (count < 0)
-            break;
-        for (i=0; i < (count / sizeof(unsigned long)); i += 2) {
-            if (buf[i] == AT_HWCAP) {
-                result = !!(buf[i+1] & PPC_FEATURE_HAS_ALTIVEC);
-                goto out_close;
-            } else if (buf[i] == AT_NULL)
-                goto out_close;
-        }
-    } while (count == sizeof(buf));
-out_close:
-    close(fd);
-    return result;
+    return !!(getauxval(AT_HWCAP) & PPC_FEATURE_HAS_ALTIVEC);
 }
 #  elif defined(__FreeBSD__)
 #include <sys/types.h>
