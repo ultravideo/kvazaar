@@ -374,13 +374,23 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
-#  if defined(__linux__)
+#  if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD__ >= 12)
+#ifdef __linux__
 #include <asm/cputable.h>
+#else
+#include <machine/cpu.h>
+#endif
 #include <sys/auxv.h>
 
 static int altivec_available(void)
 {
-    return !!(getauxval(AT_HWCAP) & PPC_FEATURE_HAS_ALTIVEC);
+    unsigned long hwcap = 0;
+#ifdef __linux__
+    hwcap = getauxval(AT_HWCAP);
+#else
+    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+#endif
+    return !!(hwcap & PPC_FEATURE_HAS_ALTIVEC);
 }
 #  elif defined(__FreeBSD__)
 #include <sys/types.h>
