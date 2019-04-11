@@ -23,9 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// TO DO TODO TODO TO DO
-#include <immintrin.h>
-
 #include "cabac.h"
 #include "context.h"
 #include "encode_coding_tree.h"
@@ -212,11 +209,7 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
-  //       |
-  // TODO \|/
-  //       *
-#define FAST_RESIDUAL_LOWER_LIMIT 10
-  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit || state->qp <= FAST_RESIDUAL_LOWER_LIMIT) {
+  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit) {
     return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
 
   } else {

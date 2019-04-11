@@ -793,7 +793,6 @@ static INLINE int16_t to_q88(float f)
 
 static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t qp)
 {
-  // TODO!
 #define NUM_BUCKETS 5
   const int16_t wt_m[NUM_BUCKETS] = {
     to_q88(-0.004916),
@@ -860,6 +859,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   uint32_t sum_u32 = _mm_cvtsi128_si32(sum);
   uint32_t sum_total = sum_u32 + wid_wt;
   return sum_total >> 8;
+#undef NUM_BUCKETS
 }
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

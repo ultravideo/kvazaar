@@ -341,7 +341,6 @@ static INLINE int16_t to_q88(float f)
 static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int32_t qp)
 {
   uint32_t sum = 0;
-  // TODO!
 #define NUM_BUCKETS 5
   const int16_t wt_m[NUM_BUCKETS] = {
     to_q88(-0.004916),
@@ -373,6 +372,7 @@ static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int
   }
   sum += wt[NUM_BUCKETS - 1] * width;
   return sum >> 8;
+#undef NUM_BUCKETS
 }
 
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)
