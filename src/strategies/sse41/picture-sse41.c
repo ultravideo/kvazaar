@@ -18,10 +18,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#if COMPILE_INTEL_SSE41
 #include "strategies/sse41/picture-sse41.h"
 #include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
 
-#if COMPILE_INTEL_SSE41
 #include <immintrin.h>
 #include <stdlib.h>
 
