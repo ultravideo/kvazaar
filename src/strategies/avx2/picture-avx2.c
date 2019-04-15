@@ -22,6 +22,8 @@
  * \file
  */
 
+#include "global.h"
+
 #if COMPILE_INTEL_AVX2
 #include "strategies/avx2/picture-avx2.h"
 #include "strategies/avx2/reg_sad_pow2_widths-avx2.h"
