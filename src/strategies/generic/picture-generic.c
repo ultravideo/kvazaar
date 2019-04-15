@@ -588,6 +588,88 @@ static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
 }
 
 
+static optimized_sad_func_ptr_t get_optimized_sad_generic(int32_t width)
+{
+  return NULL;
+}
+
+/**
+ * \brief Vertically interpolate SAD outside the frame.
+ *
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width  Width of the pixel array.
+ *
+ * \returns Sum of Absolute Differences
+ */
+static uint32_t ver_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                int block_width, int block_height, unsigned pic_stride)
+{
+  int x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * pic_stride + x] - ref_data[x]);
+    }
+  }
+
+  return sad;
+}
+
+/**
+ * \brief Horizontally interpolate SAD outside the frame.
+ *
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width   Width of the pixel array.
+ *
+ * \returns Sum of Absolute Differences
+ */
+static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                        int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
+{
+  int x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * pic_stride + x] - ref_data[y * ref_stride]);
+    }
+  }
+
+  return sad;
+}
+
+
+static uint32_t hor_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                                int32_t width, int32_t height, uint32_t pic_stride,
+                                uint32_t ref_stride, uint32_t left, uint32_t right)
+{
+  uint32_t result = 0;
+  if (left) {
+    result += hor_sad    (pic_data, ref_data + left, left,
+                          height, pic_stride, ref_stride);
+
+    result += kvz_reg_sad(pic_data + left, ref_data + left, width - left,
+                          height, pic_stride, ref_stride);
+  } else if (right) {
+    result += kvz_reg_sad(pic_data, ref_data, width - right,
+                          height, pic_stride, ref_stride);
+
+    result += hor_sad    (pic_data + width - right,
+                          ref_data + width - right - 1,
+                          right, height, pic_stride, ref_stride);
+  } else {
+    result += kvz_reg_sad(pic_data, ref_data, width,
+                          height, pic_stride, ref_stride);
+  }
+  return result;
+}
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -624,6 +706,9 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
   success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "generic", 0, &inter_recon_bipred_generic);
 
+  success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
+  success &= kvz_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);
+  success &= kvz_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
 
   return success;
 }

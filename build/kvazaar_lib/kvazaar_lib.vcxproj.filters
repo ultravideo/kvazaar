@@ -432,6 +432,12 @@
     <ClInclude Include="..\..\src\strategies\strategies-encode.h">
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\reg_sad_pow2_widths-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\sse41\reg_sad_pow2_widths-sse41.h">
+      <Filter>Optimization\strategies\sse41</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
