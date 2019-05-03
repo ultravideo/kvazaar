@@ -638,6 +638,19 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
+      double bitrate = (long long unsigned int)bitstream_length * 8 / 1024 / ((double)frames_done) * frames_done / wall_time;
+
+      if (bitrate > 1024) { 
+       bitrate = bitrate / 1024;  
+       fprintf(stderr, " Bitrate: %.1f mbps\n", bitrate);
+      }
+
+      else {
+       fprintf(stderr, " Bitrate: %.1f kbps\n", bitrate);
+      }
+      fprintf(stderr, " AVG QP: %.1f\n", (double)(return_sum_of_qps() /frames_done));
+  
+      ;
     }
     pthread_join(input_thread, NULL);
   }

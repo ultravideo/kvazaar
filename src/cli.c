@@ -30,7 +30,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
-
+unsigned int sum_of_qps = 0;
 static const char short_options[] = "i:o:d:w:h:n:q:p:r:";
 static const struct option long_options[] = {
   { "input",              required_argument, NULL, 'i' },
@@ -571,6 +571,7 @@ void print_frame_info(const kvz_frame_info *const info,
           info->qp,
           "BPI"[info->slice_type % 3],
           bytes << 3);
+  sum_of_qps += info->qp;
   if (print_psnr) {
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
@@ -590,4 +591,9 @@ void print_frame_info(const kvz_frame_info *const info,
   }
 
   fprintf(stderr, "\n");
+}
+
+unsigned int return_sum_of_qps()
+{
+ return sum_of_qps;
 }
