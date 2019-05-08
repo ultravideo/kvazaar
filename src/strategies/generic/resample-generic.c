@@ -28,7 +28,7 @@ int kvz_strategy_register_resample_generic(void * opaque)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "resample_block_step", "generic", 100, kvz_default_block_step_resample_func);
+  success &= kvz_strategyselector_register(opaque, "resample_block_step", "generic", 1, kvz_default_block_step_resample_func);
   
   success &= kvz_strategyselector_register(opaque, "resample", "generic", 1, kvz_alt_resample_func);
   success &= kvz_strategyselector_register(opaque, "resample", "generic", 0, kvz_default_resample_func);
