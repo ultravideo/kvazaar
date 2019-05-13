@@ -636,21 +636,19 @@ int main(int argc, char *argv[])
       double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
       fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
-      fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
+
+      double encoding_cpu = encoding_time / wall_time * 100.f;
+
+#ifdef _WIN32
+      if (encoding_cpu > 100)  encoding_cpu = 100;
+#endif
+      
+
+      fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_cpu);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
-      double bitrate = (long long unsigned int)bitstream_length * 8 / 1024 / ((double)frames_done) * frames_done / wall_time;
-
-      if (bitrate > 1024) { 
-       bitrate = bitrate / 1024;  
-       fprintf(stderr, " Bitrate: %.1f mbps\n", bitrate);
-      }
-
-      else {
-       fprintf(stderr, " Bitrate: %.1f kbps\n", bitrate);
-      }
+      double bitrate = (bitstream_length * 8 * (double)(encoder->cfg.framerate_num / encoder->cfg.framerate_denom) / 1024 / frames_done / 1024);
+      fprintf(stderr, " Bitrate: %.3f mbps\n", bitrate);
       fprintf(stderr, " AVG QP: %.1f\n", (double)(return_sum_of_qps() /frames_done));
-  
-      ;
     }
     pthread_join(input_thread, NULL);
   }

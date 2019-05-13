@@ -31,6 +31,7 @@
 #include <getopt.h>
 #include <ctype.h>
 unsigned int sum_of_qps = 0;
+unsigned int frames_done = 0;
 static const char short_options[] = "i:o:d:w:h:n:q:p:r:";
 static const struct option long_options[] = {
   { "input",              required_argument, NULL, 'i' },
@@ -255,7 +256,6 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       goto done;
     }
   }
-
   // Check for extra arguments.
   if (argc - optind > 0) {
     fprintf(stderr, "Input error: Extra argument found: \"%s\"\n", argv[optind]);
@@ -282,7 +282,6 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }
-
 done:
   if (!ok) {
     cmdline_opts_free(api, opts);
@@ -566,12 +565,16 @@ void print_frame_info(const kvz_frame_info *const info,
                       const uint32_t bytes,
                       const bool print_psnr)
 {
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits",
+  sum_of_qps += info->qp;
+  frames_done += 1;
+  double avg_qp = sum_of_qps / frames_done;
+  fprintf(stderr, "POC %4d QP %2d AVG QP %.1f (%c-frame) %10d bits",
           info->poc,
           info->qp,
+          avg_qp,
           "BPI"[info->slice_type % 3],
           bytes << 3);
-  sum_of_qps += info->qp;
+
   if (print_psnr) {
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
