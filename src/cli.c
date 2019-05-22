@@ -420,7 +420,7 @@ void print_help(void)
     "                               QP values in raster order. The map can be of any\n"
     "                               size and will be scaled to the video size.\n"
     "      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.\n"
-    "                               in PPS zero.\n"
+    "                               in PPS and slice_qp_delta in slize header zero.\n"
     "      --(no-)erp-aqp         : Use adaptive QP for 360 degree video with\n"
     "                               equirectangular projection. [disabled]\n"
     "      --level <number>       : Use the given HEVC level in the output and give\n"

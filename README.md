@@ -138,7 +138,7 @@ Video structure:
                                QP values in raster order. The map can be of any
                                size and will be scaled to the video size.
       --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.
-                               in PPS zero.
+                               in PPS and slice_qp_delta in slize header zero.
       --(no-)erp-aqp         : Use adaptive QP for 360 degree video with
                                equirectangular projection. [disabled]
       --level <number>       : Use the given HEVC level in the output and give

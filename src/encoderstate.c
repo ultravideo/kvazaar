@@ -726,7 +726,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   const encoder_control_t *ctrl = state->encoder_control;
   const kvz_config *cfg = &ctrl->cfg;
 
-  state->last_qp = state->frame->QP;
+  // Signaled slice QP may be different to frame QP with set-qp-in-cu enabled.
+  state->last_qp = ctrl->cfg.set_qp_in_cu ? 26 : state->frame->QP;
 
   if (cfg->crypto_features) {
     state->crypto_hdl = kvz_crypto_create(cfg);
@@ -1140,7 +1141,7 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   if (state->is_leaf) {
     //Leaf states have cabac and context
     kvz_cabac_start(&state->cabac);
-    kvz_init_contexts(state, state->frame->QP, state->frame->slicetype);
+    kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
   }
 
   //Clear the jobs
