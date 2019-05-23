@@ -26,17 +26,8 @@
 #include "context.h"
 #include "encode_coding_tree-avx2.h"
 #include "encode_coding_tree.h"
+#include "strategies/missing-intel-intrinsics.h"
 #include <immintrin.h>
-
-// GCC headers apparently won't have this at all.. sigh
-#ifndef _andn_u32
-// VS2015 headers apparently won't have this at all.. sigh
-#ifdef __andn_u32
-#define _andn_u32(x, y) (__andn_u32((x), (y)))
-#else
-#define _andn_u32(x, y) ((~(x)) & (y))
-#endif // __andn_u32
-#endif // _andn_u32
 
 /*
  * NOTE: Unlike SSE/AVX comparisons that would return 11 or 00 for gt/lte,

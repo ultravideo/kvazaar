@@ -21,8 +21,9 @@
 #ifndef REG_SAD_POW2_WIDTHS_SSE41_H_
 #define REG_SAD_POW2_WIDTHS_SSE41_H_
 
-#include <immintrin.h>
 #include "kvazaar.h"
+#include "strategies/missing-intel-intrinsics.h"
+#include <immintrin.h>
 
 static INLINE uint32_t reg_sad_w0(const kvz_pixel * const data1, const kvz_pixel * const data2,
                            const int32_t height, const uint32_t stride1,
