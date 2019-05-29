@@ -293,7 +293,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     int dqp = ctrl->cfg.roi.dqps[roi_index];
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
     state->lambda = qp_to_lamba(state, state->qp);
-    state->lambda_sqrt = sqrt(state->frame->lambda);
+    state->lambda_sqrt = sqrt(state->lambda);
 
   } else if (ctrl->cfg.target_bitrate > 0) {
     lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
