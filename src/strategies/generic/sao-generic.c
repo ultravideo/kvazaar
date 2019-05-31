@@ -94,6 +94,9 @@ static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
 
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
+
+  
+
   for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
       const kvz_pixel *c_data = &rec_data[y * block_width + x];
@@ -164,7 +167,6 @@ static int sao_band_ddistortion_generic(const encoder_state_t * const state,
   int y, x;
   int shift = state->encoder_control->bitdepth-5;
   int sum = 0;
-
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {
       int band = (rec_data[y * block_width + x] >> shift) - band_pos;
