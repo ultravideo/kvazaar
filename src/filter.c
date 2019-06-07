@@ -272,7 +272,8 @@ static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir
   } else if (dir == EDGE_VER && x > 0) {
     qp_p = kvz_cu_array_at_const(state->tile->frame->cu_array, x - 1, y)->qp;
   } else {
-    qp_p = state->frame->QP;
+    // TODO: This seems to be dead code. Investigate.
+    qp_p = state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP;
   }
 
   const int32_t qp_q =

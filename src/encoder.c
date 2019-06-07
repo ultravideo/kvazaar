@@ -352,32 +352,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 
   }
 
-  // If QP will be set at CU level instead of PPS,
-  // encoder is given qp 26 making pic_init_qp_minus26
-  // zero. The difference is added to the delta QP map.
-  if (cfg->set_qp_in_cu) {
-
-    encoder->cfg.qp = 26;
-
-    // If delta QP map does not already exist, it has to be created.
-    if (encoder->cfg.roi.dqps == NULL) {
-      encoder->cfg.roi.width  = 1;
-      encoder->cfg.roi.height = 1;
-      encoder->cfg.roi.dqps   = calloc(1, sizeof(cfg->roi.dqps[0]));
-    }
-
-    const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
-    for (int i = 0; i < roi_size; ++i) {
-      encoder->cfg.roi.dqps[i] += cfg->qp - 26;
-      encoder->cfg.roi.dqps[i]  = CLIP(-51, 51, encoder->cfg.roi.dqps[i]);
-    }
-  }
-
   // NOTE: When tr_depth_inter is equal to 0, the transform is still split
   // for SMP and AMP partition units.
   encoder->tr_depth_inter = 0;
 
-  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps) {
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps || encoder->cfg.set_qp_in_cu) {
     encoder->max_qp_delta_depth = 0;
   } else {
     encoder->max_qp_delta_depth = -1;
