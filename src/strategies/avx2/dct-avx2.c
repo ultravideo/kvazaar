@@ -531,6 +531,17 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
   const int32_t add    = 1 << (shift - 1);
   const __m256i debias = _mm256_set1_epi32(add);
 
+  __m256i sliced_right[16];
+  for (int32_t dry = 0; dry < 16; dry += 2) {
+      __m256i right_up        = _mm256_loadu_si256((const __m256i *)right + dry + 0);
+      __m256i right_dn        = _mm256_loadu_si256((const __m256i *)right + dry + 1);
+
+      __m256i right_slices_lo = _mm256_unpacklo_epi16(right_up, right_dn);
+      __m256i right_slices_hi = _mm256_unpackhi_epi16(right_up, right_dn);
+
+      sliced_right[dry + 0] = right_slices_lo;
+      sliced_right[dry + 1] = right_slices_hi;
+  }
   for (int32_t dry = 0; dry < 16; dry += 2) {
     __m256i accum1 = _mm256_setzero_si256();
     __m256i accum2 = _mm256_setzero_si256();
@@ -544,11 +555,8 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
       __m256i left_slice_lo   = _mm256_set1_epi32(*curr_left_up);
       __m256i left_slice_hi   = _mm256_set1_epi32(*curr_left_dn);
 
-      __m256i right_up        = _mm256_loadu_si256((const __m256i *)right + lx + 0);
-      __m256i right_dn        = _mm256_loadu_si256((const __m256i *)right + lx + 1);
-
-      __m256i right_slices_lo = _mm256_unpacklo_epi16(right_up, right_dn);
-      __m256i right_slices_hi = _mm256_unpackhi_epi16(right_up, right_dn);
+      __m256i right_slices_lo = sliced_right[lx + 0];
+      __m256i right_slices_hi = sliced_right[lx + 1];
 
       __m256i prod1 = _mm256_madd_epi16(left_slice_lo, right_slices_lo);
       __m256i prod2 = _mm256_madd_epi16(left_slice_hi, right_slices_lo);
