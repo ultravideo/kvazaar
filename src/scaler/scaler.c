@@ -1497,7 +1497,7 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
   int width_bound = base_param->trgt_width;
   int height_bound = is_vertical ? base_param->trgt_height : base_param->src_height + base_param->src_padding_y;
   if (block_x < 0 || block_y < 0 || block_x + block_width > width_bound || block_y + block_height > height_bound) {
-    fprintf(stderr, "Specified block outside given target picture size.");
+    fprintf(stderr, "Specified block outside given target picture size.\n");
     return 0;
   }
 
@@ -1597,7 +1597,7 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
   //both dimensions need to be either up- or downscaled
   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
     (is_downscaled_height && !is_downscaled_width && !is_equal_width)) {
-    fprintf(stderr, "Both dimensions need to be either upscaled or downscaled");
+    fprintf(stderr, "Both dimensions need to be either upscaled or downscaled\n");
     return 0;
   }
   if (is_equal_height && is_equal_width) {

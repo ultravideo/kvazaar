@@ -810,10 +810,6 @@ void kvz_block_step_scaler_worker(void * opaque_param)
     int cp_block_width = (in_param->use_tiles ? range[1] : range[3]) - cp_block_x + 1;
     int cp_block_height = in_param->block_height;
     
-    //When using tiles, copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
-    int cp_dst_x = in_param->use_tiles ? 0 : cp_block_x;
-    int cp_dst_y = in_param->use_tiles ? 0 : cp_block_y;
-    
     int hor_block_y = in_param->block_y;
     int hor_block_height = in_param->block_height;
 
@@ -838,6 +834,10 @@ void kvz_block_step_scaler_worker(void * opaque_param)
         hor_block_height = range[3] - range[2] + 1;
       }
     }
+
+    //When using tiles, copy from in_pic to the src buffer (src buffer should hold only one tile and start from indexing (0,0))
+    int cp_dst_x = in_param->use_tiles ? 0 : cp_block_x;
+    int cp_dst_y = in_param->use_tiles ? 0 : cp_block_y;
 
     //Copy from in_pic to the src buffer
     kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_dst_x, cp_dst_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
