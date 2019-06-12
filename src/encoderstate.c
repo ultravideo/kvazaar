@@ -805,7 +805,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
           // Very spesific bug that happens when owf length is longer than the
           // gop length. Takes care of that.
-          if(state->encoder_control->cfg.gop_lowdelay &&
+          if(!state->encoder_control->cfg.gop_lowdelay &&
              !state->encoder_control->cfg.open_gop &&
              state->encoder_control->cfg.owf > state->encoder_control->cfg.gop_len &&
              ref_state->frame->slicetype == KVZ_SLICE_I &&
