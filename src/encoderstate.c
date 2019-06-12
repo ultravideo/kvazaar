@@ -811,7 +811,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
              ref_state->frame->slicetype == KVZ_SLICE_I &&
              ref_state->frame->num != 0){
 
-            while (ref_state->frame->poc != state->frame->poc - 8){
+            while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
               ref_state = ref_state->previous_encoder_state;
             }
             kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
