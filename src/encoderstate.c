@@ -802,6 +802,20 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             dep_lcu = dep_lcu->right;
           }
           kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+
+          // Very spesific bug that happens when owf length is longer than the
+          // gop length. Takes care of that.
+          if(state->encoder_control->cfg.gop_lowdelay &&
+             !state->encoder_control->cfg.open_gop &&
+             state->encoder_control->cfg.owf > state->encoder_control->cfg.gop_len &&
+             ref_state->frame->slicetype == KVZ_SLICE_I &&
+             ref_state->frame->num != 0){
+
+            while (ref_state->frame->poc != state->frame->poc - 8){
+              ref_state = ref_state->previous_encoder_state;
+            }
+            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+          }
         }
 
         // Add local WPP dependancy to the LCU on the left.
