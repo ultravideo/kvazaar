@@ -757,8 +757,10 @@ void kvz_block_scaler_worker(void * opaque_param)
 #include <sys/types.h>
 #include <sys/syscall.h>
 #define PRINT_TID_JOB_INFO(x,y,w,h,dir) fprintf(stderr, "TID: %ld, pos: (%d,%d), size: (%d,%d), dir: %d\n", syscall(SYS_gettid), x, y, w, h, dir)
+#define PRINT_JOB_EXTRA_INFO(msg,dx,dy,sx,sy,w,h) fprintf(stderr, "  %s: dst_pos: (%d,%d), src_size: (%d,%d), size: (%d,%d)\n", msg, dx, dy, sx, sy, w, h)
 #else
 #define PRINT_TID_JOB_INFO(x,y,w,h,dir)
+#define PRINT_JOB_EXTRA_INFO(msg,dx,dy,sx,sy,w,h)
 #endif
 
 /** \brief Handle hor/ver scaling steps
@@ -841,6 +843,9 @@ void kvz_block_step_scaler_worker(void * opaque_param)
 
     //Copy from in_pic to the src buffer
     kvz_copy_uint8_block_to_YuvBuffer(in_param->src_buffer, pic_in->y, pic_in->u, pic_in->v, pic_in->stride, cp_dst_x, cp_dst_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height, w_factor, h_factor);
+
+    PRINT_JOB_EXTRA_INFO("Copy to src buffer", cp_dst_x, cp_dst_y, cp_block_x, cp_block_y, cp_block_width, cp_block_height);
+    PRINT_JOB_EXTRA_INFO("Hor scaling", in_param->block_x, hor_block_y, 0, 0, in_param->block_width, hor_block_height);
 
     //If both ver and hor done at the same time interpred in_param->block_y/height as the final output block and so we need to do hor scaling in the approriate range to accomodate the final block
     if (!kvz_yuvBlockStepScaling_adapter(in_param->ver_tmp_buffer, in_param->src_buffer, param, in_param->block_x, hor_block_y, in_param->block_width, hor_block_height, 0, kvz_resample_block_step)) {
