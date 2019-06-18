@@ -399,7 +399,7 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t 
    */
 }
 
-static void matmul_16x16_a_bt_t(const int16_t *a, const int16_t *b_t, int16_t *output, const int8_t shift)
+static void matmul_16x16_a_bt_t(const int16_t *a, const int16_t *b_t, __m256i *output, const int8_t shift)
 {
   const int32_t add    = 1 << (shift - 1);
   const __m256i debias = _mm256_set1_epi32(add);
@@ -458,11 +458,11 @@ static void matmul_16x16_a_bt_t(const int16_t *a, const int16_t *b_t, int16_t *o
       results_32[fro] = truncate(res, debias, shift);
     }
     __m256i final_col = _mm256_packs_epi32(results_32[0], results_32[1]);
-    _mm256_storeu_si256((__m256i *)output + x, final_col);
+    output[x] = final_col;
   }
 }
 
-static void matmul_16x16_a_bt(const int16_t *a, const int16_t *b_t, int16_t *output, const int8_t shift)
+static void matmul_16x16_a_bt(const int16_t *a, const __m256i *b_t, int16_t *output, const int8_t shift)
 {
   const int32_t add    = 1 << (shift - 1);
   const __m256i debias = _mm256_set1_epi32(add);
@@ -473,14 +473,14 @@ static void matmul_16x16_a_bt(const int16_t *a, const int16_t *b_t, int16_t *out
 
     for (int32_t fco = 0; fco < 2; fco++) {
       // Read first cols 0, 1, 2, 3, 8, 9, 10, 11, and then next 4
-      __m256i bt_c0  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 0);
-      __m256i bt_c1  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 1);
-      __m256i bt_c2  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 2);
-      __m256i bt_c3  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 3);
-      __m256i bt_c8  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 8);
-      __m256i bt_c9  = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 9);
-      __m256i bt_c10 = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 10);
-      __m256i bt_c11 = _mm256_loadu_si256((const __m256i *)b_t + fco * 4 + 11);
+      __m256i bt_c0  = b_t[fco * 4 + 0];
+      __m256i bt_c1  = b_t[fco * 4 + 1];
+      __m256i bt_c2  = b_t[fco * 4 + 2];
+      __m256i bt_c3  = b_t[fco * 4 + 3];
+      __m256i bt_c8  = b_t[fco * 4 + 8];
+      __m256i bt_c9  = b_t[fco * 4 + 9];
+      __m256i bt_c10 = b_t[fco * 4 + 10];
+      __m256i bt_c11 = b_t[fco * 4 + 11];
 
       __m256i p0  = _mm256_madd_epi16(a_r, bt_c0);
       __m256i p1  = _mm256_madd_epi16(a_r, bt_c1);
@@ -601,7 +601,7 @@ static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t
    * in the second multiplication.
    */
 
-  int16_t tmpres[16 * 16];
+  __m256i tmpres[16];
   matmul_16x16_a_bt_t(input,  dct, tmpres, shift_1st);
   matmul_16x16_a_bt  (dct, tmpres, output, shift_2nd);
 }
