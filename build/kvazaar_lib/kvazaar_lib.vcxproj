@@ -78,8 +78,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <YASM />
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Lib>
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
@@ -92,8 +94,10 @@
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Lib>
     <ClCompile>
       <UndefinePreprocessorDefinitions>
@@ -106,8 +110,10 @@
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Lib>
     <ClCompile>
       <UndefinePreprocessorDefinitions>
@@ -120,8 +126,10 @@
       <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Lib>
     <ClCompile>
       <UndefinePreprocessorDefinitions>
@@ -226,6 +234,18 @@
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
     <ClCompile Include="..\..\src\strategies\strategies-sao.c" />
     <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c" />
+    <ClCompile Include="..\..\src\threadwrapper\src\pthread.cpp">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsCpp</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\..\src\threadwrapper\src\semaphore.cpp">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\..\src\videoframe.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
     <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
@@ -297,6 +317,8 @@
     <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\threadqueue.h" />
     <ClInclude Include="..\..\src\threads.h" />
+    <ClInclude Include="..\..\src\threadwrapper\include\pthread.h" />
+    <ClInclude Include="..\..\src\threadwrapper\include\semaphore.h" />
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\videoframe.h" />
   </ItemGroup>
