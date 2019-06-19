@@ -757,7 +757,7 @@ void kvz_block_scaler_worker(void * opaque_param)
 #include <sys/types.h>
 #include <sys/syscall.h>
 #define PRINT_TID_JOB_INFO(x,y,w,h,dir) fprintf(stderr, "TID: %ld, pos: (%d,%d), size: (%d,%d), dir: %d\n", syscall(SYS_gettid), x, y, w, h, dir)
-#define PRINT_JOB_EXTRA_INFO(msg,dx,dy,sx,sy,w,h) fprintf(stderr, "  %s: dst_pos: (%d,%d), src_size: (%d,%d), size: (%d,%d)\n", msg, dx, dy, sx, sy, w, h)
+#define PRINT_JOB_EXTRA_INFO(msg,dx,dy,sx,sy,w,h) fprintf(stderr, "  %s: dst_pos: (%d,%d), src_pos: (%d,%d), size: (%d,%d)\n", msg, dx, dy, sx, sy, w, h)
 #else
 #define PRINT_TID_JOB_INFO(x,y,w,h,dir)
 #define PRINT_JOB_EXTRA_INFO(msg,dx,dy,sx,sy,w,h)
