@@ -1282,7 +1282,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     }
 
     //Account for SAO by only upsampling rows that have been SAOd on this lcu row (exclude bottom most margin pixels if not the last lcu row)
-    if (lcu->above != NULL) {
+    /*if (lcu->above != NULL) {
       param->block_y -= margin;
     } else {
       param->block_height -= margin;
@@ -1298,7 +1298,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     }
     if (lcu->right == NULL) {
       param->block_width += margin;
-    }
+    }*/
 
     //First create the job
     kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
