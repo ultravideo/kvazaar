@@ -1594,9 +1594,9 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     }
 
     //Map the pixel range to LCU pos
-    range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
+    //range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
     range[1] = ((range[1] + margin) / LCU_WIDTH) + 1;//(range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
-    range[2] = range[2] / LCU_WIDTH;
+    //range[2] = range[2] / LCU_WIDTH;
     range[3] = ((range[3] + margin) / LCU_WIDTH) + 1;//(range[3] + margin + LCU_WIDTH - 1) / LCU_WIDTH;
 
     //TODO: Figure out correct dependency.
@@ -1606,12 +1606,14 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
     range[1] = MIN(range[1] + 3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
     //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
     //Add dependencies to ilr states
-    for (int j = range[2]; j < range[3]; j++) {
+    /*for (int j = range[2]; j < range[3]; j++) {
       const encoder_state_t * const ilr_state = &state->ILR_state[j];
       for (int k = range[0]; k < range[1]; k++) {
         kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
       }
-    }
+    }*/
+    const encoder_state_t *const ilr_state = &state->ILR_state[range[3] - 1];
+    kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[range[1] - 1].id]);
 
     //Dependencies added so submit the job
     kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->cua_scaling_jobs[lcu->id]);
@@ -2524,7 +2526,12 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
             state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
             state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
-            kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[lcu->id]);
+            //Account for deblock/SAO missmatch
+            threadqueue_job_t *ilr_job = state->ILR_state->tile->wf_jobs[lcu->id];
+            if ((state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) && (state->encoder_control->cfg.sao_type == KVZ_SAO_OFF || !state->ILR_state->encoder_control->cfg.deblock_enable)) {
+              ilr_job = lcu->below != NULL ? state->ILR_state->tile->wf_jobs[lcu->below->id] : ilr_job;
+            }
+            kvz_threadqueue_job_dep_add(job[0], ilr_job);
           } else if(state->layer != NULL) {
             if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
               kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
