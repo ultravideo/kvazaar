@@ -9,8 +9,21 @@ notifications:
   - provider: Email
     to:
       - '{{commitAuthorEmail}}'
+    on_build_success: false
     on_build_failure: true
     on_build_status_changed: true
+
+# Skip commits that don't affect the code / compiling the code
+skip_commits:
+  files:
+    - .gitignore
+    - .gitlab-ci.yml
+    - .travis-install.bash
+    - .travis.yml
+    - COPYING
+    - CREDITS
+    - README.md
+    - docs.doxy
 
 # Download only a zip file of the latest commit
 # Downloading the whole history of the repository would be unnecessary
