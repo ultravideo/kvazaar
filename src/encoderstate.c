@@ -2291,6 +2291,16 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   }
 }
 
+//Debug stuff for printing thread info
+#if 1 && defined(linux)
+#define _GNU_SOURCES
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#define PRINT_TID_LCU_JOB_INFO(x,y,w,h,poc,lid) fprintf(stderr, "TID: %ld, pos: (%d,%d), size: (%d,%d), poc: %d, lid: %d\n", syscall(SYS_gettid), x, y, w, h, poc, lid)
+#else
+#define PRINT_TID_LCU_JOB_INFO(x,y,w,h,poc,lid)
+#endif
 
 static void encoder_state_worker_encode_lcu(void * opaque)
 {
@@ -2298,6 +2308,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
+
+  PRINT_TID_LCU_JOB_INFO(lcu->position_px.x, lcu->position_px.y, lcu->size.x, lcu->size.y, frame->poc, encoder->layer.layer_id);
 
   kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
