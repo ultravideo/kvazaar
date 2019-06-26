@@ -223,6 +223,18 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 #define IND2X(ind,step,stride) (((ind) * (step)) % (stride))
 #define IND2Y(ind,step,stride) (((ind) / (stride)) * (step))
 
+//Debug stuff for printing thread info
+#if 1 && defined(linux)
+#define _GNU_SOURCES
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <stdio.h>
+#define PRINT_TID_CUA_JOB_INFO(ind) fprintf(stderr, "TID: %ld, lcu_ind: %d\n", syscall(SYS_gettid), ind)
+#else
+#define PRINT_TID_CUA_JOB_INFO(ind)
+#endif
+
 void kvz_cu_array_upsampling_worker(void *opaque_param)
 {
   kvz_cua_upsampling_parameter_t *param = opaque_param;
@@ -234,6 +246,8 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
   uint8_t only_init = param->only_init;
   cu_array_t *cua = param->out_cua;
   int32_t lcu_ind = param->lcu_ind;
+
+  PRINT_TID_CUA_JOB_INFO(lcu_ind);
 
   //Define a few basic things
   //TODO: Just use MAX_DEPTH or MAX_PU_DEPTH?    v----log2_min_luma_transform_block_size
