@@ -2539,11 +2539,12 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
             state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
             //Account for deblock/SAO missmatch
-            threadqueue_job_t *ilr_job = state->ILR_state->tile->wf_jobs[lcu->id];
+            const lcu_order_element_t *ilr_lcu = lcu;
             if ((state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) && (state->encoder_control->cfg.sao_type == KVZ_SAO_OFF || !state->ILR_state->encoder_control->cfg.deblock_enable)) {
-              ilr_job = lcu->below != NULL ? state->ILR_state->tile->wf_jobs[lcu->below->id] : ilr_job;
+              ilr_lcu = ilr_lcu->below != NULL ? lcu->below : ilr_lcu;
+              ilr_lcu = ilr_lcu->right != NULL ? lcu->right : ilr_lcu;
             }
-            kvz_threadqueue_job_dep_add(job[0], ilr_job);
+            kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[ilr_lcu->id]);
           } else if(state->layer != NULL) {
             if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
               kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
