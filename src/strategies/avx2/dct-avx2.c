@@ -378,7 +378,7 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t 
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
-  int16_t tmp[8 * 8];
+  ALIGNED(64) int16_t tmp[8 * 8];
 
   const int16_t *tdct = &kvz_g_dct_8_t[0][0];
   const int16_t *dct  = &kvz_g_dct_8  [0][0];
@@ -702,7 +702,7 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right
 {\
   int32_t shift_1st = kvz_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
   int32_t shift_2nd = kvz_g_convert_to_bit[n] + 8; \
-  int16_t tmp[n * n];\
+  ALIGNED(64) int16_t tmp[n * n];\
   const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
   const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
 \
@@ -718,7 +718,7 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
 {\
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
-  int16_t tmp[n * n];\
+  ALIGNED(64) int16_t tmp[n * n];\
   const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
   const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
 \
