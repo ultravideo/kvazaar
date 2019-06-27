@@ -99,14 +99,14 @@ static void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
   const int16_t *tdst = &kvz_g_dst_4_t[0][0];
   const int16_t *dst  = &kvz_g_dst_4  [0][0];
 
-  __m256i tdst_v = _mm256_loadu_si256((const __m256i *) tdst);
-  __m256i  dst_v = _mm256_loadu_si256((const __m256i *)  dst);
-  __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
+  __m256i tdst_v = _mm256_load_si256((const __m256i *) tdst);
+  __m256i  dst_v = _mm256_load_si256((const __m256i *)  dst);
+  __m256i   in_v = _mm256_load_si256((const __m256i *)input);
 
   __m256i tmp    = mul_clip_matrix_4x4_avx2(in_v,  tdst_v, shift_1st);
   __m256i result = mul_clip_matrix_4x4_avx2(dst_v, tmp,    shift_2nd);
 
-  _mm256_storeu_si256((__m256i *)output, result);
+  _mm256_store_si256((__m256i *)output, result);
 }
 
 static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
@@ -117,14 +117,14 @@ static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   const int16_t *tdst = &kvz_g_dst_4_t[0][0];
   const int16_t *dst  = &kvz_g_dst_4  [0][0];
 
-  __m256i tdst_v = _mm256_loadu_si256((const __m256i *)tdst);
-  __m256i  dst_v = _mm256_loadu_si256((const __m256i *) dst);
-  __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
+  __m256i tdst_v = _mm256_load_si256((const __m256i *)tdst);
+  __m256i  dst_v = _mm256_load_si256((const __m256i *) dst);
+  __m256i   in_v = _mm256_load_si256((const __m256i *)input);
 
   __m256i tmp    = mul_clip_matrix_4x4_avx2(tdst_v, in_v,  shift_1st);
   __m256i result = mul_clip_matrix_4x4_avx2(tmp,    dst_v, shift_2nd);
 
-  _mm256_storeu_si256((__m256i *)output, result);
+  _mm256_store_si256((__m256i *)output, result);
 }
 
 static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
@@ -134,14 +134,14 @@ static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
   const int16_t *tdct = &kvz_g_dct_4_t[0][0];
   const int16_t *dct  = &kvz_g_dct_4  [0][0];
 
-  __m256i tdct_v = _mm256_loadu_si256((const __m256i *) tdct);
-  __m256i  dct_v = _mm256_loadu_si256((const __m256i *)  dct);
-  __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
+  __m256i tdct_v = _mm256_load_si256((const __m256i *) tdct);
+  __m256i  dct_v = _mm256_load_si256((const __m256i *)  dct);
+  __m256i   in_v = _mm256_load_si256((const __m256i *)input);
 
   __m256i tmp    = mul_clip_matrix_4x4_avx2(in_v,  tdct_v, shift_1st);
   __m256i result = mul_clip_matrix_4x4_avx2(dct_v, tmp,    shift_2nd);
 
-  _mm256_storeu_si256((__m256i *)output, result);
+  _mm256_store_si256((__m256i *)output, result);
 }
 
 static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
@@ -152,14 +152,14 @@ static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   const int16_t *tdct = &kvz_g_dct_4_t[0][0];
   const int16_t *dct  = &kvz_g_dct_4  [0][0];
 
-  __m256i tdct_v = _mm256_loadu_si256((const __m256i *)tdct);
-  __m256i  dct_v = _mm256_loadu_si256((const __m256i *) dct);
-  __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
+  __m256i tdct_v = _mm256_load_si256((const __m256i *)tdct);
+  __m256i  dct_v = _mm256_load_si256((const __m256i *) dct);
+  __m256i   in_v = _mm256_load_si256((const __m256i *)input);
 
   __m256i tmp    = mul_clip_matrix_4x4_avx2(tdct_v, in_v,  shift_1st);
   __m256i result = mul_clip_matrix_4x4_avx2(tmp,    dct_v, shift_2nd);
 
-  _mm256_storeu_si256((__m256i *)output, result);
+  _mm256_store_si256((__m256i *)output, result);
 }
 
 static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
@@ -170,16 +170,16 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
   const __m256i debias = _mm256_set1_epi32(add);
 
   __m256i left_dr[4] = {
-    _mm256_loadu_si256((const __m256i *)left + 0),
-    _mm256_loadu_si256((const __m256i *)left + 1),
-    _mm256_loadu_si256((const __m256i *)left + 2),
-    _mm256_loadu_si256((const __m256i *)left + 3),
+    _mm256_load_si256((const __m256i *)left + 0),
+    _mm256_load_si256((const __m256i *)left + 1),
+    _mm256_load_si256((const __m256i *)left + 2),
+    _mm256_load_si256((const __m256i *)left + 3),
   };
   __m256i right_dr[4] = {
-    _mm256_loadu_si256((const __m256i *)right + 0),
-    _mm256_loadu_si256((const __m256i *)right + 1),
-    _mm256_loadu_si256((const __m256i *)right + 2),
-    _mm256_loadu_si256((const __m256i *)right + 3),
+    _mm256_load_si256((const __m256i *)right + 0),
+    _mm256_load_si256((const __m256i *)right + 1),
+    _mm256_load_si256((const __m256i *)right + 2),
+    _mm256_load_si256((const __m256i *)right + 3),
   };
 
   __m256i rdrs_rearr[8];
@@ -228,7 +228,7 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
 
     __m256i final_dr = _mm256_packs_epi32(lo_tr, hi_tr);
 
-    _mm256_storeu_si256((__m256i *)dst + dry, final_dr);
+    _mm256_store_si256((__m256i *)dst + dry, final_dr);
   }
 }
 
@@ -250,10 +250,10 @@ static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
   const __m256i *b_t_256 = (const __m256i *)b_t;
 
   // Dual Rows, because two 8x16b words fit in one YMM
-  __m256i a_dr_0      = _mm256_loadu_si256((__m256i *)a + 0);
-  __m256i a_dr_1      = _mm256_loadu_si256((__m256i *)a + 1);
-  __m256i a_dr_2      = _mm256_loadu_si256((__m256i *)a + 2);
-  __m256i a_dr_3      = _mm256_loadu_si256((__m256i *)a + 3);
+  __m256i a_dr_0      = _mm256_load_si256((__m256i *)a + 0);
+  __m256i a_dr_1      = _mm256_load_si256((__m256i *)a + 1);
+  __m256i a_dr_2      = _mm256_load_si256((__m256i *)a + 2);
+  __m256i a_dr_3      = _mm256_load_si256((__m256i *)a + 3);
 
   __m256i a_dr_0_swp  = swap_lanes(a_dr_0);
   __m256i a_dr_1_swp  = swap_lanes(a_dr_1);
@@ -263,7 +263,7 @@ static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
   for (int dry = 0; dry < 4; dry++) {
 
     // Read dual columns of B matrix by reading rows of its transpose
-    __m256i b_dc        = _mm256_loadu_si256(b_t_256 + dry);
+    __m256i b_dc        = _mm256_load_si256(b_t_256 + dry);
 
     __m256i prod0       = _mm256_madd_epi16(b_dc,     a_dr_0);
     __m256i prod0_swp   = _mm256_madd_epi16(b_dc,     a_dr_0_swp);
@@ -318,7 +318,7 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
   __m256i b_dc_3_swp  = swap_lanes(b_dc_3);
 
   for (int dry = 0; dry < 4; dry++) {
-    __m256i a_dr        = _mm256_loadu_si256(a_256 + dry);
+    __m256i a_dr        = _mm256_load_si256(a_256 + dry);
 
     __m256i prod0       = _mm256_madd_epi16(a_dr,     b_dc_0);
     __m256i prod0_swp   = _mm256_madd_epi16(a_dr,     b_dc_0_swp);
@@ -344,7 +344,7 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
 
     __m256i final_dr    = _mm256_shuffle_epi8(tmp_dr, shuf_lorow_mask);
 
-    _mm256_storeu_si256((__m256i *)output + dry, final_dr);
+    _mm256_store_si256((__m256i *)output + dry, final_dr);
   }
 }
 
@@ -405,21 +405,21 @@ static void matmul_16x16_a_bt_t(const int16_t *a, const int16_t *b_t, __m256i *o
   const __m256i debias = _mm256_set1_epi32(add);
 
   for (int32_t x = 0; x < 16; x++) {
-    __m256i bt_c = _mm256_loadu_si256((const __m256i *)b_t + x);
+    __m256i bt_c = _mm256_load_si256((const __m256i *)b_t + x);
 
     __m256i results_32[2];
 
     // First Row Offset
     for (int32_t fro = 0; fro < 2; fro++) {
       // Read first rows 0, 1, 2, 3, 8, 9, 10, 11, and then next 4
-      __m256i a_r0  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 0);
-      __m256i a_r1  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 1);
-      __m256i a_r2  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 2);
-      __m256i a_r3  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 3);
-      __m256i a_r8  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 8);
-      __m256i a_r9  = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 9);
-      __m256i a_r10 = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 10);
-      __m256i a_r11 = _mm256_loadu_si256((const __m256i *)a + fro * 4 + 11);
+      __m256i a_r0  = _mm256_load_si256((const __m256i *)a + fro * 4 + 0);
+      __m256i a_r1  = _mm256_load_si256((const __m256i *)a + fro * 4 + 1);
+      __m256i a_r2  = _mm256_load_si256((const __m256i *)a + fro * 4 + 2);
+      __m256i a_r3  = _mm256_load_si256((const __m256i *)a + fro * 4 + 3);
+      __m256i a_r8  = _mm256_load_si256((const __m256i *)a + fro * 4 + 8);
+      __m256i a_r9  = _mm256_load_si256((const __m256i *)a + fro * 4 + 9);
+      __m256i a_r10 = _mm256_load_si256((const __m256i *)a + fro * 4 + 10);
+      __m256i a_r11 = _mm256_load_si256((const __m256i *)a + fro * 4 + 11);
 
       __m256i p0  = _mm256_madd_epi16(bt_c, a_r0);
       __m256i p1  = _mm256_madd_epi16(bt_c, a_r1);
@@ -468,7 +468,7 @@ static void matmul_16x16_a_bt(const int16_t *a, const __m256i *b_t, int16_t *out
   const __m256i debias = _mm256_set1_epi32(add);
 
   for (int32_t y = 0; y < 16; y++) {
-    __m256i a_r = _mm256_loadu_si256((const __m256i *)a + y);
+    __m256i a_r = _mm256_load_si256((const __m256i *)a + y);
     __m256i results_32[2];
 
     for (int32_t fco = 0; fco < 2; fco++) {
@@ -519,7 +519,7 @@ static void matmul_16x16_a_bt(const int16_t *a, const __m256i *b_t, int16_t *out
       results_32[fco] = truncate(res, debias, shift);
     }
     __m256i final_col = _mm256_packs_epi32(results_32[0], results_32[1]);
-    _mm256_storeu_si256((__m256i *)output + y, final_col);
+    _mm256_store_si256((__m256i *)output + y, final_col);
   }
 }
 
@@ -533,8 +533,8 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
 
   __m256i sliced_right[16];
   for (int32_t dry = 0; dry < 16; dry += 2) {
-      __m256i right_up        = _mm256_loadu_si256((const __m256i *)right + dry + 0);
-      __m256i right_dn        = _mm256_loadu_si256((const __m256i *)right + dry + 1);
+      __m256i right_up        = _mm256_load_si256((const __m256i *)right + dry + 0);
+      __m256i right_dn        = _mm256_load_si256((const __m256i *)right + dry + 1);
 
       __m256i right_slices_lo = _mm256_unpacklo_epi16(right_up, right_dn);
       __m256i right_slices_hi = _mm256_unpackhi_epi16(right_up, right_dn);
@@ -576,8 +576,8 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
     __m256i out_up = _mm256_packs_epi32(accum1_tr, accum3_tr);
     __m256i out_dn = _mm256_packs_epi32(accum2_tr, accum4_tr);
 
-    _mm256_storeu_si256((__m256i *)dst + dry + 0, out_up);
-    _mm256_storeu_si256((__m256i *)dst + dry + 1, out_dn);
+    _mm256_store_si256((__m256i *)dst + dry + 0, out_up);
+    _mm256_store_si256((__m256i *)dst + dry + 1, out_dn);
   }
 }
 
