@@ -1601,9 +1601,9 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 
     //TODO: Figure out correct dependency.
     //range[2] = 0;//MAX(0, range[2] - 1); //0;
-    range[3] = MIN(range[3] + 3, state->ILR_state->tile->frame->height_in_lcu);  //state->ILR_state->tile->frame->height_in_lcu;//MIN(range[3]+3, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
+    range[3] = MIN(range[3] + state->encoder_control->max_inter_ref_lcu.down, state->ILR_state->tile->frame->height_in_lcu);  //state->ILR_state->tile->frame->height_in_lcu;//MIN(range[3]+3, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
     //range[0] = 0; //MAX(0, range[0] - 1); //0;
-    range[1] = MIN(range[1] + 3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
+    range[1] = MIN(range[1] + state->encoder_control->max_inter_ref_lcu.right, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
     //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
     //Add dependencies to ilr states
     /*for (int j = range[2]; j < range[3]; j++) {
@@ -2536,15 +2536,17 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
           //Add a direct dependecy from ilr states wf_job to this (only for SNR)
           if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
-            state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
-            state->ILR_state->tile->wf_jobs[lcu->id] != NULL) {
-            //Account for deblock/SAO missmatch
+            state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width) {
+            //Account for deblock/SAO
             const lcu_order_element_t *ilr_lcu = lcu;
-            if ((state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) && (state->encoder_control->cfg.sao_type == KVZ_SAO_OFF || !state->ILR_state->encoder_control->cfg.deblock_enable)) {
-              ilr_lcu = ilr_lcu->below != NULL ? lcu->below : ilr_lcu;
-              ilr_lcu = ilr_lcu->right != NULL ? lcu->right : ilr_lcu;
+            if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) {
+              ilr_lcu = (ilr_lcu->below != NULL) ? lcu->below : ilr_lcu;
+              ilr_lcu = (ilr_lcu->right != NULL) ? lcu->right : ilr_lcu;
             }
-            kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[ilr_lcu->id]);
+            if (state->ILR_state->tile->wf_jobs[ilr_lcu->id] != NULL)
+            {
+              kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[ilr_lcu->id]);
+            }
           } else if(state->layer != NULL) {
             if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
               kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
