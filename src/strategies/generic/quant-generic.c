@@ -189,8 +189,8 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   kvz_pixel *rec_out, coeff_t *coeff_out)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
-  int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   int has_coeffs = 0;
 
