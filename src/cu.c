@@ -224,7 +224,7 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 #define IND2Y(ind,step,stride) (((ind) / (stride)) * (step))
 
 //Debug stuff for printing thread info
-#if 1 && defined(linux)
+#if 0 && defined(linux)
 #define _GNU_SOURCES
 #include <sys/types.h>
 #include <unistd.h>
