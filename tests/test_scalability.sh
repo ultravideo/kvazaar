@@ -6,46 +6,46 @@ set -eu
 . "${0%/*}/util.sh"
 
 # Basic scalable encoding
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --no-wpp --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-wpp --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --no-wpp --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-wpp --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --no-wpp --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-wpp
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --no-deblock --no-wpp --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-wpp
 
 #   Test without threads
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --threads=0 --owf=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --threads=0 --owf=0 --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --threads=0 --owf=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --threads=0 --owf=0
 
 # Test SNR
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --no-wpp --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-wpp --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --no-wpp --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-wpp --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --no-wpp --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --no-wpp
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --no-wpp --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --no-wpp
 
 #   Test without threads
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --threads=0 --owf=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --threads=0 --owf=0 --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r0 --ilr=1 --gop=0 --threads=0 --owf=0
+valgrind_test 512x264 20 --preset=ultrafast -p12 -q30 -r3 --gop=0 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=0 --threads=0 --owf=0
 
 # Test with GOP
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p16 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=8 --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1
+valgrind_test 512x264 20 --preset=ultrafast -p16 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=8
 
 #   Test without threads
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --threads=0 --owf=0 --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p16 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=8 --threads=0 --owf=0 --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --threads=0 --owf=0
+valgrind_test 512x264 20 --preset=ultrafast -p16 --layer-res=256x132 -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --gop=8 --threads=0 --owf=0
 
 # Test SAO/deblock
-valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=full --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=full --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12   --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132  --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12   --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132  --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full --no-tmvp
-valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full --no-tmvp
+valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=full
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=full
+valgrind_test 512x264 20 --preset=ultrafast -p12   --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132  --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12   --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132  --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full
+valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=off
+valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full
+valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1 --no-deblock --sao=full
 
 
 # Test encoder control initing failures when using layers. TODO: strictly necessary?
