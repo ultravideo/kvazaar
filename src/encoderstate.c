@@ -2567,8 +2567,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             //Account for deblock/SAO
             const lcu_order_element_t *ilr_lcu = lcu;
             if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) {
-              ilr_lcu = (ilr_lcu->below != NULL) ? lcu->below : ilr_lcu;
-              ilr_lcu = (ilr_lcu->right != NULL) ? lcu->right : ilr_lcu;
+              ilr_lcu = (ilr_lcu->below != NULL) ? ilr_lcu->below : ilr_lcu;
+              ilr_lcu = (ilr_lcu->right != NULL) ? ilr_lcu->right : ilr_lcu;
             }
             if (state->ILR_state->tile->wf_jobs[ilr_lcu->id] != NULL)
             {
