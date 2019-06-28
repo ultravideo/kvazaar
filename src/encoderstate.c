@@ -1562,28 +1562,18 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 
   case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
   {
-    //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
-    kvz_cua_upsampling_parameter_t *param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
-    kvz_copy_cua_upsampling_parameters(param, state_param);
+    //Need to pre-allocate cua upsampling jobs so that lcu search can add dependancy to the future jobs
+    const int max_inter_ref_down = state->encoder_control->max_inter_ref_lcu.down;
+    const int max_inter_ref_right = state->encoder_control->max_inter_ref_lcu.right;
+    int job_range[4] = { lcu->position.x, lcu->position.x + max_inter_ref_right, lcu->position.y, lcu->position.y + max_inter_ref_down }; // {start_hor,end_hor,start_ver,end_ver}
 
-    int block_x = state->tile->offset_x + lcu->position_px.x;
-    int block_y = state->tile->offset_y + lcu->position_px.y;
-    int block_width = lcu->size.x;
-    int block_height = lcu->size.y;
-    int src_width = state_param->base_cua->width;
-    int src_height = state_param->base_cua->height;
-    int tile_x = state->tile->lcu_offset_x;
-    int tile_y = state->tile->lcu_offset_y;
+    //Make sure previously created jobs aren't dublicated
+    int new_job_range[2] = {job_range[0] == 0 ? 0 : job_range[1], job_range[2] == 0 ? 0 : job_range[3]}; // {first_new_hor_job,first_new_ver_job}
 
-    param->lcu_ind = lcu->id + tile_x + tile_y * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
-
-    kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[lcu->id]);
-    state->layer->cua_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, (void*)param);
-
-    //Calculate (vertical/horizontal) range of scaling
-    int range[4]; //Range of blocks needed for scaling
-    kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, param->cu_pos_scale[0]); //Width  
-    kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
+    const int src_width = state_param->base_cua->width;
+    const int src_height = state_param->base_cua->height;
+    const int tile_x = state->tile->lcu_offset_x;
+    const int tile_y = state->tile->lcu_offset_y;
 
     //Need to account for SAO/deblock in the ilr state.
     int margin = 0; //4; //Accounts for fracmvest?
@@ -1593,30 +1583,67 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
       margin += DEBLOCK_DELAY_PX;
     }
 
-    //Map the pixel range to LCU pos
-    //range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
-    range[1] = ((range[1] + margin) / LCU_WIDTH) + 1;//(range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
-    //range[2] = range[2] / LCU_WIDTH;
-    range[3] = ((range[3] + margin) / LCU_WIDTH) + 1;//(range[3] + margin + LCU_WIDTH - 1) / LCU_WIDTH;
-
-    //TODO: Figure out correct dependency.
-    //range[2] = 0;//MAX(0, range[2] - 1); //0;
-    range[3] = MIN(range[3] + state->encoder_control->max_inter_ref_lcu.down, state->ILR_state->tile->frame->height_in_lcu);  //state->ILR_state->tile->frame->height_in_lcu;//MIN(range[3]+3, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
-    //range[0] = 0; //MAX(0, range[0] - 1); //0;
-    range[1] = MIN(range[1] + state->encoder_control->max_inter_ref_lcu.right, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
-    //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
-    //Add dependencies to ilr states
-    /*for (int j = range[2]; j < range[3]; j++) {
-      const encoder_state_t * const ilr_state = &state->ILR_state[j];
-      for (int k = range[0]; k < range[1]; k++) {
-        kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
+    const lcu_order_element_t *ver_lcu = lcu;
+    for (int j = job_range[2]; j <= job_range[3]; j++, ver_lcu = ver_lcu->below)
+    {
+      if (ver_lcu == NULL) {
+        break;
       }
-    }*/
-    const encoder_state_t *const ilr_state = &state->ILR_state[range[3] - 1];
-    kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[range[1] - 1].id]);
 
-    //Dependencies added so submit the job
-    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->cua_scaling_jobs[lcu->id]);
+      const lcu_order_element_t *hor_lcu = ver_lcu;
+      for (int i = job_range[0]; i <= job_range[1]; i++, hor_lcu = hor_lcu->right)
+      {
+        if (hor_lcu == NULL) {
+          break;
+        } else if (i < new_job_range[0] || j < new_job_range[1]) {
+          continue;
+        }
+
+        //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
+        kvz_cua_upsampling_parameter_t *param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
+        kvz_copy_cua_upsampling_parameters(param, state_param);
+
+        const int block_x = state->tile->offset_x + hor_lcu->position_px.x;
+        const int block_y = state->tile->offset_y + hor_lcu->position_px.y;
+        const int block_width = hor_lcu->size.x;
+        const int block_height = hor_lcu->size.y;
+
+        param->lcu_ind = hor_lcu->id + tile_x + tile_y * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
+
+        kvz_threadqueue_free_job(&state->layer->cua_scaling_jobs[hor_lcu->id]);
+        state->layer->cua_scaling_jobs[hor_lcu->id] = kvz_threadqueue_job_create(kvz_cu_array_upsampling_worker, (void*)param);
+
+        //Calculate (vertical/horizontal) range of scaling
+        int range[4]; //Range of blocks needed for scaling
+        kvz_cu_array_upsampling_src_range(range, block_x, block_x + block_width - 1, src_width, param->cu_pos_scale[0]); //Width  
+        kvz_cu_array_upsampling_src_range(range + 2, block_y, block_y + block_height - 1, src_height, param->cu_pos_scale[1]); //Height
+
+        //Map the pixel range to LCU pos
+        //range[0] = range[0] / LCU_WIDTH; //First LCU that is needed
+        range[1] = ((range[1] + margin) / LCU_WIDTH) + 1;//(range[1] + margin + LCU_WIDTH - 1) / LCU_WIDTH; //Last LCU that is not needed
+        //range[2] = range[2] / LCU_WIDTH;
+        range[3] = ((range[3] + margin) / LCU_WIDTH) + 1;//(range[3] + margin + LCU_WIDTH - 1) / LCU_WIDTH;
+
+        //TODO: Figure out correct dependency.
+        //range[2] = 0;//MAX(0, range[2] - 1); //0;
+        range[3] = MIN(range[3] + max_inter_ref_down, state->ILR_state->tile->frame->height_in_lcu);  //state->ILR_state->tile->frame->height_in_lcu;//MIN(range[3]+3, state->ILR_state->tile->frame->height_in_lcu);//state->ILR_state->tile->frame->height_in_lcu;
+        //range[0] = 0; //MAX(0, range[0] - 1); //0;
+        range[1] = MIN(range[1] + max_inter_ref_right, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;//MIN(range[1]+3, state->ILR_state->tile->frame->width_in_lcu); //state->ILR_state->tile->frame->width_in_lcu;
+        //TODO: Only need to add dependency to last lcu since it already depends on prev lcu?
+        //Add dependencies to ilr states
+        /*for (int j = range[2]; j < range[3]; j++) {
+          const encoder_state_t * const ilr_state = &state->ILR_state[j];
+          for (int k = range[0]; k < range[1]; k++) {
+            kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[k].id]);
+          }
+        }*/
+        const encoder_state_t *const ilr_state = &state->ILR_state[range[3] - 1];
+        kvz_threadqueue_job_dep_add(state->layer->cua_scaling_jobs[hor_lcu->id], ilr_state->tile->wf_jobs[ilr_state->lcu_order[range[1] - 1].id]);
+
+        //Dependencies added so submit the job
+        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->layer->cua_scaling_jobs[hor_lcu->id]);
+      }
+    }
     
     break;
   }
@@ -2552,7 +2579,15 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
               kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
             }
             if (state->layer->cua_scaling_jobs[lcu->id] != NULL) {
-              kvz_threadqueue_job_dep_add(job[0], state->layer->cua_scaling_jobs[lcu->id]);
+              //Set dep to a cua scaling job so that max inter ref is inside the dep range
+              const lcu_order_element_t *dep_lcu = lcu;
+              for (int i = 0; dep_lcu->below && i < ctrl->max_inter_ref_lcu.down; i++) {
+                dep_lcu = dep_lcu->below;
+              }
+              for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
+                dep_lcu = dep_lcu->right;
+              }
+              kvz_threadqueue_job_dep_add(job[0], state->layer->cua_scaling_jobs[dep_lcu->id]);
             }
           }
         } 
