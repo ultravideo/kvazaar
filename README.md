@@ -337,16 +337,6 @@ improve in the build process. We want to make this as simple as
 possible.
 
 
-### Required libraries
-- For Visual Studio, the pthreads-w32 library is required. Platforms
-  with native POSIX thread support don't need anything.
-  - The project file expects the library to be in ../pthreads.2/
-    relative to Kvazaar. You can just extract the pre-built library
-    there.
-  - The executable needs pthreadVC2.dll to be present. Either install it
-    somewhere or ship it with the executable.
-
-
 ### Autotools
 Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
 For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`. Yasm is
@@ -369,7 +359,7 @@ See `./configure --help` for more options.
 
 
 ### Visual Studio
-- At least VisualStudio 2013 is required.
+- At least VisualStudio 2015 is required.
 - Project files can be found under build/.
 - Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
   in %PATH%
@@ -389,7 +379,7 @@ Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SD
 
 Directory `visualizer_extras` has to be added into the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
 
-`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`) and the dll folder inside the pthreads folder (see `Required libraries`).
+`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, and `zlib1.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`).
 
 Note: The solution should be compiled on the x64 platform in visual studio.
 
@@ -441,7 +431,7 @@ You can generate Doxygen documentation pages by running the command
   - Uninitialized variables and such are checked with Valgrind.
   - Bitstream validity is checked with HM.
   - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
-- Windows msys2 build is checked automatically on Appveyor.
+- Windows msys2 and msvc builds are checked automatically on Appveyor.
 - If your changes change the bitstream, decode with HM to check that
   it doesn't throw checksum errors or asserts.
 - If your changes shouldn't alter the bitstream, check that they don't.
@@ -465,7 +455,7 @@ You can generate Doxygen documentation pages by running the command
 
 ### Code style
 We try to follow the following conventions:
-- C99 without features not supported by Visual Studio 2013 (VLAs).
+- C99 without features not supported by Visual Studio 2015 (VLAs).
  - // comments allowed and encouraged.
 - Follow overall conventions already established in the code.
 - Indent by 2 spaces. (no tabs)
