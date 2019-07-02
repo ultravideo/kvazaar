@@ -41,7 +41,7 @@ typedef struct {
 
 typedef struct {
   unsigned int count;
-  unsigned int allocated;
+  unsigned int allocated;//How much memory is allocated
   strategy_t* strategies;
 } strategy_list_t;
 
@@ -63,6 +63,8 @@ typedef struct {
     int sse42;
     int avx;
     int avx2;
+
+    bool hyper_threading;
   } intel_flags;
   
   struct {
@@ -72,10 +74,14 @@ typedef struct {
   struct {
     int neon;
   } arm_flags;
+
+  int logical_cpu_count;
+  int physical_cpu_count;
 } hardware_flags_t;
 
 extern hardware_flags_t kvz_g_hardware_flags;
-
+extern hardware_flags_t kvz_g_strategies_in_use;
+extern hardware_flags_t kvz_g_strategies_available;
 
 int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth);
 int kvz_strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
@@ -89,6 +95,7 @@ int kvz_strategyselector_register(void *opaque, const char *type, const char *st
 #include "strategies/strategies-quant.h"
 #include "strategies/strategies-intra.h"
 #include "strategies/strategies-sao.h"
+#include "strategies/strategies-encode.h"
 
 static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
@@ -98,6 +105,7 @@ static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_QUANT_EXPORTS
   STRATEGIES_INTRA_EXPORTS
   STRATEGIES_SAO_EXPORTS
+  STRATEGIES_ENCODE_EXPORTS
   { NULL, NULL },
 };
 

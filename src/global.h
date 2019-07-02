@@ -78,6 +78,12 @@
  * Stuff related to multi-threading using pthreads
  */
 
+ // Pthreads-win32 tries to define timespec even if it has already been defined.
+ // In Visual Studio 2015 timespec is defined in time.h so we may need to define
+ // HAVE_STRUCT_TIMESPEC.
+#if _MSC_VER >= 1900 && !defined(HAVE_STRUCT_TIMESPEC)
+#   define HAVE_STRUCT_TIMESPEC
+#endif
 
 #if defined(_MSC_VER) && defined(_M_AMD64)
   #define X86_64
@@ -119,15 +125,8 @@ typedef int16_t coeff_t;
 //! Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu()
 #define MAX_PU_DEPTH 4
 
-//! Minimum log2 transform sizes.
-//! spec: max_transform_hierarchy_depth_inter
-#define TR_DEPTH_INTER 2
-
 //! spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM)
 #define ENABLE_PCM 0
-
-//! Enable usage of temporal Motion Vector Prediction
-#define ENABLE_TEMPORAL_MVP 0
 
 //! skip residual coding when it's under _some_ threshold
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0
@@ -155,22 +154,44 @@ typedef int16_t coeff_t;
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
+/**
+ * \brief Number of pixels to delay deblocking.
+ *
+ * Number of pixels at the bottom and right side of the LCU that are not
+ * deblocked until when filtering the neighboring LCU. The last four chroma
+ * pixels of the horizontal edges within the LCU are deblocked with the LCU
+ * to the right. Therefore, DEBLOCK_DELAY_PX is set to 8 pixels.
+ */
+#define DEBLOCK_DELAY_PX 8
+
+/**
+ * \brief Number of pixels to delay SAO in horizontal and vertical
+ * directions.
+ *
+ * Number of pixels at the bottom and right side of the LCU that are not
+ * filtered with SAO until when filtering the neighboring LCU. SAO
+ * reconstruction requires that a one pixels border has been deblocked for
+ * both luma and chroma.  Therefore, SAO_DELAY_PX is set to
+ * DEBLOCK_DELAY_PX + 2.
+ */
+#define SAO_DELAY_PX (DEBLOCK_DELAY_PX + 2)
+
 #define MAX_REF_PIC_COUNT 16
-#define DEFAULT_REF_PIC_COUNT 3
 
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
 #define MRG_MAX_NUM_CANDS 5
 
 /* Some tools */
+#define ABS(a) ((a) >= 0 ? (a) : (-a))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
 #define CLIP_TO_PIXEL(value) CLIP(0, PIXEL_MAX, (value))
+#define CLIP_TO_QP(value) CLIP(0, 51, (value))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
-#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
 #define CEILDIV(x,y) (((x) + (y) - 1) / (y))
 
 #define LOG2_LCU_WIDTH 6
@@ -187,7 +208,7 @@ typedef int16_t coeff_t;
 // NOTE: When making a release, check to see if incrementing libversion in 
 // configure.ac is necessary.
 #ifndef KVZ_VERSION
-#define KVZ_VERSION 0.8.3
+#define KVZ_VERSION 1.2.0
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
@@ -212,10 +233,18 @@ typedef int16_t coeff_t;
 #define SIMD_ALIGNMENT 32
 
 #ifdef _MSC_VER
+  #define ALIGNED(alignment) __declspec(align(alignment))
+#else
+  #define ALIGNED(alignment) __attribute__((aligned (alignment)))
+#endif
+
+#ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) (type *)malloc(sizeof(type) * (num) + (padding))
 #else
   #define MALLOC(type, num) malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) malloc(sizeof(type) * (num) + (padding))
 #endif
 
 // Use memset through FILL and FILL_ARRAY when appropriate, such as when
@@ -225,7 +254,11 @@ typedef int16_t coeff_t;
 // Fill a structure or a static array with val bytes.
 #define FILL(var, val) memset(&(var), (val), sizeof(var))
 // Fill a number of elements in an array with val bytes.
-#define FILL_ARRAY(ar, val, size) memset((ar), (val), (size) * sizeof(*(ar)))
+#define FILL_ARRAY(ar, val, size) \
+{\
+  void *temp_ptr = (void*)(ar);\
+  memset((temp_ptr), (val), (size) * sizeof(*(ar)));\
+}
 
 #define FREE_POINTER(pointer) { free((void*)pointer); pointer = NULL; }
 #define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
@@ -252,14 +285,12 @@ typedef int16_t coeff_t;
 
 #define MAX_TR_DYNAMIC_RANGE 15
 
-#define EXP_GOLOMB_TABLE_SIZE (4096*8)
-
 //Constants
-typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 
 
 // Hardware data (abstraction of defines). Extend for other compilers
-#if defined(_M_IX86) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
+#if defined(_M_IX86) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
 #  define COMPILE_INTEL 1
 #else
 #  define COMPILE_INTEL 0

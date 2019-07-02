@@ -88,6 +88,11 @@ enum kvz_ime_algorithm {
   KVZ_IME_HEXBS = 0,
   KVZ_IME_TZ = 1,
   KVZ_IME_FULL = 2,
+  KVZ_IME_FULL8 = 3, //! \since 3.6.0
+  KVZ_IME_FULL16 = 4, //! \since 3.6.0
+  KVZ_IME_FULL32 = 5, //! \since 3.6.0
+  KVZ_IME_FULL64 = 6, //! \since 3.6.0
+  KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
 };
 
 /**
@@ -124,6 +129,92 @@ enum kvz_hash
   KVZ_HASH_CHECKSUM = 1,
   KVZ_HASH_MD5 = 2,
 };
+
+/**
+* \brief cu split termination mode
+* \since since 3.8.0
+*/
+enum kvz_cu_split_termination
+{
+  KVZ_CU_SPLIT_TERMINATION_ZERO = 0,
+  KVZ_CU_SPLIT_TERMINATION_OFF = 1
+};
+
+/**
+* \brief Enable and disable crypto features.
+* \since 3.7.0
+*/
+enum kvz_crypto_features {
+  KVZ_CRYPTO_OFF = 0,
+  KVZ_CRYPTO_MVs = (1 << 0),
+  KVZ_CRYPTO_MV_SIGNS = (1 << 1),
+  KVZ_CRYPTO_TRANSF_COEFFS = (1 << 2),
+  KVZ_CRYPTO_TRANSF_COEFF_SIGNS = (1 << 3),
+  KVZ_CRYPTO_INTRA_MODE = (1 << 4),
+  KVZ_CRYPTO_ON = (1 << 5) - 1,
+};
+
+/**
+* \brief me early termination mode
+* \since since 3.8.0
+*/
+enum kvz_me_early_termination
+{
+  KVZ_ME_EARLY_TERMINATION_OFF = 0,
+  KVZ_ME_EARLY_TERMINATION_ON = 1,
+  KVZ_ME_EARLY_TERMINATION_SENSITIVE = 2
+};
+
+
+/**
+ * \brief Format the pixels are read in.
+ * This is separate from chroma subsampling, because we might want to read
+ * interleaved formats in the future.
+ * \since 3.12.0
+ */
+enum kvz_input_format {
+  KVZ_FORMAT_P400 = 0,
+  KVZ_FORMAT_P420 = 1,
+  KVZ_FORMAT_P422 = 2,
+  KVZ_FORMAT_P444 = 3,
+};
+
+/**
+* \brief Chroma subsampling format used for encoding.
+* \since 3.12.0
+*/
+enum kvz_chroma_format {
+  KVZ_CSP_400 = 0,
+  KVZ_CSP_420 = 1,
+  KVZ_CSP_422 = 2,
+  KVZ_CSP_444 = 3,
+};
+
+/**
+ * \brief Chroma subsampling format used for encoding.
+ * \since 3.15.0
+ */
+enum kvz_slices {
+  KVZ_SLICES_NONE,
+  KVZ_SLICES_TILES = (1 << 0), /*!< \brief Put each tile in a slice. */
+  KVZ_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
+};
+
+enum kvz_sao {
+  KVZ_SAO_OFF = 0,
+  KVZ_SAO_EDGE = 1,
+  KVZ_SAO_BAND = 2,
+  KVZ_SAO_FULL = 3
+};
+
+enum kvz_scalinglist {
+  KVZ_SCALING_LIST_OFF = 0,
+  KVZ_SCALING_LIST_CUSTOM = 1,
+  KVZ_SCALING_LIST_DEFAULT = 2,  
+};
+
+// Map from input format to chroma format.
+#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
 /**
  * \brief GoP picture configuration.
@@ -169,7 +260,7 @@ typedef struct kvz_config
   int32_t framerate_num; /*!< \brief Framerate numerator */
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
-  int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
+  enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */
@@ -231,6 +322,71 @@ typedef struct kvz_config
 
   enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
   enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
+
+  enum kvz_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
+
+  enum kvz_crypto_features crypto_features; /*!< \since 3.7.0 */
+  uint8_t *optional_key;
+
+  enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
+  int32_t intra_rdo_et; /*!< \since 4.1.0 \brief Use early termination in intra rdo. */
+
+  int32_t lossless; /*!< \brief Use lossless coding. */
+
+  int32_t tmvp_enable; /*!> \brief Use Temporal Motion Vector Predictors. */
+
+  int32_t rdoq_skip; /*!< \brief Mode of rdoq skip */
+
+  enum kvz_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
+  int32_t input_bitdepth; /*!< \brief Use Temporal Motion Vector Predictors. */
+
+  struct {
+    unsigned d;  // depth
+    unsigned t;  // temporal
+  } gop_lp_definition;
+
+  int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
+
+  struct {
+    int32_t width;
+    int32_t height;
+    int8_t *dqps;
+  } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
+
+  unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
+
+  /**
+   * \brief Use adaptive QP for 360 video with equirectangular projection.
+   */
+  int32_t erp_aqp;
+
+  /** \brief The HEVC level */
+  uint8_t level;
+  /** \brief Whether we ignore and just warn from all of the errors about the output not conforming to the level's requirements. */
+  uint8_t force_level;
+  /** \brief Whether we use the high tier bitrates. Requires the level to be 4 or higher. */
+  uint8_t high_tier;
+  /** \brief The maximum allowed bitrate for this level and tier. */
+  uint32_t max_bitrate;
+
+  /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
+  uint32_t me_max_steps;
+
+  /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
+  int8_t fast_residual_cost_limit;
+
+  /** \brief Set QP at CU level keeping pic_init_qp_minus26 in PPS zero */
+  int8_t set_qp_in_cu;
+
+  /** \brief Flag to enable/disable open GOP configuration */
+  int8_t open_gop;
+
+  /** \brief Type of scaling lists to use */
+  int8_t scaling_list;
+
+  /** \brief Maximum number of merge cadidates */
+  uint8_t max_merge;
+
 } kvz_config;
 
 /**
@@ -239,7 +395,8 @@ typedef struct kvz_config
  * Function picture_alloc in kvz_api must be used for allocation.
  */
 typedef struct kvz_picture {
-  kvz_pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+  kvz_pixel *fulldata_buf;     //!< \brief Allocated buffer with padding (only used in the base_image)
+  kvz_pixel *fulldata;         //!< \brief Allocated buffer portion that's actually used
 
   kvz_pixel *y;                //!< \brief Pointer to luma pixel array.
   kvz_pixel *u;                //!< \brief Pointer to chroma U pixel array.
@@ -258,6 +415,9 @@ typedef struct kvz_picture {
   int64_t dts;             //!< \brief Decompression timestamp.
 
   enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
+  enum kvz_chroma_format chroma_format;
+
+  int32_t ref_pocs[16];
 } kvz_picture;
 
 /**
@@ -462,9 +622,6 @@ typedef struct kvz_api {
    *
    * Only one encoder may be open at a time.
    *
-   * The caller must not modify the config between passing it to this function
-   * and calling encoder_close.
-   *
    * \param cfg   encoder configuration
    * \return      created encoder, or NULL if creation failed.
    */
@@ -535,6 +692,19 @@ typedef struct kvz_api {
                                   kvz_picture **pic_out,
                                   kvz_picture **src_out,
                                   kvz_frame_info *info_out);
+
+  /**
+   * \brief Allocate a kvz_picture.
+   *
+   * The returned kvz_picture should be deallocated by calling picture_free.
+   *
+   * \since 3.12.0
+   * \param chroma_fomat  Chroma subsampling to use.
+   * \param width   width of luma pixel array to allocate
+   * \param height  height of luma pixel array to allocate
+   * \return        allocated picture, or NULL if allocation failed.
+   */
+  kvz_picture * (*picture_alloc_csp)(enum kvz_chroma_format chroma_fomat, int32_t width, int32_t height);
 } kvz_api;
 
 

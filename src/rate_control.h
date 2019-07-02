@@ -30,11 +30,9 @@
 
 #include "encoderstate.h"
 
+void kvz_set_picture_lambda_and_qp(encoder_state_t * const state);
 
-double kvz_select_picture_lambda(encoder_state_t * const state);
-
-int8_t kvz_lambda_to_QP(const double lambda);
-
-double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state);
+void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
+                               vector2d_t pos);
 
 #endif // RATE_CONTROL_H_

@@ -78,70 +78,140 @@ const uint8_t kvz_part_mode_sizes[][4][2] = {
 };
 
 
-#define BLIT_COEFF_CASE(n) case n:\
-  for (y = 0; y < n; ++y) {\
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(coeff_t));\
-  }\
-  break;
-
-void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
-                         const unsigned width, const unsigned height,
-                         const unsigned orig_stride, const unsigned dst_stride)
+cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
-  unsigned y;
-  
-  int nxn_width = (width == height) ? width : 0;
-  switch (nxn_width) {
-    BLIT_COEFF_CASE(4)
-    BLIT_COEFF_CASE(8)
-    BLIT_COEFF_CASE(16)
-    BLIT_COEFF_CASE(32)
-    BLIT_COEFF_CASE(64)
-  default:
-    for (y = 0; y < height; ++y) {
-      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coeff_t));
-    }
-    break;
-  }
+  return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
 }
 
-unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
-                        const int width)
+
+const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
-  int sum = 0;
-  int y, x;
-
-  for (y = 0; y < width; ++y) {
-    for (x = 0; x < width; ++x) {
-      sum += abs(buf[x + y * buf_stride]);
-    }
-  }
-
-  return sum;
+  assert(x_px < cua->width);
+  assert(y_px < cua->height);
+  return &(cua)->data[(x_px >> 2) + (y_px >> 2) * ((cua)->stride >> 2)];
 }
 
-cu_array_t * kvz_cu_array_alloc(const int width_in_scu, const int height_in_scu) {
-  unsigned cu_array_size = height_in_scu * width_in_scu;
-  cu_array_t *cua;
-  cua = MALLOC(cu_array_t, 1);
-  cua->data = (cu_info_t*)malloc(sizeof(cu_info_t) * cu_array_size);
+
+/**
+ * \brief Allocate a CU array.
+ *
+ * \param width   width of the array in luma pixels
+ * \param height  height of the array in luma pixels
+ */
+cu_array_t * kvz_cu_array_alloc(const int width, const int height)
+{
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
+
+  // Round up to a multiple of LCU width and divide by cell width.
+  const int width_scu  = CEILDIV(width,  LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
+  const int height_scu = CEILDIV(height, LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
+  const unsigned cu_array_size = width_scu * height_scu;
+
+  cua->base     = NULL;
+  cua->data     = calloc(cu_array_size, sizeof(cu_info_t));
+  cua->width    = width_scu  * SCU_WIDTH;
+  cua->height   = height_scu * SCU_WIDTH;
+  cua->stride   = cua->width;
   cua->refcount = 1;
-  FILL_ARRAY(cua->data, 0, cu_array_size);
+
   return cua;
 }
 
-int kvz_cu_array_free(cu_array_t * const cua)
-{
-  int32_t new_refcount;
-  if (!cua) return 1;
-  
-  new_refcount = KVZ_ATOMIC_DEC(&(cua->refcount));
-  //Still we have some references, do nothing
-  if (new_refcount > 0) return 1;
-  
-  FREE_POINTER(cua->data);
-  free(cua);
 
-  return 1;
+cu_array_t * kvz_cu_subarray(cu_array_t *base,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height)
+{
+  assert(x_offset + width <= base->width);
+  assert(y_offset + height <= base->height);
+
+  if (x_offset == 0 &&
+      y_offset == 0 &&
+      width == base->width &&
+      height == base->height)
+  {
+    return kvz_cu_array_copy_ref(base);
+  }
+
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
+
+  // Find the real base array.
+  cu_array_t *real_base = base;
+  while (real_base->base) {
+    real_base = real_base->base;
+  }
+  cua->base     = kvz_cu_array_copy_ref(real_base);
+  cua->data     = kvz_cu_array_at(base, x_offset, y_offset);
+  cua->width    = width;
+  cua->height   = height;
+  cua->stride   = base->stride;
+  cua->refcount = 1;
+
+  return cua;
 }
 
+void kvz_cu_array_free(cu_array_t **cua_ptr)
+{
+  cu_array_t *cua = *cua_ptr;
+  if (cua == NULL) return;
+  *cua_ptr = NULL;
+
+  int new_refcount = KVZ_ATOMIC_DEC(&cua->refcount);
+  if (new_refcount > 0) {
+    // Still we have some references, do nothing.
+    return;
+  }
+
+  assert(new_refcount == 0);
+
+  if (!cua->base) {
+    FREE_POINTER(cua->data);
+  } else {
+    kvz_cu_array_free(&cua->base);
+    cua->data = NULL;
+  }
+
+  FREE_POINTER(cua);
+}
+
+
+/**
+ * \brief Get a new pointer to a cu array.
+ *
+ * Increment reference count and return the cu array.
+ */
+cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua)
+{
+  int32_t new_refcount = KVZ_ATOMIC_INC(&cua->refcount);
+  // The caller should have had another reference and we added one
+  // reference so refcount should be at least 2.
+  assert(new_refcount >= 2);
+  return cua;
+}
+
+
+/**
+ * \brief Copy an lcu to a cu array.
+ *
+ * All values are in luma pixels.
+ *
+ * \param dst     destination array
+ * \param dst_x   x-coordinate of the left edge of the copied area in dst
+ * \param dst_y   y-coordinate of the top edge of the copied area in dst
+ * \param src     source lcu
+ */
+void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
+{
+  const int dst_stride = dst->stride >> 2;
+  for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {
+    for (int x = 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+      const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
+      const int x_scu = (dst_x + x) >> 2;
+      const int y_scu = (dst_y + y) >> 2;
+      cu_info_t *to_cu = &dst->data[x_scu + y_scu * dst_stride];
+      memcpy(to_cu,                  from_cu, sizeof(*to_cu));
+    }
+  }
+}

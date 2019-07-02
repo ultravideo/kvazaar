@@ -102,7 +102,7 @@ static double get_cost(encoder_state_t * const state,
                        int width)
 {
   double satd_cost = satd_func(pred, orig_block);
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -111,10 +111,13 @@ static double get_cost(encoder_state_t * const state,
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
     const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
-    ctx = &state->cabac.ctx.transform_skip_model_chroma;
-    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
 
-    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->global->cur_lambda_cost_sqrt * trskip_bits;
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+    }
+
+    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
       return sad_cost;
     }
@@ -142,7 +145,7 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[0] = (double)satd_costs[0];
   costs_out[1] = (double)satd_costs[1];
 
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -151,14 +154,17 @@ static void get_cost_dual(encoder_state_t * const state,
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
     const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
-    ctx = &state->cabac.ctx.transform_skip_model_chroma;
-    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+    }
 
     unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
     double sad_costs[PARALLEL_BLKS] = { 0 };
     sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->global->cur_lambda_cost_sqrt * trskip_bits;
+      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->lambda_sqrt * trskip_bits;
       if (sad_costs[i] < (double)satd_costs[i]) {
         costs_out[i] = sad_costs[i];
       }
@@ -195,14 +201,14 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
     kvz_pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
     kvz_pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
   } nosplit_pixels;
-  cu_cbf_t nosplit_cbf = { .y = 0, .u = 0, .v = 0 };
+  uint16_t nosplit_cbf = 0;
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -213,16 +219,21 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     nosplit_cost = 0.0;
 
-    cbf_clear(&pred_cu->cbf.y, depth + PU_INDEX(x_px / 4, y_px / 4));
-
-    kvz_intra_recon_lcu_luma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
-    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-
+    cbf_clear(&pred_cu->cbf, depth, COLOR_Y);
     if (reconstruct_chroma) {
-      cbf_clear(&pred_cu->cbf.u, depth);
-      cbf_clear(&pred_cu->cbf.v, depth);
+      cbf_clear(&pred_cu->cbf, depth, COLOR_U);
+      cbf_clear(&pred_cu->cbf, depth, COLOR_V);
+    }
 
-      kvz_intra_recon_lcu_chroma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
+    const int8_t chroma_mode = reconstruct_chroma ? intra_mode : -1;
+    kvz_intra_recon_cu(state,
+                       x_px, y_px,
+                       depth,
+                       intra_mode, chroma_mode,
+                       pred_cu, lcu);
+
+    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+    if (reconstruct_chroma) {
       nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
 
@@ -248,7 +259,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   //     max_depth.
   // - Min transform size hasn't been reached (MAX_PU_DEPTH).
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
-    split_cost = 3 * state->global->cur_lambda_cost;
+    split_cost = 3 * state->lambda;
 
     split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     if (split_cost < nosplit_cost) {
@@ -277,20 +288,20 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // if this and any previous transform block has no chroma coefficients.
     // When searching the first block we don't actually know the real values,
     // so this will code cbf as 0 and not code the cbf at all for descendants.
-    {
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
       const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
       }
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
       }
     }
 
     double bits = tr_split_bit + cbf_bits;
-    split_cost += bits * state->global->cur_lambda_cost;
+    split_cost += bits * state->lambda;
   } else {
     assert(width <= TR_MAX_WIDTH);
   }
@@ -343,7 +354,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred);
+    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -351,7 +362,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred);
+    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -404,6 +415,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
   cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
 
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+
   // Temporary block arrays
   kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
   pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
@@ -421,7 +435,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.
   int offset;
-  if (state->encoder_control->full_intra_search) {
+  if (state->encoder_control->cfg.full_intra_search) {
     offset = 1;
   } else {
     static const int8_t offsets[4] = { 2, 4, 8, 8 };
@@ -434,7 +448,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      if (mode + i * offset <= 34) kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i]);
+      if (mode + i * offset <= 34) {
+        kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary);
+      }
     }
     
     //TODO: add generic version of get cost  multi
@@ -471,7 +487,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
       if (mode_in_range) {
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
-          if (test_modes[i] >= 2 && test_modes[i] <= 34) kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i]);
+          if (test_modes[i] >= 2 && test_modes[i] <= 34) {
+            kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary);
+          }
         }
 
         //TODO: add generic version of get cost multi
@@ -507,7 +525,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0]);
+      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0], filter_boundary);
       costs[modes_selected] = get_cost(state, preds[0], orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
@@ -516,7 +534,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  int lambda_cost = (int)(state->global->cur_lambda_cost_sqrt + 0.5);
+  int lambda_cost = (int)(state->lambda_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
     costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
   }
@@ -560,7 +578,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              int8_t modes[35], double costs[35],
                              lcu_t *lcu)
 {
-  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->tr_depth_intra);
+  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
@@ -587,18 +605,15 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
-    costs[rdo_mode] = rdo_bitcost * (int)(state->global->cur_lambda_cost + 0.5);
+    costs[rdo_mode] = rdo_bitcost * (int)(state->lambda + 0.5);
 
     // Perform transform split search and save mode RD cost for the best one.
     cu_info_t pred_cu;
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-    pred_cu.intra[0].mode = modes[rdo_mode];
-    pred_cu.intra[1].mode = modes[rdo_mode];
-    pred_cu.intra[2].mode = modes[rdo_mode];
-    pred_cu.intra[3].mode = modes[rdo_mode];
-    pred_cu.intra[0].mode_chroma = modes[rdo_mode];
+    pred_cu.intra.mode = modes[rdo_mode];
+    pred_cu.intra.mode_chroma = modes[rdo_mode];
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.
@@ -606,7 +621,16 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
+
+    // Early termination if no coefficients has to be coded
+    if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
+      modes_to_check = rdo_mode + 1;
+      break;
+    }
   }
+
+  // Update order according to new costs
+  sort_modes(modes, costs, modes_to_check);
 
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
@@ -616,11 +640,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-    pred_cu.intra[0].mode = modes[0];
-    pred_cu.intra[1].mode = modes[0];
-    pred_cu.intra[2].mode = modes[0];
-    pred_cu.intra[3].mode = modes[0];
-    pred_cu.intra[0].mode_chroma = modes[0];
+    pred_cu.intra.mode = modes[0];
+    pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
     search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
@@ -690,11 +711,15 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
     for (int8_t chroma_mode_i = 0; chroma_mode_i < num_modes; ++chroma_mode_i) {
       chroma.mode = modes[chroma_mode_i];
 
-      kvz_intra_recon_lcu_chroma(state, x_px, y_px, depth, chroma.mode, NULL, lcu);
+      kvz_intra_recon_cu(state,
+                         x_px, y_px,
+                         depth,
+                         -1, chroma.mode, // skip luma
+                         NULL, lcu);
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
-      chroma.cost += mode_bits * state->global->cur_lambda_cost;
+      chroma.cost += mode_bits * state->lambda;
 
       if (chroma.cost < best_chroma.cost) {
         best_chroma = chroma;
@@ -713,10 +738,9 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int depth, lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-  const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
 
-  cu_info_t *cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
-  int8_t intra_mode = cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].mode;
+  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
   int8_t modes[5] = { 0, 26, 10, 1, 34 };
@@ -731,7 +755,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = modes_in_depth[depth];
 
-  if (state->encoder_control->rdo == 3) {
+  if (state->encoder_control->cfg.rdo == 3) {
     num_modes = 5;
   }
 
@@ -772,16 +796,16 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-double kvz_search_cu_intra(encoder_state_t * const state,
-                           const int x_px, const int y_px,
-                           const int depth, lcu_t *lcu)
+void kvz_search_cu_intra(encoder_state_t * const state,
+                         const int x_px, const int y_px,
+                         const int depth, lcu_t *lcu,
+                         int8_t *mode_out, double *cost_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-  const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
-  const int8_t cu_width = (LCU_WIDTH >> (depth));
+  const int8_t cu_width = LCU_WIDTH >> depth;
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
 
-  cu_info_t *cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
+  cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   kvz_intra_references refs;
 
@@ -792,11 +816,11 @@ double kvz_search_cu_intra(encoder_state_t * const state,
 
   // Select left and top CUs if they are available.
   // Top CU is not available across LCU boundary.
-  if ((x_px >> 3) > 0) {
-    left_cu = LCU_GET_CU(lcu, lcu_cu.x - 1, lcu_cu.y);
+  if (x_px >= SCU_WIDTH) {
+    left_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x - 1, lcu_px.y);
   }
-  if ((y_px >> 3) > 0 && lcu_cu.y != 0) {
-    above_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y - 1);
+  if (y_px >= SCU_WIDTH && lcu_px.y > 0) {
+    above_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y - 1);
   }
   kvz_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
@@ -811,10 +835,9 @@ double kvz_search_cu_intra(encoder_state_t * const state,
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
-  unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
   int8_t number_of_modes;
-  bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
+  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
@@ -831,14 +854,14 @@ double kvz_search_cu_intra(encoder_state_t * const state,
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
-
   // Refine results with slower search or get some results if rough search was skipped.
-  if (state->encoder_control->rdo >= 2 || skip_rough_search) {
+  const int32_t rdo_level = state->encoder_control->cfg.rdo;
+  if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
-    if (state->encoder_control->rdo == 3) {
+    if (rdo_level == 3) {
       number_of_modes_to_search = 35;
-    } else if (state->encoder_control->rdo == 2) {
-      number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+    } else if (rdo_level == 2) {
+      number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
       // Check only the predicted modes.
       number_of_modes_to_search = 0;
@@ -855,7 +878,7 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   }
 
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
-  cur_cu->intra[pu_index].mode = modes[best_mode_i];
 
-  return costs[best_mode_i];
+  *mode_out = modes[best_mode_i];
+  *cost_out = costs[best_mode_i];
 }

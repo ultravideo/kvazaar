@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "scalinglist.h"
+#include "rdo.h"
 #include "tables.h"
 
 
@@ -101,6 +102,7 @@ void kvz_scalinglist_init(scaling_list_t * const scaling_list)
   }
   
   scaling_list->enable = 0;
+  scaling_list->use_default_list = 0;
 }
 
 /**
@@ -345,7 +347,7 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const s
   double *err_scale         = (double *) scaling_list->error_scale[size][list][qp];
 
   // Compensate for scaling of bitcount in Lagrange cost function
-  double scale = (double)(1<<15);
+  double scale = CTX_FRAC_ONE_BIT;
   // Compensate for scaling through forward transform
   scale = scale*pow(2.0,-2.0*transform_shift);
   for(i=0;i<max_num_coeff;i++) {
@@ -396,9 +398,9 @@ void kvz_scalinglist_process(scaling_list_t * const scaling_list, uint8_t bitdep
 
   for (size = 0; size < SCALING_LIST_SIZE_NUM; size++) {
     for (list = 0; list < kvz_g_scaling_list_num[size]; list++) {
-      const int32_t * const list_ptr = scaling_list->enable ?
-                                       scaling_list->scaling_list_coeff[size][list] :
-                                       kvz_scalinglist_get_default(size, list);
+      const int32_t * const list_ptr = scaling_list->use_default_list ?
+                                       kvz_scalinglist_get_default(size, list) :
+                                       scaling_list->scaling_list_coeff[size][list];
 
       for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
         kvz_scalinglist_set(scaling_list, list_ptr, list, size, qp);

@@ -29,12 +29,14 @@
 #include "global.h" // IWYU pragma: keep
 
 #include "kvazaar.h"
+#include "strategies/optimized_sad_func_ptr_t.h"
 
 
 typedef struct {
   kvz_pixel y[LCU_LUMA_SIZE];
   kvz_pixel u[LCU_CHROMA_SIZE];
   kvz_pixel v[LCU_CHROMA_SIZE];
+  enum kvz_chroma_format chroma_format;
 } lcu_yuv_t;
 
 typedef struct {
@@ -52,7 +54,8 @@ typedef struct {
 } yuv_t;
 
 
-kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc_420(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height);
 
 void kvz_image_free(kvz_picture *im);
 
@@ -64,7 +67,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
                              const unsigned width,
                              const unsigned height);
 
-yuv_t * kvz_yuv_t_alloc(int luma_size);
+yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size);
 void kvz_yuv_t_free(yuv_t * yuv);
 
 hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size);
@@ -72,13 +75,25 @@ void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv);
 
 
 //Algorithms
-unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_lcu_below);
+unsigned kvz_image_calc_sad(const kvz_picture *pic,
+                            const kvz_picture *ref,
+                            int pic_x,
+                            int pic_y,
+                            int ref_x,
+                            int ref_y,
+                            int block_width,
+                            int block_height,
+                            optimized_sad_func_ptr_t optimized_sad);
 
 
-unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
-                  const int ref_stride, const int rec_stride,
-                  const int width);
+unsigned kvz_image_calc_satd(const kvz_picture *pic,
+                             const kvz_picture *ref,
+                             int pic_x,
+                             int pic_y,
+                             int ref_x,
+                             int ref_y,
+                             int block_width,
+                             int block_height);
 
 
 void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,

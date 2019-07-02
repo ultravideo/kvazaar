@@ -30,7 +30,9 @@ extern SUITE(speed_tests);
 extern SUITE(dct_tests);
 #endif //KVZ_BIT_DEPTH == 8
 
+extern SUITE(coeff_sum_tests);
 extern SUITE(mv_cand_tests);
+extern SUITE(inter_recon_bipred_tests);
 
 int main(int argc, char **argv)
 {
@@ -52,7 +54,12 @@ int main(int argc, char **argv)
   printf("10-bit tests are not yet supported\n");
 #endif //KVZ_BIT_DEPTH == 8
 
+  RUN_SUITE(coeff_sum_tests);
+
   RUN_SUITE(mv_cand_tests);
+
+  // Doesn't work in git
+  //RUN_SUITE(inter_recon_bipred_tests);
 
   GREATEST_MAIN_END();
 }

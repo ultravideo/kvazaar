@@ -30,6 +30,7 @@
 
 #include "bitstream.h"
 
+struct encoder_state_t;
 
 // Types
 typedef struct
@@ -59,6 +60,7 @@ typedef struct
     cabac_ctx_t trans_subdiv_model[3]; //!< \brief intra mode context models
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_chroma[4];
+    cabac_ctx_t cu_qp_delta_abs[4];
     cabac_ctx_t part_size_model[4];
     cabac_ctx_t cu_sig_coeff_group_model[4];
     cabac_ctx_t cu_sig_model_luma[27];
@@ -75,6 +77,7 @@ typedef struct
     cabac_ctx_t cu_skip_flag_model[3];
     cabac_ctx_t cu_merge_idx_ext_model;
     cabac_ctx_t cu_merge_flag_ext_model;
+    cabac_ctx_t cu_transquant_bypass;
     cabac_ctx_t cu_mvd_model[2];
     cabac_ctx_t cu_ref_pic_model[2];
     cabac_ctx_t mvp_idx_model[2];
@@ -100,11 +103,12 @@ void kvz_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_b
 void kvz_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
 void kvz_cabac_write(cabac_data_t *data);
 void kvz_cabac_finish(cabac_data_t *data);
-void kvz_cabac_flush(cabac_data_t *data);
 void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param);
-void kvz_cabac_write_ep_ex_golomb(cabac_data_t *data, uint32_t symbol,
-                              uint32_t count);
+void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac, const uint32_t symbol,
+		const uint32_t r_param, int32_t base_level);
+void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
+								uint32_t symbol, uint32_t count);
 void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
@@ -112,36 +116,36 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
 
 
 // Macros
-#define CTX_STATE(ctx) (ctx->uc_state >> 1)
-#define CTX_MPS(ctx) (ctx->uc_state & 1)
+#define CTX_STATE(ctx) ((ctx)->uc_state >> 1)
+#define CTX_MPS(ctx) ((ctx)->uc_state & 1)
 #define CTX_UPDATE_LPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_lps[ (ctx)->uc_state ]; }
 #define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_mps[ (ctx)->uc_state ]; }
 
 #ifdef VERBOSE
   #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    kvz_cabac_encode_bin(data, value); \
+    kvz_cabac_encode_bin((data), (value)) \
     printf("%s = %u, state = %u -> %u\n", \
-           name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
+           (name), (uint32_t)(value), prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    kvz_cabac_encode_bins_ep(data, value, bins); \
+    kvz_cabac_encode_bins_ep((data), (value), (bins)); \
     printf("%s = %u(%u bins), state = %u -> %u\n", \
-           name, (uint32_t)value, (uint32_t)bins, prev_state, (data)->ctx->uc_state); }
+           (name), (uint32_t)(value), (bins), prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    kvz_cabac_encode_bin_ep(data, value); \
+    kvz_cabac_encode_bin_ep((data), (value)); \
     printf("%s = %u, state = %u -> %u\n", \
-           name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
+           (name), (uint32_t)(value), prev_state, (data)->ctx->uc_state); }
 #else
   #define CABAC_BIN(data, value, name) \
-    kvz_cabac_encode_bin(data, value);
+    kvz_cabac_encode_bin((data), (value));
   #define CABAC_BINS_EP(data, value, bins, name) \
-    kvz_cabac_encode_bins_ep(data, value, bins);
+    kvz_cabac_encode_bins_ep((data), (value), (bins));
   #define CABAC_BIN_EP(data, value, name) \
-    kvz_cabac_encode_bin_ep(data, value);
+    kvz_cabac_encode_bin_ep((data), (value));
 #endif
 
 #endif

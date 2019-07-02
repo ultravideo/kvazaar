@@ -35,7 +35,12 @@
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
-typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
+typedef enum {
+  CU_NOTSET = 0,
+  CU_INTRA  = 1,
+  CU_INTER  = 2,
+  CU_PCM    = 3,
+} cu_type_t;
 
 typedef enum {
   SIZE_2Nx2N = 0,
@@ -106,45 +111,58 @@ typedef struct {
   int y;
 } vector2d_t;
 
-typedef struct
-{
-  uint8_t y;
-  uint8_t u;
-  uint8_t v;
-} cu_cbf_t;
-
 /**
  * \brief Struct for CU info
  */
 typedef struct
 {
-  int8_t type;       //!< \brief block type, CU_INTER / CU_INTRA
-  int8_t depth;      //!< \brief depth / size of this block
-  int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
-  int8_t tr_depth;   //!< \brief transform depth
-  int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
-  int8_t skipped;    //!< \brief flag to indicate this block is skipped
-  int8_t merged;     //!< \brief flag to indicate this block is merged
-  int8_t merge_idx;  //!< \brief merge index
+  uint8_t type      : 2; //!< \brief block type, one of cu_type_t values
+  uint8_t depth     : 3; //!< \brief depth / size of this block
+  uint8_t part_size : 3; //!< \brief partition mode, one of part_mode_t values
+  uint8_t tr_depth  : 3; //!< \brief transform depth
+  uint8_t skipped   : 1; //!< \brief flag to indicate this block is skipped
+  uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
+  uint8_t merge_idx : 3; //!< \brief merge index
+  uint8_t tr_skip   : 1; //!< \brief transform skip flag
 
-  cu_cbf_t cbf;
-  struct {
-    int8_t mode;
-    int8_t mode_chroma;
-    int8_t tr_skip;    //!< \brief transform skip flag
-  } intra[4];
-  struct {
-    double cost;
-    uint32_t bitcost;
-    int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
-    int16_t mvd[2][2]; // \brief Motion vector differences for L0 and L1
-    uint8_t mv_cand[2]; // \brief selected MV candidate
-    uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
-    uint8_t mv_ref_coded[2]; // \brief Coded and corrected index of ref picture
-    uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
-    int8_t mode;
-  } inter;
+  uint16_t cbf;
+
+  /**
+   * \brief QP used for the CU.
+   *
+   * This is required for deblocking when per-LCU QPs are enabled.
+   */
+  uint8_t qp;
+
+  union {
+    struct {
+      int8_t mode;
+      int8_t mode_chroma;
+#if KVZ_SEL_ENCRYPTION
+      int8_t mode_encry;
+#endif
+    } intra;
+    struct {
+      int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
+      uint8_t mv_ref[2]; // \brief Index of the L0 and L1 array.
+      uint8_t mv_cand0 : 3; // \brief selected MV candidate
+      uint8_t mv_cand1 : 3; // \brief selected MV candidate
+      uint8_t mv_dir   : 2; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
+    } inter;
+  };
 } cu_info_t;
+
+#define CU_GET_MV_CAND(cu_info_ptr, reflist) \
+  (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)
+
+#define CU_SET_MV_CAND(cu_info_ptr, reflist, value) \
+  do { \
+    if ((reflist) == 0) { \
+      (cu_info_ptr)->inter.mv_cand0 = (value); \
+    } else { \
+      (cu_info_ptr)->inter.mv_cand1 = (value); \
+    } \
+  } while (0)
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
@@ -163,13 +181,27 @@ typedef struct
   (cu).inter.cost, (cu).inter.bitcost, (cu).inter.mv[0], (cu).inter.mv[1], (cu).inter.mvd[0], (cu).inter.mvd[1], \
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
-typedef struct {
-  cu_info_t *data;           //!< \brief cu_info data
-  int32_t refcount;        //!< \brief number of references in reflists to this cu_array
+typedef struct cu_array_t {
+  struct cu_array_t *base; //!< \brief base cu array or NULL
+  cu_info_t *data;  //!< \brief cu array
+  int32_t width;    //!< \brief width of the array in pixels
+  int32_t height;   //!< \brief height of the array in pixels
+  int32_t stride;   //!< \brief stride of the array in pixels
+  int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
-cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
-int kvz_cu_array_free(cu_array_t *cua);
+cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
+const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
+
+cu_array_t * kvz_cu_array_alloc(const int width, const int height);
+cu_array_t * kvz_cu_subarray(cu_array_t *base,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height);
+void kvz_cu_array_free(cu_array_t **cua_ptr);
+cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
+
 
 /**
  * \brief Return the 7 lowest-order bits of the pixel coordinate.
@@ -179,9 +211,10 @@ int kvz_cu_array_free(cu_array_t *cua);
  */
 #define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
 
-#define LCU_CU_WIDTH 8
-#define LCU_T_CU_WIDTH 9
-#define LCU_CU_OFFSET 10
+#define LCU_CU_WIDTH 16
+#define LCU_T_CU_WIDTH (LCU_CU_WIDTH + 1)
+#define LCU_CU_OFFSET (LCU_T_CU_WIDTH + 1)
+#define SCU_WIDTH (LCU_WIDTH / LCU_CU_WIDTH)
 
 // Width from top left of the LCU, so +1 for ref buffer size.
 #define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
@@ -197,7 +230,54 @@ typedef struct {
   kvz_pixel v[LCU_REF_PX_WIDTH / 2 + 1];
 } lcu_ref_px_t;
 
-typedef struct {
+/**
+ * \brief Coefficients of an LCU
+ *
+ * Coefficients inside a single TU are stored in row-major order. TUs
+ * themselves are stored in a zig-zag order, so that the coefficients of
+ * a TU are contiguous in memory.
+ *
+ * Example storage order for a 32x32 pixel TU tree
+ *
+ \verbatim
+
+   +------+------+------+------+---------------------------+
+   |   0  |  16  |  64  |  80  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   |  15  |  31  |  79  |  95  |                           |
+   +------+------+------+------+                           |
+   |  32  |  48  |  96  | 112  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   |  47  |  63  | 111  | 127  |                           |
+   +------+------+------+------+         256 - 511         |
+   | 128  | 144  | 192  | 208  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   | 143  | 159  | 207  | 223  |                           |
+   +------+------+------+------+                           |
+   | 160  | 176  | 224  | 240  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   | 175  | 191  | 239  | 255  |                           |
+   +------+------+------+------+-------------+------+------+
+   | 512  | 528  |             |             | 832  | 848  |
+   |   -  |   -  |             |             |   -  |   -  |
+   | 527  | 543  |             |             | 847  | 863  |
+   +------+------+  576 - 639  |  768 - 831  +------+------+
+   | 544  | 560  |             |             | 864  | 880  |
+   |   -  |   -  |             |             |   -  |   -  |
+   | 559  | 575  |             |             | 879  | 895  |
+   +------+------+-------------+-------------+------+------+
+   |             |             |             |             |
+   |             |             |             |             |
+   |             |             |             |             |
+   |  640 - 703  |  704 - 767  |  896 - 959  |  960 - 1023 |
+   |             |             |             |             |
+   |             |             |             |             |
+   |             |             |             |             |
+   +-------------+-------------+-------------+-------------+
+
+ \endverbatim
+ */
+typedef ALIGNED(8) struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_CHROMA_SIZE];
   coeff_t v[LCU_CHROMA_SIZE];
@@ -217,43 +297,34 @@ typedef struct {
   lcu_coeff_t coeff; //!< LCU coefficients
 
   /**
-   * A 9x9 CU array for the LCU, +1 CU.
-   * - Top reference CUs on row 0.
-   * - Left reference CUs on column 0.
-   * - All of LCUs CUs on 1:9, 1:9.
-   * - Top right reference CU on the last slot.
+   * A 17x17 CU array, plus the top right reference CU.
+   * - Top reference CUs at indices [0,16] (row 0).
+   * - Left reference CUs at indices 17*n where n is in [0,16] (column 0).
+   * - All CUs of this LCU at indices 17*y + x where x,y are in [1,16].
+   * - Top right reference CU at the last index.
+   *
+   * The figure below shows how the indices map to CU locations.
    *
    \verbatim
 
-      .-- left reference CUs
-      v
-       0 |  1  2  3  4  5  6  7  8 | 81 <-- top reference CUs
-     ----+-------------------------+----
-       9 | 10 11 12 13 14 15 16 17 |
-      18 | 19 20 21 22 23 24 25 26 <-- this LCU
-      27 | 28 29 30 31 32 33 34 35 |
-      36 | 37 38 39 40 41 42 43 44 |
-      45 | 46 47 48 49 50 51 52 53 |
-      54 | 55 56 57 58 59 60 61 62 |
-      63 | 64 65 66 67 68 69 70 71 |
-      72 | 73 74 75 76 77 78 79 80 |
-     ----+-------------------------+----
+       .-- left reference CUs
+       v
+        0 |   1   2  . . .  16 | 289 <-- top reference CUs
+     -----+--------------------+----
+       17 |  18  19  . . .  33 |
+       34 |  35  36  . . .  50 <-- this LCU
+        . |   .   .  .       . |
+        . |   .   .    .     . |
+        . |   .   .      .   . |
+      272 | 273 274  . . . 288 |
+     -----+--------------------+----
 
    \endverbatim
    */
-  cu_info_t cu[9*9+1];
+  cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-/**
- * \brief Return pointer to a given CU.
- *
- * \param lcu   pointer to the containing LCU
- * \param x_cu  x-index of the CU
- * \param y_cu  y-index of the CU
- * \return      pointer to the CU
- */
-#define LCU_GET_CU(lcu, x_cu, y_cu) \
-  (&(lcu)->cu[LCU_CU_OFFSET + (x_cu) + (y_cu) * LCU_T_CU_WIDTH])
+void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
 
 /**
  * \brief Return pointer to the top right reference CU.
@@ -269,18 +340,74 @@ typedef struct {
  * \param y_px  y-coordinate relative to the upper left corner of the LCU
  * \return      pointer to the CU at coordinates (x_px, y_px)
  */
-#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) LCU_GET_CU(lcu, (x_px) >> 3, (y_px) >> 3)
+#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) \
+  (&(lcu)->cu[LCU_CU_OFFSET + ((x_px) >> 2) + ((y_px) >> 2) * LCU_T_CU_WIDTH])
+
 
 /**
- * \brief Return pointer to a CU relative to the given CU.
+ * \brief  Copy a part of a coeff_t array to another.
  *
- * \param cu      pointer to a CU in the array at some location (x, y)
- * \param x_offs  x-offset
- * \param y_offs  y-offset
- * \return        pointer to the CU at (x + x_offs, y + y_offs)
+ * \param width  Size of the block to be copied in pixels.
+ * \param src    Pointer to the source array.
+ * \param dest   Pointer to the destination array.
  */
-#define CU_GET_CU(cu_array, x_offs, y_offs) \
-  (&cu_array[(x_offs) + (y_offs) * LCU_T_CU_WIDTH])
+static INLINE void copy_coeffs(const coeff_t *__restrict src,
+                               coeff_t *__restrict dest,
+                               size_t width)
+{
+  memcpy(dest, src, width * width * sizeof(coeff_t));
+}
+
+
+/**
+ * \brief  Convert (x, y) coordinates to z-order index.
+ *
+ * Only works for widths and coordinates divisible by four. Width must be
+ * a power of two in range [4..64].
+ *
+ * \param width   size of the containing block
+ * \param x       x-coordinate
+ * \param y       y-coordinate
+ * \return        index in z-order
+ */
+static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
+{
+  assert(width % 4 == 0 && width >= 4 && width <= 64);
+  assert(x % 4 == 0 && x < width);
+  assert(y % 4 == 0 && y < width);
+
+  unsigned result = 0;
+
+  switch (width) {
+    case 64:
+      result += x / 32 * (32*32);
+      result += y / 32 * (64*32);
+      x %= 32;
+      y %= 32;
+      // fallthrough
+    case 32:
+      result += x / 16 * (16*16);
+      result += y / 16 * (32*16);
+      x %= 16;
+      y %= 16;
+      // fallthrough
+    case 16:
+      result += x / 8 * ( 8*8);
+      result += y / 8 * (16*8);
+      x %= 8;
+      y %= 8;
+      // fallthrough
+    case 8:
+      result += x / 4 * (4*4);
+      result += y / 4 * (8*4);
+      // fallthrough
+    case 4:
+      break;
+  }
+
+  return result;
+}
+
 
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
   CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \
@@ -368,44 +495,65 @@ typedef struct {
 } while(0)
 
 
-void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
-
-unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
-                        const int width);
-
-
+#define NUM_CBF_DEPTHS 5
+static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
 
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set(uint8_t cbf_flags, int depth)
+static INLINE int cbf_is_set(uint16_t cbf, int depth, color_t plane)
 {
-  // Transform data for 4x4 blocks is stored at depths 4-8 for luma, so masks
-  // for those levels don't include the other ones.
-  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+  return (cbf & (cbf_masks[depth] << (NUM_CBF_DEPTHS * plane))) != 0;
+}
 
-  return (cbf_flags & masks[depth]) != 0;
+/**
+ * Check if CBF in a given level >= depth is true.
+ */
+static INLINE int cbf_is_set_any(uint16_t cbf, int depth)
+{
+  return cbf_is_set(cbf, depth, COLOR_Y) ||
+         cbf_is_set(cbf, depth, COLOR_U) ||
+         cbf_is_set(cbf, depth, COLOR_V);
 }
 
 /**
  * Set CBF in a level to true.
  */
-static INLINE void cbf_set(uint8_t *cbf_flags, int depth)
+static INLINE void cbf_set(uint16_t *cbf, int depth, color_t plane)
 {
   // Return value of the bit corresponding to the level.
-  *cbf_flags |= 1 << (7 - depth);
+  *cbf |= (0x10 >> depth) << (NUM_CBF_DEPTHS * plane);
+}
+
+/**
+ * Set CBF in a level to true if it is set at a lower level in any of
+ * the child_cbfs.
+ */
+static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], int depth, color_t plane)
+{
+  bool child_cbf_set = cbf_is_set(child_cbfs[0], depth + 1, plane) ||
+                       cbf_is_set(child_cbfs[1], depth + 1, plane) ||
+                       cbf_is_set(child_cbfs[2], depth + 1, plane);
+  if (child_cbf_set) {
+    cbf_set(cbf, depth, plane);
+  }
 }
 
 /**
  * Set CBF in a levels <= depth to false.
  */
-static INLINE void cbf_clear(uint8_t *cbf_flags, int depth)
+static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
 {
-  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+  *cbf &= ~(cbf_masks[depth] << (NUM_CBF_DEPTHS * plane));
+}
 
-  *cbf_flags &= ~masks[depth];
+/**
+ * Copy cbf flags.
+ */
+static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
+{
+  cbf_clear(cbf, 0, plane);
+  *cbf |= src & (cbf_masks[0] << (NUM_CBF_DEPTHS * plane));
 }
 
 #define GET_SPLITDATA(CU,curDepth) ((CU)->depth > curDepth)

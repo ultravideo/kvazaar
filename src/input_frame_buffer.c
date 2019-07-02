@@ -23,7 +23,6 @@
 #include "encoder.h"
 #include "encoderstate.h"
 #include "image.h"
-#include "videoframe.h"
 
 
 void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
@@ -39,42 +38,49 @@ void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
 /**
  * \brief Pass an input frame to the encoder state.
  *
- * Sets the source image of the encoder state if there is a suitable image
- * available.
+ * Returns the image that should be encoded next if there is a suitable
+ * image available.
  *
  * The caller must not modify img_in after calling this function.
  *
  * \param buf     an input frame buffer
  * \param state   a main encoder state
  * \param img_in  input frame or NULL
- * \return        1 if the source image was set, 0 if not
+ * \return        pointer to the next picture, or NULL if no picture is
+ *                available
  */
-int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
-                           encoder_state_t *const state,
-                           kvz_picture *const img_in)
+kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
+                                    encoder_state_t *const state,
+                                    kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
-  const kvz_config* const cfg = encoder->cfg;
+  const kvz_config* const cfg = &encoder->cfg;
 
   const int gop_buf_size = 3 * cfg->gop_len;
 
-  assert(state->global->frame >= 0);
+  bool is_closed_gop = false;
 
-  videoframe_t *frame = state->tile->frame;
-  assert(frame->source == NULL);
-  assert(frame->rec    != NULL);
+  // Check for closed gop, we need an extra frame in the buffer in this case
+  if (!cfg->open_gop && cfg->intra_period > 0 && cfg->gop_len > 0) is_closed_gop = true;
 
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
-    // GOP disabled, just return the input frame.
+    // No reordering of output pictures necessary.
 
-    if (img_in == NULL) return 0;
+    if (img_in == NULL) return NULL;
 
     img_in->dts = img_in->pts;
-    frame->source   = kvz_image_copy_ref(img_in);
-    frame->rec->pts = img_in->pts;
-    frame->rec->dts = img_in->dts;
-    state->global->gop_offset = cfg->gop_lowdelay ? (state->global->frame-1) % cfg->gop_len : 0;
-    return 1;
+    state->frame->gop_offset = 0;
+    if (cfg->gop_len > 0) {
+      // Using a low delay GOP structure.
+      uint64_t frame_num = buf->num_out;
+      if (cfg->intra_period) {
+        frame_num %= cfg->intra_period;
+      }
+      state->frame->gop_offset = (frame_num + cfg->gop_len - 1) % cfg->gop_len;
+    }
+    buf->num_in++;
+    buf->num_out++;
+    return kvz_image_copy_ref(img_in);
   }
 
   if (img_in != NULL) {
@@ -93,11 +99,11 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     buf->pts_buffer[buf_idx] = img_in->pts;
     buf->num_in++;
 
-    if (buf->num_in < cfg->gop_len) {
+    if (buf->num_in < cfg->gop_len + is_closed_gop ? 1 : 0) {
       // Not enough frames to start output.
       return 0;
 
-    } else if (buf->num_in == cfg->gop_len) {
+    } else if (buf->num_in == cfg->gop_len + is_closed_gop ? 1 : 0) {
       // Now we known the PTSs that are needed to compute the delay.
       buf->delay = buf->pts_buffer[gop_buf_size - 1] - img_in->pts;
     }
@@ -105,10 +111,10 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
   if (buf->num_out == buf->num_in) {
     // All frames returned.
-    return 0;
+    return NULL;
   }
 
-  if (img_in == NULL && buf->num_in < cfg->gop_len) {
+  if (img_in == NULL && buf->num_in < cfg->gop_len + is_closed_gop ? 1 : 0) {
     // End of the sequence but we have less than a single GOP of frames. Use
     // the difference between the PTSs of the first and the last frame as the
     // delay.
@@ -132,26 +138,39 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     // Output the first frame.
     idx_out = -1;
     dts_out = buf->pts_buffer[gop_buf_size - 1] + buf->delay;
-    gop_offset = 0;
+    gop_offset = 0; // highest quality picture
 
   } else {
     gop_offset = (buf->num_out - 1) % cfg->gop_len;
+    
+    // For closed gop, calculate the gop_offset again
+    if (!cfg->open_gop && cfg->intra_period > 0) {
+      // Offset the GOP position for each extra I-frame added to the structure
+      // in closed gop case
+      int num_extra_frames = (buf->num_out - 1) / (cfg->intra_period + 1);
+      gop_offset = (buf->num_out - 1 - num_extra_frames) % cfg->gop_len;
+    }
 
     // Index of the first picture in the GOP that is being output.
     int gop_start_idx = buf->num_out - 1 - gop_offset;
 
     // Skip pictures until we find an available one.
     gop_offset += buf->gop_skipped;
-    for (;;) {
-      assert(gop_offset < cfg->gop_len);
 
-      idx_out = gop_start_idx + cfg->gop[gop_offset].poc_offset - 1;
-      if (idx_out < buf->num_in - 1) {
-        // An available picture found.
-        break;
+    // Every closed-gop IRAP handled here
+    if (is_closed_gop && (!cfg->open_gop && ((buf->num_out - 1) % (cfg->intra_period + 1)) == cfg->intra_period)) {
+      idx_out = gop_start_idx;
+    } else {
+      for (;;) {
+        assert(gop_offset < cfg->gop_len + is_closed_gop ? 1 : 0);
+        idx_out = gop_start_idx + cfg->gop[gop_offset].poc_offset - 1;
+        if (idx_out < buf->num_in - 1) {
+          // An available picture found.
+          break;
+        }
+        buf->gop_skipped++;
+        gop_offset++;
       }
-      buf->gop_skipped++;
-      gop_offset++;
     }
 
     if (buf->num_out < cfg->gop_len - 1) {
@@ -168,14 +187,12 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Index in buf->pic_buffer and buf->pts_buffer.
   int buf_idx = (idx_out + gop_buf_size) % gop_buf_size;
 
-  assert(buf->pic_buffer[buf_idx] != NULL);
-  frame->source      = buf->pic_buffer[buf_idx];
-  frame->rec->pts    = frame->source->pts;
-  frame->source->dts = dts_out;
-  frame->rec->dts    = dts_out;
+  kvz_picture* next_pic = buf->pic_buffer[buf_idx];
+  assert(next_pic != NULL);
+  next_pic->dts = dts_out;
   buf->pic_buffer[buf_idx] = NULL;
-  state->global->gop_offset = gop_offset;
+  state->frame->gop_offset = gop_offset;
 
   buf->num_out++;
-  return 1;
+  return next_pic;
 }

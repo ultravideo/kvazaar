@@ -36,9 +36,9 @@ static const struct option long_options[] = {
   { "input",              required_argument, NULL, 'i' },
   { "output",             required_argument, NULL, 'o' },
   { "debug",              required_argument, NULL, 'd' },
-  { "width",              required_argument, NULL, 'w' },
+  { "width",              required_argument, NULL, 'w' }, // deprecated
   { "height",             required_argument, NULL, 'h' }, // deprecated
-  { "frames",             required_argument, NULL, 'n' }, // deprecated
+  { "frames",             required_argument, NULL, 'n' },
   { "qp",                 required_argument, NULL, 'q' },
   { "period",             required_argument, NULL, 'p' },
   { "ref",                required_argument, NULL, 'r' },
@@ -47,7 +47,7 @@ static const struct option long_options[] = {
   { "input-fps",          required_argument, NULL, 0 },
   { "deblock",            required_argument, NULL, 0 },
   { "no-deblock",               no_argument, NULL, 0 },
-  { "sao",                      no_argument, NULL, 0 },
+  { "sao",                optional_argument, NULL, 0 },
   { "no-sao",                   no_argument, NULL, 0 },
   { "rdoq",                     no_argument, NULL, 0 },
   { "no-rdoq",                  no_argument, NULL, 0 },
@@ -84,9 +84,10 @@ static const struct option long_options[] = {
   { "wpp",                      no_argument, NULL, 0 },
   { "no-wpp",                   no_argument, NULL, 0 },
   { "owf",                required_argument, NULL, 0 },
-  { "slice-addresses",    required_argument, NULL, 0 },
+  { "slices",             required_argument, NULL, 0 },
   { "threads",            required_argument, NULL, 0 },
-  { "cpuid",              required_argument, NULL, 0 },
+  { "cpuid",              optional_argument, NULL, 0 },
+  { "no-cpuid",                 no_argument, NULL, 0 },
   { "pu-depth-inter",     required_argument, NULL, 0 },
   { "pu-depth-intra",     required_argument, NULL, 0 },
   { "info",                     no_argument, NULL, 0 },
@@ -105,6 +106,35 @@ static const struct option long_options[] = {
   { "loop-input",               no_argument, NULL, 0 },
   { "mv-constraint",      required_argument, NULL, 0 },
   { "hash",               required_argument, NULL, 0 },
+  {"cu-split-termination",required_argument, NULL, 0 },
+  { "crypto",             required_argument, NULL, 0 },
+  { "key",                required_argument, NULL, 0 },
+  { "me-early-termination",required_argument, NULL, 0 },
+  { "intra-rdo-et",             no_argument, NULL, 0 },
+  { "no-intra-rdo-et",          no_argument, NULL, 0 },
+  { "lossless",                 no_argument, NULL, 0 },
+  { "no-lossless",              no_argument, NULL, 0 },
+  { "tmvp",                     no_argument, NULL, 0 },
+  { "no-tmvp",                  no_argument, NULL, 0 },
+  { "rdoq-skip",                no_argument, NULL, 0 },
+  { "no-rdoq-skip",             no_argument, NULL, 0 },
+  { "input-bitdepth",     required_argument, NULL, 0 },
+  { "input-format",       required_argument, NULL, 0 },
+  { "implicit-rdpcm",           no_argument, NULL, 0 },
+  { "no-implicit-rdpcm",        no_argument, NULL, 0 },
+  { "roi",                required_argument, NULL, 0 },
+  { "erp-aqp",                  no_argument, NULL, 0 },
+  { "no-erp-aqp",               no_argument, NULL, 0 },
+  { "level",              required_argument, NULL, 0 },
+  { "force-level",        required_argument, NULL, 0 },
+  { "high-tier",                no_argument, NULL, 0 },
+  { "me-steps",           required_argument, NULL, 0 },
+  { "fast-residual-cost", required_argument, NULL, 0 },
+  { "set-qp-in-cu",             no_argument, NULL, 0 },
+  { "open-gop",                 no_argument, NULL, 0 },
+  { "no-open-gop",              no_argument, NULL, 0 },
+  { "scaling-list",       required_argument, NULL, 0 },
+  { "max-merge",          required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -246,7 +276,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   }
 
   // Set resolution automatically if necessary
-  if (opts->config->width == 0 && opts->config->width == 0){
+  if (opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }
@@ -299,153 +329,249 @@ void print_help(void)
     "Usage:\n"
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
     "\n"
-    "Optional parameters:\n"
-    "      --help                     : Print this help message and exit\n"
-    "      --version                  : Print version information and exit\n"
-    "      -n, --frames <integer>     : Number of frames to code [all]\n"
-    "      --seek <integer>           : First frame to code [0]\n"
-    "      --input-res <int>x<int>    : Input resolution (width x height) or\n"
-    "                  auto           : try to detect from file name [auto]\n"
-    "      --input-fps <num>/<denom>  : Framerate of the input video [25.0]\n"
-    "      -q, --qp <integer>         : Quantization Parameter [32]\n"
-    "      -p, --period <integer>     : Period of intra pictures [0]\n"
-    "                                     0: only first picture is intra\n"
-    "                                     1: all pictures are intra\n"
-    "                                     2-N: every Nth picture is intra\n"
-    "          --vps-period <integer> : Specify how often the video parameter set is\n"
-    "                                   re-sent. [0]\n"
-    "                                     0: only send VPS with the first frame\n"
-    "                                     1: send VPS with every intra frame\n"
-    "                                     N: send VPS with every Nth intra frame\n"
-    "      -r, --ref <integer>        : Reference frames, range 1..15 [3]\n"
-    "          --no-deblock           : Disable deblocking filter\n"
-    "          --deblock <beta:tc>    : Deblocking filter parameters\n"
-    "                                   beta and tc range is -6..6 [0:0]\n"
-    "          --no-sao               : Disable sample adaptive offset\n"
-    "          --no-rdoq              : Disable RDO quantization\n"
-    "          --no-signhide          : Disable sign hiding in quantization\n"
-    "          --smp                  : Enable Symmetric Motion Partition\n"
-    "          --amp                  : Enable Asymmetric Motion Partition\n"
-    "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
-    "                                     0: no RDO\n"
-    "                                     1: estimated RDO\n"
-    "                                     2: full RDO\n"
-    "          --mv-rdo               : Enable Rate-Distortion Optimized motion vector costs\n"
-    "          --full-intra-search    : Try all intra modes.\n"
-    "          --no-transform-skip    : Disable transform skip\n"
-    "          --aud                  : Use access unit delimiters\n"
-    "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
-    "          --debug <string>       : Output encoders reconstruction.\n"
-    "          --cpuid <integer>      : Disable runtime cpu optimizations with value 0.\n"
-    "          --me <string>          : Set integer motion estimation algorithm [\"hexbs\"]\n"
-    "                                     \"hexbs\": Hexagon Based Search (faster)\n"
-    "                                     \"tz\":    Test Zone Search (better quality)\n"
-    "                                     \"full\":  Full Search (super slow)\n"
-    "          --subme <integer>      : Set fractional pixel motion estimation level [1].\n"
-    "                                     0: only integer motion estimation\n"
-    "                                     1: fractional pixel motion estimation enabled\n"
-    "          --source-scan-type <string> : Set source scan type [\"progressive\"].\n"
-    "                                     \"progressive\": progressive scan\n"
-    "                                     \"tff\": top field first\n"
-    "                                     \"bff\": bottom field first\n"
-    "          --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.\n"
-    "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8\n"
-    "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"
-    "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4\n"
-    "          --no-info              : Don't add information about the encoder to settings.\n"
-    "          --gop <string>         : Definition of GOP structure [0]\n"
-    "                                     \"0\":           disabled\n"
-    "                                     \"8\":           B-frame pyramid of length 8\n"
-    "                                     \"lp-<string>\": lp-gop definition (e.g. lp-g8d4r3t2)\n"
-    "          --bipred               : Enable bi-prediction search\n"
-    "          --bitrate <integer>    : Target bitrate. [0]\n"
-    "                                     0: disable rate-control\n"
-    "                                     N: target N bits per second\n"
-    "          --preset <string>      : Use preset. This will override previous options.\n"
-    "                                     ultrafast, superfast,veryfast, faster,\n"
-    "                                     fast, medium, slow, slower, veryslow, placebo\n"
-    "          --no-psnr              : Don't calculate PSNR for frames\n"
-    "          --loop-input           : Re-read input file forever\n"
-    "          --mv-constraint        : Constrain movement vectors\n"
-    "                                     \"none\": no constraint\n"
-    "                                     \"frametile\": constrain within the tile\n"
-    "                                     \"frametilemargin\": constrain even more\n"
-    "          --hash                 : Specify which decoded picture hash to use [checksum]\n"
-    "                                     \"none\": no constraint\n"
-    "                                     \"checksum\": constrain within the tile\n"
-    "                                     \"md5\": constrain even more\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Required:\n"
+    "  -i, --input <filename>     : Input file\n"
+    "      --input-res <res>      : Input resolution [auto]\n"
+    "                                   - auto: Detect from file name.\n"
+    "                                   - <int>x<int>: width times height\n"
+    "  -o, --output <filename>    : Output file\n"
     "\n"
-    "  Video Usability Information:\n"
-    "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
-    "          --overscan <string>    : Specify crop overscan setting [\"undef\"]\n"
-    "                                     - undef, show, crop\n"
-    "          --videoformat <string> : Specify video format [\"undef\"]\n"
-    "                                     - component, pal, ntsc, secam, mac, undef\n"
-    "          --range <string>       : Specify color range [\"tv\"]\n"
-    "                                     - tv, pc\n"
-    "          --colorprim <string>   : Specify color primaries [\"undef\"]\n"
-    "                                     - undef, bt709, bt470m, bt470bg,\n"
-    "                                       smpte170m, smpte240m, film, bt2020\n"
-    "          --transfer <string>    : Specify transfer characteristics [\"undef\"]\n"
-    "                                     - undef, bt709, bt470m, bt470bg,\n"
-    "                                       smpte170m, smpte240m, linear, log100,\n"
-    "                                       log316, iec61966-2-4, bt1361e,\n"
-    "                                       iec61966-2-1, bt2020-10, bt2020-12\n"
-    "          --colormatrix <string> : Specify color matrix setting [\"undef\"]\n"
-    "                                     - undef, bt709, fcc, bt470bg, smpte170m,\n"
-    "                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
-    "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Presets:\n"
+    "      --preset <preset>      : Set options to a preset [medium]\n"
+    "                                   - ultrafast, superfast, veryfast, faster,\n"
+    "                                     fast, medium, slow, slower, veryslow\n"
+    "                                     placebo\n"
     "\n"
-    "  Parallel processing:\n"
-    "          --threads <integer>    : Maximum number of threads to use.\n"
-    "                                   Disable threads if set to 0.\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Input:\n"
+    "  -n, --frames <integer>     : Number of frames to code [all]\n"
+    "      --seek <integer>       : First frame to code [0]\n"
+    "      --input-fps <num>[/<denom>] : Frame rate of the input video [25]\n"
+    "      --source-scan-type <string> : Source scan type [progressive]\n"
+    "                                   - progressive: Progressive scan\n"
+    "                                   - tff: Top field first\n"
+    "                                   - bff: Bottom field first\n"
+    "      --input-format <string> : P420 or P400 [P420]\n"
+    "      --input-bitdepth <int> : 8-16 [8]\n"
+    "      --loop-input           : Re-read input file forever.\n"
     "\n"
-    "  Tiles:\n"
-    "          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.\n"
-    "          --tiles-width-split <string>|u<int> :\n"
-    "                                   Specifies a comma separated list of pixel\n"
-    "                                   positions of tiles columns separation coordinates.\n"
-    "                                   Can also be u followed by and a single int n,\n"
-    "                                   in which case it produces columns of uniform width.\n"
-    "          --tiles-height-split <string>|u<int> :\n"
-    "                                   Specifies a comma separated list of pixel\n"
-    "                                   positions of tiles rows separation coordinates.\n"
-    "                                   Can also be u followed by and a single int n,\n"
-    "                                   in which case it produces rows of uniform height.\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Options:\n"
+    "      --help                 : Print this help message and exit.\n"
+    "      --version              : Print version information and exit.\n"
+    "      --(no-)aud             : Use access unit delimiters. [disabled]\n"
+    "      --debug <filename>     : Output internal reconstruction.\n"
+    "      --(no-)cpuid           : Enable runtime CPU optimizations. [enabled]\n"
+    "      --hash <string>        : Decoded picture hash [checksum]\n"
+    "                                   - none: 0 bytes\n"
+    "                                   - checksum: 18 bytes\n"
+    "                                   - md5: 56 bytes\n"
+    "      --(no-)psnr            : Calculate PSNR for frames. [enabled]\n"
+    "      --(no-)info            : Add encoder info SEI. [enabled]\n"
+    "      --crypto <string>      : Selective encryption. Crypto support must be\n"
+    "                               enabled at compile-time. Can be 'on' or 'off' or\n"
+    "                               a list of features separated with a '+'. [off]\n"
+    "                                   - on: Enable all encryption features.\n"
+    "                                   - off: Disable selective encryption.\n"
+    "                                   - mvs: Motion vector magnitudes.\n"
+    "                                   - mv_signs: Motion vector signs.\n"
+    "                                   - trans_coeffs: Coefficient magnitudes.\n"
+    "                                   - trans_coeff_signs: Coefficient signs.\n"
+    "                                   - intra_pred_modes: Intra prediction modes.\n"
+    "      --key <string>         : Encryption key [16,213,27,56,255,127,242,112,\n"
+    "                                               97,126,197,204,25,59,38,30]\n"
     "\n"
-    "  Wpp:\n"
-    "          --wpp                  : Enable wavefront parallel processing\n"
-    "          --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Video structure:\n"
+    "  -q, --qp <integer>         : Quantization parameter [22]\n"
+    "  -p, --period <integer>     : Period of intra pictures [64]\n"
+    "                                   - 0: Only first picture is intra.\n"
+    "                                   - 1: All pictures are intra.\n"
+    "                                   - N: Every Nth picture is intra.\n"
+    "      --vps-period <integer> : How often the video parameter set is re-sent [0]\n"
+    "                                   - 0: Only send VPS with the first frame.\n"
+    "                                   - N: Send VPS with every Nth intra frame.\n"
+    "  -r, --ref <integer>        : Number of reference frames, in range 1..15 [4]\n"
+    "      --gop <string>         : GOP structure [8]\n"
+    "                                   - 0: Disabled\n"
+    "                                   - 8: B-frame pyramid of length 8\n"
+    "                                   - lp-<string>: Low-delay P-frame GOP\n"
+    "                                     (e.g. lp-g8d4t2, see README)\n"
+    "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
+    "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
+    "      --scaling-list <string>: Set scaling list mode. [off]\n"
+    "                                   - off: Disable scaling lists.\n"
+    "                                   - custom: use custom list (with --cqmfile).\n"
+    "                                   - default: Use default lists.\n"
+    "      --bitrate <integer>    : Target bitrate [0]\n"
+    "                                   - 0: Disable rate control.\n"
+    "                                   - N: Target N bits per second.\n"
+    "      --(no-)lossless        : Use lossless coding. [disabled]\n"
+    "      --mv-constraint <string> : Constrain movement vectors. [none]\n"
+    "                                   - none: No constraint\n"
+    "                                   - frametile: Constrain within the tile.\n"
+    "                                   - frametilemargin: Constrain even more.\n"
+    "      --roi <filename>       : Use a delta QP map for region of interest.\n"
+    "                               Reads an array of delta QP values from a text\n"
+    "                               file. The file format is: width and height of\n"
+    "                               the QP delta map followed by width*height delta\n"
+    "                               QP values in raster order. The map can be of any\n"
+    "                               size and will be scaled to the video size.\n"
+    "      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.\n"
+    "                               in PPS and slice_qp_delta in slize header zero.\n"
+    "      --(no-)erp-aqp         : Use adaptive QP for 360 degree video with\n"
+    "                               equirectangular projection. [disabled]\n"
+    "      --level <number>       : Use the given HEVC level in the output and give\n"
+    "                               an error if level limits are exceeded. [6.2]\n"
+    "                                   - 1, 2, 2.1, 3, 3.1, 4, 4.1, 5, 5.1, 5.2, 6,\n"
+    "                                     6.1, 6.2\n"
+    "      --force-level <number> : Same as --level but warnings instead of errors.\n"
+    "      --high-tier            : Used with --level. Use high tier bitrate limits\n"
+    "                               instead of the main tier limits during encoding.\n"
+    "                               High tier requires level 4 or higher.\n"
     "\n"
-    "  Slices:\n"
-    "          --slice-addresses <string>|u<int> :\n"
-    "                                   Specifies a comma separated list of LCU\n"
-    "                                   positions in tile scan order of tile separations.\n"
-    "                                   Can also be u followed by and a single int n,\n"
-    "                                   in which case it produces uniform slice length.\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Compression tools:\n"
+    "      --(no-)deblock <beta:tc> : Deblocking filter. [0:0]\n"
+    "                                   - beta: Between -6 and 6\n"
+    "                                   - tc: Between -6 and 6\n"
+    "      --sao <string>         : Sample Adaptive Offset [full]\n"
+    "                                   - off: SAO disabled\n"
+    "                                   - band: Band offset only\n"
+    "                                   - edge: Edge offset only\n"
+    "                                   - full: Full SAO\n"
+    "      --(no-)rdoq            : Rate-distortion optimized quantization [enabled]\n"
+    "      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]\n"
+    "      --(no-)signhide        : Sign hiding [disabled]\n"
+    "      --(no-)smp             : Symmetric motion partition [disabled]\n"
+    "      --(no-)amp             : Asymmetric motion partition [disabled]\n"
+    "      --rd <integer>         : Intra mode search complexity [0]\n"
+    "                                   - 0: Skip intra if inter is good enough.\n"
+    "                                   - 1: Rough intra mode search with SATD.\n"
+    "                                   - 2: Refine intra mode search with SSE.\n"
+    "                                   - 3: Try all intra modes and enable intra\n"
+    "                                        chroma mode search.\n"
+    "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
+    "                               [disabled]\n"
+    "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
+    "                               [disabled]\n"
+    "      --(no-)transform-skip  : Try transform skip [disabled]\n"
+    "      --me <string>          : Integer motion estimation algorithm [hexbs]\n"
+    "                                   - hexbs: Hexagon Based Search\n"
+    "                                   - tz:    Test Zone Search\n"
+    "                                   - full:  Full Search\n"
+    "                                   - full8, full16, full32, full64\n"
+    "                                   - dia:   Diamond Search\n"
+    "      --me-steps <integer>   : Motion estimation search step limit. Only\n"
+    "                               affects 'hexbs' and 'dia'. [-1]\n"
+    "      --subme <integer>      : Fractional pixel motion estimation level [4]\n"
+    "                                   - 0: Integer motion estimation only\n"
+    "                                   - 1: + 1/2-pixel horizontal and vertical\n"
+    "                                   - 2: + 1/2-pixel diagonal\n"
+    "                                   - 3: + 1/4-pixel horizontal and vertical\n"
+    "                                   - 4: + 1/4-pixel diagonal\n"
+    "      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]\n"
+    "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
+    "      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]\n"
+    "                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4\n"
+    "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
+    "      --(no-)bipred          : Bi-prediction [disabled]\n"
+    "      --cu-split-termination <string> : CU split search termination [zero]\n"
+    "                                   - off: Don't terminate early.\n"
+    "                                   - zero: Terminate when residual is zero.\n"
+    "      --me-early-termination <string> : Motion estimation termination [on]\n"
+    "                                   - off: Don't terminate early.\n"
+    "                                   - on: Terminate early.\n"
+    "                                   - sensitive: Terminate even earlier.\n"
+    "      --fast-residual-cost <int> : Skip CABAC cost for residual coefficients\n"
+    "                                   when QP is below the limit. [0]\n"
+    "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
+    "                               a zero coefficient CU is found. [disabled]\n"
+    "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
+    "                               with lossless coding. [disabled]\n"
+    "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
     "\n"
-    "  Deprecated parameters: (might be removed at some point)\n"
-    "     Use --input-res:\n"
-    "       -w, --width               : Width of input in pixels\n"
-    "       -h, --height              : Height of input in pixels\n");
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Parallel processing:\n"
+    "      --threads <integer>    : Number of threads to use [auto]\n"
+    "                                   - 0: Process everything with main thread.\n"
+    "                                   - N: Use N threads for encoding.\n"
+    "                                   - auto: Select automatically.\n"
+    "      --owf <integer>        : Frame-level parallelism [auto]\n"
+    "                                   - N: Process N+1 frames at a time.\n"
+    "                                   - auto: Select automatically.\n"
+    "      --(no-)wpp             : Wavefront parallel processing. [enabled]\n"
+    "                               Enabling tiles automatically disables WPP.\n"
+    "                               To enable WPP with tiles, re-enable it after\n"
+    "                               enabling tiles. Enabling wpp with tiles is,\n"
+    "                               however, an experimental feature since it is\n"
+    "                               not supported in any HEVC profile.\n"
+    "      --tiles <int>x<int>    : Split picture into width x height uniform tiles.\n"
+    "      --tiles-width-split <string>|u<int> :\n"
+    "                                   - <string>: A comma-separated list of tile\n"
+    "                                               column pixel coordinates.\n"
+    "                                   - u<int>: Number of tile columns of uniform\n"
+    "                                             width.\n"
+    "      --tiles-height-split <string>|u<int> :\n"
+    "                                   - <string>: A comma-separated list of tile row\n"
+    "                                               column pixel coordinates.\n"
+    "                                   - u<int>: Number of tile rows of uniform\n"
+    "                                             height.\n"
+    "      --slices <string>      : Control how slices are used.\n"
+    "                                   - tiles: Put tiles in independent slices.\n"
+    "                                   - wpp: Put rows in dependent slices.\n"
+    "                                   - tiles+wpp: Do both.\n"
+    "\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Video Usability Information:\n"
+    "      --sar <width:height>   : Specify sample aspect ratio\n"
+    "      --overscan <string>    : Specify crop overscan setting [undef]\n"
+    "                                   - undef, show, crop\n"
+    "      --videoformat <string> : Specify video format [undef]\n"
+    "                                   - undef, component, pal, ntsc, secam, mac\n"
+    "      --range <string>       : Specify color range [tv]\n"
+    "                                   - tv, pc\n"
+    "      --colorprim <string>   : Specify color primaries [undef]\n"
+    "                                   - undef, bt709, bt470m, bt470bg,\n"
+    "                                     smpte170m, smpte240m, film, bt2020\n"
+    "      --transfer <string>    : Specify transfer characteristics [undef]\n"
+    "                                   - undef, bt709, bt470m, bt470bg,\n"
+    "                                     smpte170m, smpte240m, linear, log100,\n"
+    "                                     log316, iec61966-2-4, bt1361e,\n"
+    "                                     iec61966-2-1, bt2020-10, bt2020-12\n"
+    "      --colormatrix <string> : Specify color matrix setting [undef]\n"
+    "                                   - undef, bt709, fcc, bt470bg, smpte170m,\n"
+    "                                     smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
+    "      --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
+    "\n"
+    /* Word wrap to this width to stay under 80 characters (including ") *************/
+    "Deprecated parameters: (might be removed at some point)\n"
+    "  -w, --width <integer>       : Use --input-res.\n"
+    "  -h, --height <integer>      : Use --input-res.\n");
 }
 
 
 void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
-                      const uint32_t bytes)
+                      const uint32_t bytes,
+                      const bool print_psnr)
 {
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits",
           info->poc,
           info->qp,
           "BPI"[info->slice_type % 3],
-          bytes << 3,
-          frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+          bytes << 3);
+  if (print_psnr) {
+    fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
+            frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+  }
 
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists
     fprintf(stderr, " [L0 ");
-    for (int j = info->ref_list_len[0] - 1; j >= 0; j--) {
+    for (int j = 0; j < info->ref_list_len[0]; j++) {
       fprintf(stderr, "%d ", info->ref_list[0][j]);
     }
     fprintf(stderr, "] [L1 ");

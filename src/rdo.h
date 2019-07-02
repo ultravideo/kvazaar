@@ -30,21 +30,20 @@
 #include "cu.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "inter.h"
-#include "kvazaar.h"
+#include "search_inter.h"
 
 
 extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 
-int kvz_intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost);
-
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
-uint32_t kvz_rdo_cost_intra(encoder_state_t *state, kvz_pixel* pred, kvz_pixel* orig_block, int width, int8_t mode, int tr_depth);
-
-int32_t kvz_get_coeff_cost(const encoder_state_t *state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode);
+uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+                            const coeff_t *coeff,
+                            int32_t width,
+                            int32_t type,
+                            int8_t scan_mode);
 
 int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                     uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
@@ -55,12 +54,23 @@ uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double
                          uint32_t c1_idx, uint32_t c2_idx,
                          int32_t q_bits,double temp, int8_t last, int8_t type);
 
-int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
-  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost);
-uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac);
+kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
 
+uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
+                                       const cabac_data_t* cabac,
+                                       int32_t mvd_hor,
+                                       int32_t mvd_ver);
+
+// Number of fixed point fractional bits used in the fractional bit table.
+#define CTX_FRAC_BITS 15
+#define CTX_FRAC_ONE_BIT (1 << CTX_FRAC_BITS)
+#define CTX_FRAC_HALF_BIT (1 << (CTX_FRAC_BITS - 1))
+
+extern const uint32_t kvz_entropy_bits[128];
+#define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[(ctx)->uc_state ^ (val)]
+
+// Floating point fractional bits, derived from kvz_entropy_bits
 extern const float kvz_f_entropy_bits[128];
-#define CTX_ENTROPY_FBITS(ctx,val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #endif

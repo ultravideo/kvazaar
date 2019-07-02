@@ -22,33 +22,39 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #   - Increment when making new releases and major or minor was not changed since last release.
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
-ver_major=3
-ver_minor=5
+ver_major=4
+ver_minor=1
 ver_release=0
 
-# not used, but it prevents configure from adding a lot of defines to the CFLAGS
+# Prevents configure from adding a lot of defines to the CFLAGS
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 
-AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 dist-xz foreign subdir-objects])
+AM_INIT_AUTOMAKE([-Wall dist-bzip2 dist-xz foreign subdir-objects])
 AM_SILENT_RULES([yes])
 
 AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_AR
+AC_PROG_CXX
 
 # Get fread that can read more than 2GB on 32 bit systems.
 AC_SYS_LARGEFILE
 
 LT_INIT([win32-dll])
 
+AX_CHECK_COMPILE_FLAG([-maltivec],[flag_altivec="true"])
 AX_CHECK_COMPILE_FLAG([-mavx2],   [flag_avx2="true"])
 AX_CHECK_COMPILE_FLAG([-msse4.1], [flag_sse4_1="true"])
 AX_CHECK_COMPILE_FLAG([-msse2],   [flag_sse2="true"])
+AX_CHECK_COMPILE_FLAG([-mbmi],    [flag_bmi="true"])
+AX_CHECK_COMPILE_FLAG([-mabm],    [flag_abm="true"])
+AX_CHECK_COMPILE_FLAG([-mbmi2],   [flag_bmi2="true"])
 
-AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
+AM_CONDITIONAL([HAVE_ALTIVEC], [test x"$flag_altivec" = x"true"])
+AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true" -a x"$flag_bmi" = x"true" -a x"$flag_abm" = x"true" -a x"$flag_bmi2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
@@ -62,23 +68,55 @@ AS_IF([test "x$with_sdl2" = "xyes"], [
     )
 ])
 
-AX_PTHREAD
-CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS $SDL2_CFLAGS"
-CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
+KVZ_CFLAGS="-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
+CFLAGS="$KVZ_CFLAGS $PTHREAD_CFLAGS $CFLAGS $SDL2_CFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
-LIBS="$PTHREAD_LIBS $LIBS $SDL2_LIBS"
 
-# --disable-werror
-AC_ARG_ENABLE([werror], [AS_HELP_STRING([--disable-werror], [don't treat warnings as errors [no]])],
-              [], [CFLAGS="-Werror $CFLAGS"]
+AC_ARG_WITH([cryptopp],
+    AS_HELP_STRING([--with-cryptopp],
+        [Build with cryptopp Enables selective encryption.]))
+AS_IF([test "x$with_cryptopp" = "xyes"],
+    [PKG_CHECK_MODULES([cryptopp], [cryptopp],
+        [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
+        [PKG_CHECK_MODULES([cryptopp], [libcrypto++],
+            [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
+            [PKG_CHECK_MODULES([cryptopp], [libcryptopp],
+                [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
+                [AC_MSG_ERROR([neither cryptopp, libcrypto++ nor libcryptopp found with pkg-config])]
+            )]
+        )]
+    )]
 )
 
+AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
+CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
+LIBS="$LIBS $cryptopp_LIBS"
 
-# check for getopt
-AC_CHECK_HEADER([getopt.h], [], [CFLAGS="$CFLAGS -I$srcdir/src/extras"])
+
+CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
+
+
+# We need to force AX_PTHREAD to check -pthread -lpthread since otherwise
+# it only outputs -pthread for GCC. Without -lpthread GCC does not link the
+# shared library against the pthread library (even though it does link the
+# executable).
+PTHREAD_CFLAGS=-pthread
+PTHREAD_LIBS=-lpthread
+
+# This does workarounds for pthreads on various compilers.
+AX_PTHREAD([],[AC_MSG_ERROR([POSIX threads not found])])
+
+CFLAGS="$PTHREAD_CFLAGS $CFLAGS"
+LIBS="$PTHREAD_LIBS $LIBS"
+CC="$PTHREAD_CC"
+
+# --enable-werror
+AC_ARG_ENABLE([werror], [AS_HELP_STRING([--enable-werror], [treat warnings as errors [no]])],
+              [CFLAGS="-Werror $CFLAGS"], []
+)
 
 
 # host and cpu specific settings
@@ -137,7 +175,6 @@ AC_SUBST([ASFLAGS])
 
 KVZ_API_VERSION="$ver_major:$ver_minor:$ver_release"
 AC_SUBST([KVZ_API_VERSION])
-
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile

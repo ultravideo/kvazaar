@@ -1,122 +1,53 @@
 language: c
 
-env:
-  global:
-  - TEST_DIM=264x130
-  - TEST_FRAMES=10
-
-# Use container based infrastructure
+# Use container based infrastructure.
 sudo: false
 
-# Use this the global requirements list for valgrind tests, because those are the most numerous.
 addons:
   apt:
     sources:
-    - ubuntu-toolchain-r-test
+      - ubuntu-toolchain-r-test
     packages:
-    - autoconf
-    - libtool
-    - p7zip-full  # to uncompress our own ffmpeg binary
-    - valgrind
-    - yasm
+      - autoconf
+      - gcc-4.8
+      - libtool
+      - valgrind
+      - yasm
 
 matrix:
   fast_finish: true
-  
+
   include:
     - compiler: clang
-      addons:
-        apt:
-          sources:
-          - ubuntu-toolchain-r-test
-          packages:
-          - autoconf
-          - libtool
-          - yasm
-    
-    - compiler: gcc-4.8
-      addons:
-        apt:
-          sources:
-          - ubuntu-toolchain-r-test
-          packages:
-          - autoconf
-          - gcc-4.8
-          - libtool
-          - yasm
+      env: KVZ_TEST_VALGRIND=1
 
+    - compiler: clang
+      env: CFLAGS='-fsanitize=thread'
+
+    - compiler: clang
+      env: CFLAGS='-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
+
+    - compiler: gcc-4.8
+      env: CFLAGS='-fsanitize=address'
+
+    # We have some Mac specific code and Mac sometimes has odd build issues.
     - os: osx
-      # The version of clang in the osx image complains about -pthread being given to linker.
-      # It's a silly warning and I don't know a workaround, so let's just ignore all warnings.
-      env: KVZ_CONFIGURE_ARGS="--disable-werror"
-
-    # Check for external symbols without kvz_ prefix.
-    - compiler: gcc-4.8
+      compiler: clang  # gcc is actually clang on Travis OS X
+      install: true
       script:
         - ./autogen.sh
-        - ./configure && make
-        - (! nm -go --defined-only src/.libs/libkvazaar.a | grep -v ' kvz_') || (echo 'ERROR Only symbols prefixed with kvz_ should be exported from libkvazaar.'; false)
-      addons:
-        apt:
-          sources:
-          - ubuntu-toolchain-r-test
-          packages:
-          - autoconf
-          - gcc-4.8
-          - libtool
-          - yasm
+        - ./configure --enable-werror || (cat config.log && false)
+        - make --jobs=2 V=1
+        - make check TESTS=kvazaar_tests
 
-    # Tests trying to use invalid input dimensions
-    - env: EXPECTED_STATUS=1 PARAMS="-i src/kvazaar --input-res=1x65 -o /dev/null"
-      addons:
-        apt:
-          sources:
-          - ubuntu-toolchain-r-test
-          packages:
-          - autoconf
-          - libtool
-          - yasm
-
-    # These valgrind tests are slow, so they are performed with the minimum
-    # number of small frames and fast settings.
-    
-    # Tests for interlace
-    - env: VALGRIND_TEST="--source-scan-type=tff -p0 --preset=ultrafast --threads=2 --owf=1 --wpp"
-    
-    # Tests for owf, wpp and tiles. There is lots of separate branches of
-    # code related to owf=0 and owf!=0, which is why all permutations are
-    # tried.
-    - env: VALGRIND_TEST="-p4 -r1 --owf=1 --threads=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p4 -r1 --owf=0 --threads=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p4 -r2 --owf=1 --threads=2 --wpp --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p4 -r2 --owf=0 --threads=2 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p4 -r2 --owf=1 --threads=2 --tiles-height-split=u2 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p4 -r2 --owf=0 --threads=2 --tiles-height-split=u2 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    
-    # Tests for rdoq, sao, deblock and signhide and subme.
-    - env: VALGRIND_TEST="-p0 -r1 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=1 --pu-depth-intra=2-3"
-    - env: VALGRIND_TEST="-p0 -r1 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-signhide --subme=0"
-    - env: VALGRIND_TEST="-p0 -r1 --threads=2 --wpp --owf=1 --rd=0 --no-deblock --no-sao --subme=0"
-    
-    # Tests for all-intra.
-    - env: VALGRIND_TEST="-p1 --threads=2 --owf=1 --rd=1 --no-rdoq --no-deblock --no-sao --no-signhide"
-    - env: VALGRIND_TEST="-p1 --threads=2 --owf=1 --rd=2 --no-rdoq --no-deblock --no-sao --no-signhide --no-transform-skip"
-
-    # Tests for SMP and AMP blocks.
-    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --smp"
-    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --amp"
-    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --smp --amp"
-
-    # Tests for rate control
-    - env: VALGRIND_TEST="--bitrate=500000 -p0 -r1 --owf=1 --threads=2 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    
-    # Tests for GOP, with and without OWF.
-    - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: TEST_FRAMES=10 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=4 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-    - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-
-install:
-  - source .travis-install.sh
+install: bash .travis-install.bash
 
 script:
-  - source .travis-script.sh
+  - ./autogen.sh
+  - ./configure --enable-werror || (cat config.log && false)
+  - make --jobs=2 V=1
+  - make check VERBOSE=1
+
+after_script:
+  # Disable errors to work around Travis not knowing how to fix their stuff.
+  - set +e

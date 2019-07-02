@@ -33,6 +33,7 @@
 
 int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
+                unsigned from_bitdepth, unsigned to_bitdepth,
                 kvz_picture *img_out);
 
 int yuv_io_seek(FILE* file, unsigned frames,

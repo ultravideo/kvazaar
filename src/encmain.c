@@ -27,6 +27,9 @@
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
 #define _WIN32_WINNT 0x0500
+
+#include "global.h" // IWYU pragma: keep
+
 #include <fcntl.h>    /* _O_BINARY */
 #include <io.h>       /* _setmode() */
 #endif
@@ -41,7 +44,6 @@
 #include "checkpoint.h"
 #include "cli.h"
 #include "encoder.h"
-#include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 #include "kvazaar_internal.h"
 #include "threads.h"
@@ -87,11 +89,11 @@ static unsigned get_padding(unsigned width_or_height){
   }
 }
 
-#if KVZ_BIT_DEPTH == 8
-#define PSNRMAX (255.0 * 255.0)
-#else
-  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
-#endif
+/**
+ * \brief Value that is printed instead of PSNR when SSE is zero.
+ */
+static const double MAX_PSNR = 999.99;
+static const double MAX_SQUARED_ERROR = (double)PIXEL_MAX * (double)PIXEL_MAX;
 
 /**
  * \brief Calculates image PSNR value
@@ -102,34 +104,38 @@ static unsigned get_padding(unsigned width_or_height){
  */
 static void compute_psnr(const kvz_picture *const src,
                          const kvz_picture *const rec,
-                         double psnr[NUM_COLORS])
+                         double psnr[3])
 {
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 
   int32_t pixels = src->width * src->height;
+  int colors = rec->chroma_format == KVZ_CSP_400 ? 1 : 3;
+  double sse[3] = { 0.0 };
 
-  for (int32_t c = 0; c < NUM_COLORS; ++c) {
+  for (int32_t c = 0; c < colors; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
       num_pixels >>= 2;
     }
-    psnr[c] = 0;
     for (int32_t i = 0; i < num_pixels; ++i) {
       const int32_t error = src->data[c][i] - rec->data[c][i];
-      psnr[c] += error * error;
+      sse[c] += error * error;
     }
 
     // Avoid division by zero
-    if (psnr[c] == 0) psnr[c] = 99.0;
-    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
+    if (sse[c] == 0.0) {
+      psnr[c] = MAX_PSNR;
+    } else {
+      psnr[c] = 10.0 * log10(num_pixels * MAX_SQUARED_ERROR / sse[c]);
+    }
   }
 }
 
 typedef struct {
-  // Mutexes for synchronization.
-  pthread_mutex_t* input_mutex;
-  pthread_mutex_t* main_thread_mutex;
+  // Semaphores for synchronization.
+  kvz_sem_t* available_input_slots;
+  kvz_sem_t* filled_input_slots;
 
   // Parameters passed from main thread to input thread.
   FILE* input;
@@ -143,9 +149,6 @@ typedef struct {
   kvz_picture *img_in;
   int retval;
 } input_handler_args;
-
-#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
-#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 
 #define RETVAL_RUNNING 0
 #define RETVAL_FAILURE 1
@@ -182,8 +185,10 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
-    frame_in = args->api->picture_alloc(args->opts->config->width  + args->padding_x,
-                                        args->opts->config->height + args->padding_y);
+    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
+    frame_in = args->api->picture_alloc_csp(csp,
+                                            args->opts->config->width  + args->padding_x,
+                                            args->opts->config->height + args->padding_y);
 
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");
@@ -191,16 +196,35 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
-    if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+    // Set PTS to make sure we pass it on correctly.
+    frame_in->pts = frames_read;
+
+    bool read_success = yuv_io_read(args->input,
+                                    args->opts->config->width,
+                                    args->opts->config->height,
+                                    args->encoder->cfg.input_bitdepth,
+                                    args->encoder->bitdepth,
+                                    frame_in);
+    if (!read_success) {
       // reading failed
       if (feof(args->input)) {
         // When looping input, re-open the file and re-read data.
         if (args->opts->loop_input && args->input != stdin) {
           fclose(args->input);
           args->input = fopen(args->opts->input, "rb");
-          if (args->input == NULL ||
-              !yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in))
+          if (args->input == NULL)
           {
+            fprintf(stderr, "Could not re-open input file, shutting down!\n");
+            retval = RETVAL_FAILURE;
+            goto done;
+          }
+          bool read_success = yuv_io_read(args->input,
+                                          args->opts->config->width,
+                                          args->opts->config->height,
+                                          args->encoder->cfg.input_bitdepth,
+                                          args->encoder->bitdepth,
+                                          frame_in);
+          if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
             retval = RETVAL_FAILURE;
             goto done;
@@ -218,36 +242,71 @@ static void* input_read_thread(void* in_args)
 
     frames_read++;
 
-    if (args->encoder->cfg->source_scan_type != 0) {
+    if (args->encoder->cfg.source_scan_type != 0) {
       // Set source scan type for frame, so that it will be turned into fields.
-      frame_in->interlacing = args->encoder->cfg->source_scan_type;
+      frame_in->interlacing = args->encoder->cfg.source_scan_type;
     }
 
     // Wait until main thread is ready to receive the next frame.
-    PTHREAD_LOCK(args->input_mutex);
+    kvz_sem_wait(args->available_input_slots);
     args->img_in = frame_in;
     args->retval = retval;
     // Unlock main_thread_mutex to notify main thread that the new img_in
     // and retval have been placed to args.
-    PTHREAD_UNLOCK(args->main_thread_mutex);
+    kvz_sem_post(args->filled_input_slots);
 
     frame_in = NULL;
   }
 
 done:
   // Wait until main thread is ready to receive the next frame.
-  PTHREAD_LOCK(args->input_mutex);
+  kvz_sem_wait(args->available_input_slots);
   args->img_in = NULL;
   args->retval = retval;
   // Unlock main_thread_mutex to notify main thread that the new img_in
   // and retval have been placed to args.
-  PTHREAD_UNLOCK(args->main_thread_mutex);
+  kvz_sem_post(args->filled_input_slots);
 
   // Do some cleaning up.
   args->api->picture_free(frame_in);
 
   pthread_exit(NULL);
-  return 0;
+  return NULL;
+}
+
+
+void output_recon_pictures(const kvz_api *const api,
+                           FILE *recout,
+                           kvz_picture *buffer[KVZ_MAX_GOP_LENGTH],
+                           int *buffer_size,
+                           uint64_t *next_pts,
+                           unsigned width,
+                           unsigned height)
+{
+  bool picture_written;
+  do {
+    picture_written = false;
+    for (int i = 0; i < *buffer_size; i++) {
+
+      kvz_picture *pic = buffer[i];
+      if (pic->pts == *next_pts) {
+        // Output the picture and remove it.
+        if (!yuv_io_write(recout, pic, width, height)) {
+          fprintf(stderr, "Failed to write reconstructed picture!\n");
+        }
+        api->picture_free(pic);
+        picture_written = true;
+        (*next_pts)++;
+
+        // Move rest of the pictures one position backward.
+        for (i++; i < *buffer_size; i++) {
+          buffer[i - 1] = buffer[i];
+          buffer[i] = NULL;
+        }
+        (*buffer_size)--;
+      }
+    }
+  } while (picture_written);
 }
 
 
@@ -269,15 +328,37 @@ int main(int argc, char *argv[])
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   KVZ_CLOCK_T encoding_start_real_time;
-  
+
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
+
+  // PTS of the reconstructed picture that should be output next.
+  // Only used with --debug.
+  uint64_t next_recon_pts = 0;
+  // Buffer for storing reconstructed pictures that are not to be output
+  // yet (i.e. in wrong order because GOP is used).
+  // Only used with --debug.
+  kvz_picture *recon_buffer[KVZ_MAX_GOP_LENGTH] = { NULL };
+  int recon_buffer_size = 0;
+
+  // Semaphores for synchronizing the input reader thread and the main
+  // thread.
+  //
+  // available_input_slots tells whether the main thread is currently using
+  // input_handler_args.img_in. (0 = in use, 1 = not in use)
+  //
+  // filled_input_slots tells whether there is a new input picture (or NULL
+  // if the input has ended) in input_handler_args.img_in placed by the
+  // input reader thread. (0 = no new image, 1 = one new image)
+  //
+  kvz_sem_t *available_input_slots = NULL;
+  kvz_sem_t *filled_input_slots = NULL;
 
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
   setmode( _fileno( stderr ), _O_TEXT );
 #endif
-      
+
   CHECKPOINTS_INIT();
 
   const kvz_api * const api = kvz_api_get(8);
@@ -334,8 +415,8 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  encoder_control_t *encoder = enc->control;
-  
+  const encoder_control_t *encoder = enc->control;
+
   fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
@@ -360,22 +441,26 @@ int main(int argc, char *argv[])
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
+    // how many bits have been written this second? used for checking if framerate exceeds level's limits
+    uint64_t bits_this_second = 0;
+    // the amount of frames have been encoded in this second of video. can be non-integer value if framerate is non-integer value
+    unsigned frames_this_second = 0;
+    const float framerate = ((float)encoder->cfg.framerate_num) / ((float)encoder->cfg.framerate_denom);
+
     uint8_t padding_x = get_padding(opts->config->width);
     uint8_t padding_y = get_padding(opts->config->height);
 
     pthread_t input_thread;
 
-    pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t main_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-    // Lock both mutexes at startup
-    PTHREAD_LOCK(&main_thread_mutex);
-    PTHREAD_LOCK(&input_mutex);
+    available_input_slots = calloc(1, sizeof(kvz_sem_t));
+    filled_input_slots    = calloc(1, sizeof(kvz_sem_t));
+    kvz_sem_init(available_input_slots, 0);
+    kvz_sem_init(filled_input_slots,    0);
 
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
-      .input_mutex = NULL,
-      .main_thread_mutex = NULL,
+      .available_input_slots = available_input_slots,
+      .filled_input_slots    = filled_input_slots,
 
       .input = input,
       .api = api,
@@ -387,8 +472,8 @@ int main(int argc, char *argv[])
       .img_in = NULL,
       .retval = RETVAL_RUNNING,
     };
-    in_args.input_mutex = &input_mutex;
-    in_args.main_thread_mutex = &main_thread_mutex;
+    in_args.available_input_slots = available_input_slots;
+    in_args.filled_input_slots    = filled_input_slots;
 
     if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
       fprintf(stderr, "pthread_create failed!\n");
@@ -400,11 +485,12 @@ int main(int argc, char *argv[])
 
       // Skip mutex locking if the input thread does not exist.
       if (in_args.retval == RETVAL_RUNNING) {
-        // Unlock input_mutex so that the input thread can write the new
-        // img_in and retval to in_args.
-        PTHREAD_UNLOCK(&input_mutex);
-        // Wait until the input thread has updated in_args.
-        PTHREAD_LOCK(&main_thread_mutex);
+        // Increase available_input_slots so that the input thread can
+        // write the new img_in and retval to in_args.
+        kvz_sem_post(available_input_slots);
+        // Wait until the input thread has updated in_args and then
+        // decrease filled_input_slots.
+        kvz_sem_wait(filled_input_slots);
 
         cur_in_img = in_args.img_in;
         in_args.img_in = NULL;
@@ -461,11 +547,44 @@ int main(int argc, char *argv[])
         fflush(output);
 
         bitstream_length += len_out;
+        
+        // the level's bitrate check
+        frames_this_second += 1;
+
+        if ((float)frames_this_second >= framerate) {
+          // if framerate <= 1 then we go here always
+
+          // how much of the bits of the last frame belonged to the next second
+          uint64_t leftover_bits = (uint64_t)((double)len_out * ((double)frames_this_second - framerate));
+
+          // the latest frame is counted for the amount that it contributed to this current second
+          bits_this_second += len_out - leftover_bits;
+
+          if (bits_this_second > encoder->cfg.max_bitrate) {
+            fprintf(stderr, "Level warning: This %s's bitrate (%llu bits/s) reached the maximum bitrate (%u bits/s) of %s tier level %g.",
+              framerate >= 1.0f ? "second" : "frame",
+              (unsigned long long) bits_this_second,
+              encoder->cfg.max_bitrate,
+              encoder->cfg.high_tier ? "high" : "main",
+              (float)encoder->cfg.level / 10.0f );
+          }
+
+          if (framerate > 1.0f) {
+            // leftovers for the next second
+            bits_this_second = leftover_bits;
+          } else {
+            // one or more next seconds are from this frame and their bitrate is the same or less as this frame's
+            bits_this_second = 0;
+          }
+          frames_this_second = 0;
+        } else {
+          bits_this_second += len_out;
+        }
 
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
           // Do not compute PSNR for interlaced frames, because img_rec does not contain
           // the deinterlaced frame yet.
           compute_psnr(img_src, img_rec, frame_psnr);
@@ -474,12 +593,20 @@ int main(int argc, char *argv[])
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
           assert(img_rec);
-          if (!yuv_io_write(recout,
-                            img_rec,
-                            opts->config->width,
-                            opts->config->height)) {
-            fprintf(stderr, "Failed to write reconstructed picture!\n");
-          }
+
+          // Move img_rec to the recon buffer.
+          assert(recon_buffer_size < KVZ_MAX_GOP_LENGTH);
+          recon_buffer[recon_buffer_size++] = img_rec;
+          img_rec = NULL;
+
+          // Try to output some reconstructed pictures.
+          output_recon_pictures(api,
+                                recout,
+                                recon_buffer,
+                                &recon_buffer_size,
+                                &next_recon_pts,
+                                opts->config->width,
+                                opts->config->height);
         }
 
         frames_done += 1;
@@ -487,7 +614,7 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out);
+        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr);
       }
 
       api->picture_free(cur_in_img);
@@ -500,12 +627,15 @@ int main(int argc, char *argv[])
     encoding_end_cpu_time = clock();
     // Coding finished
 
+    // All reconstructed pictures should have been output.
+    assert(recon_buffer_size == 0);
+
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits",
             frames_done,
             (long long unsigned int)bitstream_length * 8);
-    if (frames_done > 0) {
-      fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+    if (encoder->cfg.calc_psnr && frames_done > 0) {
+      fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
               psnr_sum[2] / frames_done);
@@ -530,6 +660,12 @@ exit_failure:
   retval = EXIT_FAILURE;
 
 done:
+  // destroy semaphores
+  if (available_input_slots) kvz_sem_destroy(available_input_slots);
+  if (filled_input_slots)    kvz_sem_destroy(filled_input_slots);
+  FREE_POINTER(available_input_slots);
+  FREE_POINTER(filled_input_slots);
+
   // deallocate structures
   if (enc) api->encoder_close(enc);
   if (opts) cmdline_opts_free(api, opts);

@@ -39,4 +39,17 @@ kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value);
 // Assumes PIXEL_MAX to be 2^n-1
 kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
 
+unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
+                                       const int32_t     stride1,
+                                       const kvz_pixel * buf2,
+                                       const int32_t     stride2);
+
+void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
+                                        const int stride,
+                                        const kvz_pixel *orig,
+                                        const int orig_stride,
+                                        unsigned costs[4]);
+
+
+
 #endif //STRATEGIES_PICTURE_GENERIC_H_

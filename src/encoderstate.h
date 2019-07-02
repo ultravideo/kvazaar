@@ -37,6 +37,7 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "extras/crypto.h"
 
 
 typedef enum {
@@ -48,29 +49,59 @@ typedef enum {
 } encoder_state_type;
 
 
+typedef struct lcu_stats_t {
+  //! \brief Number of bits that were spent
+  uint32_t bits;
 
-typedef struct {
-  double cur_lambda_cost; //!< \brief Lambda for SSE
-  double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
-  
-  int32_t frame;
-  int32_t poc; /*!< \brief picture order count */
-  int8_t gop_offset; /*!< \brief offset in the gop structure */
-  
-  int8_t QP;   //!< \brief Quantization parameter
-  double QP_factor; //!< \brief Quantization factor
-  
-  //Current picture available references
+  //! \brief Weight of the LCU for rate control
+  double weight;
+
+  //! \brief Lambda value which was used for this LCU
+  double lambda;
+
+  //! \brief Rate control alpha parameter
+  double rc_alpha;
+
+  //! \brief Rate control beta parameter
+  double rc_beta;
+} lcu_stats_t;
+
+
+typedef struct encoder_state_config_frame_t {
+  /**
+   * \brief Frame-level lambda.
+   *
+   * Use state->lambda or state->lambda_sqrt for cost computations.
+   *
+   * \see encoder_state_t::lambda
+   * \see encoder_state_t::lambda_sqrt
+   */
+  double lambda;
+
+  int32_t num;       /*!< \brief Frame number */
+  int32_t poc;       /*!< \brief Picture order count */
+  int8_t gop_offset; /*!< \brief Offset in the gop structure */
+  int32_t irap_poc;  /*!< \brief POC of the associated IRAP picture */
+
+  /**
+   * \brief Frame-level quantization parameter
+   *
+   * \see encoder_state_t::qp
+   */
+  int8_t QP;
+  //! \brief quantization factor
+  double QP_factor;
+
+  //! Current pictures available for references
   image_list_t *ref;
   int8_t ref_list;
 
-  struct {
-    int32_t poc;
-    int8_t list;
-    int8_t idx;
-  } refmap[16];
-  
-  bool is_idr_frame;
+  //! L0 and L1 reference index list
+  uint8_t ref_LX[2][16];
+  //! L0 reference index list size
+  uint8_t ref_LX_size[2];
+
+  bool is_irap;
   uint8_t pictype;
   enum kvz_slice_type slicetype;
 
@@ -83,39 +114,82 @@ typedef struct {
   //! Number of bits targeted for the current GOP.
   double cur_gop_target_bits;
 
+  //! Number of bits targeted for the current picture.
+  double cur_pic_target_bits;
+
   // Parameters used in rate control
   double rc_alpha;
   double rc_beta;
 
-} encoder_state_config_global_t;
+  /**
+   * \brief Indicates that this encoder state is ready for encoding the
+   * next frame i.e. kvz_encoder_prepare has been called.
+   */
+  bool prepared;
 
-typedef struct {
+  /**
+   * \brief Indicates that the previous frame has been encoded and the
+   * encoded data written and the encoding the next frame has not been
+   * started yet.
+   */
+  bool done;
+
+  /**
+   * \brief Information about the coded LCUs.
+   *
+   * Used for rate control.
+   */
+  lcu_stats_t *lcu_stats;
+
+  /**
+   * \brief Whether next NAL is the first NAL in the access unit.
+   */
+  bool first_nal;
+
+} encoder_state_config_frame_t;
+
+typedef struct encoder_state_config_tile_t {
   //Current sub-frame
   videoframe_t *frame;
   
   int32_t id;
-  
+
   //Tile: offset in LCU for current encoder_state in global coordinates
   int32_t lcu_offset_x;
   int32_t lcu_offset_y;
-  
+
+  //Tile: offset in pixels
+  int32_t offset_x;
+  int32_t offset_y;
+
   //Position of the first element in tile scan in global coordinates
   int32_t lcu_offset_in_ts;
   
-  //Buffer for search
-  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
+  // This is a buffer for the non-loopfiltered bottom pixels of every LCU-row
+  // in the tile. They are packed such that each LCU-row index maps to the
+  // y-coordinate.
   yuv_t *hor_buf_search;
-  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
+  // This is a buffer for the non-loopfiltered rightmost pixels of every
+  // LCU-column. They are packed such that each LCU-column index maps to the
+  // x-coordinate.
   yuv_t *ver_buf_search;
-  
-  // The bottom post-deblocking, pre-SAO pixels of every WPP-row.
+
+  // This is a buffer for the deblocked bottom pixels of every LCU in the
+  // tile. They are packed such that each LCU-row index maps to the
+  // y-coordinate.
   yuv_t *hor_buf_before_sao;
-  
+
+  // This is a buffer for the deblocked right pixels of every LCU in the
+  // tile. They are packed such that each LCU-column index maps to the
+  // x-coordinate.
+  yuv_t *ver_buf_before_sao;
+
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
+
 } encoder_state_config_tile_t;
 
-typedef struct {
+typedef struct encoder_state_config_slice_t {
   int32_t id;
   
   //Global coordinates
@@ -127,7 +201,7 @@ typedef struct {
   int32_t end_in_rs;
 } encoder_state_config_slice_t;
 
-typedef struct {
+typedef struct encoder_state_config_wfrow_t {
   //Row in tile coordinates of the wavefront
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow_t;
@@ -163,7 +237,7 @@ typedef struct encoder_state_t {
   //Pointer to the encoder_state of the previous frame
   struct encoder_state_t *previous_encoder_state;
   
-  encoder_state_config_global_t *global;
+  encoder_state_config_frame_t  *frame;
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;
@@ -175,52 +249,98 @@ typedef struct encoder_state_t {
   bitstream_t stream;
   cabac_data_t cabac;
 
-  /**
-   * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. kvz_encoder_next_frame has been called.
-   */
-  int prepared;
-
-  /**
-   * \brief Indicates that the previous frame has been encoded and the
-   * encoded data written and the encoding the next frame has not been
-   * started yet.
-   */
-  int frame_done;
+  // Crypto stuff
+  crypto_handle_t *crypto_hdl;
+  uint32_t crypto_prev_pos;
 
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
-  
+
+  //! \brief Lambda for SSE
+  double lambda;
+  //! \brief Lambda for SAD and SATD
+  double lambda_sqrt;
+  //! \brief Quantization parameter for the current LCU
+  int8_t qp;
+
+  /**
+   * \brief Whether a QP delta value must be coded for the current LCU.
+   */
+  bool must_code_qp_delta;
+
+  /**
+   * \brief QP value of the last CU in the last coded quantization group.
+   *
+   * A quantization group is a square of width
+   * (LCU_WIDTH >> encoder_control->max_qp_delta_depth). All CUs of in the
+   * same quantization group share the QP predictor value, but may have
+   * different QP values.
+   *
+   * Set to the frame QP at the beginning of a wavefront row or a tile and
+   * updated when the last CU of a quantization group is coded.
+   */
+  int8_t last_qp;
+
+  /**
+   * \brief Coeffs for the LCU.
+   */
+  lcu_coeff_t *coeff;
+
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
 } encoder_state_t;
 
-void kvz_encode_one_frame(encoder_state_t *state);
+void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
 
-void kvz_encoder_next_frame(encoder_state_t *state);
+void kvz_encoder_prepare(encoder_state_t *state);
 
-
-void kvz_encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
-                        uint16_t y_ctb, uint8_t depth);
-
-void kvz_encode_last_significant_xy(encoder_state_t *state,
-                                uint8_t lastpos_x, uint8_t lastpos_y,
-                                uint8_t width, uint8_t height,
-                                uint8_t type, uint8_t scan);
-void kvz_encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
-                      uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void kvz_encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
-                            int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(const encoder_control_t * const encoder,
-                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 
-void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
-                               int ref_list_len_out[2],
-                               int ref_list_poc_out[2][16]);
+void kvz_encoder_create_ref_lists(const encoder_state_t *const state);
+
+lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
+
+
+int kvz_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp);
+
+/**
+ * Whether the parameter sets should be written with the current frame.
+ */
+static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
+{
+  const int32_t frame = state->frame->num;
+  const int32_t vps_period = state->encoder_control->cfg.vps_period;
+
+  return (vps_period >  0 && frame % vps_period == 0) ||
+         (vps_period >= 0 && frame == 0);
+}
+
+
+/**
+ * \brief Returns true if the CU is the last CU in its containing
+ * quantization group.
+ *
+ * \param state   encoder state
+ * \param x       x-coordinate of the left edge of the CU
+ * \param y       y-cooradinate of the top edge of the CU
+ * \param depth   depth in the CU tree
+ * \return true, if it's the last CU in its QG, otherwise false
+ */
+static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, int x, int y, int depth)
+{
+  if (state->encoder_control->max_qp_delta_depth < 0) return false;
+
+  const int cu_width = LCU_WIDTH >> depth;
+  const int qg_width = LCU_WIDTH >> state->encoder_control->max_qp_delta_depth;
+  const int right  = x + cu_width;
+  const int bottom = y + cu_width;
+  return (right % qg_width == 0 || right >= state->tile->frame->width) &&
+         (bottom % qg_width == 0 || bottom >= state->tile->frame->height);
+}
+
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

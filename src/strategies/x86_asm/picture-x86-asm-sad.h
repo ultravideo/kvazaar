@@ -36,6 +36,8 @@ unsigned kvz_sad_16x16_avx(const kvz_pixel*, const kvz_pixel*);
 unsigned kvz_sad_4x4_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
 unsigned kvz_sad_8x8_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
 unsigned kvz_sad_16x16_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
+unsigned kvz_sad_32x32_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
+unsigned kvz_sad_64x64_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
 
 
 #endif

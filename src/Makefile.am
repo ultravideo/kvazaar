@@ -36,6 +36,16 @@ kvazaar_LDADD = libkvazaar.la libvisualization.la $(LIBS)
 
 kvazaar_CPPFLAGS = -DKVZ_VERSION="`$(srcdir)/../tools/version.sh`"
 
+if USE_CRYPTOPP
+kvazaar_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+else
+kvazaar_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+endif
+
 libkvazaar_la_SOURCES = \
 	bitstream.c \
 	bitstream.h \
@@ -59,6 +69,8 @@ libkvazaar_la_SOURCES = \
 	encoder_state-ctors_dtors.h \
 	encoder_state-geometry.c \
 	encoder_state-geometry.h \
+	encode_coding_tree.c \
+	encode_coding_tree.h \
 	filter.c \
 	filter.h \
 	global.h \
@@ -114,6 +126,8 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/quant-generic.h \
 	strategies/generic/sao-generic.c \
 	strategies/generic/sao-generic.h \
+	strategies/generic/encode_coding_tree-generic.c \
+	strategies/generic/encode_coding_tree-generic.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -129,12 +143,15 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-quant.h \
 	strategies/strategies-sao.c \
 	strategies/strategies-sao.h \
+	strategies/strategies-encode.c \
+	strategies/strategies-encode.h \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
 	strategyselector.h \
 	extras/libmd5.c \
-	extras/libmd5.h
+	extras/libmd5.h \
+	extras/crypto.h
 
 libkvazaar_la_CFLAGS = $(AM_CFLAGS)
 
@@ -150,6 +167,18 @@ libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VE
 libvisualization_la_SOURCES = \
 	visualization.c \
 	visualization.h
+if USE_CRYPTOPP
+libkvazaar_la_SOURCES += \
+	extras/crypto.h \
+	extras/crypto.cpp
+libkvazaar_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) \
+	$(libkvazaar_la_LDFLAGS) $(LDFLAGS) -o $@
+else
+libkvazaar_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libkvazaar_la_LDFLAGS) $(LDFLAGS) -o $@
+endif
 
 libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.c \
@@ -167,8 +196,9 @@ libavx2_la_SOURCES = \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
 	strategies/avx2/sao-avx2.c \
-	strategies/avx2/sao-avx2.h
-	
+	strategies/avx2/sao-avx2.h \
+	strategies/avx2/encode_coding_tree-avx2.c \
+	strategies/avx2/encode_coding_tree-avx2.h
 
 libsse2_la_SOURCES = \
 	strategies/sse2/picture-sse2.c \
@@ -179,13 +209,17 @@ libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.h
 
 if HAVE_PPC
-libaltivec_la_CFLAGS = $(AM_CFLAGS) -maltivec
+
+if HAVE_ALTIVEC
+libaltivec_la_CFLAGS = -maltivec
 endif
+
+endif #HAVE_PPC
 
 if HAVE_X86
 
 if HAVE_AVX2
-libavx2_la_CFLAGS = $(AM_CFLAGS) -mavx2
+libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mbmi2
 endif
 if HAVE_SSE4_1
 libsse41_la_CFLAGS = $(AM_CFLAGS) -msse4.1
@@ -215,5 +249,5 @@ yasm_verbose_ = $(yasm_verbose_@AM_DEFAULT_V@)
 yasm_verbose_0 = @echo "  YASM    " $@;
 
 .asm.lo:
-	$(yasm_verbose)$(LIBTOOL) --mode=compile $(YASM) -I$(srcdir)/extras $(ASFLAGS) $< -o $@ -prefer-non-pic 1>/dev/null
+	$(yasm_verbose)$(LIBTOOL) --mode=compile --tag=CC $(YASM) -I$(srcdir)/extras $(ASFLAGS) $< -o $@ -prefer-non-pic 1>/dev/null
 

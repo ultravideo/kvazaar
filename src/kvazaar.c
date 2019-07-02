@@ -43,14 +43,29 @@
 static void kvazaar_close(kvz_encoder *encoder)
 {
   if (encoder) {
+    // The threadqueue must be stopped before freeing states.
+    if (encoder->control) {
+      kvz_threadqueue_stop(encoder->control->threadqueue);
+    }
+
     if (encoder->states) {
+      // Flush input frame buffer.
+      kvz_picture *pic = NULL;
+      while ((pic = kvz_encoder_feed_frame(&encoder->input_buffer,
+                                           &encoder->states[0],
+                                           NULL)) != NULL) {
+        kvz_image_free(pic);
+        pic = NULL;
+      }
+
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
         kvz_encoder_state_finalize(&encoder->states[i]);
       }
     }
     FREE_POINTER(encoder->states);
 
-    kvz_encoder_control_free(encoder->control);
+    // Discard const from the pointer.
+    kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
   }
   FREE_POINTER(encoder);
@@ -68,8 +83,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  kvz_init_exp_golomb();
-
   encoder = calloc(1, sizeof(kvz_encoder));
   if (!encoder) {
     goto kvazaar_open_failure;
@@ -80,7 +93,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  encoder->num_encoder_states = encoder->control->owf + 1;
+  encoder->num_encoder_states = encoder->control->cfg.owf + 1;
   encoder->cur_state_num = 0;
   encoder->out_state_num = 0;
   encoder->frames_started = 0;
@@ -100,7 +113,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
       goto kvazaar_open_failure;
     }
 
-    encoder->states[i].global->QP = (int8_t)cfg->qp;
+    encoder->states[i].frame->QP = (int8_t)cfg->qp;
   }
 
   for (int i = 0; i < encoder->num_encoder_states; ++i) {
@@ -112,7 +125,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     kvz_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
   }
 
-  encoder->states[encoder->cur_state_num].global->frame = -1;
+  encoder->states[encoder->cur_state_num].frame->num = -1;
 
   return encoder;
 
@@ -124,11 +137,24 @@ kvazaar_open_failure:
 
 static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *const state)
 {
-  info->poc = state->global->poc,
-  info->qp = state->global->QP;
-  info->nal_unit_type = state->global->pictype;
-  info->slice_type = state->global->slicetype;
-  kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
+  info->poc = state->frame->poc,
+  info->qp = state->frame->QP;
+  info->nal_unit_type = state->frame->pictype;
+  info->slice_type = state->frame->slicetype;
+
+  memset(info->ref_list[0], 0, 16 * sizeof(int));
+  memset(info->ref_list[1], 0, 16 * sizeof(int));
+
+  for (size_t i = 0; i < state->frame->ref_LX_size[0]; i++) {
+    info->ref_list[0][i] = state->frame->ref->pocs[state->frame->ref_LX[0][i]];
+  }
+
+  for (size_t i = 0; i < state->frame->ref_LX_size[1]; i++) {
+    info->ref_list[1][i] = state->frame->ref->pocs[state->frame->ref_LX[1][i]];
+  }
+
+  info->ref_list_len[0] = state->frame->ref_LX_size[0];
+  info->ref_list_len[1] = state->frame->ref_LX_size[1];
 }
 
 
@@ -211,19 +237,20 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-  if (!state->prepared) {
-    kvz_encoder_next_frame(state);
+  if (!state->frame->prepared) {
+    kvz_encoder_prepare(state);
   }
 
   if (pic_in != NULL) {
     // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
+    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
-  if (kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in)) {
-    assert(state->global->frame == enc->frames_started);
+  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
+  if (frame) {
+    assert(state->frame->num == enc->frames_started);
     // Start encoding.
-    kvz_encode_one_frame(state);
+    kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;
   }
 
@@ -232,19 +259,19 @@ static int kvazaar_encode(kvz_encoder *enc,
     return 1;
   }
 
-  if (!state->frame_done) {
+  if (!state->frame->done) {
     // We started encoding a frame; move to the next encoder state.
     enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   }
 
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
-  if (!output_state->frame_done &&
+  if (!output_state->frame->done &&
       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
 
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
     // The job pointer must be set to NULL here since it won't be usable after
     // the next frame is done.
-    output_state->tqj_bitstream_written = NULL;
+    kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
     if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
@@ -253,8 +280,8 @@ static int kvazaar_encode(kvz_encoder *enc,
     if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
     if (info_out) set_frame_info(info_out, output_state);
 
-    output_state->frame_done = 1;
-    output_state->prepared = 0;
+    output_state->frame->done = 1;
+    output_state->frame->prepared = 0;
     enc->frames_done += 1;
 
     enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);
@@ -272,7 +299,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
                                           kvz_picture **src_out,
                                           kvz_frame_info *info_out)
 {
-  if (enc->control->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+  if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
@@ -283,14 +310,14 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   struct {
     kvz_data_chunk* data_out;
     uint32_t len_out;
-  } first = { 0 }, second = { 0 };
+  } first = { 0, 0 }, second = { 0, 0 };
 
   if (pic_in != NULL) {
-    first_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    first_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (first_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
-    second_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    second_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (second_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
@@ -354,7 +381,7 @@ static const kvz_api kvz_8bit_api = {
   .config_destroy = kvz_config_destroy,
   .config_parse = kvz_config_parse,
 
-  .picture_alloc = kvz_image_alloc,
+  .picture_alloc = kvz_image_alloc_420,
   .picture_free = kvz_image_free,
 
   .chunk_free = kvz_bitstream_free_chunks,
@@ -363,6 +390,8 @@ static const kvz_api kvz_8bit_api = {
   .encoder_close = kvazaar_close,
   .encoder_headers = kvazaar_headers,
   .encoder_encode = kvazaar_field_encoding_adapter,
+
+  .picture_alloc_csp = kvz_image_alloc,
 };
 
 

@@ -24,7 +24,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 hardware_flags_t kvz_g_hardware_flags;
+hardware_flags_t kvz_g_strategies_in_use;
+hardware_flags_t kvz_g_strategies_available;
 
 static void set_hardware_flags(int32_t cpuid);
 static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type);
@@ -78,6 +86,11 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     return 0;
   }
   
+  if (!kvz_strategy_register_encode(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_encode failed!\n");
+    return 0;
+  }
+  
   while(cur_strategy_to_select->fptr) {
     *(cur_strategy_to_select->fptr) = strategyselector_choose_for(&strategies, cur_strategy_to_select->strategy_type);
     
@@ -87,10 +100,118 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     }
     ++cur_strategy_to_select;
   }
-  
+
   //We can free the structure now, as all strategies are statically set to pointers
   if (strategies.allocated) {
-    free(strategies.strategies);
+	  //Also check what optimizations are available and what are in use
+	  //SIMD optimizations available
+	  bool strategies_available = false;
+	  fprintf(stderr, "Available: ");
+	  if (kvz_g_strategies_available.intel_flags.avx != 0){
+		  fprintf(stderr, "avx(%d) ", kvz_g_strategies_available.intel_flags.avx);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.avx2 != 0){
+		  fprintf(stderr, "avx2(%d) ", kvz_g_strategies_available.intel_flags.avx2);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.mmx != 0) {
+		  fprintf(stderr, "mmx(%d) ", kvz_g_strategies_available.intel_flags.mmx);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.sse != 0) {
+		  fprintf(stderr, "sse(%d) ", kvz_g_strategies_available.intel_flags.sse);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.sse2 != 0) {
+		  fprintf(stderr, "sse2(%d) ", kvz_g_strategies_available.intel_flags.sse2);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.sse3 != 0) {
+		  fprintf(stderr, "sse3(%d) ", kvz_g_strategies_available.intel_flags.sse3);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.sse41 != 0) {
+		  fprintf(stderr, "sse41(%d) ", kvz_g_strategies_available.intel_flags.sse41);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.sse42 != 0) {
+		  fprintf(stderr, "sse42(%d) ", kvz_g_strategies_available.intel_flags.sse42);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.intel_flags.ssse3 != 0) {
+		  fprintf(stderr, "ssse3(%d) ", kvz_g_strategies_available.intel_flags.ssse3);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.arm_flags.neon != 0) {
+		  fprintf(stderr, "neon(%d) ", kvz_g_strategies_available.arm_flags.neon);
+		  strategies_available = true;
+	  }
+	  if (kvz_g_strategies_available.powerpc_flags.altivec != 0) {
+		  fprintf(stderr, "altivec(%d) ", kvz_g_strategies_available.powerpc_flags.altivec);
+		  strategies_available = true;
+	  }
+	  //If there is no strategies available
+	  if (!strategies_available){
+		  fprintf(stderr, "no SIMD optimizations");
+	  }
+	  fprintf(stderr, "\n");
+
+	  //SIMD optimizations in use
+	  bool strategies_in_use = false;
+	  fprintf(stderr, "In use: ");
+	  if (kvz_g_strategies_in_use.intel_flags.avx != 0){
+		  fprintf(stderr, "avx(%d) ", kvz_g_strategies_in_use.intel_flags.avx);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.avx2 != 0){ 
+		  fprintf(stderr, "avx2(%d) ", kvz_g_strategies_in_use.intel_flags.avx2);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.mmx != 0) {
+		  fprintf(stderr, "mmx(%d) ", kvz_g_strategies_in_use.intel_flags.mmx);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.sse != 0) {
+		  fprintf(stderr, "sse(%d) ", kvz_g_strategies_in_use.intel_flags.sse);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.sse2 != 0) {
+		  fprintf(stderr, "sse2(%d) ", kvz_g_strategies_in_use.intel_flags.sse2);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.sse3 != 0) {
+		  fprintf(stderr, "sse3(%d) ", kvz_g_strategies_in_use.intel_flags.sse3);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.sse41 != 0) {
+		  fprintf(stderr, "sse41(%d) ", kvz_g_strategies_in_use.intel_flags.sse41);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.sse42 != 0) {
+		  fprintf(stderr, "sse42(%d) ", kvz_g_strategies_in_use.intel_flags.sse42);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.intel_flags.ssse3 != 0) {
+		  fprintf(stderr, "ssse3(%d) ", kvz_g_strategies_in_use.intel_flags.ssse3);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.arm_flags.neon != 0) {
+		  fprintf(stderr, "neon(%d) ", kvz_g_strategies_in_use.arm_flags.neon);
+		  strategies_in_use = true;
+	  }
+	  if (kvz_g_strategies_in_use.powerpc_flags.altivec != 0) {
+		  fprintf(stderr, "altivec(%d) ", kvz_g_strategies_in_use.powerpc_flags.altivec);
+		  strategies_in_use = true;
+	  }
+	  //If there is no strategies in use
+	  if (!strategies_in_use){
+		  fprintf(stderr, "no SIMD optimizations");
+	  }
+	  fprintf(stderr, "\n");
+
+	  //Free memory
+	  free(strategies.strategies);
   }
 
   return 1;
@@ -117,6 +238,21 @@ int kvz_strategyselector_register(void * const opaque, const char * const type, 
     new_strategy->priority = priority;
     new_strategy->fptr = fptr;
   }
+
+  //Check what strategies are available when they are registered
+  if (strcmp(strategy_name, "avx") == 0) kvz_g_strategies_available.intel_flags.avx++;
+  if (strcmp(strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_available.intel_flags.avx++;
+  if (strcmp(strategy_name, "avx2") == 0) kvz_g_strategies_available.intel_flags.avx2++;
+  if (strcmp(strategy_name, "mmx") == 0) kvz_g_strategies_available.intel_flags.mmx++;
+  if (strcmp(strategy_name, "sse") == 0) kvz_g_strategies_available.intel_flags.sse++;
+  if (strcmp(strategy_name, "sse2") == 0) kvz_g_strategies_available.intel_flags.sse2++;
+  if (strcmp(strategy_name, "sse3") == 0) kvz_g_strategies_available.intel_flags.sse3++;
+  if (strcmp(strategy_name, "sse41") == 0) kvz_g_strategies_available.intel_flags.sse41++;
+  if (strcmp(strategy_name, "sse42") == 0) kvz_g_strategies_available.intel_flags.sse42++;
+  if (strcmp(strategy_name, "ssse3") == 0) kvz_g_strategies_available.intel_flags.ssse3++;
+  if (strcmp(strategy_name, "altivec") == 0) kvz_g_strategies_available.powerpc_flags.altivec++;
+  if (strcmp(strategy_name, "neon") == 0) kvz_g_strategies_available.arm_flags.neon++;
+
 #ifdef DEBUG_STRATEGYSELECTOR
   fprintf(stderr, "Registered strategy %s:%s with priority %d (%p)\n", type, strategy_name, priority, fptr);
 #endif //DEBUG_STRATEGYSELECTOR
@@ -174,6 +310,20 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   if (max_priority_i == -1) {
     return NULL;
   }
+
+  //Check what strategy we are going to use
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx2") == 0) kvz_g_strategies_in_use.intel_flags.avx2++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "mmx") == 0) kvz_g_strategies_in_use.intel_flags.mmx++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse") == 0) kvz_g_strategies_in_use.intel_flags.sse++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse2") == 0) kvz_g_strategies_in_use.intel_flags.sse2++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse3") == 0) kvz_g_strategies_in_use.intel_flags.sse3++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse41") == 0) kvz_g_strategies_in_use.intel_flags.sse41++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse42") == 0) kvz_g_strategies_in_use.intel_flags.sse42++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "ssse3") == 0) kvz_g_strategies_in_use.intel_flags.ssse3++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "altivec") == 0) kvz_g_strategies_in_use.powerpc_flags.altivec++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "neon") == 0) kvz_g_strategies_in_use.arm_flags.neon++;
   
   return strategies->strategies[max_priority_i].fptr;
 }
@@ -224,40 +374,67 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/auxvec.h>
+#  if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD__ >= 12)
+#ifdef __linux__
 #include <asm/cputable.h>
+#else
+#include <machine/cpu.h>
+#endif
+#include <sys/auxv.h>
 
-//Source: http://freevec.org/function/altivec_runtime_detection_linux
 static int altivec_available(void)
 {
-    int result = 0;
-    unsigned long buf[64];
-    ssize_t count;
-    int fd, i;
- 
-    fd = open("/proc/self/auxv", O_RDONLY);
-    if (fd < 0) {
-        return 0;
-    }
-    // loop on reading
-    do {
-        count = read(fd, buf, sizeof(buf));
-        if (count < 0)
-            break;
-        for (i=0; i < (count / sizeof(unsigned long)); i += 2) {
-            if (buf[i] == AT_HWCAP) {
-                result = !!(buf[i+1] & PPC_FEATURE_HAS_ALTIVEC);
-                goto out_close;
-            } else if (buf[i] == AT_NULL)
-                goto out_close;
-        }
-    } while (count == sizeof(buf));
-out_close:
-    close(fd);
-    return result;
+    unsigned long hwcap = 0;
+#ifdef __linux__
+    hwcap = getauxval(AT_HWCAP);
+#else
+    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+#endif
+    return !!(hwcap & PPC_FEATURE_HAS_ALTIVEC);
 }
+#  elif defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <machine/cpu.h>
+
+static int altivec_available(void)
+{
+  u_long cpu_features = 0;
+  size_t len = sizeof(cpu_features);
+
+  sysctlbyname("hw.cpu_features", &cpu_features, &len, NULL, 0);
+  return !!(cpu_features & PPC_FEATURE_HAS_ALTIVEC);
+}
+#  elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#ifndef __APPLE__
+#include <machine/cpu.h>
+#endif
+
+static int altivec_available(void)
+{
+  int cpu_altivec = 0;
+  size_t len = sizeof(cpu_altivec);
+#ifdef HW_VECTORUNIT
+  int mib[] = { CTL_HW, HW_VECTORUNIT };
+#else
+  int mib[] = { CTL_MACHDEP, CPU_ALTIVEC };
+#endif
+
+  sysctl(mib, sizeof(mib)/sizeof(mib[0]), &cpu_altivec, &len, NULL, 0);
+  return cpu_altivec;
+}
+#  else
+static int altivec_available(void)
+{
+#if COMPILE_POWERPC_ALTIVEC
+  return 1;
+#else
+  return 0;
+#endif
+}
+#  endif
 #endif //COMPILE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
@@ -271,6 +448,7 @@ static void set_hardware_flags(int32_t cpuid) {
       CPUID1_EDX_MMX = 1 << 23,
       CPUID1_EDX_SSE = 1 << 25,
       CPUID1_EDX_SSE2 = 1 << 26,
+      CPUID1_EDX_HYPER_THREADING = 1 << 28,
     };
     enum {
       CPUID1_ECX_SSE3 = 1 << 0,
@@ -291,6 +469,21 @@ static void set_hardware_flags(int32_t cpuid) {
 
     // Dig CPU features with cpuid
     get_cpuid(1, 0, &cpuid1);
+
+#ifdef _WIN32
+    SYSTEM_INFO systeminfo;
+    GetSystemInfo(&systeminfo);
+
+    kvz_g_hardware_flags.logical_cpu_count = systeminfo.dwNumberOfProcessors;
+#else
+    kvz_g_hardware_flags.logical_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+
+    kvz_g_hardware_flags.physical_cpu_count = kvz_g_hardware_flags.logical_cpu_count;
+    kvz_g_hardware_flags.intel_flags.hyper_threading = cpuid1.edx & CPUID1_EDX_HYPER_THREADING;
+    if (kvz_g_hardware_flags.intel_flags.hyper_threading) {
+      kvz_g_hardware_flags.physical_cpu_count /= 2;
+    }
     
     // EDX
     if (cpuid1.edx & CPUID1_EDX_MMX)   kvz_g_hardware_flags.intel_flags.mmx = 1;
@@ -369,7 +562,6 @@ static void set_hardware_flags(int32_t cpuid) {
   if (kvz_g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
   if (kvz_g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
   fprintf(stderr, "\n");
-  
 #endif //COMPILE_INTEL
 
 #if COMPILE_POWERPC

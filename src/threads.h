@@ -31,10 +31,6 @@
 #include <pthread.h>
 #include <stdio.h>
 
-#define E3 1000
-#define E9 1000000000
-#define FILETIME_TO_EPOCH 0x19DB1DED53E8000LL
-
 #if defined(__GNUC__) && !defined(__MINGW32__) 
 #include <unistd.h> // IWYU pragma: export
 #include <time.h> // IWYU pragma: export
@@ -43,40 +39,20 @@
 
 #ifdef __MACH__
 // Workaround Mac OS not having clock_gettime.
-#include <mach/clock.h> // IWYU pragma: export
-#include <mach/mach.h> // IWYU pragma: export
-#define KVZ_GET_TIME(clock_t) { \
-  clock_serv_t cclock; \
-  mach_timespec_t mts; \
-  host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock); \
-  clock_get_time(cclock, &mts); \
-  mach_port_deallocate(mach_task_self(), cclock); \
-  (clock_t)->tv_sec = mts.tv_sec; \
-  (clock_t)->tv_nsec = mts.tv_nsec; \
-}
+// This needs to work with pthread_cond_timedwait.
+#  include <sys/time.h>
+#  define KVZ_GET_TIME(clock_t) { \
+     struct timeval tv; \
+     gettimeofday(&tv, NULL); \
+     (clock_t)->tv_sec = tv.tv_sec; \
+     (clock_t)->tv_nsec = tv.tv_usec * 1000; \
+   }
 #else
-#define KVZ_GET_TIME(clock_t) { clock_gettime(CLOCK_MONOTONIC, (clock_t)); }
+#  define KVZ_GET_TIME(clock_t) { clock_gettime(CLOCK_MONOTONIC, (clock_t)); }
 #endif
 
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / 1e9)
 #define KVZ_CLOCK_T_DIFF(start, stop) ((double)((stop).tv_sec - (start).tv_sec) + (double)((stop).tv_nsec - (start).tv_nsec) / 1e9)
-
-static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, int wait_ms)
-{
-  KVZ_GET_TIME(result);
-  int64_t secs = result->tv_sec + wait_ms / E3;
-  int64_t nsecs = result->tv_nsec + (wait_ms % E3) * (E9 / E3);
-  
-  if (nsecs >= E9) {
-    secs += 1;
-    nsecs -= E9;
-  }
-  
-  result->tv_sec = secs;
-  result->tv_nsec = nsecs;
-
-  return result;
-}
 
 #define KVZ_ATOMIC_INC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, 1)
 #define KVZ_ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)
@@ -92,35 +68,70 @@ static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, i
 #define KVZ_CLOCK_T_DIFF(start, stop) ((double)((((uint64_t)(stop).dwHighDateTime)<<32 | (uint64_t)(stop).dwLowDateTime) - \
                                   (((uint64_t)(start).dwHighDateTime)<<32 | (uint64_t)(start).dwLowDateTime)) / 1e7)
 
-static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, int wait_ms)
-{
-  KVZ_CLOCK_T now;
-  KVZ_GET_TIME(&now);
-
-  int64_t moment_100ns = (int64_t)now.dwHighDateTime << 32 | (int64_t)now.dwLowDateTime;
-  moment_100ns -= (int64_t)FILETIME_TO_EPOCH;
-   
-  int64_t secs = moment_100ns / (E9 / 100) + (wait_ms / E3);
-  int64_t nsecs = (moment_100ns % (E9 / 100))*100 + ((wait_ms % E3) * (E9 / E3));
-  
-  if (nsecs >= E9) {
-    secs += 1;
-    nsecs -= E9;
-  }
-
-  result->tv_sec = secs;
-  result->tv_nsec = nsecs;
-
-  return result;
-}
-
 #define KVZ_ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define KVZ_ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
 
 #endif //__GNUC__
 
-#undef E9
-#undef E3
+#ifdef __APPLE__
+// POSIX semaphores are deprecated on Mac so we use Grand Central Dispatch
+// semaphores instead.
+#include <dispatch/dispatch.h>
+typedef dispatch_semaphore_t kvz_sem_t;
+
+static INLINE void kvz_sem_init(kvz_sem_t *sem, int value)
+{
+    assert(value >= 0);
+    *sem = dispatch_semaphore_create(value);
+}
+
+static INLINE void kvz_sem_wait(kvz_sem_t *sem)
+{
+    dispatch_semaphore_wait(*sem, DISPATCH_TIME_FOREVER);
+}
+
+static INLINE void kvz_sem_post(kvz_sem_t *sem)
+{
+    dispatch_semaphore_signal(*sem);
+}
+
+
+static INLINE void kvz_sem_destroy(kvz_sem_t *sem)
+{
+    // Do nothing for GCD semaphores.
+}
+
+#else
+// Use POSIX semaphores.
+#include <semaphore.h>
+
+typedef sem_t kvz_sem_t;
+
+static INLINE void kvz_sem_init(kvz_sem_t *sem, int value)
+{
+    assert(value >= 0);
+    // Pthreads-w32 does not support process-shared semaphores, so pshared
+    // must always be zero.
+    int pshared = 0;
+    sem_init(sem, pshared, value);
+}
+
+static INLINE void kvz_sem_wait(kvz_sem_t *sem)
+{
+    sem_wait(sem);
+}
+
+static INLINE void kvz_sem_post(kvz_sem_t *sem)
+{
+    sem_post(sem);
+}
+
+static INLINE void kvz_sem_destroy(kvz_sem_t *sem)
+{
+    sem_destroy(sem);
+}
+
+#endif
 
 static INLINE int kvz_mutex_lock(pthread_mutex_t *mutex)
 {
