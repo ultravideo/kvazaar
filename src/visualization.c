@@ -173,8 +173,9 @@ static void *kvz_visualization_eventloop(void* temp)
     width_in_lcu++;
   }
 
-  sdl_cu_array = MALLOC(cu_info_t, (height_in_lcu << MAX_DEPTH)*(width_in_lcu << MAX_DEPTH));
-  FILL_ARRAY(sdl_cu_array, 0, (height_in_lcu << MAX_DEPTH)*(width_in_lcu << MAX_DEPTH));
+  // LCUs are split into 4x4 regions. Note that smallest "CU" is here 4x4.
+  sdl_cu_array = MALLOC(cu_info_t, (height_in_lcu * LCU_CU_WIDTH)*(width_in_lcu * LCU_CU_WIDTH));
+  FILL_ARRAY(sdl_cu_array, 0, (height_in_lcu * LCU_CU_WIDTH)*(width_in_lcu * LCU_CU_WIDTH));
 
   // Set the window manager title bar
   renderer = SDL_CreateRenderer(window, -1, 0);
@@ -255,15 +256,14 @@ static void *kvz_visualization_eventloop(void* temp)
           SDL_GetMouseState(&mouse_x, &mouse_y);
           // If mouse inside the perimeters of the frame
           if (mouse_x > 0 && mouse_x < screen_w && mouse_y > 0 && mouse_y < screen_h) {
-
-            cu_info_t *over_cu = &sdl_cu_array[(mouse_x / (LCU_WIDTH >> MAX_DEPTH)) + (mouse_y / (LCU_WIDTH >> MAX_DEPTH))*(width_in_lcu << MAX_DEPTH)];
+            cu_info_t *over_cu = &sdl_cu_array[(mouse_x / SCU_WIDTH) + (mouse_y / SCU_WIDTH)*(width_in_lcu * LCU_CU_WIDTH)];
             char* cu_types[5] = { "64x64", "32x32", "16x16", "8x8", "4x4" };
 
             // If block has changed
             if (sdl_block_info && selected_cu != over_cu) {
               char temp[128];
               selected_cu = over_cu;
-              sprintf(temp, "Block type: Intra\nIntra mode: %d", over_cu->intra->mode);
+              sprintf(temp, "Block type: Intra\nIntra mode: %d", over_cu->intra.mode);
 
               // Clear the hilight buffer
               memset(sdl_pixels_hilight, 0, (screen_w*screen_h * 4));
@@ -297,11 +297,25 @@ static void *kvz_visualization_eventloop(void* temp)
                 sprintf(temp, "Tr-size: %s", cu_types[over_cu->tr_depth]);
                 sdl_render_multiline_text(temp, 0, 40);
                 if (over_cu->part_size == SIZE_2Nx2N) {
-                  sprintf(temp, "Intra mode: %d", over_cu->intra->mode);
+                  sprintf(temp, "Intra mode: %d", over_cu->intra.mode);
                   sdl_render_multiline_text(temp, 0, 60);
                 } else {
-                  sprintf(temp, "Intra mode: %d, %d, %d, %d", over_cu->intra[0].mode, over_cu->intra[1].mode
-                    , over_cu->intra[2].mode, over_cu->intra[3].mode);
+                  assert(over_cu->depth == MAX_DEPTH); // Might need an update for VVC
+                  uint8_t modes[4];
+                  uint16_t cu_width = CU_WIDTH_FROM_DEPTH(over_cu->depth);
+                  uint16_t cu_x = mouse_x >> over_cu->depth << over_cu->depth;
+                  uint16_t cu_y = mouse_y >> over_cu->depth << over_cu->depth;
+                  for (int pu_i = 0; pu_i < 4; ++pu_i) {
+                    uint16_t pu_off_x = PU_GET_X(SIZE_NxN, cu_width, 0, pu_i);
+                    uint16_t pu_off_y = PU_GET_Y(SIZE_NxN, cu_width, 0, pu_i);
+                    uint16_t pu_x = cu_x + pu_off_x;
+                    uint16_t pu_y = cu_y + pu_off_y;
+                    cu_info_t *pu = &sdl_cu_array[(pu_x / SCU_WIDTH) + (pu_y / SCU_WIDTH)*(width_in_lcu * LCU_CU_WIDTH)];
+                    modes[pu_i] = pu->intra.mode;
+                  }
+
+                  sprintf(temp, "Intra mode: %d, %d, %d, %d", modes[0], modes[1]
+                    , modes[2], modes[3]);
                   sdl_render_multiline_text(temp, 0, 60);
                 }
               }
@@ -486,13 +500,13 @@ static void render_image(encoder_control_t *encoder, kvz_picture *image)
 {
   kvz_mutex_lock(&sdl_mutex);
   
-  memcpy(sdl_pixels, image->y, (encoder->cfg->width * encoder->cfg->height));
-  memcpy(sdl_pixels_u, image->u, (encoder->cfg->width * encoder->cfg->height) >> 2);
-  memcpy(sdl_pixels_v, image->v, (encoder->cfg->width * encoder->cfg->height) >> 2);
+  memcpy(sdl_pixels, image->y, (encoder->cfg.width * encoder->cfg.height));
+  memcpy(sdl_pixels_u, image->u, (encoder->cfg.width * encoder->cfg.height) >> 2);
+  memcpy(sdl_pixels_v, image->v, (encoder->cfg.width * encoder->cfg.height) >> 2);
 
   SDL_Rect rect;
   rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
-  SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, encoder->cfg->width, sdl_pixels_u, encoder->cfg->width >> 1, sdl_pixels_v, encoder->cfg->width >> 1);
+  SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, encoder->cfg.width, sdl_pixels_u, encoder->cfg.width >> 1, sdl_pixels_v, encoder->cfg.width >> 1);
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, overlay, NULL, NULL);
   SDL_RenderPresent(renderer);
@@ -535,7 +549,7 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   const vector2d_t lcu_px = { x & (LCU_WIDTH - 1), y & (LCU_WIDTH - 1) };
   const vector2d_t lcu_px_c = { lcu_px.x / 2, lcu_px.y / 2 };
 
-  const int pic_width = state->encoder_control->cfg->width;
+  const int pic_width = state->encoder_control->cfg.width;
   const int visible_width = MIN(frame_px.x + cu_width, pic->width) - frame_px.x;
   const int visible_height = MIN(frame_px.y + cu_width, pic->height) - frame_px.y;
   const int index_RGB = (x + y * pic_width +
@@ -548,7 +562,7 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
     state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
     state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
-  if ((cur_cu->depth == 0) || cur_cu->depth == depth || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
+  if ((cur_cu->depth == 0) || cur_cu->depth == depth || !(depth < ctrl->cfg.pu_depth_intra.max || depth < ctrl->cfg.pu_depth_inter.max)) {
     for (int row = 0; row < visible_height; ++row) {
       memcpy(&sdl_pixels[frame_px.x + (frame_px.y + row) * pic_width],
              &lcu->rec.y[lcu_px.x + (lcu_px.y + row) * LCU_WIDTH],
@@ -577,13 +591,13 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
 
     {
       const int width_cu = cur_cu->part_size == SIZE_2Nx2N ? LCU_CU_WIDTH >> cur_cu->depth : 1;
-      const int x_cu = (x / (LCU_WIDTH >> MAX_DEPTH));
-      const int y_cu = (y / (LCU_WIDTH >> MAX_DEPTH));
+      const int x_cu = (x / SCU_WIDTH);
+      const int y_cu = (y / SCU_WIDTH);
       int temp_x, temp_y;
       // Set mode in every CU covered by part_mode in this depth.
       for (temp_y = y_cu; temp_y < y_cu + width_cu; ++temp_y) {
         for (temp_x = x_cu; temp_x < x_cu + width_cu; ++temp_x) {
-          cu_info_t *cu = &sdl_cu_array[temp_x + temp_y *  (state->tile->frame->width_in_lcu << MAX_DEPTH)];
+          cu_info_t *cu = &sdl_cu_array[temp_x + temp_y * (state->tile->frame->width_in_lcu * LCU_CU_WIDTH)];
           memcpy(cu, cur_cu, sizeof(cu_info_t));
         }
       }
@@ -591,7 +605,7 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
 
     //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
 
-    uint8_t framemod = state->global->frame % 8;
+    uint8_t framemod = state->frame->num % 8;
     
     {
       int temp_x;
@@ -611,7 +625,7 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
 
     // Intra directions
     if (cur_cu->type == CU_INTRA) {
-      int mode = cur_cu->intra[PU_INDEX(x / 4, y / 4)].mode;
+      int mode = cur_cu->intra.mode;
       // These define end points for lines originating from the center of the block.
       const int line_from_center_8x8_x[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
       const int line_from_center_8x8_y[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};
@@ -689,7 +703,7 @@ static void vis_mv(encoder_state_t * const state, int x, int y, lcu_t *lcu, int 
 {
   const int cu_width = LCU_WIDTH >> depth;
   const cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
-  const int poc = state->global->poc;
+  const int poc = state->frame->poc;
   
   // The right and bottom borders are located within the block,
   // so the center of the block is (width / 2 - 1).
@@ -699,7 +713,7 @@ static void vis_mv(encoder_state_t * const state, int x, int y, lcu_t *lcu, int 
   const int y2 = CLIP(0, screen_h - 1, y1 + ((cur_cu->inter.mv[mv_dir][1] + 2) >> 2));
 
   const int ref_idx = MIN(2, cur_cu->inter.mv_ref[mv_dir]);
-  const int ref_poc = state->global->ref->pocs[ref_idx];
+  const int ref_poc = state->frame->ref->pocs[ref_idx];
   const int ref_framemod = ref_poc % 8;
 
   if (x1 != x2 || y1 != y2) {
@@ -766,7 +780,7 @@ void kvz_visualization_mv_clear_lcu(encoder_state_t * const state, int x, int y)
 {
   kvz_mutex_lock(&sdl_mutex);
 
-  const int poc = state->global->poc;
+  const int poc = state->frame->poc;
   const int lcu_width = (x + 64 >= screen_w ? screen_w - x : 64);
   const int lcu_height = (y + 64 >= screen_h ? screen_h - y : 64);
 
