@@ -26,6 +26,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
   - [Visual Studio](#visual-studio)
   - [Docker](#docker)
   - [Visualization (Windows only)](#visualization-windows-only)
+- [Paper](#paper)
 - [Contributing to Kvazaar](#contributing-to-kvazaar)
   - [Code documentation](#code-documentation)
   - [For version control we try to follow these conventions:](#for-version-control-we-try-to-follow-these-conventions)
@@ -394,6 +395,25 @@ Note: The solution should be compiled on the x64 platform in visual studio.
 
 Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
 
+## Paper
+
+Please cite [this paper](https://dl.acm.org/citation.cfm?doid=2964284.2973796) for Kvazaar:
+
+```M. Viitanen, A. Koivula, A. Lemmetti, A. Ylä-Outinen, J. Vanne, and T. D. Hämäläinen, “Kvazaar: open-source HEVC/H.265 encoder,” in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
+
+Or in BibTex:
+
+```
+@inproceedings{Kvazaar2016,
+ author = {Viitanen, Marko and Koivula, Ari and Lemmetti, Ari and Yl\"{a}-Outinen, Arttu and Vanne, Jarno and H\"{a}m\"{a}l\"{a}inen, Timo D.},
+ title = {Kvazaar: Open-Source HEVC/H.265 Encoder},
+ booktitle = {Proceedings of the 24th ACM International Conference on Multimedia},
+ year = {2016},
+ isbn = {978-1-4503-3603-1},
+ location = {Amsterdam, The Netherlands},
+ url = {http://doi.acm.org/10.1145/2964284.2973796},
+}
+```
 
 ## Contributing to Kvazaar
 We are happy to look at pull requests in Github. There is still lots of work to be done.
