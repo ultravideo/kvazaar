@@ -46,6 +46,7 @@ static int sdl_draw_blocks = 1;
 static int sdl_draw_intra = 1;
 static int sdl_block_info = 0;
 static pthread_mutex_t sdl_mutex;
+static kvz_sem_t sdl_init_sem;
 static kvz_pixel *sdl_pixels_hilight;
 static kvz_pixel *sdl_pixels_RGB;
 static kvz_pixel *sdl_pixels_RGB_intra_dir;
@@ -243,8 +244,7 @@ static void *kvz_visualization_eventloop(void* temp)
   SDL_SetSurfaceBlendMode(textSurface, SDL_BLENDMODE_BLEND);
   cu_info_t* selected_cu = NULL;
 
-
-  kvz_mutex_unlock(&sdl_mutex);
+  kvz_sem_post(&sdl_init_sem);
   int locked = 0;
   for (;;) {
     SDL_Event event;
@@ -469,9 +469,7 @@ void kvz_visualization_init(int width, int height)
   pthread_t sdl_thread;
 
   pthread_mutex_init(&sdl_mutex, NULL);
-
-  // Lock for eventloop thread to unlock
-  kvz_mutex_lock(&sdl_mutex);
+  kvz_sem_init(&sdl_init_sem, 0);
 
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     fprintf(stderr, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -484,8 +482,7 @@ void kvz_visualization_init(int width, int height)
   }
 
   // Wait for eventloop to handle opening the window etc
-  kvz_mutex_lock(&sdl_mutex);
-  kvz_mutex_unlock(&sdl_mutex);
+  kvz_sem_wait(&sdl_init_sem);
 }
 
 void kvz_visualization_free()
