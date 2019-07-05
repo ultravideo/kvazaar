@@ -2319,7 +2319,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
 }
 
 //Debug stuff for printing thread info
-#if 0 && defined(linux)
+#if 1 && defined(linux)
 #define _GNU_SOURCES
 #include <sys/types.h>
 #include <unistd.h>
