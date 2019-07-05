@@ -74,6 +74,7 @@ CFLAGS="$KVZ_CFLAGS $PTHREAD_CFLAGS $CFLAGS $SDL2_CFLAGS"
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
+LIBS="$PTHREAD_LIBS $LIBS $SDL2_LIBS"
 
 AC_ARG_WITH([cryptopp],
     AS_HELP_STRING([--with-cryptopp],
