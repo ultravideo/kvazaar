@@ -135,6 +135,8 @@ static const struct option long_options[] = {
   { "no-open-gop",              no_argument, NULL, 0 },
   { "scaling-list",       required_argument, NULL, 0 },
   { "max-merge",          required_argument, NULL, 0 },
+  { "early-skip",               no_argument, NULL, 0 },
+  { "no-early-skip",            no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -489,6 +491,11 @@ void print_help(void)
     "                                   when QP is below the limit. [0]\n"
     "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
     "                               a zero coefficient CU is found. [disabled]\n"
+    "      --(no-)early-skip      : Try to find skip cu from merge candidates.\n"
+    "                               Perform no further search if skip is found.\n"
+    "                               For rd=0..1: Try the first candidate.\n"
+    "                               For rd=2.. : Try the best candidate based\n"
+    "                                            on luma satd cost. [enabled]\n"
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
