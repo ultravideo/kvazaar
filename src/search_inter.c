@@ -1572,7 +1572,7 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
       cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
       cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
-      kvz_lcu_set_trdepth(lcu, x, y, depth, depth);
+      kvz_lcu_set_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width);
       kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu);
 
