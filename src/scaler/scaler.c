@@ -63,7 +63,7 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
   if (yuv == NULL) {
     return NULL; //TODO: Add error message?
   }
-  yuv->format =format;
+  yuv->format = format;
   yuv->y = kvz_newPictureBuffer(width, height, has_tmp_row);
 
   int w_factor = 0;
@@ -102,6 +102,73 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
   yuv->v = kvz_newPictureBuffer( width, height, has_tmp_row);
 
   return yuv;
+}
+
+opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(const void * const data, int width, int height, int stride)
+{
+  opaque_pic_buffer_t *buffer = (opaque_pic_buffer_t*)malloc(sizeof(opaque_pic_buffer_t));
+  if (buffer == NULL)
+  {
+    return NULL;
+  }
+  
+  buffer->data = data;
+  buffer->width = width;
+  buffer->height = height;
+  buffer->stride = stride;
+
+  return buffer;
+}
+
+opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(const void * const y_data, const void * const u_data, const void * const v_data, int width, int height, int stride, chroma_format_t format)
+{
+  opaque_yuv_buffer_t *buffer = (opaque_yuv_buffer_t*)malloc(sizeof(opaque_yuv_buffer_t));
+  if (buffer == NULL)
+  {
+    return NULL;
+  }
+
+  buffer->format = format;
+
+  buffer->y = kvz_newOpaquePictureBuffer(y_data, width, height, stride);
+
+  int w_factor = 0;
+  int h_factor = 0;
+
+  switch (format) {
+    case CHROMA_400:
+    {
+      //No chroma
+      width = height = stride = 0;
+      break;
+    }
+    case CHROMA_420:
+    {
+      w_factor = 1;
+      h_factor = 1;
+      break;
+    }
+    case CHROMA_422:
+    {
+      w_factor = 1;
+      break;
+    }
+    case CHROMA_444:
+    {
+      break;
+    }
+    default:
+      assert(0);//Unsupported format
+  }
+
+  width = width >> w_factor;
+  height = height >> h_factor;
+  stride = stride >> w_factor;
+
+  buffer->u = kvz_newOpaquePictureBuffer(u_data, width, height, stride);
+  buffer->v = kvz_newOpaquePictureBuffer(v_data, width, height, stride);
+
+  return buffer;
 }
 
 // ======================= newPictureBuffer_ ==================================
@@ -478,6 +545,23 @@ void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv)
   kvz_deallocatePictureBuffer(yuv->y);
   kvz_deallocatePictureBuffer(yuv->u);
   kvz_deallocatePictureBuffer(yuv->v);
+
+  free(yuv);
+}
+
+void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t * buffer)
+{
+  //Don't deallocate data here
+  free(buffer);
+}
+
+void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t * yuv)
+{
+  if (yuv == NULL) return;
+
+  kvz_deallocateOpaquePictureBuffer(yuv->y);
+  kvz_deallocateOpaquePictureBuffer(yuv->u);
+  kvz_deallocateOpaquePictureBuffer(yuv->v);
 
   free(yuv);
 }

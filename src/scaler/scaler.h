@@ -113,11 +113,12 @@ typedef int pic_data_t; //Use some other type?
  */
 typedef struct
 {
-  pic_data_t* data; //Contain main data
-  pic_data_t* tmp_row; //A temporary buffer row that may be used to hold data when operating on buffer
-
   int width;
   int height;
+  pic_data_t* data; //Contain main data
+  
+  pic_data_t* tmp_row; //A temporary buffer row that may be used to hold data when operating on buffer
+  
 } pic_buffer_t;
 
 /**
@@ -132,6 +133,33 @@ typedef struct
   chroma_format_t format;
 } yuv_buffer_t;
 
+/**
+* \brief Opaque version for passing arbitrary buffers
+* Should mirror pic_buffer so that opaque_pic_buffer_t can be used like pic_buffer_t
+*/
+typedef struct
+{
+  int width;
+  int height;
+
+  void *data;
+
+  int stride;
+} opaque_pic_buffer_t;
+
+/**
+* \brief Opaque version for passing arbitrary buffers
+* Should mirror yuv_buffer_t so that opaque_yuv_buffer_t can be cast to yuv_buffer_t
+*/
+typedef struct
+{
+  opaque_pic_buffer_t* y;
+  opaque_pic_buffer_t* u;
+  opaque_pic_buffer_t* v;
+
+  chroma_format_t format;
+} opaque_yuv_buffer_t;
+
 /*==========================================================*/
 /*==================Buffer utility functions===============*/
 /**
@@ -139,6 +167,12 @@ typedef struct
  */
 pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row);
 yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row);
+
+/**
+* \brief return a opaque buffer type using the given input
+*/
+opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(const void *const data, int width, int height, int stride);
+opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(const void *const y_data, const void *const u_data, const void *const v_data, int width, int height, int stride, chroma_format_t format);
 
 
 /**
@@ -167,6 +201,16 @@ void kvz_deallocatePictureBuffer(pic_buffer_t* buffer);
 * \brief Deallocate yuv buffer
 */
 void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv);
+
+/**
+* \brief Deallocate opaque picture buffer
+*/
+void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t* buffer);
+
+/**
+* \brief Deallocate opaque yuv buffer
+*/
+void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t* yuv);
 
 
 /**
