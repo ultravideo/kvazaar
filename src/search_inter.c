@@ -1537,7 +1537,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
       if (cfg->rdo >= 2) {
 
-        kvz_lcu_set_trdepth(lcu, x, y, depth, depth);
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, depth);
         kvz_inter_recon_cu(state, lcu, x, y, width);
         mrg_costs[merge_idx] = kvz_satd_any_size(width, height,
           lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
@@ -1572,7 +1572,7 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
       cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
       cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
-      kvz_lcu_set_trdepth(lcu, x, y, depth, MAX(1, depth));
+      kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width);
       kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu);
 
@@ -1645,7 +1645,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   if (cur_cu->part_size != SIZE_2Nx2N) {
     tr_depth = depth + 1;
   }
-  kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
+  kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
   kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth));
 
   const bool reconstruct_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;

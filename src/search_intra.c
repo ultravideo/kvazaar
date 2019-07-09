@@ -286,7 +286,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   if (depth == 0 || split_cost < nosplit_cost) {
     return split_cost;
   } else {
-    kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+    kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
 
     pred_cu->cbf = nosplit_cbf;
 
@@ -594,7 +594,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.
-    kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+    kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
@@ -830,7 +830,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   }
 
   // Set transform depth to current depth, meaning no transform splits.
-  kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+  kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {

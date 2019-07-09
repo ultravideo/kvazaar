@@ -116,7 +116,7 @@ static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work
   }
 }
 
-void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
+void kvz_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
 {
   const int x_local = SUB_SCU(x_px);
   const int y_local = SUB_SCU(y_px);
@@ -153,7 +153,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
   }
 }
 
-static void lcu_set_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
+static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
 {
   const part_mode_t part_mode = LCU_GET_CU_AT_PX(lcu, x_local, y_local)->part_size;
   const int num_pu = kvz_part_mode_num_parts[part_mode];
@@ -170,7 +170,7 @@ static void lcu_set_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
   }
 }
 
-static void lcu_set_coeff(lcu_t *lcu, int x_local, int y_local, int width, cu_info_t *cur_cu)
+static void lcu_fill_cbf(lcu_t *lcu, int x_local, int y_local, int width, cu_info_t *cur_cu)
 {
   const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
   const uint32_t mask = ~((width >> tr_split)-1);
@@ -602,7 +602,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (cur_cu->part_size != SIZE_2Nx2N) {
           tr_depth = depth + 1;
         }
-        kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
 
         kvz_inter_recon_cu(state, lcu, x, y, cu_width);
 
@@ -630,8 +630,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           }
         }
       }
-      lcu_set_inter(lcu, x_local, y_local, cu_width);
-      lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
+      lcu_fill_inter(lcu, x_local, y_local, cu_width);
+      lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
 
@@ -665,11 +665,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       if (cur_cu->tr_depth != depth) {
         // Reset transform depth since there are no coefficients. This
         // ensures that CBF is cleared for the whole area of the CU.
-        kvz_lcu_set_trdepth(lcu, x, y, depth, depth);
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, depth);
       }
 
       cur_cu->cbf = 0;
-      lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
+      lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
 
@@ -733,7 +733,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = SIZE_2Nx2N;
 
-        kvz_lcu_set_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
         const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
