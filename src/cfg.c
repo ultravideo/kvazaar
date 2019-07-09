@@ -386,7 +386,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
-  static const char * const preset_values[11][24*2] = {
+  static const char * const preset_values[11][25*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -412,6 +412,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -439,6 +440,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -466,6 +468,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -493,6 +496,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -520,6 +524,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -547,6 +552,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -574,6 +580,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -601,6 +608,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -628,6 +636,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -655,6 +664,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       { NULL }
