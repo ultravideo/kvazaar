@@ -744,33 +744,33 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
     __m256i col = tsrc[j];
     __m256i odds = extract_odds(col);
 
-    __m256i o04   = _mm256_madd_epi16(odds,  dct_col_odds[0]);
-    __m256i o15   = _mm256_madd_epi16(odds,  dct_col_odds[1]);
-    __m256i o26   = _mm256_madd_epi16(odds,  dct_col_odds[2]);
-    __m256i o37   = _mm256_madd_epi16(odds,  dct_col_odds[3]);
+    __m256i o04   = _mm256_madd_epi16           (odds,     dct_col_odds[0]);
+    __m256i o15   = _mm256_madd_epi16           (odds,     dct_col_odds[1]);
+    __m256i o26   = _mm256_madd_epi16           (odds,     dct_col_odds[2]);
+    __m256i o37   = _mm256_madd_epi16           (odds,     dct_col_odds[3]);
 
-    __m256i o0145 = _mm256_hadd_epi32(o04,   o15);
-    __m256i o2367 = _mm256_hadd_epi32(o26,   o37);
+    __m256i o0145 = _mm256_hadd_epi32           (o04,      o15);
+    __m256i o2367 = _mm256_hadd_epi32           (o26,      o37);
 
-    __m256i o     = _mm256_hadd_epi32(o0145, o2367);
+    __m256i o     = _mm256_hadd_epi32           (o0145,    o2367);
 
     // D0,2 D0,6 D1,2 D1,6 D1,a D1,e D0,a D0,e | D2,2 D2,6 D3,2 D3,6 D3,a D3,e D2,a D2,e
     __m256i d_db2 = extract_26ae(dct_cols);
 
     // 2 6 2 6 a e a e | 2 6 2 6 a e a e
-    __m256i t_db2 = extract_26ae_vec        (col);
+    __m256i t_db2 = extract_26ae_vec            (col);
 
-    __m256i eo_parts  = _mm256_madd_epi16   (d_db2,    t_db2);
-    __m256i eo_parts2 = _mm256_shuffle_epi32(eo_parts, _MM_SHUFFLE(0, 1, 2, 3));
+    __m256i eo_parts  = _mm256_madd_epi16       (d_db2,    t_db2);
+    __m256i eo_parts2 = _mm256_shuffle_epi32    (eo_parts, _MM_SHUFFLE(0, 1, 2, 3));
 
     // EO0 EO1 EO1 EO0 | EO2 EO3 EO3 EO2
     __m256i eo        = _mm256_add_epi32        (eo_parts, eo_parts2);
     __m256i eo2       = _mm256_permute4x64_epi64(eo,       _MM_SHUFFLE(1, 3, 2, 0));
     __m256i eo3       = _mm256_sign_epi32       (eo2,      eo_signmask);
 
-    __m256i d_db4     = extract_d048c      (dct_cols);
-    __m256i t_db4     = extract_d048c_vec  (col);
-    __m256i eee_eeo   = _mm256_madd_epi16  (d_db4,   t_db4);
+    __m256i d_db4     = extract_d048c           (dct_cols);
+    __m256i t_db4     = extract_d048c_vec       (col);
+    __m256i eee_eeo   = _mm256_madd_epi16       (d_db4,   t_db4);
 
     __m256i eee_eee   = _mm256_permute4x64_epi64(eee_eeo,  _MM_SHUFFLE(3, 0, 3, 0));
     __m256i eeo_eeo1  = _mm256_permute4x64_epi64(eee_eeo,  _MM_SHUFFLE(1, 2, 1, 2));
