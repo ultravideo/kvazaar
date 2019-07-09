@@ -496,6 +496,7 @@ void print_help(void)
     "                               For rd=0..1: Try the first candidate.\n"
     "                               For rd=2.. : Try the best candidate based\n"
     "                                            on luma satd cost. [enabled]\n"
+    "      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]"
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
