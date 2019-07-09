@@ -387,6 +387,9 @@ typedef struct kvz_config
   /** \brief Maximum number of merge cadidates */
   uint8_t max_merge;
 
+  /** \brief Enable Early Skip Mode Decision */
+  uint8_t early_skip;
+
 } kvz_config;
 
 /**

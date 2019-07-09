@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "May 2019" "kvazaar v1.2.0" "User Commands"
+.TH KVAZAAR "1" "July 2019" "kvazaar v1.2.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -277,6 +277,13 @@ Skip CABAC cost for residual coefficients
 \fB\-\-(no\-)intra\-rdo\-et   
 Check intra modes in rdo stage only until
 a zero coefficient CU is found. [disabled]
+.TP
+\fB\-\-(no\-)early\-skip     
+Try to find skip cu from merge candidates.
+Perform no further search if skip is found.
+For rd=0..1: Try the first candidate.
+For rd=2.. : Try the best candidate based
+             on luma satd cost. [enabled]
 .TP
 \fB\-\-(no\-)implicit\-rdpcm 
 Implicit residual DPCM. Currently only supported

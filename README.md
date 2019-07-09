@@ -207,6 +207,11 @@ Compression tools:
                                    when QP is below the limit. [0]
       --(no-)intra-rdo-et    : Check intra modes in rdo stage only until
                                a zero coefficient CU is found. [disabled]
+      --(no-)early-skip      : Try to find skip cu from merge candidates.
+                               Perform no further search if skip is found.
+                               For rd=0..1: Try the first candidate.
+                               For rd=2.. : Try the best candidate based
+                                            on luma satd cost. [enabled]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]

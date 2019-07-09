@@ -403,6 +403,30 @@ static double calc_mode_bits(const encoder_state_t *state,
 }
 
 
+/**
+ * \brief Sort modes and costs to ascending order according to costs.
+ */
+void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length)
+{
+  // Length for intra is always between 5 and 23, and is either 21, 17, 9 or 8 about
+  // 60% of the time, so there should be no need for anything more complex
+  // than insertion sort.
+  // Length for merge is 5 or less.
+  for (uint8_t i = 1; i < length; ++i) {
+    const double cur_cost = costs[i];
+    const int8_t cur_mode = modes[i];
+    uint8_t j = i;
+    while (j > 0 && cur_cost < costs[j - 1]) {
+      costs[j] = costs[j - 1];
+      modes[j] = modes[j - 1];
+      --j;
+    }
+    costs[j] = cur_cost;
+    modes[j] = cur_mode;
+  }
+}
+
+
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
   vector2d_t lcu_cu = { SUB_SCU(x), SUB_SCU(y) };
@@ -482,29 +506,31 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTER;
       }
 
-      // Try SMP and AMP partitioning.
-      static const part_mode_t mp_modes[] = {
-        // SMP
-        SIZE_2NxN, SIZE_Nx2N,
-        // AMP
-        SIZE_2NxnU, SIZE_2NxnD,
-        SIZE_nLx2N, SIZE_nRx2N,
-      };
+      if (!cur_cu->skipped) {
+        // Try SMP and AMP partitioning.
+        static const part_mode_t mp_modes[] = {
+          // SMP
+          SIZE_2NxN, SIZE_Nx2N,
+          // AMP
+          SIZE_2NxnU, SIZE_2NxnD,
+          SIZE_nLx2N, SIZE_nRx2N,
+        };
 
-      const int first_mode = ctrl->cfg.smp_enable ? 0 : 2;
-      const int last_mode  = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
-      for (int i = first_mode; i <= last_mode; ++i) {
-        kvz_search_cu_smp(state,
-                          x, y,
-                          depth,
-                          mp_modes[i],
-                          &work_tree[depth + 1],
-                          &mode_cost, &mode_bitcost);
-        if (mode_cost < cost) {
-          cost = mode_cost;
-          inter_bitcost = mode_bitcost;
-          // Copy inter prediction info to current level.
-          copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
+        const int first_mode = ctrl->cfg.smp_enable ? 0 : 2;
+        const int last_mode = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
+        for (int i = first_mode; i <= last_mode; ++i) {
+          kvz_search_cu_smp(state,
+		                    x, y,
+		                    depth,
+		                    mp_modes[i],
+		                    &work_tree[depth + 1],
+		                    &mode_cost, &mode_bitcost);
+          if (mode_cost < cost) {
+            cost = mode_cost;
+            inter_bitcost = mode_bitcost;
+            // Copy inter prediction info to current level.
+            copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
+          }
         }
       }
     }
@@ -512,9 +538,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
-    bool skip_intra = state->encoder_control->cfg.rdo == 0
+    bool skip_intra = (state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
-                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD;
+                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
+                      || cur_cu->skipped;
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
@@ -567,43 +594,47 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            NULL, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
-      // Reset transform depth because intra messes with them.
-      // This will no longer be necessary if the transform depths are not shared.
-      int tr_depth = MAX(1, depth);
-      if (cur_cu->part_size != SIZE_2Nx2N) {
-        tr_depth = depth + 1;
-      }
-      kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
-      kvz_inter_recon_cu(state, lcu, x, y, cu_width);
+      if (!cur_cu->skipped) {
+        // Reset transform depth because intra messes with them.
+        // This will no longer be necessary if the transform depths are not shared.
+        int tr_depth = MAX(1, depth);
+        if (cur_cu->part_size != SIZE_2Nx2N) {
+          tr_depth = depth + 1;
+        }
+        kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
-      if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
-        //Calculate cost for zero coeffs
-        inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
+        kvz_inter_recon_cu(state, lcu, x, y, cu_width);
 
-      }
+        if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
+          //Calculate cost for zero coeffs
+          inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
 
-      const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-      kvz_quantize_lcu_residual(state,
-                                true, has_chroma,
-                                x, y, depth,
-                                NULL,
-                                lcu);
+        }
 
-      int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+        kvz_quantize_lcu_residual(state,
+          true, has_chroma,
+          x, y, depth,
+          NULL,
+          lcu);
 
-      if (cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
-        cur_cu->merged = 0;
-        cur_cu->skipped = 1;
-        // Selecting skip reduces bits needed to code the CU
-        if (inter_bitcost > 1) {
-          inter_bitcost -= 1;
+        int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+
+        if (cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
+          cur_cu->merged = 0;
+          cur_cu->skipped = 1;
+          // Selecting skip reduces bits needed to code the CU
+          if (inter_bitcost > 1) {
+            inter_bitcost -= 1;
+          }
         }
       }
       lcu_set_inter(lcu, x_local, y_local, cu_width);
       lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
+
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
