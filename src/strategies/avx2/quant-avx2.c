@@ -786,27 +786,24 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-static INLINE int16_t to_q88(float f)
-{
-  return (int16_t)(f * 256.0f);
-}
+#define TO_Q88(f) ((int16_t)((f) * 256.0f))
 
 static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t qp)
 {
 #define NUM_BUCKETS 5
-  const int16_t wt_m[NUM_BUCKETS] = {
-    to_q88(-0.004916),
-    to_q88(0.010806),
-    to_q88(0.055562),
-    to_q88(0.033436),
-    to_q88(-0.007690),
+  static const int16_t wt_m[NUM_BUCKETS] = {
+    TO_Q88(-0.004916),
+    TO_Q88( 0.010806),
+    TO_Q88( 0.055562),
+    TO_Q88( 0.033436),
+    TO_Q88(-0.007690),
   };
-  const int16_t wt_c[NUM_BUCKETS] = {
-    to_q88(0.172024),
-    to_q88(3.421462),
-    to_q88(2.879506),
-    to_q88(5.585471),
-    to_q88(0.256772),
+  static const int16_t wt_c[NUM_BUCKETS] = {
+    TO_Q88( 0.172024),
+    TO_Q88( 3.421462),
+    TO_Q88( 2.879506),
+    TO_Q88( 5.585471),
+    TO_Q88( 0.256772),
   };
 
   const __m256i zero   = _mm256_setzero_si256();
@@ -842,10 +839,10 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
     __m256i wt_2_32b  = _mm256_madd_epi16(curr_2_wt, ones);
     __m256i wt_3_32b  = _mm256_madd_epi16(curr_3_wt, ones);
 
-    avx_inc           = _mm256_add_epi32(avx_inc, wt_0_32b);
-    avx_inc           = _mm256_add_epi32(avx_inc, wt_1_32b);
-    avx_inc           = _mm256_add_epi32(avx_inc, wt_2_32b);
-    avx_inc           = _mm256_add_epi32(avx_inc, wt_3_32b);
+    __m256i wt_01     = _mm256_add_epi32(wt_0_32b, wt_1_32b);
+    __m256i wt_23     = _mm256_add_epi32(wt_2_32b, wt_3_32b);
+    __m256i curr_wts  = _mm256_add_epi32(wt_01,    wt_23);
+    avx_inc           = _mm256_add_epi32(avx_inc,  curr_wts);
   }
   __m128i inchi = _mm256_extracti128_si256(avx_inc, 1);
   __m128i inclo = _mm256_castsi256_si128  (avx_inc);
@@ -861,6 +858,8 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   return sum_total >> 8;
 #undef NUM_BUCKETS
 }
+
+#undef TO_Q88
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
