@@ -719,18 +719,18 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
                                                    8,  9, 10, 11, 12, 13, 14, 15,
                                                    6,  7,  4,  5,  2,  3,  0,  1,
                                                   14, 15, 12, 13, 10, 11,  8,  9);
-
-  // TODO: this seems stoopid, fix 16x16 tp? :D
-  for (uint32_t i = 0; i < width; i++) {
-    __m256i v = _mm256_load_si256((const __m256i *)src + i);
-    _mm256_store_si256((__m256i *)tsrc + i, v);
-  }
   transpose_16x16(src, (int16_t *)tsrc);
 
-  __m256i dct_cols[8];
-  for (uint32_t j = 0; j < 8; j++) {
-    dct_cols[j] = _mm256_load_si256((const __m256i *)tdct + j);
-  }
+  const __m256i dct_cols[8] = {
+    _mm256_load_si256((const __m256i *)tdct + 0),
+    _mm256_load_si256((const __m256i *)tdct + 1),
+    _mm256_load_si256((const __m256i *)tdct + 2),
+    _mm256_load_si256((const __m256i *)tdct + 3),
+    _mm256_load_si256((const __m256i *)tdct + 4),
+    _mm256_load_si256((const __m256i *)tdct + 5),
+    _mm256_load_si256((const __m256i *)tdct + 6),
+    _mm256_load_si256((const __m256i *)tdct + 7),
+  };
 
   // These contain: D1,0 D3,0 D5,0 D7,0 D9,0 Db,0 Dd,0 Df,0 | D1,4 D3,4 D5,4 D7,4 D9,4 Db,4 Dd,4 Df,4
   //                D1,1 D3,1 D5,1 D7,1 D9,1 Db,1 Dd,1 Df,1 | D1,5 D3,5 D5,5 D7,5 D9,5 Db,5 Dd,5 Df,5
