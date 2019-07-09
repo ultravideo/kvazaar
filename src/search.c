@@ -506,7 +506,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTER;
       }
 
-      if (!cur_cu->skipped) {
+      if (!(ctrl->cfg.early_skip && cur_cu->skipped)) {
         // Try SMP and AMP partitioning.
         static const part_mode_t mp_modes[] = {
           // SMP
@@ -541,7 +541,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     bool skip_intra = (state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
                       && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
-                      || cur_cu->skipped;
+                      || (ctrl->cfg.early_skip && cur_cu->skipped);
 
     int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
     bool can_use_intra =
