@@ -120,10 +120,10 @@ Video structure:
                                      (e.g. lp-g8d4t2, see README)
       --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
-      --scaling-list <string>: Set scaling list mode. [off]\n"
-                                   - off: Disable scaling lists.\n"
-                                   - custom: use custom list (with --cqmfile).\n"
-                                   - default: Use default lists.\n"
+      --scaling-list <string>: Set scaling list mode. [off]
+                                   - off: Disable scaling lists.
+                                   - custom: use custom list (with --cqmfile).
+                                   - default: Use default lists.
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.
                                    - N: Target N bits per second.
@@ -212,10 +212,10 @@ Compression tools:
                                For rd=0..1: Try the first candidate.
                                For rd=2.. : Try the best candidate based
                                             on luma satd cost. [enabled]
+      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
-      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]
