@@ -82,6 +82,9 @@ typedef struct
 
   int is_calculated; //Flag that tells that parameters have been calculated. Needs to be set to false manually if values are changed
 
+  //Source and target buffer depths, used with opaque buffers to determine buffer element size
+  int src_depth;
+  int trgt_depth;
 } scaling_parameter_t;
 
 /*==========================================================================*/
@@ -171,8 +174,8 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
 /**
 * \brief return a opaque buffer type using the given input
 */
-opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(const void *const data, int width, int height, int stride);
-opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(const void *const y_data, const void *const u_data, const void *const v_data, int width, int height, int stride, chroma_format_t format);
+opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride);
+opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(void *const y_data, void *const u_data, void *const v_data, int width, int height, int stride, chroma_format_t format);
 
 
 /**
@@ -228,9 +231,12 @@ typedef void (resample_block_step_func)(const pic_buffer_t* const src_buffer, co
 
 typedef void (resample_func)(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
 
+typedef void (opaque_resample_block_step_func)(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical);
+
 extern resample_block_step_func *const kvz_default_block_step_resample_func;
 extern resample_func *const kvz_default_resample_func;
 extern resample_func *const kvz_alt_resample_func;
+extern opaque_resample_block_step_func *const kvz_opaque_block_step_resample_func;
 /*=============================================================================================*/
 
 /*================Main scaling functions========================*/

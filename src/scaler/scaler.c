@@ -29,6 +29,7 @@
 #define DEFAULT_RESAMPLE_BLOCK_STEP_FUNC resampleBlockStep
 #define DEFAULT_RESAMPLE_FUNC resample
 #define ALT_RESAMPLE_FUNC resample2resampleBlockStep_default
+#define OPAQUE_RESAMPLE_BLOCK_STEP_FUNC opaqueResampleBlockStep_adapter
 
 
 pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
@@ -104,7 +105,7 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
   return yuv;
 }
 
-opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(const void * const data, int width, int height, int stride)
+opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride)
 {
   opaque_pic_buffer_t *buffer = (opaque_pic_buffer_t*)malloc(sizeof(opaque_pic_buffer_t));
   if (buffer == NULL)
@@ -120,7 +121,7 @@ opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(const void * const data, int wi
   return buffer;
 }
 
-opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(const void * const y_data, const void * const u_data, const void * const v_data, int width, int height, int stride, chroma_format_t format)
+opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u_data, void * const v_data, int width, int height, int stride, chroma_format_t format)
 {
   opaque_yuv_buffer_t *buffer = (opaque_yuv_buffer_t*)malloc(sizeof(opaque_yuv_buffer_t));
   if (buffer == NULL)
@@ -898,6 +899,136 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
 }
 
+#define OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(src_type, trgt_type) do { \
+for (int y = block_y; y < (block_y + block_height); y++) {\
+  src_type *src = is_vertical ? (src_type *)(src_buffer->data) : &((src_type *)(src_buffer->data))[y * src_buffer->stride];\
+  trgt_type *trgt_row = &((trgt_type *)(trgt_buffer->data))[y * trgt_buffer->stride];\
+  pic_data_t *tmp_trgt_row = &tmp_trgt_data[(y - block_y) * tmp_trgt_data_stride];\
+  for (int o_ind = outer_init; o_ind < outer_bound; o_ind++) {\
+    const int t_ind = is_vertical ? y : o_ind;\
+    const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;\
+    const int phase = ref_pos_16 & 15;\
+    const int ref_pos = ref_pos_16 >> 4;\
+    for (int i_ind = inner_init; i_ind < inner_bound; i_ind++) {\
+      const int f_ind = is_vertical ? o_ind : i_ind;\
+      const int t_col = is_vertical ? i_ind : o_ind;\
+      if (f_ind == 0) {\
+        tmp_trgt_row[t_col - block_x + tmp_trgt_offset] = 0;\
+      }\
+      const int s_ind = SCALER_CLIP(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1);\
+      src_type *src_col = src + (is_vertical ? i_ind : 0);\
+      tmp_trgt_row[t_col - block_x + tmp_trgt_offset] += getFilterCoeff(filter, filter_size, phase, f_ind) * (pic_data_t)(src_col[s_ind * s_stride + src_offset]);\
+      if (is_vertical && o_ind == outer_bound - 1) {\
+        trgt_row[t_col + trgt_offset] = (trgt_type)(SCALER_CLIP(is_upscaling ? (tmp_trgt_row[t_col - block_x + tmp_trgt_offset] + 2048) >> 12 : (tmp_trgt_row[t_col - block_x + tmp_trgt_offset] + 8192) >> 14, 0, 255));\
+      }\
+    }\
+  }\
+}\
+}while(0)
+
+static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical) 
+{
+  //Based on the src and trgt depths select the relevant function
+  if (param->trgt_depth == sizeof(pic_data_t) && param->src_depth == sizeof(pic_data_t)) {
+    //Use the basic algorithm
+    resampleBlockStep((const pic_buffer_t *)src_buffer, (const pic_buffer_t *)trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
+    return;
+  }
+
+  //TODO: Add cropping etc.
+
+  //Choose best filter to use when downsampling
+  //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+  int filter_phase = 0;
+
+  const int src_size = is_vertical ? param->src_height + param->src_padding_y : param->src_width + param->src_padding_x;
+  const int trgt_size = is_vertical ? param->rnd_trgt_height : param->rnd_trgt_width;
+
+  if (!is_upscaling) {
+    int crop_size = src_size - (is_vertical ? param->bottom_offset : param->right_offset); //- param->left_offset/top_offset;
+    if (4 * crop_size > 15 * trgt_size)
+      filter_phase = 7;
+    else if (7 * crop_size > 20 * trgt_size)
+      filter_phase = 6;
+    else if (2 * crop_size > 5 * trgt_size)
+      filter_phase = 5;
+    else if (1 * crop_size > 2 * trgt_size)
+      filter_phase = 4;
+    else if (3 * crop_size > 5 * trgt_size)
+      filter_phase = 3;
+    else if (4 * crop_size > 5 * trgt_size)
+      filter_phase = 2;
+    else if (19 * crop_size > 20 * trgt_size)
+      filter_phase = 1;
+  }
+
+  const int shift = (is_vertical ? param->shift_y : param->shift_x) - 4;
+  const int scale = is_vertical ? param->scale_y : param->scale_x;
+  const int add = is_vertical ? param->add_y : param->add_x;
+  const int delta = is_vertical ? param->delta_y : param->delta_x;
+
+  //Set loop parameters based on the resampling dir
+  const int *filter;
+  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int outer_init = is_vertical ? 0 : block_x;
+  const int outer_bound = is_vertical ? filter_size : block_x + block_width;
+  const int inner_init = is_vertical ? block_x : 0;
+  const int inner_bound = is_vertical ? block_x + block_width : filter_size;
+  const int s_stride = is_vertical ? src_buffer->stride : 1; //Multiplier to s_ind
+
+  //Set tmp target ad trgt buffer by default
+  pic_data_t *tmp_trgt_data = (pic_data_t *)trgt_buffer->data + block_y * trgt_buffer->stride + block_x;
+  int tmp_trgt_data_stride = trgt_buffer->stride;
+  int tmp_trgt_offset = trgt_offset;
+
+  if (param->trgt_depth != sizeof(pic_data_t)) {
+    //Need to make use of a tmp buffer to maintain enough precission
+    tmp_trgt_data = (pic_data_t *)malloc(sizeof(pic_data_t) * block_width * block_height);
+    tmp_trgt_offset = 0;
+    tmp_trgt_data_stride = block_width;
+
+    if (param->trgt_depth == sizeof(short)) {
+      if (param->src_depth == sizeof(short)) {
+        //Handle 16-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, short);
+      } else if (param->src_depth == sizeof(char)) {
+        //Handle 8-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, short);
+      } else {
+        //No valid handling for the given depth
+        free(tmp_trgt_data);
+        assert(0);
+      }
+    }
+    else if (param->trgt_depth == sizeof(char)) {
+      if (param->src_depth == sizeof(short)) {
+        //Handle 16-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, char);
+      } else if (param->src_depth == sizeof(char)) {
+        //Handle 8-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, char);
+      } else {
+        //No valid handling for the given depth
+        free(tmp_trgt_data);
+        assert(0);
+      }
+    }
+
+    free(tmp_trgt_data);
+  }
+  else if (param->src_depth == sizeof(short)) {
+    //Handle 16-bit input buffer case
+    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, pic_data_t);
+  }
+  else if (param->src_depth == sizeof(char)) {
+    //Handle 8-bit input buffer case
+    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, pic_data_t);
+  }
+  else {
+    //No valid handling for the given depths
+    assert(0);
+  }
+}
 
 //Do the resampling in one pass using 2D-convolution.
 static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const pic_buffer_t *const trgt_buffer, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height )
@@ -1069,7 +1200,9 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
     .src_padding_x = 0,
     .src_padding_y = 0,
     .trgt_padding_x = 0,
-    .trgt_padding_y = 0
+    .trgt_padding_y = 0,
+    .src_depth = sizeof(pic_data_t),
+    .trgt_depth = sizeof(pic_data_t)
   };
 
   //Calculate Resampling parameters
@@ -1741,3 +1874,4 @@ static void resample2resampleBlockStep_default(const pic_buffer_t* const buffer,
 resample_block_step_func *const kvz_default_block_step_resample_func = &DEFAULT_RESAMPLE_BLOCK_STEP_FUNC;
 resample_func *const kvz_default_resample_func = &DEFAULT_RESAMPLE_FUNC;
 resample_func *const kvz_alt_resample_func  = &ALT_RESAMPLE_FUNC;
+opaque_resample_block_step_func *const kvz_opaque_block_step_resample_func = &OPAQUE_RESAMPLE_BLOCK_STEP_FUNC;
