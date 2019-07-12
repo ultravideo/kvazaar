@@ -550,19 +550,23 @@ void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv)
   free(yuv);
 }
 
-void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t * buffer)
+void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t * buffer, const int free_buffer)
 {
-  //Don't deallocate data here
+  //Don't deallocate data here if free buffer is not set
+  if (free_buffer)
+  {
+    free(buffer->data);
+  }
   free(buffer);
 }
 
-void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t * yuv)
+void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t * yuv, const int free_buffer)
 {
   if (yuv == NULL) return;
 
-  kvz_deallocateOpaquePictureBuffer(yuv->y);
-  kvz_deallocateOpaquePictureBuffer(yuv->u);
-  kvz_deallocateOpaquePictureBuffer(yuv->v);
+  kvz_deallocateOpaquePictureBuffer(yuv->y, free_buffer);
+  kvz_deallocateOpaquePictureBuffer(yuv->u, free_buffer);
+  kvz_deallocateOpaquePictureBuffer(yuv->v, free_buffer);
 
   free(yuv);
 }
@@ -926,6 +930,9 @@ for (int y = block_y; y < (block_y + block_height); y++) {\
 }\
 }while(0)
 
+/**
+*  \brief Do resampling on opaque data buffers. Supported bit-depths: horizontal step: {8,16,32}-bit -> 32-bit, vertical step 32-bit -> {8,16,32}-bit
+*/
 static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical) 
 {
   //Based on the src and trgt depths select the relevant function
@@ -981,46 +988,31 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
   int tmp_trgt_data_stride = trgt_buffer->stride;
   int tmp_trgt_offset = trgt_offset;
 
-  if (param->trgt_depth != sizeof(pic_data_t)) {
+  if (param->trgt_depth != sizeof(pic_data_t) && is_vertical) {
     //Need to make use of a tmp buffer to maintain enough precission
     tmp_trgt_data = (pic_data_t *)malloc(sizeof(pic_data_t) * block_width * block_height);
     tmp_trgt_offset = 0;
     tmp_trgt_data_stride = block_width;
 
-    if (param->trgt_depth == sizeof(short)) {
-      if (param->src_depth == sizeof(short)) {
-        //Handle 16-bit input buffer case
-        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, short);
-      } else if (param->src_depth == sizeof(char)) {
-        //Handle 8-bit input buffer case
-        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, short);
-      } else {
-        //No valid handling for the given depth
-        free(tmp_trgt_data);
-        assert(0);
-      }
+    if (param->src_depth == sizeof(pic_data_t) && param->trgt_depth == sizeof(short)) {
+      //Handle 16-bit output buffer case
+      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, short);
     }
-    else if (param->trgt_depth == sizeof(char)) {
-      if (param->src_depth == sizeof(short)) {
-        //Handle 16-bit input buffer case
-        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, char);
-      } else if (param->src_depth == sizeof(char)) {
-        //Handle 8-bit input buffer case
-        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, char);
-      } else {
-        //No valid handling for the given depth
-        free(tmp_trgt_data);
-        assert(0);
-      }
+    else if (param->src_depth == sizeof(pic_data_t) && param->trgt_depth == sizeof(char)) {
+      //Handle 8-bit output buffer case
+      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, char);
+    } else {
+      //No valid handling for the given depth
+      assert(0);
     }
 
     free(tmp_trgt_data);
   }
-  else if (param->src_depth == sizeof(short)) {
+  else if (param->src_depth == sizeof(short) && !is_vertical) {
     //Handle 16-bit input buffer case
     OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, pic_data_t);
   }
-  else if (param->src_depth == sizeof(char)) {
+  else if (param->src_depth == sizeof(char) && !is_vertical) {
     //Handle 8-bit input buffer case
     OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, pic_data_t);
   }

@@ -208,12 +208,12 @@ void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv);
 /**
 * \brief Deallocate opaque picture buffer
 */
-void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t* buffer);
+void kvz_deallocateOpaquePictureBuffer(opaque_pic_buffer_t* buffer, const int free_buffer);
 
 /**
 * \brief Deallocate opaque yuv buffer
 */
-void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t* yuv);
+void kvz_deallocateOpaqueYuvBuffer(opaque_yuv_buffer_t* yuv, const int free_buffer);
 
 
 /**
