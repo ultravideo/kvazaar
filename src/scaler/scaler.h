@@ -173,9 +173,11 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
 
 /**
 * \brief return a opaque buffer type using the given input
+  \param ?_data: set data buffer to given opaque buffer. If data is NULL, allocate memory based on alloc_depth.
+  \param alloc_depth: Set element size and allocate needed memory. If depth is 0 does not allocate memory for data
 */
-opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride);
-opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(void *const y_data, void *const u_data, void *const v_data, int width, int height, int stride, chroma_format_t format);
+opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride, const unsigned alloc_depth);
+opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(void *const y_data, void *const u_data, void *const v_data, int width, int height, int stride, chroma_format_t format, const unsigned alloc_depth);
 
 
 /**

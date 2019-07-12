@@ -105,7 +105,7 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
   return yuv;
 }
 
-opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride)
+opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride, const unsigned alloc_depth)
 {
   opaque_pic_buffer_t *buffer = (opaque_pic_buffer_t*)malloc(sizeof(opaque_pic_buffer_t));
   if (buffer == NULL)
@@ -113,7 +113,12 @@ opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, in
     return NULL;
   }
   
-  buffer->data = data;
+  if (data == NULL && alloc_depth != 0 ) {
+    buffer->data = malloc(width * height * alloc_depth);
+  } else {
+    buffer->data = data;
+  }
+
   buffer->width = width;
   buffer->height = height;
   buffer->stride = stride;
@@ -121,7 +126,7 @@ opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, in
   return buffer;
 }
 
-opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u_data, void * const v_data, int width, int height, int stride, chroma_format_t format)
+opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u_data, void * const v_data, int width, int height, int stride, chroma_format_t format, const unsigned alloc_depth)
 {
   opaque_yuv_buffer_t *buffer = (opaque_yuv_buffer_t*)malloc(sizeof(opaque_yuv_buffer_t));
   if (buffer == NULL)
@@ -131,7 +136,7 @@ opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u
 
   buffer->format = format;
 
-  buffer->y = kvz_newOpaquePictureBuffer(y_data, width, height, stride);
+  buffer->y = kvz_newOpaquePictureBuffer(y_data, width, height, stride, alloc_depth);
 
   int w_factor = 0;
   int h_factor = 0;
@@ -166,8 +171,8 @@ opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u
   height = height >> h_factor;
   stride = stride >> w_factor;
 
-  buffer->u = kvz_newOpaquePictureBuffer(u_data, width, height, stride);
-  buffer->v = kvz_newOpaquePictureBuffer(v_data, width, height, stride);
+  buffer->u = kvz_newOpaquePictureBuffer(u_data, width, height, stride, alloc_depth);
+  buffer->v = kvz_newOpaquePictureBuffer(v_data, width, height, stride, alloc_depth);
 
   return buffer;
 }
