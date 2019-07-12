@@ -126,6 +126,8 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/sao-generic.h \
 	strategies/generic/encode_coding_tree-generic.c \
 	strategies/generic/encode_coding_tree-generic.h \
+	strategies/missing-intel-intrinsics.h \
+	strategies/optimized_sad_func_ptr_t.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -179,6 +181,7 @@ libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.h
 
 libavx2_la_SOURCES = \
+	strategies/avx2/avx2_common_functions.h \
 	strategies/avx2/dct-avx2.c \
 	strategies/avx2/dct-avx2.h \
 	strategies/avx2/intra-avx2.c \
@@ -189,6 +192,7 @@ libavx2_la_SOURCES = \
 	strategies/avx2/picture-avx2.h \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
+	strategies/avx2/reg_sad_pow2_widths-avx2.h \
 	strategies/avx2/sao-avx2.c \
 	strategies/avx2/sao-avx2.h \
 	strategies/avx2/encode_coding_tree-avx2.c \
@@ -200,7 +204,8 @@ libsse2_la_SOURCES = \
 
 libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.c \
-	strategies/sse41/picture-sse41.h
+	strategies/sse41/picture-sse41.h \
+	strategies/sse41/reg_sad_pow2_widths-sse41.h
 
 if HAVE_PPC
 
