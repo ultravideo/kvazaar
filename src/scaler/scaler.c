@@ -1896,7 +1896,7 @@ int kvz_opaqueYuvBlockStepScaling_adapter(opaque_yuv_buffer_t* const dst, const 
 
 int kvz_opaqueYuvBlockStepScaling(opaque_yuv_buffer_t* const dst, const opaque_yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
 {
-  return kvz_opaqueYuvBlockStepScaling_adapter(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, &kvz_opaque_block_step_resample_func);
+  return kvz_opaqueYuvBlockStepScaling_adapter(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, kvz_opaque_block_step_resample_func);
 }
 
 void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height)
