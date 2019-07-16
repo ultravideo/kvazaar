@@ -82,9 +82,6 @@ typedef struct
 
   int is_calculated; //Flag that tells that parameters have been calculated. Needs to be set to false manually if values are changed
 
-  //Source and target buffer depths, used with opaque buffers to determine buffer element size
-  int src_depth;
-  int trgt_depth;
 } scaling_parameter_t;
 
 /*==========================================================================*/
@@ -148,6 +145,7 @@ typedef struct
   void *data;
 
   int stride;
+  int depth; //Determine the bit-depth of data
 } opaque_pic_buffer_t;
 
 /**
@@ -285,6 +283,21 @@ int kvz_yuvBlockStepScaling( yuv_buffer_t* const dst, const yuv_buffer_t* const 
 * \param resample_func uses the given function pointer as the resample function
 */
 int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func *const resample_func);
+
+/**
+* \brief Function for scaling an image, given in a opaque yuv buffer, in either the vertical or horizontal direction (can handle down- and upscaling).
+* \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
+*        Result given in dst buffer.
+* \param resample_func uses the given function pointer as the resample function
+*/
+int kvz_opaqueYuvBlockStepScaling_adapter(opaque_yuv_buffer_t * const dst, const opaque_yuv_buffer_t * const src, const scaling_parameter_t * const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, opaque_resample_block_step_func * const resample_func);
+
+/**
+* \brief Function for scaling an image, given in a opaque yuv buffer, in either the vertical or horizontal direction (can handle down- and upscaling).
+* \pre dst should be a buffer of either size block_width-by-block_height or the size of the trgt image. And src should be large enough to accomodate the block schaling src range
+*        Result given in dst buffer.
+*/
+int kvz_opaqueYuvBlockStepScaling(opaque_yuv_buffer_t * const dst, const opaque_yuv_buffer_t * const src, const scaling_parameter_t * const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical);
 /*=============================================================*/
 
 /*================Block scaling helper functions========================*/

@@ -122,6 +122,7 @@ opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, in
   buffer->width = width;
   buffer->height = height;
   buffer->stride = stride;
+  buffer->depth = alloc_depth;
 
   return buffer;
 }
@@ -337,6 +338,7 @@ static void copyYuvBufferBlock(const yuv_buffer_t* const src, const yuv_buffer_t
   copyPictureBufferBlock(src->v, dst->v, SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
 }
 
+
 //Copy memory blocks between different types
 static void copyMemBlock( void * const dst, const void * const src, const int dst_sizeof, const int src_sizeof, const int dst_stride, const int src_stride, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height)
 {
@@ -360,6 +362,25 @@ static void copyMemBlock( void * const dst, const void * const src, const int ds
     src_char += src_stride * src_sizeof;
   }
 }
+
+/**
+* \brief Copies data from a sub-block from one opaque buffer to the other.
+* \param src is the source buffer
+* \param dst is the destination buffer
+* \param src/dst_x is the x-coordinate for the sub-block (needs to be valid for both buffers).
+* \param src/dst_y is the y-coordinate for the sub-block (needs to be valid for both buffers).
+* \param block_width is the width for the sub-block (needs to be valid for both buffers).
+* \param block_height is the height for the sub-block (needs to be valid for both buffers).
+* \param w_factor is how much chroma sizes are scaled (width).
+* \param h_factor is how much chroma sizes are scaled (heigth).
+*/
+static void copyOpaqueYuvBufferBlock(const opaque_yuv_buffer_t* const src, const opaque_yuv_buffer_t* const dst, const int src_x, const int src_y, const int dst_x, const int dst_y, const int block_width, const int block_height, const int w_factor, const int h_factor)
+{
+  copyMemBlock(dst->y->data, src->y->data, dst->y->depth, src->y->depth, dst->y->stride, src->y->stride, dst_x, dst_y, src_x, src_y, block_width, block_height);
+  copyMemBlock(dst->u->data, src->u->data, dst->u->depth, src->u->depth, dst->u->stride, src->u->stride, SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
+  copyMemBlock(dst->v->data, src->v->data, dst->v->depth, src->v->depth, dst->v->stride, src->v->stride, SCALER_SHIFT(dst_x, w_factor), SCALER_SHIFT(dst_y, h_factor), SCALER_SHIFT(src_x, w_factor), SCALER_SHIFT(src_y, h_factor), SCALER_SHIFT(block_width, w_factor), SCALER_SHIFT(block_height, h_factor));
+}
+
 
 void kvz_copy_uint8_block_to_YuvBuffer(const yuv_buffer_t* dst, const uint8_t* const y, const uint8_t* const u, const uint8_t* const v, const int luma_stride, const int dst_x, const int dst_y, const int src_x, const int src_y, const int block_width, const int block_height, const int w_factor, const int h_factor){
   //TODO: Sanity checks
@@ -939,11 +960,11 @@ for (int y = block_y; y < (block_y + block_height); y++) {\
 *  \brief Do resampling on opaque data buffers. Supported bit-depths: horizontal step: {8,16,32}-bit -> 32-bit, vertical step 32-bit -> {8,16,32}-bit
 */
 static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical) 
-{
+{  
   //Based on the src and trgt depths select the relevant function
-  if (param->trgt_depth == sizeof(pic_data_t) && param->src_depth == sizeof(pic_data_t)) {
+  if (trgt_buffer->depth == sizeof(pic_data_t) && src_buffer->depth == sizeof(pic_data_t)) {
     //Use the basic algorithm
-    resampleBlockStep((const pic_buffer_t *)src_buffer, (const pic_buffer_t *)trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
+    resampleBlockStep((pic_buffer_t *)src_buffer, (pic_buffer_t *)trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
     return;
   }
 
@@ -993,17 +1014,17 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
   int tmp_trgt_data_stride = trgt_buffer->stride;
   int tmp_trgt_offset = trgt_offset;
 
-  if (param->trgt_depth != sizeof(pic_data_t) && is_vertical) {
+  if (trgt_buffer->depth != sizeof(pic_data_t) && is_vertical) {
     //Need to make use of a tmp buffer to maintain enough precission
     tmp_trgt_data = (pic_data_t *)malloc(sizeof(pic_data_t) * block_width * block_height);
     tmp_trgt_offset = 0;
     tmp_trgt_data_stride = block_width;
 
-    if (param->src_depth == sizeof(pic_data_t) && param->trgt_depth == sizeof(short)) {
+    if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(short)) {
       //Handle 16-bit output buffer case
       OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, short);
     }
-    else if (param->src_depth == sizeof(pic_data_t) && param->trgt_depth == sizeof(char)) {
+    else if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(char)) {
       //Handle 8-bit output buffer case
       OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, char);
     } else {
@@ -1013,11 +1034,11 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
 
     free(tmp_trgt_data);
   }
-  else if (param->src_depth == sizeof(short) && !is_vertical) {
+  else if (src_buffer->depth == sizeof(short) && !is_vertical) {
     //Handle 16-bit input buffer case
     OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, pic_data_t);
   }
-  else if (param->src_depth == sizeof(char) && !is_vertical) {
+  else if (src_buffer->depth == sizeof(char) && !is_vertical) {
     //Handle 8-bit input buffer case
     OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, pic_data_t);
   }
@@ -1197,9 +1218,7 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
     .src_padding_x = 0,
     .src_padding_y = 0,
     .trgt_padding_x = 0,
-    .trgt_padding_y = 0,
-    .src_depth = sizeof(pic_data_t),
-    .trgt_depth = sizeof(pic_data_t)
+    .trgt_padding_y = 0
   };
 
   //Calculate Resampling parameters
@@ -1686,27 +1705,9 @@ static void blockScalingSrcRange( int range[2], const int scale, const int add, 
 
 }
 
-void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width)
+//Do validity checks and calculate offset parameters and scaling dir if needed
+static int blockStepScalingChecks( const yuv_buffer_t *const dst, const yuv_buffer_t *const src, const scaling_parameter_t *const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, int *dst_offset_luma, int *dst_offset_chroma, int *src_offset_luma, int *src_offset_chroma, int *scaling_dir, int *w_factor_out, int *h_factor_out)
 {
-  //Calculate parameters
-  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
-
-  blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, base_param->src_width + base_param->src_padding_x);
-}
-
-void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height)
-{
-  //Calculate parameters
-  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
-
-  blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, base_param->src_height + base_param->src_padding_y);
-}
-
-// Do block scaling in one direction. yuv buffer should not be modified.
-int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func * const resample_func)
-{
-  /*========== Basic Initialization ==============*/
-
   //Check that block parameters are valid
   int width_bound = base_param->trgt_width;
   int height_bound = is_vertical ? base_param->trgt_height : base_param->src_height + base_param->src_padding_y;
@@ -1716,7 +1717,7 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
   }
 
   //Initialize basic parameters
-  scaling_parameter_t param = *base_param;
+  const scaling_parameter_t param = *base_param;
 
   //How much to scale the luma sizes to get the chroma sizes
   int w_factor = 0;
@@ -1749,19 +1750,20 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
     assert(0); //Unsupported chroma type
   }
 
+  if (w_factor_out) *w_factor_out = w_factor;
+  if (h_factor_out) *h_factor_out = h_factor;
+
   //Calculate a src offset depending on wheather src is the whole image or just the block
   // if src is smaller than the specified src size, the src buffer is intepreted to contain the area specified by kvz_blockScaling*Range.
   // if src is the size of the specified src, the src buffer is accessed in the area specified by kvz_blockScaling*Range.
-  int src_offset_luma = 0;
-  int src_offset_chroma = 0;
   width_bound = is_vertical ? param.trgt_width : param.src_width + param.src_padding_x;
   height_bound = param.src_height + param.src_padding_y;
   if (src == NULL || src->y->width < width_bound || src->y->height < height_bound || src->u->width < SCALER_SHIFT(width_bound, w_factor) || src->u->height < SCALER_SHIFT(height_bound, w_factor) || src->v->width < SCALER_SHIFT(width_bound, w_factor) || src->v->height < SCALER_SHIFT(height_bound, w_factor)) {
-    
+
     //Get src range needed for scaling
     int range[4];
     kvz_blockScalingSrcWidthRange(range, base_param, block_x, block_width);
-    kvz_blockScalingSrcHeightRange(range+2, base_param, block_y, block_height);
+    kvz_blockScalingSrcHeightRange(range + 2, base_param, block_y, block_height);
     width_bound = is_vertical ? block_width : range[1] - range[0];
     height_bound = is_vertical ? range[3] - range[2] : block_height;
 
@@ -1773,15 +1775,13 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
       return 0;
     }
     //Set src offset so that the block is written to the correct pos
-    src_offset_luma = is_vertical ? block_x + range[2] * src->y->width : range[0] + block_y * src->y->width;
-    src_offset_chroma = is_vertical ? SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(range[2], h_factor) * src->u->width : SCALER_SHIFT(range[0], w_factor) + SCALER_SHIFT(block_y, h_factor) * src->u->width;
+    if(src_offset_luma) *src_offset_luma = is_vertical ? block_x + range[2] * src->y->width : range[0] + block_y * src->y->width;
+    if(src_offset_chroma) *src_offset_chroma = is_vertical ? SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(range[2], h_factor) * src->u->width : SCALER_SHIFT(range[0], w_factor) + SCALER_SHIFT(block_y, h_factor) * src->u->width;
   }
 
   //Calculate a dst offset depending on wheather dst is the whole image or just the block
   // if dst is smaller than the specified trgt size, the scaled block is written starting from (0,0)
   // if dst is the size of the specified trgt, the scaled block is written starting from (block_x,block_y)
-  int dst_offset_luma = 0;
-  int dst_offset_chroma = 0;
   width_bound = param.trgt_width;
   height_bound = is_vertical ? param.trgt_height : param.src_height + param.src_padding_y;
   if (dst == NULL || dst->y->width < width_bound || dst->y->height < height_bound
@@ -1796,8 +1796,8 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
       return 0;
     }
     //Set dst offset so that the block is written to the correct pos
-    dst_offset_luma = block_x + block_y * dst->y->width;
-    dst_offset_chroma = SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(block_y, h_factor) * dst->u->width;
+    if (dst_offset_luma) *dst_offset_luma = block_x + block_y * dst->y->width;
+    if (dst_offset_chroma) *dst_offset_chroma = SCALER_SHIFT(block_x, w_factor) + SCALER_SHIFT(block_y, h_factor) * dst->u->width;
   }
 
   //Calculate if we are upscaling or downscaling
@@ -1806,23 +1806,140 @@ int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t*
   int is_equal_width = param.src_width == param.trgt_width;
   int is_equal_height = param.src_height == param.trgt_height;
 
-  int is_upscaling = 1;
-
   //both dimensions need to be either up- or downscaled
   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
     (is_downscaled_height && !is_downscaled_width && !is_equal_width)) {
     fprintf(stderr, "Both dimensions need to be either upscaled or downscaled\n");
     return 0;
   }
+
+  if (scaling_dir == NULL) {
+    //Don't set scaling dir
+    return 1;
+  }
+
   if (is_equal_height && is_equal_width) {
+    *scaling_dir = 0; //No scaling
+  }
+  else if (is_downscaled_width || is_downscaled_height) {
+    //Atleast one dimension is downscaled
+    *scaling_dir = -1;
+  } else {
+    *scaling_dir = 1; //upscaling
+  }
+
+  return 1;
+}
+
+void kvz_blockScalingSrcWidthRange(int range[2], const scaling_parameter_t * const base_param, const int block_x, const int block_width)
+{
+  //Calculate parameters
+  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
+
+  blockScalingSrcRange(range, base_param->scale_x, base_param->add_x, base_param->shift_x, base_param->delta_x, block_x, block_x + block_width - 1, base_param->src_width + base_param->src_padding_x);
+}
+
+int kvz_opaqueYuvBlockStepScaling_adapter(opaque_yuv_buffer_t* const dst, const opaque_yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, opaque_resample_block_step_func * const resample_func)
+{
+  //Do validity checks
+  int scaling_dir = 0;
+  int src_offset_luma = 0;
+  int src_offset_chroma = 0;
+  int dst_offset_luma = 0;
+  int dst_offset_chroma = 0;
+
+  int w_factor = 0;
+  int h_factor = 0;
+
+  if (!blockStepScalingChecks((yuv_buffer_t *)dst, (yuv_buffer_t *)src, base_param, block_x, block_y, block_width, block_height, is_vertical, &dst_offset_luma, &dst_offset_chroma, &src_offset_luma, &src_offset_chroma, &scaling_dir, &w_factor, &h_factor))
+  {
+    return 0;
+  }
+
+  if (scaling_dir == 0) {
+    //If equal just copy block from src
+    copyOpaqueYuvBufferBlock(src, dst, src_offset_luma != 0 ? 0 : block_x, src_offset_luma != 0 ? 0 : block_y, dst_offset_luma != 0 ? 0 : block_x, dst_offset_luma != 0 ? 0 : block_y, block_width, block_height, w_factor, h_factor);
+    return 1;
+  }
+
+  int is_upscaling = 1;
+  if (scaling_dir == -1) {
+    //Atleast one dimension is downscaled
+    is_upscaling = 0;
+  }
+  
+  scaling_parameter_t param = *base_param;
+
+  //Do resampling
+
+  //Resample y
+  /*resampleBlockStep*/resample_func(src->y, dst->y, -src_offset_luma, -dst_offset_luma, block_x, block_y, block_width, block_height, &param, is_upscaling, 1, is_vertical);
+
+  //Skip chroma if CHROMA_400
+  if (param.chroma != CHROMA_400) {
+    //If chroma size differs from luma size, we need to recalculate the parameters
+    if (h_factor != 0 || w_factor != 0) {
+      param.is_calculated = 0;
+      calculateParameters(&param, w_factor, h_factor, 1);
+    }
+
+    //In order to scale blocks not divisible by 2 correctly, need to do some tricks
+    //Resample u
+    /*resampleBlockStep*/resample_func(src->u, dst->u, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+
+    //Resample v
+    /*resampleBlockStep*/resample_func(src->v, dst->v, -src_offset_chroma, -dst_offset_chroma, SCALER_SHIFT(block_x, w_factor), SCALER_SHIFT(block_y, h_factor), SCALER_ROUND_SHIFT(block_width, w_factor), SCALER_ROUND_SHIFT(block_height, h_factor), &param, is_upscaling, 0, is_vertical);
+  }
+
+  return 1;
+}
+
+int kvz_opaqueYuvBlockStepScaling(opaque_yuv_buffer_t* const dst, const opaque_yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical)
+{
+  return kvz_opaqueYuvBlockStepScaling_adapter(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, &kvz_opaque_block_step_resample_func);
+}
+
+void kvz_blockScalingSrcHeightRange(int range[2], const scaling_parameter_t * const base_param, const int block_y, const int block_height)
+{
+  //Calculate parameters
+  calculateParameters((scaling_parameter_t*)base_param, 0, 0, 0);
+
+  blockScalingSrcRange(range, base_param->scale_y, base_param->add_y, base_param->shift_y, base_param->delta_y, block_y, block_y + block_height - 1, base_param->src_height + base_param->src_padding_y);
+}
+
+// Do block scaling in one direction. yuv buffer should not be modified.
+int kvz_yuvBlockStepScaling_adapter(yuv_buffer_t* const dst, const yuv_buffer_t* const src, const scaling_parameter_t* const base_param, const int block_x, const int block_y, const int block_width, const int block_height, const int is_vertical, resample_block_step_func * const resample_func)
+{
+  /*========== Basic Initialization ==============*/
+
+    //Do validity checks
+  int scaling_dir = 0;
+  int src_offset_luma = 0;
+  int src_offset_chroma = 0;
+  int dst_offset_luma = 0;
+  int dst_offset_chroma = 0;
+
+  int w_factor = 0;
+  int h_factor = 0;
+
+  if (!blockStepScalingChecks(dst, src, base_param, block_x, block_y, block_width, block_height, is_vertical, &dst_offset_luma, &dst_offset_chroma, &src_offset_luma, &src_offset_chroma, &scaling_dir, &w_factor, &h_factor))
+  {
+    return 0;
+  }
+
+  if (scaling_dir == 0) {
     //If equal just copy block from src
     copyYuvBufferBlock(src, dst, src_offset_luma != 0 ? 0 : block_x, src_offset_luma != 0 ? 0 : block_y, dst_offset_luma != 0 ? 0 : block_x, dst_offset_luma != 0 ? 0 : block_y, block_width, block_height, w_factor, h_factor);
     return 1;
   }
-  if (is_downscaled_width || is_downscaled_height) {
+
+  int is_upscaling = 1;
+  if (scaling_dir == -1) {
     //Atleast one dimension is downscaled
     is_upscaling = 0;
   }
+
+  scaling_parameter_t param = *base_param;
   /*=================================*/
 
   /*==========Start Resampling=============*/
