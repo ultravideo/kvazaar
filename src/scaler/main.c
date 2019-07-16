@@ -62,7 +62,7 @@ static void copyFrom(uint8_t* dst, pic_data_t* src, int size)
 
 #define COPY_CUSTOM(dst, src, size, dst_type, src_type) \
   for (int i = 0; i < (size); i++) {\
-    ((dst_type *)(dst))[i] = ((src_type *)(src))[i];\
+    ((dst_type *)(dst))[i] = (dst_type)(((src_type *)(src))[i]);\
   }\
 
 /**
@@ -305,7 +305,7 @@ static void kvzBlockStepScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   kvz_deallocateYuvBuffer(tmp);
 }
 
-static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer_t** out, int in_depth, int out_depth)
+static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
@@ -324,39 +324,35 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
   int luma_size = out_y_width * in_y_height;
   int chroma_size = luma_size >> 2;
 
-  opaque_yuv_buffer_t* tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, in_y_height, CHROMA_420, sizeof(pic_data_t));
+  opaque_yuv_buffer_t* tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(pic_data_t));
 
   int32_t in_parts = (in_y_height + block_height - 1) / block_height;
 
   //Horizontal
-  param.src_depth = in_depth;
-  param.trgt_depth = sizeof(pic_data_t);
   for (size_t y = 0; y < in_parts; y++) {
     for (size_t x = 0; x < (1 << part); x++) {
       int block_x = block_width * x;
       int block_y = block_height * y;
       int bh = min(block_height, in_y_height - block_y);
 
-      kvz_yuvBlockStepScaling_adapter((yuv_buffer_t *)in, (yuv_buffer_t *)tmp, &param, block_x, block_y,
-        block_width, bh, 0, (resample_block_step_func *)&kvz_opaque_block_step_resample_func);
+      kvz_opaqueYuvBlockStepScaling_adapter(in, tmp, &param, block_x, block_y,
+        block_width, bh, 0, &kvz_opaque_block_step_resample_func);
     }
   }
 
   //Vertical
-  param.src_depth = sizeof(pic_data_t);
-  param.trgt_depth = out_depth;
   for (size_t y = 0; y < (1 << part); y++) {
     for (size_t x = 0; x < (1 << part); x++) {
       int block_x = block_width * x;
       int block_y = block_height * y;
 
-      kvz_yuvBlockStepScaling_adapter((yuv_buffer_t *)tmp, (yuv_buffer_t *)*out, &param, block_x, block_y,
-        block_width, block_height, 1, (resample_block_step_func *)&kvz_opaque_block_step_resample_func);
+      kvz_opaqueYuvBlockStepScaling_adapter(tmp, *out, &param, block_x, block_y,
+        block_width, block_height, 1, &kvz_opaque_block_step_resample_func);
     }
   }
 
   kvz_deallocateOpaqueYuvBuffer(tmp, 1);
-  kvz_deallocateYuvBuffer(tmp);
+  //kvz_deallocateYuvBuffer(tmp);
 }
 
 static void kvzScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out)
@@ -1113,8 +1109,8 @@ static void opaque_validate_test()
   }
 
   yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
-  opaque_yuv_buffer_t* data2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, out_width, CHROMA_420, sizeof(char));
-  opaque_yuv_buffer_t* data3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, out_width, CHROMA_420, sizeof(short));
+  opaque_yuv_buffer_t* data2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(char));
+  opaque_yuv_buffer_t* data3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(short));
   yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
   opaque_yuv_buffer_t* out2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(char));
   opaque_yuv_buffer_t* out3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(short));
@@ -1123,9 +1119,12 @@ static void opaque_validate_test()
 
   while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
 
-    COPY_CUSTOM(data2->y->data, data->y->data, in_width * in_height, char, pic_data_t);
-    COPY_CUSTOM(data2->u->data, data->u->data, (in_width * in_height) >> 2, char, pic_data_t);
-    COPY_CUSTOM(data2->v->data, data->v->data, (in_width * in_height) >> 2, char, pic_data_t);
+    //COPY_CUSTOM(data2->y->data, data->y->data, in_width * in_height, unsigned char, pic_data_t);
+    //COPY_CUSTOM(data2->u->data, data->u->data, (in_width * in_height) >> 2, unsigned char, pic_data_t);
+    //COPY_CUSTOM(data2->v->data, data->v->data, (in_width * in_height) >> 2, unsigned char, pic_data_t);
+    copyFrom((uint8_t *)data2->y->data, data->y->data, in_width * in_height);
+    copyFrom((uint8_t *)data2->u->data, data->u->data, (in_width * in_height) >> 2);
+    copyFrom((uint8_t *)data2->v->data, data->v->data, (in_width * in_height) >> 2);
 
     COPY_CUSTOM(data3->y->data, data->y->data, in_width * in_height, short, pic_data_t);
     COPY_CUSTOM(data3->u->data, data->u->data, (in_width * in_height) >> 2, short, pic_data_t);
@@ -1149,9 +1148,9 @@ static void opaque_validate_test()
     }
 
     yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
-    yuv_io_write(out_file2, out2, out2->y->width, out2->y->height);
-    yuv_io_write(out_file3, out3, out3->y->width, out3->y->height);
-    yuv_io_write(out_file4, out4, out4->y->width, out4->y->height);
+    yuv_io_write(out_file2, (yuv_buffer_t *)out2, out2->y->width, out2->y->height);
+    yuv_io_write(out_file3, (yuv_buffer_t *)out3, out3->y->width, out3->y->height);
+    yuv_io_write(out_file4, (yuv_buffer_t *)out4, out4->y->width, out4->y->height);
 
     printf("Frame number %i\r", ++i);
   }
@@ -1231,7 +1230,8 @@ static void validate_test4()
 int main()
 {
   //vscaling();
-  validate_test3();
+  //validate_test3();
+  opaque_validate_test();
   //int r = test_avx();
   //printf("%d", r);
 
