@@ -65,6 +65,63 @@ static void copyFrom(uint8_t* dst, pic_data_t* src, int size)
     ((dst_type *)(dst))[i] = (dst_type)(((src_type *)(src))[i]);\
   }\
 
+static int opaque_piccmp(opaque_pic_buffer_t *b1, opaque_pic_buffer_t *b2)
+{
+  int ret_val = 1;
+  for (int i = 0; i < b1->width * b1->height; i++) {
+    long b1_val, b2_val;
+
+    switch (b1->depth)
+    {
+      case sizeof(char):
+        b1_val = (long)(((unsigned char *)(b1->data))[i]);
+        break;
+
+      case sizeof(short) :
+        b1_val = (long)(((unsigned short *)(b1->data))[i]);
+        break;
+
+      case sizeof(int) :
+        b1_val = (long)(((unsigned int *)(b1->data))[i]);
+        break;
+
+      default:
+      break;
+    }
+
+    switch (b2->depth)
+    {
+      case sizeof(char) :
+        b2_val = (long)(((unsigned char *)(b2->data))[i]);
+        break;
+
+      case sizeof(short) :
+        b2_val = (long)(((unsigned short *)(b2->data))[i]);
+        break;
+
+      case sizeof(int) :
+        b2_val = (long)(((unsigned int *)(b2->data))[i]);
+        break;
+
+      default:
+        break;
+    }
+
+    ret_val &= b1_val == b2_val;
+  }
+
+  return ret_val;
+}
+
+static int opaque_yuvcmp(opaque_yuv_buffer_t *yuv1, opaque_yuv_buffer_t *yuv2)
+{
+  int ret_val = 1;
+  ret_val &= opaque_piccmp(yuv1->y, yuv2->y);
+  ret_val &= opaque_piccmp(yuv1->u, yuv2->u);
+  ret_val &= opaque_piccmp(yuv1->v, yuv2->v);
+  return ret_val;
+}
+
 /**
 * \brief Read a single frame from a file.
 *
@@ -286,7 +343,7 @@ static void kvzBlockStepScaling(yuv_buffer_t* in, yuv_buffer_t** out)
       int block_y = block_height * y;
       int bh = min(block_height, in_y_height-block_y);
 
-      kvz_yuvBlockStepScaling(in, tmp, &param, block_x, block_y,
+      kvz_yuvBlockStepScaling(tmp, in, &param, block_x, block_y,
         block_width, bh, 0);
     }
   }
@@ -297,7 +354,7 @@ static void kvzBlockStepScaling(yuv_buffer_t* in, yuv_buffer_t** out)
       int block_x = block_width * x;
       int block_y = block_height * y;
 
-      kvz_yuvBlockStepScaling(tmp, *out, &param, block_x, block_y,
+      kvz_yuvBlockStepScaling(*out, tmp, &param, block_x, block_y,
         block_width, block_height, 1);
     }
   }
@@ -335,8 +392,8 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
       int block_y = block_height * y;
       int bh = min(block_height, in_y_height - block_y);
 
-      kvz_opaqueYuvBlockStepScaling_adapter(in, tmp, &param, block_x, block_y,
-        block_width, bh, 0, &kvz_opaque_block_step_resample_func);
+      kvz_opaqueYuvBlockStepScaling_adapter(tmp, in, &param, block_x, block_y,
+        block_width, bh, 0, kvz_opaque_block_step_resample_func);
     }
   }
 
@@ -346,8 +403,8 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
       int block_x = block_width * x;
       int block_y = block_height * y;
 
-      kvz_opaqueYuvBlockStepScaling_adapter(tmp, *out, &param, block_x, block_y,
-        block_width, block_height, 1, &kvz_opaque_block_step_resample_func);
+      kvz_opaqueYuvBlockStepScaling_adapter(*out, tmp, &param, block_x, block_y,
+        block_width, block_height, 1, kvz_opaque_block_step_resample_func);
     }
   }
 
@@ -1077,8 +1134,8 @@ static void opaque_validate_test()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t out_width = in_width >> 1;//264;
+  int32_t out_height = in_height >> 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -1111,7 +1168,9 @@ static void opaque_validate_test()
   yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
   opaque_yuv_buffer_t* data2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(char));
   opaque_yuv_buffer_t* data3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(short));
+  opaque_yuv_buffer_t* data4 = kvz_newOpaqueYuvBuffer(data->y->data, data->u->data, data->v->data, in_width, in_height, in_width, CHROMA_420, sizeof(pic_data_t));
   yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  opaque_yuv_buffer_t* op_out1 = kvz_newOpaqueYuvBuffer(out1->y->data, out1->u->data, out1->v->data, out_width, out_height, out_width, CHROMA_420, sizeof(pic_data_t));
   opaque_yuv_buffer_t* out2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(char));
   opaque_yuv_buffer_t* out3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(short));
   opaque_yuv_buffer_t* out4 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(pic_data_t));
@@ -1131,33 +1190,37 @@ static void opaque_validate_test()
     COPY_CUSTOM(data3->v->data, data->v->data, (in_width * in_height) >> 2, short, pic_data_t);
 
     kvzScaling(data, &out1);
-    kvzOpaqueBlockStepScaling(data2, &out2, sizeof(char), sizeof(char));
-    kvzOpaqueBlockStepScaling(data3, &out3, sizeof(short), sizeof(short));
-    kvzOpaqueBlockStepScaling((opaque_yuv_buffer_t *)data, &out4, sizeof(pic_data_t), sizeof(pic_data_t));
+    kvzOpaqueBlockStepScaling(data2, &out2);
+    kvzOpaqueBlockStepScaling(data3, &out3);
+    kvzOpaqueBlockStepScaling(data4, &out4);
 
-    if (memcmp(out1->y->data, out2->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out2->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out2->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
+    if (opaque_yuvcmp(op_out1, out2) == 0) {
       printf("Frame %i differs in block char\n", i + 1);
     }
 
-    if (memcmp(out1->y->data, out3->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out3->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out3->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
+    if (opaque_yuvcmp(op_out1, out3) == 0) {
       printf("Frame %i differs in block short\n", i + 1);
     }
 
-    if (memcmp(out1->y->data, out4->y->data, sizeof(pic_data_t)*out_width*out_height) != 0 || memcmp(out1->u->data, out4->u->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0 || memcmp(out1->v->data, out4->v->data, sizeof(pic_data_t)*out_chroma_height*out_chroma_width) != 0) {
+    if (opaque_yuvcmp(op_out1, out4) == 0) {
       printf("Frame %i differs in block int\n", i + 1);
     }
 
-    yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
-    yuv_io_write(out_file2, (yuv_buffer_t *)out2, out2->y->width, out2->y->height);
-    yuv_io_write(out_file3, (yuv_buffer_t *)out3, out3->y->width, out3->y->height);
-    yuv_io_write(out_file4, (yuv_buffer_t *)out4, out4->y->width, out4->y->height);
+    //yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
+    //yuv_io_write(out_file2, (yuv_buffer_t *)out2, out2->y->width, out2->y->height);
+    //yuv_io_write(out_file3, (yuv_buffer_t *)out3, out3->y->width, out3->y->height);
+    //yuv_io_write(out_file4, (yuv_buffer_t *)out4, out4->y->width, out4->y->height);
 
     printf("Frame number %i\r", ++i);
   }
   printf("Wrote %i frames.\n", i);
 
   kvz_deallocateYuvBuffer(data);
+  kvz_deallocateOpaqueYuvBuffer(data2, 1);
+  kvz_deallocateOpaqueYuvBuffer(data3, 1);
+  kvz_deallocateOpaqueYuvBuffer(data4, 0);
   kvz_deallocateYuvBuffer(out1);
+  kvz_deallocateOpaqueYuvBuffer(op_out1, 0);
   kvz_deallocateOpaqueYuvBuffer(out2, 1);
   kvz_deallocateOpaqueYuvBuffer(out3, 1);
   kvz_deallocateOpaqueYuvBuffer(out4, 1);
