@@ -1022,11 +1022,11 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
 
     if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(short)) {
       //Handle 16-bit output buffer case
-      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, short);
+      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned short);
     }
     else if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(char)) {
       //Handle 8-bit output buffer case
-      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, char);
+      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned char);
     } else {
       //No valid handling for the given depth
       assert(0);
@@ -1036,11 +1036,11 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
   }
   else if (src_buffer->depth == sizeof(short) && !is_vertical) {
     //Handle 16-bit input buffer case
-    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(short, pic_data_t);
+    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, pic_data_t);
   }
   else if (src_buffer->depth == sizeof(char) && !is_vertical) {
     //Handle 8-bit input buffer case
-    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(char, pic_data_t);
+    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned char, pic_data_t);
   }
   else {
     //No valid handling for the given depths
