@@ -108,10 +108,10 @@ void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
 typedef struct {
   kvz_picture *pic_in;
   kvz_picture *pic_out;
-
-  yuv_buffer_t *src_buffer;
-  yuv_buffer_t *ver_tmp_buffer;
-  yuv_buffer_t *trgt_buffer;
+  
+  opaque_yuv_buffer_t *src_buffer;
+  opaque_yuv_buffer_t *ver_tmp_buffer;
+  opaque_yuv_buffer_t *trgt_buffer;
 
   int block_x;
   int block_y;
@@ -127,6 +127,7 @@ typedef struct {
 void kvz_image_scaler_worker( void *opaque_param);
 void kvz_block_scaler_worker( void *opaque_param );
 void kvz_block_step_scaler_worker(void * opaque_param);
+void kvz_opaque_block_step_scaler_worker(void * opaque_param);
 //void kvz_tile_step_scaler_worker(void * opaque_param);
 kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, uint8_t skip_same);
 void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src);

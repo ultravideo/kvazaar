@@ -26,6 +26,7 @@
 
 
 resample_block_step_func * kvz_resample_block_step = 0;
+opaque_resample_block_step_func * kvz_opaque_resample_block_step = 0;
 resample_func * kvz_resample = 0;
 
 int kvz_strategy_register_resample(void * opaque)

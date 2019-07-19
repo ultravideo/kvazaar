@@ -1102,7 +1102,7 @@ static void block_step_scaling(encoder_state_t * const state )
   param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
 
   param->use_tiles = 1;
-  kvz_block_step_scaler_worker(param);
+  kvz_opaque_block_step_scaler_worker(param);
 
   //state->layer->scaling_started = 1;
 
@@ -1137,7 +1137,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //First create job for vertical scaling
     kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
-    state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param_ver);
+    state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_opaque_block_step_scaler_worker, (void*)param_ver);
 
     //Add dependencies
     //  Create horizontal scaling jobs that the ver job depends on
@@ -1199,7 +1199,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
         }
 
         kvz_threadqueue_free_job(&state->layer->image_hor_scaling_jobs[hor_ind]);
-        state->layer->image_hor_scaling_jobs[hor_ind] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param_hor);
+        state->layer->image_hor_scaling_jobs[hor_ind] = kvz_threadqueue_job_create(kvz_opaque_block_step_scaler_worker, (void*)param_hor);
 
         //Add dependency to ILR jobs
         //Calculate vertical range of block scaling
@@ -1238,8 +1238,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     break;
 #else
     //Calculate suitable size for scaling job. Make sure atleast on ctu of the BL is processed
-    unsigned job_width = MAX(1, (unsigned)(state_param->param->rnd_trgt_width / state_param->param->scaled_src_width));
-    unsigned job_height = MAX(1, (unsigned)(state_param->param->rnd_trgt_height / state_param->param->scaled_src_height)) + 1;
+    const unsigned job_width = MAX(1, (unsigned)(state_param->param->rnd_trgt_width / state_param->param->scaled_src_width));
+    const unsigned job_height = MAX(1, (unsigned)(state_param->param->rnd_trgt_height / state_param->param->scaled_src_height)) + 1;
 
     //Skip creating job if current lcu is already being upsampled
     if (lcu->position.x % job_width != 0 || lcu->position.y % job_height != 0)
@@ -1302,7 +1302,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //First create the job
     kvz_threadqueue_free_job(&state->layer->image_ver_scaling_jobs[lcu->id]);
-    state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param);
+    state->layer->image_ver_scaling_jobs[lcu->id] = kvz_threadqueue_job_create(kvz_opaque_block_step_scaler_worker, (void*)param);
 
     //Calculate horizontal range
     int ver_range[2];
@@ -1377,7 +1377,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //Do hor/ver scaling in the same job
     kvz_threadqueue_free_job(&state->tqj_ilr_rec_scaling_done); //Should have been set to NULL anyway
-    state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_block_step_scaler_worker, (void*)param);
+    state->tqj_ilr_rec_scaling_done = kvz_threadqueue_job_create(kvz_opaque_block_step_scaler_worker, (void*)param);
 
     //Need to add dependency to all ilr tiles that that are within the src range
     int range[4];
@@ -1454,6 +1454,13 @@ static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_i
   state->layer->img_job_param.pic_out = kvz_image_alloc(pic_in->chroma_format,
     param->trgt_width + param->trgt_padding_x,
     param->trgt_height + param->trgt_padding_y);
+  kvz_picture *tmp = state->layer->img_job_param.pic_out;
+
+  //Add opaque buffers for the in/out image
+  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.src_buffer, 0);
+  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.trgt_buffer, 0);
+  state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, pic_in->stride, pic_in->chroma_format, sizeof(kvz_pixel));
+  state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(tmp->y, tmp->u, tmp->v, tmp->width, tmp->height, tmp->stride, tmp->chroma_format, sizeof(kvz_pixel));
 
   //Copy other information
   state->layer->img_job_param.pic_out->dts = pic_in->dts;
@@ -2718,12 +2725,12 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //TODO: Could use subimage/array for out/in(?) images/cua?
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
         if (!main_state->layer->scaling_started) {
-          //kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
-          kvz_image_free(sub_state->layer->img_job_param.pic_in);
-          sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
-          kvz_image_free(sub_state->layer->img_job_param.pic_out);
-          sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
-          sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
+          kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+          //kvz_image_free(sub_state->layer->img_job_param.pic_in);
+          //sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
+          //kvz_image_free(sub_state->layer->img_job_param.pic_out);
+          //sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
+          //sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
           kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
         }
         sub_state->layer->scaling_started = main_state->layer->scaling_started;

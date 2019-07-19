@@ -25,12 +25,14 @@
 #include "scaler/scaler.h"
 
 extern resample_block_step_func * kvz_resample_block_step;
+extern opaque_resample_block_step_func * kvz_opaque_resample_block_step;
 extern resample_func * kvz_resample;
 
 int kvz_strategy_register_resample(void *opaque);
 
 #define STRATEGIES_RESAMPLE_EXPORTS \
   {"resample_block_step", (void**) &kvz_resample_block_step}, \
+  {"opaque_resample_block_step", (void**) &kvz_opaque_resample_block_step}, \
   {"resample", (void**) &kvz_resample}, \
 
 #endif

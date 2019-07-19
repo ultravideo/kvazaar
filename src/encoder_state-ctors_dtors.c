@@ -227,9 +227,10 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
   int src_height = range[3] - range[2] + 1;
 
   //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
-  state->layer->img_job_param.src_buffer = kvz_newYuvBuffer(src_width, src_height, ctrl->chroma_format, 0);
-  state->layer->img_job_param.ver_tmp_buffer = kvz_newYuvBuffer(width, src_height, ctrl->chroma_format, 0);
-  state->layer->img_job_param.trgt_buffer = kvz_newYuvBuffer(width, height, ctrl->chroma_format, 0);
+  //Allocate the trgt/src buffers when input image is recieved
+  state->layer->img_job_param.src_buffer = NULL;//kvz_newYuvBuffer(src_width, src_height, ctrl->chroma_format, 0);
+  state->layer->img_job_param.ver_tmp_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, src_height, width, ctrl->chroma_format, sizeof(pic_data_t));
+  state->layer->img_job_param.trgt_buffer = NULL;//kvz_newYuvBuffer(width, height, ctrl->chroma_format, 0);
   
 
   state->layer->img_job_param.param = NULL;
@@ -282,9 +283,9 @@ static int encoder_state_config_layer_finalize(encoder_state_t * const state)
     }  
   }
 
-  kvz_deallocateYuvBuffer(state->layer->img_job_param.src_buffer);
-  kvz_deallocateYuvBuffer(state->layer->img_job_param.ver_tmp_buffer);
-  kvz_deallocateYuvBuffer(state->layer->img_job_param.trgt_buffer);
+  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.src_buffer, 0);
+  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.ver_tmp_buffer, 1);
+  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.trgt_buffer, 0);
 
   FREE_POINTER(state->layer->image_ver_scaling_jobs);
   FREE_POINTER(state->layer->image_hor_scaling_jobs);
