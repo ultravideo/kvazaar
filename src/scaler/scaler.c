@@ -127,6 +127,19 @@ opaque_pic_buffer_t * kvz_newOpaquePictureBuffer(void *const data, int width, in
   return buffer;
 }
 
+void kvz_setOpaqueYuvBuffer(opaque_yuv_buffer_t * buffer, void * const y_data, void * const u_data, void * const v_data, const unsigned depth)
+{
+  kvz_setOpaquePicBuffer(buffer->y, y_data, depth);
+  kvz_setOpaquePicBuffer(buffer->u, u_data, depth);
+  kvz_setOpaquePicBuffer(buffer->v, v_data, depth);
+}
+
+void kvz_setOpaquePicBuffer(opaque_pic_buffer_t * buffer, void * const data, const unsigned depth)
+{
+  buffer->data = data;
+  buffer->depth = depth;
+}
+
 opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u_data, void * const v_data, int width, int height, int stride, chroma_format_t format, const unsigned alloc_depth)
 {
   opaque_yuv_buffer_t *buffer = (opaque_yuv_buffer_t*)malloc(sizeof(opaque_yuv_buffer_t));
@@ -555,7 +568,8 @@ static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
 yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv)
 {
   yuv_buffer_t* ret = malloc(sizeof(yuv_buffer_t));
-  if (ret == NULL) {
+  if (ret == NULL || yuv == NULL) {
+    free(ret);
     return NULL; //TODO: Add error message?
   }
   ret->y = clonePictureBuffer(yuv->y);
@@ -563,6 +577,16 @@ yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv)
   ret->v = clonePictureBuffer(yuv->v);
 
   return ret;
+}
+
+
+opaque_yuv_buffer_t * kvz_copyOpaqueYuvBuffer(const opaque_yuv_buffer_t * const yuv)
+{
+  if (yuv == NULL) {
+    return NULL; //TODO: Add error message?
+  }
+  
+  return kvz_newOpaqueYuvBuffer(yuv->y->data, yuv->u->data, yuv->v->data, yuv->y->width, yuv->y->height, yuv->y->stride, yuv->format, yuv->y->depth);
 }
 
 void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv)

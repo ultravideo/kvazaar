@@ -145,7 +145,7 @@ typedef struct
   void *data;
 
   int stride;
-  int depth; //Determine the bit-depth of data
+  unsigned depth; //Determine the bit-depth of data
 } opaque_pic_buffer_t;
 
 /**
@@ -171,12 +171,17 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
 
 /**
 * \brief return a opaque buffer type using the given input
-  \param ?_data: set data buffer to given opaque buffer. If data is NULL, allocate memory based on alloc_depth.
-  \param alloc_depth: Set element size and allocate needed memory. If depth is 0 does not allocate memory for data
+* \param ?_data: set data buffer to given opaque buffer. If data is NULL, allocate memory based on alloc_depth.
+* \param alloc_depth: Set element size and allocate needed memory. If depth is 0 does not allocate memory for data
 */
-opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride, const unsigned alloc_depth);
 opaque_yuv_buffer_t* kvz_newOpaqueYuvBuffer(void *const y_data, void *const u_data, void *const v_data, int width, int height, int stride, chroma_format_t format, const unsigned alloc_depth);
+opaque_pic_buffer_t* kvz_newOpaquePictureBuffer(void *const data, int width, int height, int stride, const unsigned alloc_depth);
 
+/**
+* \brief set the opaque data buffers and depth value for an existing buffer
+*/
+void kvz_setOpaqueYuvBuffer(opaque_yuv_buffer_t *buffer, void *const y_data, void *const u_data, void *const v_data, const unsigned depth);
+void kvz_setOpaquePicBuffer(opaque_pic_buffer_t *buffer, void *const data, const unsigned depth);
 
 /**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
@@ -191,9 +196,15 @@ yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const u
 
 
 /**
-* \brief Clone the given yuv buffer
+* \brief Clone the given yuv buffer (deep copy)
 */
 yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv);
+
+/**
+* \brief Clone the given yuv buffer (shallow copy)
+*/
+opaque_yuv_buffer_t* kvz_copyOpaqueYuvBuffer(const opaque_yuv_buffer_t* const yuv);
+
 
 /**
 * \brief Deallocate picture buffer

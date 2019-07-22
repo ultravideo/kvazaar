@@ -1456,11 +1456,13 @@ static kvz_picture* prepare_deferred_block_step_scaling(kvz_picture* const pic_i
     param->trgt_height + param->trgt_padding_y);
   kvz_picture *tmp = state->layer->img_job_param.pic_out;
 
-  //Add opaque buffers for the in/out image
-  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.src_buffer, 0);
-  kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.trgt_buffer, 0);
-  state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, pic_in->stride, pic_in->chroma_format, sizeof(kvz_pixel));
-  state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(tmp->y, tmp->u, tmp->v, tmp->width, tmp->height, tmp->stride, tmp->chroma_format, sizeof(kvz_pixel));
+  //Set opaque buffers for the in/out image
+  //kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.src_buffer, 0);
+  //kvz_deallocateOpaqueYuvBuffer(state->layer->img_job_param.trgt_buffer, 0);
+  //state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, pic_in->stride, pic_in->chroma_format, sizeof(kvz_pixel));
+  //state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(tmp->y, tmp->u, tmp->v, tmp->width, tmp->height, tmp->stride, tmp->chroma_format, sizeof(kvz_pixel));
+  kvz_setOpaqueYuvBuffer(state->layer->img_job_param.src_buffer, pic_in->y, pic_in->u, pic_in->v, sizeof(kvz_pixel));
+  kvz_setOpaqueYuvBuffer(state->layer->img_job_param.trgt_buffer, tmp->y, tmp->u, tmp->v, sizeof(kvz_pixel));
 
   //Copy other information
   state->layer->img_job_param.pic_out->dts = pic_in->dts;
