@@ -220,10 +220,10 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
 
     //Allocate buffers for holding the intermediate results of scaling etc.
   int range[4];
-  kvz_blockScalingSrcWidthRange(range, scaling_param, lcu_offset_x * LCU_WIDTH, width);
+  //kvz_blockScalingSrcWidthRange(range, scaling_param, lcu_offset_x * LCU_WIDTH, width);
   kvz_blockScalingSrcHeightRange(range + 2, scaling_param, lcu_offset_y * LCU_WIDTH, height);
 
-  int src_width = range[1] - range[0] + 1;
+  //int src_width = range[1] - range[0] + 1;
   int src_height = range[3] - range[2] + 1;
 
   //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
