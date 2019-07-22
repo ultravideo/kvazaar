@@ -130,6 +130,15 @@ AS_CASE([$host_os],
                ]
          )
         ],
+         [midipix*], [
+         AS_IF(
+               [test "x$BITS" = "x32"], [
+                ASFLAGS="$ASFLAGS -fwin32 -DPREFIX -DHAVE_ALIGNED_STACK=0"
+               ], [
+                ASFLAGS="$ASFLAGS -fwin64 -DHAVE_ALIGNED_STACK=1"
+               ]
+         )
+        ],
         [linux*|*kfreebsd*], [
          ASFLAGS="$ASFLAGS -f elf$BITS"
          LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
