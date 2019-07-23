@@ -1189,6 +1189,41 @@ kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_paramete
   return pic_out;
 }
 
+void kvz_propagate_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src)
+{
+  //Make sure that if dst and src pics are the same, the pic is not deallocated.
+  kvz_picture* tmp_in = dst->pic_in;
+  kvz_picture* tmp_out = dst->pic_out;
+
+  dst->pic_in = src->pic_in != NULL ? kvz_image_copy_ref(src->pic_in) : NULL;
+  dst->pic_out = src->pic_out != NULL ? kvz_image_copy_ref(src->pic_out) : NULL;
+
+  kvz_image_free(tmp_in);
+  kvz_image_free(tmp_out);
+
+  //propagate the opaque buffers
+  if (dst->src_buffer != NULL) {
+    kvz_setOpaqueYuvBuffer(dst->src_buffer, src->src_buffer->y->data, src->src_buffer->u->data, src->src_buffer->v->data, src->src_buffer->y->depth);
+  } else {
+    dst->src_buffer = src->src_buffer;
+  }
+  if (dst->trgt_buffer != NULL) {
+    kvz_setOpaqueYuvBuffer(dst->trgt_buffer, src->trgt_buffer->y->data, src->trgt_buffer->u->data, src->trgt_buffer->v->data, src->trgt_buffer->y->depth);
+  } else {
+    dst->trgt_buffer = src->trgt_buffer;
+  }
+
+  if (dst->ver_tmp_buffer == NULL) dst->ver_tmp_buffer = src->ver_tmp_buffer;
+
+  dst->block_x = src->block_x;
+  dst->block_y = src->block_y;
+  dst->block_width = src->block_width;
+  dst->block_height = src->block_height;
+  dst->param = src->param;
+
+  dst->use_tiles = src->use_tiles;
+}
+
 void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src)
 {
   //Make sure that if dst and src pics are the same, the pic is not deallocated.
@@ -1217,5 +1252,4 @@ void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst
 
   dst->use_tiles = src->use_tiles;
 }
-
 // ***********************************************

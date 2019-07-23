@@ -201,7 +201,7 @@ yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const u
 yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv);
 
 /**
-* \brief Clone the given yuv buffer (shallow copy)
+* \brief Copy the given yuv buffer (shallow copy)
 */
 opaque_yuv_buffer_t* kvz_copyOpaqueYuvBuffer(const opaque_yuv_buffer_t* const yuv);
 

@@ -1095,7 +1095,7 @@ static void block_step_scaling(encoder_state_t * const state )
 {
   //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
   kvz_image_scaling_parameter_t * const param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-  kvz_copy_image_scaling_parameters(param, &state->layer->img_job_param);
+  kvz_propagate_image_scaling_parameters(param, &state->layer->img_job_param);
   param->block_x = state->tile->offset_x;
   param->block_y = state->tile->offset_y;
   param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
@@ -1249,7 +1249,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
     kvz_image_scaling_parameter_t *param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-    kvz_copy_image_scaling_parameters(param, state_param);
+    kvz_propagate_image_scaling_parameters(param, state_param);
     param->block_x = state->tile->offset_x + lcu->position_px.x;
     param->block_y = state->tile->offset_y + lcu->position_px.y;
     param->block_width = lcu->size.x;
@@ -1367,7 +1367,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
 
     //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
     kvz_image_scaling_parameter_t * const param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-    kvz_copy_image_scaling_parameters(param, state_param);
+    kvz_propagate_image_scaling_parameters(param, state_param);
     param->block_x = state->tile->offset_x;
     param->block_y = state->tile->offset_y;
     param->block_width = state_param->trgt_buffer->y->width; //Trgt buffer should be the size of the block
@@ -2727,7 +2727,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //TODO: Could use subimage/array for out/in(?) images/cua?
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
         if (!main_state->layer->scaling_started) {
-          kvz_copy_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+          kvz_propagate_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
           //kvz_image_free(sub_state->layer->img_job_param.pic_in);
           //sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
           //kvz_image_free(sub_state->layer->img_job_param.pic_out);

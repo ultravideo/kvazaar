@@ -133,6 +133,7 @@ void kvz_opaque_block_step_scaler_worker(void * opaque_param);
 //void kvz_tile_step_scaler_worker(void * opaque_param);
 kvz_picture* kvz_image_scaling(kvz_picture* const pic_in, const scaling_parameter_t *const param, uint8_t skip_same);
 void kvz_copy_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src);
+void kvz_propagate_image_scaling_parameters(kvz_image_scaling_parameter_t * const dst, const kvz_image_scaling_parameter_t * const src);
 // ***********************************************
 
 #endif
