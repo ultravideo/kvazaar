@@ -953,11 +953,11 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
 }
 
-#define OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(src_type, trgt_type) do { \
+#define OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(src_type, trgt_type, tmp_trgt_type) do { \
 for (int y = block_y; y < (block_y + block_height); y++) {\
   src_type *src = is_vertical ? (src_type *)(src_buffer->data) : &((src_type *)(src_buffer->data))[y * src_buffer->stride];\
   trgt_type *trgt_row = &((trgt_type *)(trgt_buffer->data))[y * trgt_buffer->stride];\
-  pic_data_t *tmp_trgt_row = &tmp_trgt_data[(y - block_y) * tmp_trgt_data_stride];\
+  tmp_trgt_type *tmp_trgt_row = &tmp_trgt_data[(y - block_y) * tmp_trgt_data_stride];\
   for (int o_ind = outer_init; o_ind < outer_bound; o_ind++) {\
     const int t_ind = is_vertical ? y : o_ind;\
     const int ref_pos_16 = (int)((unsigned int)(t_ind * scale + add) >> shift) - delta;\
@@ -971,7 +971,7 @@ for (int y = block_y; y < (block_y + block_height); y++) {\
       }\
       const int s_ind = SCALER_CLIP(ref_pos + f_ind - (filter_size >> 1) + 1, 0, src_size - 1);\
       src_type *src_col = src + (is_vertical ? i_ind : 0);\
-      tmp_trgt_row[t_col - block_x + tmp_trgt_offset] += getFilterCoeff(filter, filter_size, phase, f_ind) * (pic_data_t)(src_col[s_ind * s_stride + src_offset]);\
+      tmp_trgt_row[t_col - block_x + tmp_trgt_offset] += (tmp_trgt_type)(getFilterCoeff(filter, filter_size, phase, f_ind) * (pic_data_t)(src_col[s_ind * s_stride + src_offset]));\
       if (is_vertical && o_ind == outer_bound - 1) {\
         trgt_row[t_col + trgt_offset] = (trgt_type)(SCALER_CLIP(is_upscaling ? (tmp_trgt_row[t_col - block_x + tmp_trgt_offset] + 2048) >> 12 : (tmp_trgt_row[t_col - block_x + tmp_trgt_offset] + 8192) >> 14, 0, 255));\
       }\
@@ -981,14 +981,16 @@ for (int y = block_y; y < (block_y + block_height); y++) {\
 }while(0)
 
 /**
-*  \brief Do resampling on opaque data buffers. Supported bit-depths: horizontal step: {8,16,32}-bit -> 32-bit, vertical step 32-bit -> {8,16,32}-bit
+*  \brief Do resampling on opaque data buffers. Supported bit-depths: 
+*     horizontal step: {8,16,32}-bit -> {16,32}-bit
+*     vertical step: {16,32}-bit -> {8,16,32}-bit
 */
 static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical) 
 {  
   //Based on the src and trgt depths select the relevant function
   if (trgt_buffer->depth == sizeof(pic_data_t) && src_buffer->depth == sizeof(pic_data_t)) {
     //Use the basic algorithm
-    resampleBlockStep((pic_buffer_t *)src_buffer, (pic_buffer_t *)trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
+    resampleBlockStep((const pic_buffer_t *)src_buffer, (const pic_buffer_t *)trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, param, is_upscaling, is_luma, is_vertical);
     return;
   }
 
@@ -1033,41 +1035,106 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
   const int inner_bound = is_vertical ? block_x + block_width : filter_size;
   const int s_stride = is_vertical ? src_buffer->stride : 1; //Multiplier to s_ind
 
-  //Set tmp target ad trgt buffer by default
-  pic_data_t *tmp_trgt_data = (pic_data_t *)trgt_buffer->data + block_y * trgt_buffer->stride + block_x;
-  int tmp_trgt_data_stride = trgt_buffer->stride;
-  int tmp_trgt_offset = trgt_offset;
+  
 
-  if (trgt_buffer->depth != sizeof(pic_data_t) && is_vertical) {
-    //Need to make use of a tmp buffer to maintain enough precission
-    tmp_trgt_data = (pic_data_t *)malloc(sizeof(pic_data_t) * block_width * block_height);
-    tmp_trgt_offset = 0;
-    tmp_trgt_data_stride = block_width;
+  if (is_vertical && src_buffer->depth >= sizeof(short)) {
 
-    if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(short)) {
-      //Handle 16-bit output buffer case
-      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned short);
+    //Set tmp target and trgt buffer the same by default
+    pic_data_t *tmp_trgt_data = (pic_data_t *)malloc(sizeof(pic_data_t) * block_width * block_height);
+    int tmp_trgt_data_stride = 0;
+    int tmp_trgt_offset = block_width;
+
+    if (src_buffer->depth == sizeof(pic_data_t)) {
+      //Handle 32-bit input buffer case
+      if (trgt_buffer->depth == sizeof(short)) {
+        //Handle 16-bit output buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned short, pic_data_t);
+      }
+      else if (trgt_buffer->depth == sizeof(char)) {
+        //Handle 8-bit output buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned char, pic_data_t);
+      }
+      else {
+        //No valid handling for the given depth
+        assert(0);
+      }
     }
-    else if (src_buffer->depth == sizeof(pic_data_t) && trgt_buffer->depth == sizeof(char)) {
-      //Handle 8-bit output buffer case
-      OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned char);
-    } else {
+    else if (src_buffer->depth == sizeof(short)) {
+      //Handle 16-bit input buffer case
+      if (trgt_buffer->depth == sizeof(pic_data_t)) {
+        //Handle 32-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, pic_data_t, pic_data_t);
+      }
+      else if (trgt_buffer->depth == sizeof(short)) {
+        //Handle 16-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, unsigned short, pic_data_t);
+      } 
+      else if (trgt_buffer->depth == sizeof(char)) {
+        //Handle 8-bit output buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, unsigned char, pic_data_t);
+      }
+      else {
+        //No valid handling for the given depth
+        assert(0);
+      }
+    } 
+    else {
       //No valid handling for the given depth
       assert(0);
     }
 
     free(tmp_trgt_data);
   }
-  else if (src_buffer->depth == sizeof(short) && !is_vertical) {
-    //Handle 16-bit input buffer case
-    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, pic_data_t);
-  }
-  else if (src_buffer->depth == sizeof(char) && !is_vertical) {
-    //Handle 8-bit input buffer case
-    OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned char, pic_data_t);
+  else if (!is_vertical)
+  {
+    //Set tmp target and trgt buffer the same by default
+    int tmp_trgt_data_stride = trgt_buffer->stride;
+    int tmp_trgt_offset = trgt_offset;
+
+    if (trgt_buffer->depth == sizeof(pic_data_t)) {
+      //Handle 32-bit out buffer case
+      pic_data_t *tmp_trgt_data = (pic_data_t *)trgt_buffer->data + block_y * trgt_buffer->stride + block_x;
+
+      if (src_buffer->depth == sizeof(short)) {
+        //Handle 16-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, pic_data_t, pic_data_t);
+      } 
+      else if (src_buffer->depth == sizeof(char)) {
+        //Handle 8-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned char, pic_data_t, pic_data_t);
+      } 
+      else {
+        //8-bit trgt buffer not supported
+        assert(0);
+      }
+    }
+    else if (trgt_buffer->depth == sizeof(short)) {
+      //Handle 16-bit out buffer case
+      unsigned short *tmp_trgt_data = (unsigned short *)trgt_buffer->data + block_y * trgt_buffer->stride + block_x;
+
+      if (src_buffer->depth == sizeof(pic_data_t)) {
+        //Handle 32-bit in buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(pic_data_t, unsigned short, unsigned short);
+      } 
+      else if (src_buffer->depth == sizeof(short)) {
+        //Handle 16-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned short, unsigned short, unsigned short);
+      } 
+      else if (src_buffer->depth == sizeof(char)) {
+        //Handle 8-bit input buffer case
+        OPAQUE_RESAMPLE_BLOCK_STEP_TYPE_MACRO(unsigned char, unsigned short, unsigned short);
+      } 
+      else {
+        //8-bit trgt buffer not supported
+        assert(0);
+      }
+    } else {
+      //No valid handling for the given depths
+      assert(0);
+    }
   }
   else {
-    //No valid handling for the given depths
+    //Not 8-bit vertical src buffer not supported
     assert(0);
   }
 }
