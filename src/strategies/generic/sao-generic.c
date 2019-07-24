@@ -19,6 +19,7 @@
  ****************************************************************************/
 
 #include "strategies/generic/sao-generic.h"
+#include "strategies/generic/sao_band_ddistortion.h"
 
 #include "cu.h"
 #include "encoder.h"
@@ -155,35 +156,6 @@ static void sao_reconstruct_color_generic(const encoder_control_t * const encode
   }
 }
 
-
-static int sao_band_ddistortion_generic(const encoder_state_t * const state,
-                                        const kvz_pixel *orig_data,
-                                        const kvz_pixel *rec_data,
-                                        int block_width,
-                                        int block_height,
-                                        int band_pos,
-                                        int sao_bands[4])
-{
-  int y, x;
-  int shift = state->encoder_control->bitdepth-5;
-  int sum = 0;
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      int band = (rec_data[y * block_width + x] >> shift) - band_pos;
-      int offset = 0;
-      if (band >= 0 && band < 4) {
-        offset = sao_bands[band];
-      }
-      if (offset != 0) {
-        int diff = orig_data[y * block_width + x] - rec_data[y * block_width + x];
-        // Offset is applied to reconstruction, so it is subtracted from diff.
-        sum += (diff - offset) * (diff - offset) - diff * diff;
-      }
-    }
-  }
-
-  return sum;
-}
 
 
 int kvz_strategy_register_sao_generic(void* opaque, uint8_t bitdepth)
