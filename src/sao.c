@@ -254,8 +254,11 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
   //Loop pixels and take top 5 bits to classify different bands
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {
-      sao_bands[0][rec_data[y * block_width + x]>>shift] += orig_data[y * block_width + x] - rec_data[y * block_width + x];
-      sao_bands[1][rec_data[y * block_width + x]>>shift]++;
+      int32_t curr_pos = y * block_width + x;
+
+      kvz_pixel sb_index = rec_data[curr_pos] >> shift;
+      sao_bands[0][sb_index] += orig_data[curr_pos] - rec_data[curr_pos];
+      sao_bands[1][sb_index]++;
     }
   }
 }
