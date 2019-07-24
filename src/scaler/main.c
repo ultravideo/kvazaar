@@ -362,7 +362,7 @@ static void kvzBlockStepScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   kvz_deallocateYuvBuffer(tmp);
 }
 
-static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer_t** out)
+static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer_t** out, int tmp_depth)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
@@ -381,7 +381,22 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
   int luma_size = out_y_width * in_y_height;
   int chroma_size = luma_size >> 2;
 
-  opaque_yuv_buffer_t* tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(pic_data_t));
+  opaque_yuv_buffer_t* tmp;
+
+  switch (tmp_depth)
+  {
+    case sizeof(pic_data_t) :
+      tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(pic_data_t));
+      break;
+
+    case sizeof(short) :
+      tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(short));
+      break;
+
+  default:
+    return;
+    break;
+  }
 
   int32_t in_parts = (in_y_height + block_height - 1) / block_height;
 
@@ -1190,22 +1205,25 @@ static void opaque_validate_test()
     COPY_CUSTOM(data3->v->data, data->v->data, (in_width * in_height) >> 2, short, pic_data_t);
 
     kvzScaling(data, &out1);
-    kvzOpaqueBlockStepScaling(data2, &out2);
-    kvzOpaqueBlockStepScaling(data3, &out3);
-    kvzOpaqueBlockStepScaling(data4, &out4);
+    
+    for (int j = sizeof(short); j <= sizeof(pic_data_t); j++)
+    {
+      kvzOpaqueBlockStepScaling(data2, &out2, j);
+      kvzOpaqueBlockStepScaling(data3, &out3, j);
+      kvzOpaqueBlockStepScaling(data4, &out4, j);
 
-    if (opaque_yuvcmp(op_out1, out2) == 0) {
-      printf("Frame %i differs in block char\n", i + 1);
+      if (opaque_yuvcmp(op_out1, out2) == 0) {
+        printf("Frame %i differs in block char tmp depth %i\n", i + 1, j);
+      }
+
+      if (opaque_yuvcmp(op_out1, out3) == 0) {
+        printf("Frame %i differs in block short tmp depth %i\n", i + 1, j);
+      }
+
+      if (opaque_yuvcmp(op_out1, out4) == 0) {
+        printf("Frame %i differs in block int tmp depth %i\n", i + 1, j);
+      }
     }
-
-    if (opaque_yuvcmp(op_out1, out3) == 0) {
-      printf("Frame %i differs in block short\n", i + 1);
-    }
-
-    if (opaque_yuvcmp(op_out1, out4) == 0) {
-      printf("Frame %i differs in block int\n", i + 1);
-    }
-
     //yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
     //yuv_io_write(out_file2, (yuv_buffer_t *)out2, out2->y->width, out2->y->height);
     //yuv_io_write(out_file3, (yuv_buffer_t *)out3, out3->y->width, out3->y->height);
