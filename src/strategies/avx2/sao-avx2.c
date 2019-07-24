@@ -78,6 +78,7 @@ static __m256i sao_calc_eo_cat_avx2(__m128i* vector_a_epi8, __m128i* vector_b_ep
   return v_cat_epi32;
 }
 
+/*
 static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  const kvz_pixel *rec_data,
  int block_width,
@@ -163,6 +164,7 @@ static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
   }
   return sum;
 }
+*/
 
 
 
@@ -329,7 +331,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 
 
     // If odd number of pixels left, use this
-    for (x; x < block_width - 1; ++x) {
+    for (; x < block_width - 1; ++x) {
       const kvz_pixel *c_data = &rec_data[y * block_width + x];
       kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
       kvz_pixel c = c_data[0];
