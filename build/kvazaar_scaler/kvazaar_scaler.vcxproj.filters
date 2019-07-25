@@ -32,5 +32,8 @@
     <ClCompile Include="..\..\src\scaler\scaler-avx2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\scaler\scaler-util.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

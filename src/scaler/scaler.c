@@ -689,12 +689,12 @@ static void _resample(const pic_buffer_t* const buffer, const scaling_parameter_
 
       //Choose filter
       const int* filter;
-      int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+      int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
 
       //Apply filter
       tmp_row[j] = 0;
       for (int k = 0; k < size; k++) {
-        int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_width - 1);
+        int m = kvz_clip_scaler(ref_pos + k - (size >> 1) + 1, 0, src_width - 1);
         tmp_row[j] += filter[k] * src_row[m];
       }
     }
@@ -715,12 +715,12 @@ static void _resample(const pic_buffer_t* const buffer, const scaling_parameter_
 
       //Choose filter
       const int* filter;
-      int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+      int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
 
       //Apply filter
       tmp_col[j] = 0;
       for (int k = 0; k < size; k++) {
-        int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
+        int m = kvz_clip_scaler(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
         tmp_col[j] += filter[k] * src_col[m * buffer->width];
       }
       //TODO: Why? Filter coefs summ up to 128 applied 2x 128*128= 2^14
@@ -731,7 +731,7 @@ static void _resample(const pic_buffer_t* const buffer, const scaling_parameter_
 
     //Clip and move to buffer data
     for (int n = 0; n < trgt_height; n++) {
-      src_col[n * buffer->width] = clip(tmp_col[n], 0, 255);
+      src_col[n * buffer->width] = kvz_clip_scaler(tmp_col[n], 0, 255);
     }
   }
 }
@@ -787,9 +787,9 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
   }
 
   const int *filter_hor;
-  const int filter_size_hor = prepareFilter(&filter_hor, is_upscaling, is_luma, hor_filter);
+  const int filter_size_hor = kvz_prepareFilter(&filter_hor, is_upscaling, is_luma, hor_filter);
   const int *filter_ver;
-  const int filter_size_ver = prepareFilter(&filter_ver, is_upscaling, is_luma, ver_filter);
+  const int filter_size_ver = kvz_prepareFilter(&filter_ver, is_upscaling, is_luma, ver_filter);
 
   int shift_x = param->shift_x - 4;
   int shift_y = param->shift_y - 4;
@@ -808,7 +808,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
 
       //Choose filter
       const int* filter;
-      //int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+      //int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
       int size = filter_size_hor;
       filter = &getFilterCoeff(filter_hor, size, phase, 0);
 
@@ -836,7 +836,7 @@ static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t
 
       //Choose filter
       const int* filter;
-      //int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+      //int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
       int size = filter_size_ver;
       filter = &getFilterCoeff(filter_ver, size, phase, 0);
 
@@ -895,7 +895,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
   const int outer_init = is_vertical ? 0 : block_x;
   const int outer_bound = is_vertical ? filter_size : block_x + block_width;
   const int inner_init = is_vertical ? block_x : 0;
@@ -930,7 +930,7 @@ static void resampleBlockStep(const pic_buffer_t* const src_buffer, const pic_bu
         
         //Choose filter
         //const int *filter;
-        //const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
+        //const int f_size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
 
         //Set trgt buffer val to zero on first loop over filter
         if( f_ind == 0 ){
@@ -1028,7 +1028,7 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
   const int outer_init = is_vertical ? 0 : block_x;
   const int outer_bound = is_vertical ? filter_size : block_x + block_width;
   const int inner_init = is_vertical ? block_x : 0;
@@ -1214,8 +1214,8 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
       //Choose filter
       const int *filter_x;
       const int *filter_y;
-      const int size_x = getFilter(&filter_x, is_upscaling, is_luma, phase_x, hor_filter);
-      const int size_y = getFilter(&filter_y, is_upscaling, is_luma, phase_y, ver_filter);
+      const int size_x = kvz_getFilter(&filter_x, is_upscaling, is_luma, phase_x, hor_filter);
+      const int size_y = kvz_getFilter(&filter_y, is_upscaling, is_luma, phase_y, ver_filter);
 
       pic_data_t new_val = 0; //Accumulate the new pixel value here
 
@@ -1223,11 +1223,11 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
       //Size of kernel depends on the filter size
       for( int j = 0; j < size_y; j++ ){
         //Calculate src sample position for kernel element (i,j)
-        int m_y = clip(ref_pos_y + j - (size_y >> 1) + 1, 0, src_height - 1);
+        int m_y = kvz_clip_scaler(ref_pos_y + j - (size_y >> 1) + 1, 0, src_height - 1);
 
         for (int i = 0; i < size_x; i++) {
           //Calculate src sample position for kernel element (i,j)
-          int m_x = clip( ref_pos_x + i - (size_x >> 1) + 1, 0, src_width - 1);
+          int m_x = kvz_clip_scaler( ref_pos_x + i - (size_x >> 1) + 1, 0, src_width - 1);
 
           //Calculate filter value in the 2D-filter for pos (i,j) and apply to sample (m_x,m_y)
           new_val += filter_x[i]*filter_y[j] * src[m_x + m_y*src_buffer->width];
@@ -1236,7 +1236,7 @@ static void resampleBlock( const pic_buffer_t* const src_buffer, const scaling_p
 
       //Scale and clip values and save to trgt buffer.
       //trgt offset is used to reposition the block in trgt in case buffer size is not target image size
-      trgt[x + y*trgt_stride + trgt_offset] = clip(is_upscaling ? (new_val + 2048) >> 12 : (new_val + 8192) >> 14, 0, 255); //TODO: account for different bit dept / different filters etc
+      trgt[x + y*trgt_stride + trgt_offset] = kvz_clip_scaler(is_upscaling ? (new_val + 2048) >> 12 : (new_val + 8192) >> 14, 0, 255); //TODO: account for different bit dept / different filters etc
     }  
   }
 }

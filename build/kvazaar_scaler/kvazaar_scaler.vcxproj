@@ -28,6 +28,7 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="..\..\src\scaler\scaler-util.c" />
     <ClCompile Include="..\..\src\scaler\scaler.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

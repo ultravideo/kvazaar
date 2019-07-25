@@ -151,8 +151,9 @@ libkvazaar_la_SOURCES = \
 	extras/libmd5.h \
 	extras/crypto.h \
 	scaler/scaler.h \
-    scaler/scaler_util.h \
-	scaler/scaler.c 
+    scaler/scaler-util.h \
+	scaler/scaler.c \
+	scaler/scaler-util.c
 
 libkvazaar_la_CFLAGS =
 

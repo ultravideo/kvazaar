@@ -149,7 +149,7 @@ static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, con
 //
 //   //Choose filter
 //   const int* filter;
-//   int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+//   int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
 //
 //
 //   pointer = clip_add_avx2(ref_pos - (size >> 1) + 1, adder, 0, src_width - 1);
@@ -230,12 +230,12 @@ static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, con
 //
 //   //Choose filter
 //   const int* filter;
-//   int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+//   int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
 //   /*
 //   //Apply filter
 //   tmp_col[j] = 0;
 //   for (int k = 0; k < size; k++) {
-//   int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
+//   int m = kvz_clip_scaler(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
 //   tmp_col[j] += filter[k] * src_col[m * buffer->width];
 //   }*/
 //   //-------------------------------------------------------
@@ -303,7 +303,7 @@ static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, con
 //
 //  //Clip and move to buffer data
 //  for (int n = 0; n < trgt_height; n++) {
-//   src_col[n * buffer->width] = clip(tmp_col[n], 0, 255);
+//   src_col[n * buffer->width] = kvz_clip_scaler(tmp_col[n], 0, 255);
 //  }
 // }
 //}
@@ -385,7 +385,7 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
 
    //Choose filter
    const int* filter;
-   int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
+   int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
 
 
    pointer = clip_add_avx2(ref_pos - (size >> 1) + 1, adder, 0, src_width - 1);
@@ -474,7 +474,7 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
 
    //Choose filter
    const int* filter;
-   int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
+   int size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
    
    pointer = clip_add_avx2(ref_pos - (size >> 1) + 1, adder, 0, src_height - 1);
 
@@ -538,7 +538,7 @@ static void resample_avx2(const pic_buffer_t* const buffer, const scaling_parame
 
   //Clip and move to buffer data
   for (int n = 0; n < trgt_height; n++) {
-   src_col[n * buffer->width] = clip(tmp_col[n], 0, 255);
+   src_col[n * buffer->width] = kvz_clip_scaler(tmp_col[n], 0, 255);
   }
  }
 }
@@ -595,7 +595,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
   const int outer_init = is_vertical ? 0 : block_x;
   const int outer_bound = is_vertical ? filter_size : block_x + block_width;
   const int inner_init = is_vertical ? block_x : 0;
@@ -651,7 +651,7 @@ static void resampleBlockStep_avx2(const pic_buffer_t* const src_buffer, const p
 
         //Choose filter
         //const int *filter;
-        //const int f_size = getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
+        //const int f_size = kvz_getFilter(&filter, is_upscaling, is_luma, phase, filter_phase);
 
         //Set trgt buffer val to zero on first loop over filter
         if (f_ind == 0) {
@@ -1257,7 +1257,7 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
   const int outer_init = is_vertical ? 0 : block_x;
   const int outer_bound = is_vertical ? filter_size : block_x + block_width;
   const int inner_init = is_vertical ? block_x : 0;
@@ -1465,7 +1465,7 @@ static void resampleBlockStep_avx2_v3(const pic_buffer_t* const src_buffer, cons
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
   
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
@@ -1872,7 +1872,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
   //Set loop parameters based on the resampling dir
   const int *filter;
-  const int filter_size = prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
+  const int filter_size = kvz_prepareFilter(&filter, is_upscaling, is_luma, filter_phase);
 
   //Only filter size of max 12 supported
   assert(filter_size <= 12);
@@ -2751,7 +2751,7 @@ static void opaqueResampleBlockStep_avx2_adapter(const opaque_pic_buffer_t* cons
 
   //Set loop parameters based on the resampling dir
   const void *filter;
-  const int filter_size = prepareFilterDepth(&filter, is_upscaling, is_luma, filter_phase, src_buffer->depth);
+  const int filter_size = kvz_prepareFilterDepth(&filter, is_upscaling, is_luma, filter_phase, src_buffer->depth);
 
   //Only filter size of max 12 supported
   assert(filter_size <= 12);

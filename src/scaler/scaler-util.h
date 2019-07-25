@@ -35,16 +35,7 @@
 #define getFilterCoeff(filter, stride, phase, ind) ((filter)[(ind)+(phase)*(stride)])
 
 //Used for clipping values
-static int clip(int val, int min, int max)
-{
-  if (val <= min)
-    return min;
-  if (val >= max)
-    return max;
-
-  return val;
-}
-
+int kvz_clip_scaler(int val, int min, int max);
 
 //Define filters for scaling operations
 //Values from SHM
@@ -835,82 +826,14 @@ static const char chromaUpFilter1D_8bit[17 * 4] = {
 
 //Helper function for choosing the correct filter
 //Returns the size of the filter and the filter param is set to the correct filter
-static int getFilter(const int** const filter, int is_upsampling, int is_luma, int phase, int filter_ind)
-{
-  if (is_upsampling) {
-    //Upsampling so use 8- or 4-tap filters
-    if (is_luma) {
-      *filter = lumaUpFilter[phase];
-      return sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]);
-    }
-
-    *filter = chromaUpFilter[phase];
-    return sizeof(chromaUpFilter[0]) / sizeof(chromaUpFilter[0][0]);
-  }
-
-  //Downsampling so use 12-tap filter
-  *filter = downFilter[filter_ind][phase];
-  return (sizeof(downFilter[0][0]) / sizeof(downFilter[0][0][0]));
-}
+int kvz_getFilter(const int** const filter, int is_upsampling, int is_luma, int phase, int filter_ind);
 
 //Helper function for choosing the correct filter
 //Returns the size of the filter and the filter param is set to the correct filter
-static unsigned prepareFilter(const int** const filter, int is_upsampling, int is_luma, int filter_ind)
-{
-  if (is_upsampling) {
-    //Upsampling so use 8- or 4-tap filters
-    if (is_luma) {
-      *filter = lumaUpFilter1D;
-      return sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]);
-    }
-
-    *filter = chromaUpFilter1D;
-    return sizeof(chromaUpFilter[0]) / sizeof(chromaUpFilter[0][0]);
-  }
-
-  //Downsampling so use 12-tap filter
-  *filter = downFilter1D[filter_ind];
-  return (sizeof(downFilter[0][0]) / sizeof(downFilter[0][0][0]));
-}
-
-
-#define FILTER_SELECT_TEMPLATE(postfix,...) \
-  if (is_upsampling) {\
-    if (is_luma) {\
-      *filter = (void *)lumaUpFilter1D##postfix;\
-      return sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]);\
-    }\
-    *filter = (void *)chromaUpFilter1D##postfix;\
-    return sizeof(chromaUpFilter[0]) / sizeof(chromaUpFilter[0][0]);\
-  }\
-  *filter = (void *)downFilter1D##postfix[filter_ind];\
-  return (sizeof(downFilter[0][0]) / sizeof(downFilter[0][0][0]));\
+unsigned kvz_prepareFilter(const int** const filter, int is_upsampling, int is_luma, int filter_ind);
 
 //Helper function for choosing the correct filter with the given depth
 //Returns the size of the filter and the filter param is set to the correct filter
-static unsigned prepareFilterDepth(const void** const filter, int is_upsampling, int is_luma, int filter_ind, int depth)
-{
-  switch (depth)
-  {
-    case sizeof(pic_data_t) :
-    {
-      FILTER_SELECT_TEMPLATE(,);
-    }
-
-    case sizeof(short) : 
-    {
-      FILTER_SELECT_TEMPLATE(_16bit);
-    }
-
-    case sizeof(char) :
-    {
-      FILTER_SELECT_TEMPLATE(_8bit);
-    }
-  }
-
-  //No valid depth
-  *filter = (void *)0;
-  return 0;
-}
+unsigned kvz_prepareFilterDepth(const void** const filter, int is_upsampling, int is_luma, int filter_ind, int depth);
 
 #endif
