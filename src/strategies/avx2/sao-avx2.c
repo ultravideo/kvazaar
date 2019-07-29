@@ -403,6 +403,17 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
 }
 
 /*
+static void print_256(__m256i v)
+{
+  uint16_t buf[16];
+  _mm256_storeu_si256((__m256i *)buf, v);
+  for (int i = 0; i < 16; i++)
+    printf("%.4x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
+}
+*/
+
+
+/*
  * Calculate an array of intensity correlations for each intensity value.
  * Return array as 16 YMM vectors, each containing 2x16 unsigned bytes
  * (to ease array lookup from YMMs using the shuffle trick, the low and
@@ -477,6 +488,119 @@ static void calc_sao_offset_array_avx2(const encoder_control_t *encoder,
   }
 }
 
+static INLINE __m256i lookup_color_band_ymm(__m256i curr_row, const __m256i *offsets)
+{
+  const __m256i select_nibble = _mm256_set1_epi8   (0x0f);
+  const __m256i lo_nibbles    = _mm256_and_si256   (select_nibble, curr_row);
+  const __m256i hi_nibbles    = _mm256_andnot_si256(select_nibble, curr_row);
+
+  // Loop through the offset vectors, the 0xi'th one always holding
+  // offsets 0xi0...0xif. Use shuffle to do a lookup on the current
+  // offset vector, then check which pixels actually should be looked
+  // up from this vector (ie. whether their values are 0xi0...0xif) and
+  // mask out any but correct ones.
+  __m256i result_row = _mm256_setzero_si256();
+  for (uint8_t i = 0; i < 16; i += 4) {
+
+    __m256i curr_hinib0   = _mm256_set1_epi8   ((i + 0) << 4);
+    __m256i curr_hinib1   = _mm256_set1_epi8   ((i + 1) << 4);
+    __m256i curr_hinib2   = _mm256_set1_epi8   ((i + 2) << 4);
+    __m256i curr_hinib3   = _mm256_set1_epi8   ((i + 3) << 4);
+
+    __m256i hinib_select0 = _mm256_cmpeq_epi8  (curr_hinib0,    hi_nibbles);
+    __m256i hinib_select1 = _mm256_cmpeq_epi8  (curr_hinib1,    hi_nibbles);
+    __m256i hinib_select2 = _mm256_cmpeq_epi8  (curr_hinib2,    hi_nibbles);
+    __m256i hinib_select3 = _mm256_cmpeq_epi8  (curr_hinib3,    hi_nibbles);
+
+    __m256i lonib_lookup0 = _mm256_shuffle_epi8(offsets[i + 0], lo_nibbles);
+    __m256i lonib_lookup1 = _mm256_shuffle_epi8(offsets[i + 1], lo_nibbles);
+    __m256i lonib_lookup2 = _mm256_shuffle_epi8(offsets[i + 2], lo_nibbles);
+    __m256i lonib_lookup3 = _mm256_shuffle_epi8(offsets[i + 3], lo_nibbles);
+
+    __m256i lookup_mskd0  = _mm256_and_si256   (hinib_select0,  lonib_lookup0);
+    __m256i lookup_mskd1  = _mm256_and_si256   (hinib_select1,  lonib_lookup1);
+    __m256i lookup_mskd2  = _mm256_and_si256   (hinib_select2,  lonib_lookup2);
+    __m256i lookup_mskd3  = _mm256_and_si256   (hinib_select3,  lonib_lookup3);
+
+    __m256i lookup_mskd01 = _mm256_or_si256    (lookup_mskd0,   lookup_mskd1);
+    __m256i lookup_mskd23 = _mm256_or_si256    (lookup_mskd2,   lookup_mskd3);
+    __m256i lookup_res    = _mm256_or_si256    (lookup_mskd01,  lookup_mskd23);
+
+            result_row    = _mm256_or_si256    (result_row,     lookup_res);
+  }
+  return result_row;
+}
+
+static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
+                                          const kvz_pixel         *rec_data,
+                                                kvz_pixel         *new_rec_data,
+                                          const sao_info_t        *sao,
+                                                int32_t            stride,
+                                                int32_t            new_stride,
+                                                int32_t            block_width,
+                                                int32_t            block_height,
+                                                color_t            color_i)
+{
+  const uint32_t width_db32 = block_width & ~31;
+  const uint32_t width_db4  = block_width &  ~3;
+  const uint32_t width_rest = block_width &   3;
+
+  // Form the load&store mask
+  const __m256i wdb4_256      = _mm256_set1_epi32 (width_db4 & 31);
+  const __m256i indexes       = _mm256_setr_epi32 (3, 7, 11, 15, 19, 23, 27, 31);
+  const __m256i db4_mask      = _mm256_cmpgt_epi32(wdb4_256, indexes);
+
+  // Each of the 256 offsets is a byte, but only 16 are held in one YMM since
+  // lanes must be duplicated to use shuffle.
+  __m256i offsets[16];
+  calc_sao_offset_array_avx2(encoder, sao, offsets, color_i);
+
+  for (uint32_t y = 0; y < block_height; y++) {
+    uint32_t x = 0;
+    for (; x < width_db32; x += 32) {
+      const uint32_t curr_srcpos = y *     stride + x;
+      const uint32_t curr_dstpos = y * new_stride + x;
+
+      __m256i curr_row = _mm256_loadu_si256((const __m256i *)(rec_data + curr_srcpos));
+      __m256i result   = lookup_color_band_ymm(curr_row, offsets);
+      _mm256_storeu_si256((__m256i *)(new_rec_data + curr_dstpos), result);
+    }
+    if (block_width > width_db32) {
+      const uint32_t curr_srcpos = y *     stride + x;
+      const uint32_t curr_dstpos = y * new_stride + x;
+      const uint32_t rest_srcpos = y *     stride + width_db4;
+      const uint32_t rest_dstpos = y * new_stride + width_db4;
+
+      // Read the very last pixels byte by byte and pack them into one dword.
+      // Piggyback said dword as the highest dword of the row vector variable,
+      // that particular place can never be loaded into by the maskmove
+      // (otherwise that vector would go through the divisible-by-32 code
+      // path).
+      uint32_t last_dword = 0;
+      for (uint32_t i = 0; i < width_rest; i++) {
+        uint8_t  currb = rec_data[rest_srcpos + i];
+        uint32_t currd = ((uint32_t)currb) << (i * 8);
+        last_dword |= currd;
+      }
+      const int32_t *src_ptr = (const int32_t *)(    rec_data + curr_srcpos);
+            int32_t *dst_ptr = (      int32_t *)(new_rec_data + curr_dstpos);
+
+      __m256i curr_row = _mm256_maskload_epi32(src_ptr,  db4_mask);
+              curr_row = _mm256_insert_epi32  (curr_row, last_dword, 7);
+      __m256i result   = lookup_color_band_ymm(curr_row, offsets);
+
+      _mm256_maskstore_epi32(dst_ptr, db4_mask, result);
+      uint32_t last_dword_dst = _mm256_extract_epi32(result, 7);
+
+      for (uint32_t i = 0; i < width_rest; i++) {
+        uint8_t currb = last_dword_dst & 0xff;
+        new_rec_data[rest_dstpos + i] = currb;
+        last_dword_dst >>= 8;
+      }
+    }
+  }
+}
+
 static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  const kvz_pixel *rec_data,
  kvz_pixel *new_rec_data,
@@ -492,57 +616,7 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
   int offset_v = color_i == COLOR_V ? 5 : 0;
 
   if (sao->type == SAO_TYPE_BAND) {
-    int offsets[1 << KVZ_BIT_DEPTH];
-    kvz_calc_sao_offset_array(encoder, sao, offsets, color_i);
-    unsigned char*temp;
-
-    for (int y = 0; y < block_height; ++y) {
-      for (int x = 0; x < block_width; x+=32) {
-
-        //new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
-
-
-        bool atleast_32_elements = (block_width - x) > 31;
-        bool atleast_16_elements = (block_width - x) > 15;
-
-        int choose = atleast_32_elements + atleast_16_elements;
-
-        switch (choose) {
-
-        case 2:;
-
-          __m256i rec_data_256_epi8 = _mm256_loadu_si256((__m256i*)&rec_data[y * stride + x]);
-          temp = (unsigned char*)&rec_data_256_epi8;
-
-          __m256i offsets_256_epi8 = _mm256_set_epi8(offsets[temp[31]], offsets[temp[30]], offsets[temp[29]], offsets[temp[28]], offsets[temp[27]], offsets[temp[26]], offsets[temp[25]],
-           offsets[temp[24]], offsets[temp[23]], offsets[temp[22]], offsets[temp[21]], offsets[temp[20]], offsets[temp[19]], offsets[temp[18]], offsets[temp[17]], offsets[temp[16]],
-           offsets[temp[15]], offsets[temp[14]], offsets[temp[13]], offsets[temp[12]], offsets[temp[11]], offsets[temp[10]], offsets[temp[9]],
-           offsets[temp[8]], offsets[temp[7]], offsets[temp[6]], offsets[temp[5]], offsets[temp[4]], offsets[temp[3]], offsets[temp[2]], offsets[temp[1]], offsets[temp[0]]);
-          _mm256_storeu_si256((__m256i*)& new_rec_data[y * new_stride + x], offsets_256_epi8);
-          break;
-
-        case 1:;
-
-          __m128i rec_data_128_epi8 = _mm_loadu_si128((__m128i*)&rec_data[y * stride + x]);
-          temp = (unsigned char*)&rec_data_128_epi8;
-          __m128i offsets_128_epi8 = _mm_set_epi8(offsets[temp[15]], offsets[temp[14]], offsets[temp[13]], offsets[temp[12]], offsets[temp[11]], offsets[temp[10]], offsets[temp[9]],
-           offsets[temp[8]], offsets[temp[7]], offsets[temp[6]], offsets[temp[5]], offsets[temp[4]], offsets[temp[3]], offsets[temp[2]], offsets[temp[1]], offsets[temp[0]]);
-          _mm_storeu_si128((__m128i*)& new_rec_data[y * new_stride + x], offsets_128_epi8);
-
-          for (int i = x; i < block_width; i++) {
-            new_rec_data[y * new_stride + i] = offsets[rec_data[y * stride + i]];
-          }
-          break;
-
-        default:;
-
-          for (int i = x; i < block_width; i++) {
-            new_rec_data[y * new_stride + i] = offsets[rec_data[y * stride + i]];
-          }
-          break;
-        }
-      }
-    }
+    reconstruct_color_band(encoder, rec_data, new_rec_data, sao, stride, new_stride, block_width, block_height, color_i);
   }
   else {
 
