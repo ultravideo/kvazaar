@@ -1146,7 +1146,7 @@ static __m256i _mm256_loadu_n_epi32(const int *src, const unsigned n)
 }*/
 
 //Avx store n epi32 from src to dst
-static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
+static void _mm256_storeu_n_epi32(int *dst, const __m256i src, const unsigned n)
 {
   switch (n) {
   case 0:
@@ -1156,59 +1156,34 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
     dst[0] = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
     break;
 
-  case 2: {
-    int64_t v1v0 = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
-
-    dst[0] = (int)v1v0;
-    dst[1] = (int)(v1v0 >> 32);
-
+  case 2: 
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
     break;
-  }
 
-  case 3: {
-    __m128i tmp = _mm256_castsi256_si128(src);
-    int64_t v1v0 = _mm_extract_epi64(tmp, 0);
-
-    dst[0] = (int)v1v0;
-    dst[1] = (int)(v1v0 >> 32);
-    dst[2] = _mm_extract_epi32(tmp, 2);
-
+  case 3:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    dst[2] = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
     break;
-  }
 
   case 4:
     _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
     break;
 
-  case 5: {
+  case 5: 
     _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
-
     dst[4] = _mm_extract_epi32(_mm256_extracti128_si256(src, 1), 0);
-
     break;
-  }
 
-  case 6: {
+  case 6:
     _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
-
-    int64_t v1v0 = _mm_extract_epi64(_mm256_extracti128_si256(src, 1), 0);
-
-    dst[4] = (int)v1v0;
-    dst[5] = (int)(v1v0 >> 32);
-
+    *(int64_t *)(&dst[4]) = _mm_extract_epi64(_mm256_extracti128_si256(src, 1), 0);
     break;
-  } 
 
   case 7: {
     _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
-
-    __m128i tmp = _mm256_extracti128_si256(src, 1);
-    int64_t v1v0 = _mm_extract_epi64(tmp, 0);
-
-    dst[4] = (int)(v1v0);
-    dst[5] = (int)(v1v0 >> 32);
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[4]) = _mm_extract_epi64(tmp, 0);
     dst[6] = _mm_extract_epi32(tmp, 2);
-    
     break;
   }
 
@@ -1216,6 +1191,312 @@ static void _mm256_storeu_n_epi32(int *dst, __m256i src, const unsigned n)
     //Only max 8 values can be stored
     FALLTHROUGH;
   case 8:
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
+  }
+}
+
+//Avx store n epi16 from src to dst
+static void _mm256_storeu_n_epi16(unsigned short *dst, const __m256i src, const unsigned n)
+{
+  switch (n) {
+  case 0:
+    break;
+
+  case 1:
+    dst[0] = _mm_extract_epi16(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 2:
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+
+  case 3:
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    dst[2] = _mm_extract_epi16(_mm256_castsi256_si128(src), 2);
+
+  case 4:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 5: 
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    dst[4] = _mm_extract_epi16(_mm256_castsi256_si128(src), 4);
+    break;
+
+  case 6: 
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(int32_t *)(&dst[4]) = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
+    break;
+
+  case 7:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(int32_t *)(&dst[4]) = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
+    dst[6] = _mm_extract_epi16(_mm256_castsi256_si128(src), 6);
+    break;
+
+  case 8:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    break;
+
+  case 9:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    dst[8] = _mm_extract_epi16(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 10:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    *(int32_t *)(&dst[8]) = _mm_extract_epi32(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 11: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int32_t *)(&dst[8]) = _mm_extract_epi32(tmp, 0);
+    dst[10] = _mm_extract_epi16(tmp, 2);
+    break;
+  }
+
+  case 12: 
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    *(int64_t *)(&dst[8]) = _mm_extract_epi64(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 13: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[8]) = _mm_extract_epi64(tmp, 0);
+    dst[12] = _mm_extract_epi16(tmp, 4);
+    break;
+  }
+
+  case 14: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[8]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[12]) = _mm_extract_epi32(tmp, 2);
+    break;
+  }
+
+  case 15: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[8]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[12]) = _mm_extract_epi32(tmp, 2);
+    dst[14] = _mm_extract_epi16(tmp, 6);
+    break;
+  }
+  
+  default:
+    //Only max 16 values can be stored
+    FALLTHROUGH;
+  case 16:
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
+  }
+}
+
+//Avx store n epi8 from src to dst
+static void _mm256_storeu_n_epi8(unsigned char *dst, const __m256i src, const unsigned n)
+{
+  switch (n) {
+  case 0:
+    break;
+
+  case 1:
+    dst[0] = _mm_extract_epi8(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 2:
+    *(uint16_t *)dst = _mm_extract_epi16(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 3:
+    *(uint16_t *)dst = _mm_extract_epi16(_mm256_castsi256_si128(src), 0);
+    dst[0] = _mm_extract_epi8(_mm256_castsi256_si128(src), 2);
+    break;
+
+  case 4:
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 5:
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    dst[4] = _mm_extract_epi8(_mm256_castsi256_si128(src), 4);
+    break;
+
+  case 6: {
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    *(uint16_t *)(&dst[4]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 2);
+    break;
+  }
+
+  case 7: {
+    *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    *(uint16_t *)(&dst[4]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 2);
+    dst[6] = _mm_extract_epi8(_mm256_castsi256_si128(src), 6);
+    break;
+  }
+
+  case 8:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    break;
+
+  case 9:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    dst[8] = _mm_extract_epi8(_mm256_castsi256_si128(src), 8);
+    break;
+
+  case 10:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(uint16_t *)(&dst[8]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 4);
+    break;
+
+  case 11:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(uint16_t *)(&dst[8]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 4);
+    dst[10] = _mm_extract_epi8(_mm256_castsi256_si128(src), 10);
+    break;
+
+  case 12:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(int32_t *)(&dst[8]) = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
+    break;
+
+  case 14:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(int32_t *)(&dst[8]) = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
+    *(uint16_t *)(&dst[12]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 6);
+    break;
+
+  case 15:
+    *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
+    *(int32_t *)(&dst[8]) = _mm_extract_epi32(_mm256_castsi256_si128(src), 2);
+    *(uint16_t *)(&dst[12]) = _mm_extract_epi16(_mm256_castsi256_si128(src), 6);
+    dst[14] = _mm_extract_epi8(_mm256_castsi256_si128(src), 14);
+    break;
+
+  case 16:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    break;
+
+  case 17:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    dst[16] = _mm_extract_epi8(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 18:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    *(uint16_t *)(&dst[16]) = _mm_extract_epi16(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 19: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(uint16_t *)(&dst[16]) = _mm_extract_epi16(tmp, 0);
+    dst[18] = _mm_extract_epi8(tmp, 2);
+    break;
+  }
+
+  case 20:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    *(int32_t *)(&dst[16]) = _mm_extract_epi32(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 21: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int32_t *)(&dst[16]) = _mm_extract_epi32(tmp, 0);
+    dst[20] = _mm_extract_epi8(tmp, 4);
+    break;
+  }
+
+  case 22: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int32_t *)(&dst[16]) = _mm_extract_epi32(tmp, 0);
+    *(uint16_t *)(&dst[20]) = _mm_extract_epi16(tmp, 2);
+    break;
+  }
+
+  case 23: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    const __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int32_t *)(&dst[16]) = _mm_extract_epi32(tmp, 0);
+    *(uint16_t *)(&dst[20]) = _mm_extract_epi16(tmp, 2);
+    dst[22] = _mm_extract_epi8(tmp, 6);
+    break;
+  }
+
+  case 24:
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(_mm256_extracti128_si256(src, 1), 0);
+    break;
+
+  case 25: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    dst[24] = _mm_extract_epi8(tmp, 8);
+    break;
+  }
+
+  case 26: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(uint16_t *)(&dst[24]) = _mm_extract_epi16(tmp, 4);
+    break;
+  }
+
+  case 27: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(uint16_t *)(&dst[24]) = _mm_extract_epi16(tmp, 4);
+    dst[26] = _mm_extract_epi8(tmp, 10);
+    break;
+  }
+
+  case 28: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[24]) = _mm_extract_epi32(tmp, 2);
+    break;
+  }
+
+  case 29: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[24]) = _mm_extract_epi32(tmp, 2);
+    dst[28] = _mm_extract_epi8(tmp, 12);
+    break;
+  }
+
+  case 30: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[24]) = _mm_extract_epi32(tmp, 2);
+    *(uint16_t *)(&dst[28]) = _mm_extract_epi16(tmp, 6);
+    break;
+  }
+
+  case 31: {
+    _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(src));
+    __m128i tmp = _mm256_extracti128_si256(src, 1);
+    *(int64_t *)(&dst[16]) = _mm_extract_epi64(tmp, 0);
+    *(int32_t *)(&dst[24]) = _mm_extract_epi32(tmp, 2);
+    *(uint16_t *)(&dst[28]) = _mm_extract_epi16(tmp, 6);
+    dst[30] = _mm_extract_epi8(tmp, 14);
+    break;
+  }
+
+  default:
+    //Only max 32 values can be stored
+    FALLTHROUGH;
+  case 32:
     _mm256_storeu_si256((__m256i*)dst, src);
     break;
   }
@@ -2473,11 +2754,217 @@ static void opaqueResampleBlockStep_avx2_vertical_handler(const opaque_pic_buffe
   }
 }
 
+
+//Takes in vectors of data and filter coeffs. Apply filter and return results for 16 pixels at a time.
+//Internal precision 16-bits
+//Data layout:
+//  dataX:=|D(3+4X) D(2+4X)|D(1+4X) D(0+4X)|
+//  where DYX:={d_{Y,X+7}, d_{Y,X+6}, d_{Y,X+5}, d_{Y,X+4}, d_(Y,X+3), d_(Y,X+2), d_(Y,X+1), d_(Y,X+0)} and d_(x,y) is the yth sample for the xth pixel given as a 8-bit value
+//
+//  filterX:=|F(3+4X) F(2+4X)|F(1+4X) F(0+4X)|
+//  where FYX:={f_(Y,X+7), f_(Y,X+6), f_(Y,X+5), f_(Y,X+4), f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 8-bit value
+//
+//Returns:
+//  |r_15 r_14 r_13 r_12 r_11 r_10 r_9 r_8|r_7 r_6 r_5 r_4 r_3 r_2 r_1 r_0|
+//  where r_x = is the filterd pixel value of the xth pixel given as a 16-bit value
+//
+//Only dataX[i], where 0 < i < filter_rounds, is used.
+static __m256i apply_filter_4x8_quad_epi8_epi16(const __m256i data0, const __m256i data1, const __m256i data2, const __m256i data3, const __m256i filter0, const __m256i filter1, const __m256i filter2, const __m256i filter3)
+{
+  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0B0A, 0x0F0E, 0x0908, 0x0D0C, 0x0504, 0x0706, 0x0100, 0x0302));
+  const __m256i shuffle_mask2 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
+
+  //Filtering done eight taps at a time for four pixels, so repeate until desired number of taps performed
+  __m256i tmp0 = _mm256_maddubs_epi16(data0, filter0);
+  __m256i tmp1 = _mm256_maddubs_epi16(data1, filter1);
+  __m256i tmp2 = _mm256_maddubs_epi16(data2, filter2);
+  __m256i tmp3 = _mm256_maddubs_epi16(data3, filter3);
+  //Data Layout: |dddd cccc|bbbb aaaa|, |hhhh gggg|ffff eeee|, |llll kkkk|jjjj iiii|, |pppp oooo|nnnn mmmm|  
+
+  //Start adding the remaining values together
+  tmp0 = _mm256_add_epi16(_mm256_blend_epi32(tmp0, tmp1, /*1010 1010*/0xAA), _mm256_shuffle_epi32(_mm256_blend_epi32(tmp0, tmp1, /*0101 0101*/0x55), /*1011 0001*/0xB1));
+  tmp1 = _mm256_add_epi16(_mm256_blend_epi32(tmp2, tmp3, /*1010 1010*/0xAA), _mm256_shuffle_epi32(_mm256_blend_epi32(tmp2, tmp3, /*0101 0101*/0x55), /*1011 0001*/0xB1));
+  //Data layout: |hh dd gg cc|ff bb ee aa|, |pp ll oo kk|nn jj mm ii|
+
+  //Permute to get final low lane data to low lanes and vice versa
+  tmp2 = _mm256_inserti128_si256(tmp0, _mm256_castsi256_si128(tmp1), 1);
+  tmp3 = _mm256_inserti128_si256(tmp1, _mm256_extracti128_si256(tmp0, 1), 0);
+  //Data layout: |nn jj mm ii|ff bb ee aa|, |pp ll oo kk|hh dd gg cc|
+
+  //Do final round of additions
+  tmp0 = _mm256_add_epi16(_mm256_blend_epi16(tmp2, tmp3, /*1010 1010*/0xAA), _mm256_shuffle_epi8(_mm256_blend_epi16(tmp2, tmp3, /*0101 0101*/0x55), shuffle_mask1));
+  //Data layout: |pn lj om ki|hf db ge ca|
+
+  //Need to do one more round shuffle to get the correct order
+  return _mm256_shuffle_epi8(tmp0, shuffle_mask2);
+}
+
+//Handle 8-bit input with filter size 8
+static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const char *const filter, const int shift, const int scale, const int add, const int delta, const int src_size)
+{
+  //Calculate outer and inner step so as to maximize lane/register usage:
+  //  The accumulation can be done for 8 pixels at the same time
+  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int filter_size = 8;
+
+  const int x_bound = block_x + block_width;
+  const int y_bound = block_y + block_height;
+  //const unsigned i_bound = (is_vertical && filter_size > 8) ? filter_size : 1;
+
+  const __m256i seq = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+
+  const __m256i scale_epi32 = _mm256_set1_epi32(scale);
+  const __m256i add_epi32 = _mm256_set1_epi32(add);
+  const __m256i delta_epi32 = _mm256_set1_epi32(delta);
+
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i max_src_ind = _mm256_set1_epi32(src_size - 1);
+  const __m256i ref_pos_filt_offset = _mm256_set1_epi32((filter_size >> 1) - 1);
+  const __m256i over_bound = _mm256_set1_epi32(filter_size - src_size);
+
+  //Lookup table for permutations used in shuffling edge data
+
+  static const long long shuffle_perm_lookup_lft[2][4] = {
+    {0x0706050403020100, 0x0605040302010000, 0x0504030201000000, 0x0403020100000000},
+    {0x0F0E0D0C0B0A0908, 0x0E0D0C0B0A090808, 0x0D0C0B0A09080808, 0x0C0B0A0908080808}
+  };
+  static const long long shuffle_perm_lookup_rgt[2][5] = {
+    {0x0706050403020100, 0x0606050403020100, 0x0505050403020100, 0x0404040403020100, 0x03030303020100},
+    {0x0F0E0D0C0B0A0908, 0x0E0E0D0C0B0A0908, 0x0D0D0D0C0B0A0908, 0x0C0C0C0C0B0A0908, 0x0B0B0B0B0A0908}
+  };
+#define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
+#define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
+
+  __m256i temp_mem[12];
+  __m256i data0[6], data1[6], filter0[6], filter1[6];
+
+  //Do resampling of the specified block into trgt_buffer using src_buffer
+  for (int y = block_y; y < y_bound; y++) {
+    
+    unsigned char* src = &((unsigned char *)src_buffer->data)[(y * src_buffer->stride + src_offset)];
+    unsigned short* trgt_row = &((unsigned short *)trgt_buffer->data)[(y * trgt_buffer->stride + trgt_offset)];
+
+    //loop over x (target block width)
+    for (int x = block_x; x < x_bound; x += t_step) {
+
+      unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
+
+      //Calculate reference position in src pic (vertical scaling)
+      const __m256i t_ind_epi32 = _mm256_add_epi32(_mm256_set1_epi32(x), seq);
+      const __m256i ref_pos_16_epi32 = avx2_calc_ref_pos_16_epi32(t_ind_epi32, scale_epi32, add_epi32, shift, delta_epi32);
+      const __m256i phase_epi32 = avx2_get_phase_epi32(ref_pos_16_epi32);
+      const __m256i ref_pos_epi32 = _mm256_sub_epi32(avx2_get_ref_pos_epi32(ref_pos_16_epi32), ref_pos_filt_offset); //Calculate the first sample ind based on the ref pos
+
+      const unsigned *phase = (unsigned*)&phase_epi32;
+
+      //Pre-processing step
+      //  Load filter coeffs
+      filter0[(x - block_x) % 2] = _mm256_setr_epi64x(
+         *((long long*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
+         *((long long*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
+         *((long long*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
+         *((long long*)&getFilterCoeff(filter, filter_size, phase[3], 0))
+      );
+      filter1[(x - block_x) % 2] = _mm256_setr_epi64x(
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[4], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[5], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[6], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[7], 0))
+      );
+
+      //Load data
+        //Need to handle start/end where sample inds are out of bounds
+      
+      //Virtual position of first sample processed here. May lie outside of image
+      const int *virtual_pos_start = (int *)&ref_pos_epi32;
+      const __m256i num_over_epi32 = _mm256_add_epi32(ref_pos_epi32, over_bound); //How much the virtual sample pos processed here are over src_size - 1
+      const int *num_over = (int *)&num_over_epi32;
+
+      const __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(ref_pos_epi32, zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
+      const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
+
+      //Load src samples in as concruent 8 pixel (64-bits) values
+      temp_mem[(x - block_x) % 2] = _mm256_setr_epi64x(
+        *((long long*)&src[sample_pos[0]]),
+        *((long long*)&src[sample_pos[1]]),
+        *((long long*)&src[sample_pos[2]]),
+        *((long long*)&src[sample_pos[3]]));
+
+      temp_mem[((x - block_x) % 2) + 1] = _mm256_setr_epi64x(
+        *((long long*)&src[sample_pos[4]]),
+        *((long long*)&src[sample_pos[5]]),
+        *((long long*)&src[sample_pos[6]]),
+        *((long long*)&src[sample_pos[7]]));
+
+      //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
+      if (virtual_pos_start[0] < 0) {
+        //Shuffle data from mem so that left bound values are correctly dublicated.
+        __m256i perm = _mm256_setr_epi64x(
+          getShufflePermLft(virtual_pos_start[0], 0),
+          getShufflePermLft(virtual_pos_start[1], 1),
+          getShufflePermLft(virtual_pos_start[2], 0),
+          getShufflePermLft(virtual_pos_start[3], 1)
+        );
+        temp_mem[(x - block_x) % 2] = _mm256_shuffle_epi8(temp_mem[(x - block_x) % 2], perm);
+      }
+      if (virtual_pos_start[4] < 0) {
+        //Shuffle data from mem so that left bound values are correctly dublicated.
+        __m256i perm = _mm256_setr_epi64x(
+          getShufflePermLft(virtual_pos_start[4], 0),
+          getShufflePermLft(virtual_pos_start[5], 1),
+          getShufflePermLft(virtual_pos_start[6], 0),
+          getShufflePermLft(virtual_pos_start[7], 1)
+        );
+        temp_mem[((x - block_x) % 2) + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) + 1], perm);
+      }
+      if (num_over[3] > 0) {
+        //Shuffle data from mem so that right bound values are correctly dublicated.
+        __m256i perm = _mm256_setr_epi64x(
+          getShufflePermRgt(num_over[0], 0),
+          getShufflePermRgt(num_over[1], 1),
+          getShufflePermRgt(num_over[2], 0),
+          getShufflePermRgt(num_over[3], 1)
+        );
+        temp_mem[(x - block_x) % 2] = _mm256_shuffle_epi8(temp_mem[(x - block_x) % 2], perm);
+      }
+      if (num_over[7] > 0) {
+        //Shuffle data from mem so that right bound values are correctly dublicated.
+        __m256i perm = _mm256_setr_epi64x(
+          getShufflePermRgt(num_over[4], 0),
+          getShufflePermRgt(num_over[5], 1),
+          getShufflePermRgt(num_over[6], 0),
+          getShufflePermRgt(num_over[7], 1)
+        );
+        temp_mem[((x - block_x) % 2) + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) + 1], perm);
+      }
+
+      data0[(x - block_x) % 2] = temp_mem[(x - block_x) % 2];
+      data1[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) + 1];
+
+      //Processing step
+      //Calculate two steps worth of resutls at the same time so do calculation only every second loop cycle unless this is the final loop cycle
+      if ((x - block_x) % 2 == 1 || x + t_step >= x_bound)
+      {
+        if ((x - block_x) % 2 == 1) {
+          t_num += t_step;
+        }
+
+        //Calculate results
+        __m256i filter_res_epi16 = apply_filter_4x8_quad_epi8_epi16(data0[0], data1[0], data0[1], data1[1], filter0[0], filter1[0], filter0[1], filter1[1]);
+
+        //Write back the new values for the current t_num pixels
+        _mm256_storeu_n_epi16(&trgt_row[x], filter_res_epi16, t_num);
+      }
+
+    }
+  }
+}
+
 //Handle horizontal resampling
 static void opaqueResampleBlockStep_avx2_horizontal_handler(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const void *const filter, const int filter_size, const int shift, const int scale, const int add, const int delta, const int src_size)
 {
   //Calculate outer and inner step so as to maximize lane/register usage:
-//  The accumulation can be done for 8 pixels at the same time
+  //  The accumulation can be done for 8 pixels at the same time
   const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
   const int f_step = filter_size == 8 ? 8 : 4;//SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
 
