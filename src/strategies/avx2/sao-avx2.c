@@ -78,6 +78,52 @@ static __m256i sao_calc_eo_cat_avx2(__m128i* vector_a_epi8, __m128i* vector_b_ep
   return v_cat_epi32;
 }
 
+static INLINE __m256i srli_epi8(__m256i v, const uint32_t shift)
+{
+  const uint8_t hibit_mask     = 0xff >> shift;
+  const __m256i hibit_mask_256 = _mm256_set1_epi8(hibit_mask);
+
+  __m256i v_shifted = _mm256_srli_epi32(v,         shift);
+  __m256i v_masked  = _mm256_and_si256 (v_shifted, hibit_mask_256);
+
+  return v_masked;
+}
+
+static INLINE void cvt_epu8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
+{
+  const __m256i zero  = _mm256_setzero_si256();
+             *res_lo  = _mm256_unpacklo_epi8(v, zero);
+             *res_hi  = _mm256_unpackhi_epi8(v, zero);
+}
+
+static INLINE void cvt_epi8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
+{
+  const __m256i zero  = _mm256_setzero_si256();
+        __m256i signs = _mm256_cmpgt_epi8   (zero, v);
+             *res_lo  = _mm256_unpacklo_epi8(v,    signs);
+             *res_hi  = _mm256_unpackhi_epi8(v,    signs);
+}
+
+// Convert a byte-addressed mask for VPSHUFB into two word-addressed ones, for
+// example:
+// 7 3 6 2 5 1 4 0 => e f 6 7 c d 4 5 a b 2 3 8 9 0 1
+static INLINE void cvt_shufmask_epi8_epi16(__m256i v, __m256i *res_lo, __m256i *res_hi)
+{
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i ones = _mm256_set1_epi8(1);
+
+  // There's no 8-bit shift, so highest bit could bleed into neighboring byte
+  // if set. To avoid it, reset all sign bits with max. The only valid input
+  // values for v are [0, 7] anyway and invalid places should be masked out by
+  // caller, so it doesn't matter that we turn negative bytes into garbage.
+  __m256i v_nonnegs  = _mm256_max_epi8  (zero,      v);
+  __m256i v_lobytes  = _mm256_slli_epi32(v_nonnegs, 1);
+  __m256i v_hibytes  = _mm256_add_epi8  (v_lobytes, ones);
+
+          *res_lo    = _mm256_unpacklo_epi8(v_lobytes, v_hibytes);
+          *res_hi    = _mm256_unpackhi_epi8(v_lobytes, v_hibytes);
+}
+
 /*
 static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
  const kvz_pixel *rec_data,
@@ -356,6 +402,81 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   }
 }
 
+/*
+ * Calculate an array of intensity correlations for each intensity value.
+ * Return array as 16 YMM vectors, each containing 2x16 unsigned bytes
+ * (to ease array lookup from YMMs using the shuffle trick, the low and
+ * high lanes of each vector are duplicates). Have fun scaling this to
+ * 16-bit picture data!
+ */
+static void calc_sao_offset_array_avx2(const encoder_control_t *encoder,
+                                       const sao_info_t        *sao,
+                                             __m256i           *offsets,
+                                             color_t            color_i)
+{
+  const uint32_t band_pos   = (color_i == COLOR_V) ? 1 : 0;
+  const  int32_t cur_bp     = sao->band_position[band_pos];
+
+  const __m256i  zero       = _mm256_setzero_si256();
+  const __m256i  threes     = _mm256_set1_epi8  (  3);
+
+  const __m256i  band_pos_v = _mm256_set1_epi8  (band_pos << 2);
+  const __m256i  cur_bp_v   = _mm256_set1_epi8  (cur_bp);
+  const __m256i  val_incr   = _mm256_set1_epi8  (16);
+  const __m256i  band_incr  = _mm256_set1_epi8  ( 2);
+        __m256i  vals       = _mm256_setr_epi8  ( 0,  1,  2,  3,  4,  5,  6,  7,
+                                                  8,  9, 10, 11, 12, 13, 14, 15,
+                                                  0,  1,  2,  3,  4,  5,  6,  7,
+                                                  8,  9, 10, 11, 12, 13, 14, 15);
+
+        __m256i  bands     = _mm256_setr_epi32 (0, 0, 0x01010101, 0x01010101,
+                                                0, 0, 0x01010101, 0x01010101);
+
+  // We'll only ever address SAO offsets 1, 2, 3, 4, 6, 7, 8, 9, so only load
+  // them and truncate into signed 16 bits (anything out of that range will
+  // anyway saturate anything they're used to do)
+  __m128i sao_offs_lo  = _mm_loadu_si128((const __m128i *)(sao->offsets + 1));
+  __m128i sao_offs_hi  = _mm_loadu_si128((const __m128i *)(sao->offsets + 6));
+
+  __m128i sao_offs_xmm = _mm_packs_epi32        (sao_offs_lo, sao_offs_hi);
+  __m256i sao_offs     = _mm256_castsi128_si256 (sao_offs_xmm);
+          sao_offs     = _mm256_inserti128_si256(sao_offs,    sao_offs_xmm, 1);
+
+  for (uint32_t i = 0; i < 16; i++) {
+    // bands will always be in [0, 31], and cur_bp in [0, 27], so no overflow
+    // can occur
+    __m256i band_m_bp = _mm256_sub_epi8    (bands,  cur_bp_v);
+
+    // If (x & ~3) != 0 for any signed x, then x < 0 or x > 3
+    __m256i bmbp_bads = _mm256_andnot_si256(threes,    band_m_bp);
+    __m256i in_band   = _mm256_cmpeq_epi8  (zero,      bmbp_bads);
+
+    __m256i offset_id = _mm256_add_epi8    (band_m_bp, band_pos_v);
+
+    __m256i val_lo, val_hi;
+    cvt_epu8_epi16(vals, &val_lo, &val_hi);
+
+    __m256i offid_lo, offid_hi;
+    cvt_shufmask_epi8_epi16(offset_id, &offid_lo, &offid_hi);
+
+    __m256i offs_lo = _mm256_shuffle_epi8(sao_offs, offid_lo);
+    __m256i offs_hi = _mm256_shuffle_epi8(sao_offs, offid_hi);
+
+    __m256i sums_lo = _mm256_adds_epi16  (val_lo,   offs_lo);
+    __m256i sums_hi = _mm256_adds_epi16  (val_hi,   offs_hi);
+
+            sums_lo = _mm256_max_epi16   (sums_lo,  zero);
+            sums_hi = _mm256_max_epi16   (sums_hi,  zero);
+
+    __m256i offs    = _mm256_packus_epi16(sums_lo,  sums_hi);
+
+    offsets[i]      = _mm256_blendv_epi8 (vals,     offs, in_band);
+
+            vals    = _mm256_add_epi8    (vals,     val_incr);
+            bands   = _mm256_add_epi8    (bands,    band_incr);
+  }
+}
+
 static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
  const kvz_pixel *rec_data,
  kvz_pixel *new_rec_data,
@@ -487,32 +608,6 @@ static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
       }
     }
   }
-}
-
-static INLINE __m256i srli_epi8(__m256i v, const uint32_t shift)
-{
-  const uint8_t hibit_mask     = 0xff >> shift;
-  const __m256i hibit_mask_256 = _mm256_set1_epi8(hibit_mask);
-
-  __m256i v_shifted = _mm256_srli_epi32(v,         shift);
-  __m256i v_masked  = _mm256_and_si256 (v_shifted, hibit_mask_256);
-
-  return v_masked;
-}
-
-static INLINE void cvt_epu8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
-{
-  const __m256i zero  = _mm256_setzero_si256();
-             *res_lo  = _mm256_unpacklo_epi8(v, zero);
-             *res_hi  = _mm256_unpackhi_epi8(v, zero);
-}
-
-static INLINE void cvt_epi8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
-{
-  const __m256i zero  = _mm256_setzero_si256();
-        __m256i signs = _mm256_cmpgt_epi8   (zero, v);
-             *res_lo  = _mm256_unpacklo_epi8(v,    signs);
-             *res_hi  = _mm256_unpackhi_epi8(v,    signs);
 }
 
 static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
