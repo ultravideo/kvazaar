@@ -2590,6 +2590,143 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 }
 
 //Handle vertical resampling
+static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const short *const filter, const int shift, const int scale, const int add, const int delta, const int src_size, const int is_upscaling) {
+
+  //Calculate outer and inner step so as to maximize lane/register usage:
+  //  The accumulation can be done for 8 pixels at the same time
+  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int f_step = 4;//SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
+  const int filter_size = 8;
+
+  const unsigned num_filter_parts = filter_size / f_step;//(filter_size + 7) >> 3; //Number of loops needed to perform filtering
+
+  const int x_bound = block_x + block_width;
+  const int y_bound = block_y + block_height;
+  //const unsigned i_bound = (is_vertical && filter_size > 8) ? filter_size : 1;
+
+  const unsigned s_stride = src_buffer->width;
+  //const unsigned ref_stride = is_vertical ? s_stride : 1;
+
+  const __m256i scale_round = is_upscaling ? _mm256_set1_epi32(2048) : _mm256_set1_epi32(8192); //Rounding constant for normalizing pixel values to the correct range
+  const int scale_shift = is_upscaling ? 12 : 14; //Amount of shift in the final pixel value normalization
+
+
+  const __m256i seq = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+  //const __m256i eight_seq = _mm256_add_epi32(_mm256_set1_epi32(8), seq);
+
+  const __m256i scale_epi32 = _mm256_set1_epi32(scale);
+  const __m256i add_epi32 = _mm256_set1_epi32(add);
+  const __m256i delta_epi32 = _mm256_set1_epi32(delta);
+
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i t_step_epi32 = _mm256_set1_epi32(t_step);
+  const __m256i block_x_epi32 = _mm256_set1_epi32(block_x);
+  const __m256i max_src_ind = _mm256_set1_epi32(src_size - 1);
+  const __m256i ref_stride_epi32 = _mm256_set1_epi32(s_stride);
+  const __m256i ref_pos_filt_offset = _mm256_set1_epi32((filter_size >> 1) - 1);
+  const __m256i epi16_interleave_mask = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
+  const __m256i epi32_permute_mask = _mm256_set_epi32(7, 6, 3, 2, 5, 4, 1, 0);
+
+  __m256i temp_mem[6];
+  __m256i data0[2], data1[2], filter0[2], filter1[2];
+  __m128i filter_res_temp[4] = { _mm_setzero_si128(), _mm_setzero_si128(), _mm_setzero_si128(), _mm_setzero_si128() };
+
+  //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
+  for (int y = block_y; y < y_bound; y++) {
+
+    unsigned short* src = (unsigned short *)src_buffer->data + src_offset;
+    char* trgt_row = &((char *)(trgt_buffer->data))[(y * trgt_buffer->stride + trgt_offset)];
+
+    __m256i filter_res_epi32 = zero;
+    __m256i phase_epi32 = zero;
+    __m256i ref_pos_epi32 = zero;
+
+    const unsigned *phase = (unsigned*)&phase_epi32;
+    const unsigned *ref_pos = (unsigned*)&ref_pos_epi32;
+
+    //Calculate reference position in src pic (vertical resampling)
+    //Pre-calculate for 8 pos at a time
+    if ((y - block_y) % 8 == 0)
+    {
+      const __m256i t_ind_epi32 = _mm256_add_epi32(_mm256_set1_epi32(y), seq);
+      const __m256i ref_pos_16_epi32 = avx2_calc_ref_pos_16_epi32(t_ind_epi32, scale_epi32, add_epi32, shift, delta_epi32);
+      phase_epi32 = avx2_get_phase_epi32(ref_pos_16_epi32);
+      ref_pos_epi32 = avx2_get_ref_pos_epi32(ref_pos_16_epi32);
+
+      //Calculate the first sample ind based on the ref pos
+      ref_pos_epi32 = _mm256_sub_epi32(ref_pos_epi32, ref_pos_filt_offset);
+    }
+
+    //Pre-processing step
+    //  Load filter coeffs (vertical)
+    __m256i temp_filter = _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[(y - block_y) % 8], 0),
+                                              (__m128i*)&getFilterCoeff(filter, filter_size, phase[(y - block_y) % 8], 0));
+
+    filter0[0] = _mm256_shuffle_epi32(temp_filter, /*0000 0000*/0x00);
+    filter1[0] = _mm256_shuffle_epi32(temp_filter, /*0101 0101*/0x55);
+    filter0[1] = _mm256_shuffle_epi32(temp_filter, /*1010 1010*/0xAA);
+    filter1[1] = _mm256_shuffle_epi32(temp_filter, /*1111 1111*/0xFF);
+
+    __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(_mm256_set1_epi32(ref_pos[(y - block_y) % 8]), seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
+    sample_pos_epi32 = _mm256_add_epi32(_mm256_mullo_epi32(sample_pos_epi32, ref_stride_epi32), block_x_epi32); //Transform y-pos to indice and position to the start of the block
+
+    //loop over x (target block width)
+    for (int x = block_x; x < x_bound; x += t_step) {
+
+      unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
+
+      //Calculate reference position in src pic (vertical scaling)
+      if (x > block_x) {
+        sample_pos_epi32 = _mm256_add_epi32(sample_pos_epi32, t_step_epi32); //increment to get correct x-pos in vertical resampling
+      }
+
+      //  Loop over filter segments and load needed data 
+      for (unsigned filter_part = 0; filter_part < num_filter_parts; filter_part++) {
+
+        const int f_ind = filter_part * f_step; //Filter index
+
+        //Load data
+        const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
+
+        //Data gets loaded in order |p7_1 p6_1 p5_1 p4_1|p3_1 p2_1 p1_1 p0_1|p7_0 p6_0 p5_0 p4_0 p3_0 p2_0 p1_0 p0_0| etc.
+        temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 0]], (__m128i*)&src[sample_pos[f_ind + 1]]);
+        temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 2]], (__m128i*)&src[sample_pos[f_ind + 3]]);
+
+        //pack and re-order data to |p7_1 p7_0 p6_1 p6_0 p5_1 p5_0 p4_1 p4_0|...| etc.
+        data0[filter_part] = _mm256_shuffle_epi8(_mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], epi32_permute_mask), epi16_interleave_mask);
+        data1[filter_part] = _mm256_shuffle_epi8(_mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], epi32_permute_mask), epi16_interleave_mask);
+      }
+
+      //Processing step
+      //Calculate results
+      filter_res_epi32 = apply_filter_2x8_dual_epi16(data0, data1, filter0, filter1, num_filter_parts);
+
+      //Scale values in trgt buffer to the correct range. Only done in the final loop over o_ind (block width)
+      filter_res_epi32 = _mm256_add_epi32(filter_res_epi32, scale_round);
+      filter_res_epi32 = _mm256_srai_epi32(filter_res_epi32, scale_shift);
+      //filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
+      //Might be slightly faster to use saturation to clip to [0,255]
+      //filter_res_epi32 = _mm256_cvtepu8_epi32(_mm_packus_epi16(_mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1)), _mm_setzero_si128()));
+      filter_res_temp[(x - block_x) % 4] = _mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1));
+
+      //Accumulate four loop cycles worth of results before storing unless this is the final loop cycle
+      if ((x - block_x) % 4 == 3 || x + t_step >= x_bound)
+      {
+        const int back_shift = t_step * ((x - block_x) % 4);
+        t_num += back_shift;
+        
+        //Finish saturating the filter res and combine for final result
+        filter_res_epi32 = _mm256_castsi128_si256(_mm_packus_epi16(filter_res_temp[0], filter_res_temp[1]));
+        filter_res_epi32 = _mm256_inserti128_si256(filter_res_epi32, _mm_packus_epi16(filter_res_temp[2], filter_res_temp[3]), 0x1);
+
+        //Write back the new values for the current t_num pixels (need to shift x back to the correct index for the first of the t_num values)
+        _mm256_storeu_n_epi8(&trgt_row[x - back_shift], filter_res_epi32, t_num);
+      }
+    }
+  }
+}
+
+//Handle vertical resampling
 static void opaqueResampleBlockStep_avx2_vertical_handler(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const void *const filter, const int filter_size, const int shift, const int scale, const int add, const int delta, const int src_size, const int is_upscaling) {
   
   //Calculate outer and inner step so as to maximize lane/register usage:
@@ -2835,8 +2972,8 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
 #define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
 #define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
 
-  __m256i temp_mem[12];
-  __m256i data0[6], data1[6], filter0[6], filter1[6];
+  __m256i temp_mem[4];
+  __m256i data0[2], data1[2], filter0[2], filter1[2];
 
   //Do resampling of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < y_bound; y++) {
@@ -2884,13 +3021,13 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
       const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
 
       //Load src samples in as concruent 8 pixel (64-bits) values
-      temp_mem[(x - block_x) % 2] = _mm256_setr_epi64x(
+      temp_mem[((x - block_x) % 2) * 2] = _mm256_setr_epi64x(
         *((long long*)&src[sample_pos[0]]),
         *((long long*)&src[sample_pos[1]]),
         *((long long*)&src[sample_pos[2]]),
         *((long long*)&src[sample_pos[3]]));
 
-      temp_mem[((x - block_x) % 2) + 1] = _mm256_setr_epi64x(
+      temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_setr_epi64x(
         *((long long*)&src[sample_pos[4]]),
         *((long long*)&src[sample_pos[5]]),
         *((long long*)&src[sample_pos[6]]),
@@ -2905,7 +3042,7 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
           getShufflePermLft(virtual_pos_start[2], 0),
           getShufflePermLft(virtual_pos_start[3], 1)
         );
-        temp_mem[(x - block_x) % 2] = _mm256_shuffle_epi8(temp_mem[(x - block_x) % 2], perm);
+        temp_mem[((x - block_x) % 2) * 2] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2], perm);
       }
       if (virtual_pos_start[4] < 0) {
         //Shuffle data from mem so that left bound values are correctly dublicated.
@@ -2915,7 +3052,7 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
           getShufflePermLft(virtual_pos_start[6], 0),
           getShufflePermLft(virtual_pos_start[7], 1)
         );
-        temp_mem[((x - block_x) % 2) + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) + 1], perm);
+        temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2 + 1], perm);
       }
       if (num_over[3] > 0) {
         //Shuffle data from mem so that right bound values are correctly dublicated.
@@ -2925,7 +3062,7 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
           getShufflePermRgt(num_over[2], 0),
           getShufflePermRgt(num_over[3], 1)
         );
-        temp_mem[(x - block_x) % 2] = _mm256_shuffle_epi8(temp_mem[(x - block_x) % 2], perm);
+        temp_mem[((x - block_x) % 2) * 2] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2], perm);
       }
       if (num_over[7] > 0) {
         //Shuffle data from mem so that right bound values are correctly dublicated.
@@ -2935,25 +3072,24 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
           getShufflePermRgt(num_over[6], 0),
           getShufflePermRgt(num_over[7], 1)
         );
-        temp_mem[((x - block_x) % 2) + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) + 1], perm);
+        temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2 + 1], perm);
       }
 
-      data0[(x - block_x) % 2] = temp_mem[(x - block_x) % 2];
-      data1[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) + 1];
+      data0[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) * 2];
+      data1[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) * 2 + 1];
 
       //Processing step
-      //Calculate two steps worth of resutls at the same time so do calculation only every second loop cycle unless this is the final loop cycle
+      //Calculate two steps worth of results at the same time so do calculation only every second loop cycle unless this is the final loop cycle
       if ((x - block_x) % 2 == 1 || x + t_step >= x_bound)
       {
-        if ((x - block_x) % 2 == 1) {
-          t_num += t_step;
-        }
+        int back_shift = t_step * ((x - block_x) % 2);
+        t_num += back_shift;
 
         //Calculate results
         __m256i filter_res_epi16 = apply_filter_4x8_quad_epi8_epi16(data0[0], data1[0], data0[1], data1[1], filter0[0], filter1[0], filter0[1], filter1[1]);
 
-        //Write back the new values for the current t_num pixels
-        _mm256_storeu_n_epi16(&trgt_row[x], filter_res_epi16, t_num);
+        //Write back the new values for the current t_num pixels (need to shift x back to the correct index for the first of the t_num values)
+        _mm256_storeu_n_epi16(&trgt_row[x - back_shift], filter_res_epi16, t_num);
       }
 
     }
@@ -3247,11 +3383,23 @@ static void opaqueResampleBlockStep_avx2_adapter(const opaque_pic_buffer_t* cons
 
   if (is_vertical && (src_buffer->depth == sizeof(short) || src_buffer->depth == sizeof(pic_buffer_t))) {
     //Handle vertical resampling cases
-    opaqueResampleBlockStep_avx2_vertical_handler(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size, is_upscaling);
+    if (trgt_buffer->depth == sizeof(char) && filter_size == 8) {
+      opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, shift, scale, add, delta, src_size, is_upscaling);
+    }
+    else
+    {
+      opaqueResampleBlockStep_avx2_vertical_handler(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size, is_upscaling);
+    }
   } 
   else if (!is_vertical && (trgt_buffer->depth == sizeof(pic_data_t) || trgt_buffer->depth == sizeof(short))) {
     //Handle horizontal resampling cases
-    opaqueResampleBlockStep_avx2_horizontal_handler(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size);
+    if (src_buffer->depth == sizeof(char) && filter_size == 8) {
+      opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, shift, scale, add, delta, src_size);
+    }
+    else
+    {
+      opaqueResampleBlockStep_avx2_horizontal_handler(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size);
+    }
   } 
   else {
     //No valid handling for the given depths
