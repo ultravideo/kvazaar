@@ -58,6 +58,8 @@
 #define avx2_get_phase_epi32(ref_pos_16) _mm256_and_si256(ref_pos_16, _mm256_set1_epi32(SELECT_LOW_4_BITS))
 #define avx2_get_ref_pos_epi32(ref_pos_16) _mm256_srai_epi32(ref_pos_16, 4)
 
+#define VOID_INDEX(ptr,ind,depth) ((void *)(((char *)(ptr)) + (ind) * (depth)))
+
 // Clip sum of add_val to each epi32 of lane
 static __m256i clip_add_avx2(const int add_val, __m256i lane, const int min, const int max)
 {
@@ -2589,14 +2591,15 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
   }
 }
 
+
 //Handle vertical resampling
-static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const short *const filter, const int shift, const int scale, const int add, const int delta, const int src_size, const int is_upscaling) {
+static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const int16_t *const filter, const int is_filter_size_8, const int shift, const int scale, const int add, const int delta, const int src_size, const int is_upscaling) {
 
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
   const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
   const int f_step = 4;//SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
-  const int filter_size = 8;
+  const int filter_size = is_filter_size_8 ? 8 : 4;
 
   const unsigned num_filter_parts = filter_size / f_step;//(filter_size + 7) >> 3; //Number of loops needed to perform filtering
 
@@ -2634,8 +2637,8 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(const opa
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < y_bound; y++) {
 
-    unsigned short* src = (unsigned short *)src_buffer->data + src_offset;
-    char* trgt_row = &((char *)(trgt_buffer->data))[(y * trgt_buffer->stride + trgt_offset)];
+    int16_t* src = (int16_t *)src_buffer->data + src_offset;
+    uint8_t* trgt_row = &((uint8_t *)(trgt_buffer->data))[(y * trgt_buffer->stride + trgt_offset)];
 
     __m256i filter_res_epi32 = zero;
     __m256i phase_epi32 = zero;
@@ -2664,8 +2667,11 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(const opa
 
     filter0[0] = _mm256_shuffle_epi32(temp_filter, /*0000 0000*/0x00);
     filter1[0] = _mm256_shuffle_epi32(temp_filter, /*0101 0101*/0x55);
-    filter0[1] = _mm256_shuffle_epi32(temp_filter, /*1010 1010*/0xAA);
-    filter1[1] = _mm256_shuffle_epi32(temp_filter, /*1111 1111*/0xFF);
+    if (is_filter_size_8)
+    {
+      filter0[1] = _mm256_shuffle_epi32(temp_filter, /*1010 1010*/0xAA);
+      filter1[1] = _mm256_shuffle_epi32(temp_filter, /*1111 1111*/0xFF);
+    }
 
     __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(_mm256_set1_epi32(ref_pos[(y - block_y) % 8]), seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
     sample_pos_epi32 = _mm256_add_epi32(_mm256_mullo_epi32(sample_pos_epi32, ref_stride_epi32), block_x_epi32); //Transform y-pos to indice and position to the start of the block
@@ -2905,7 +2911,6 @@ static void opaqueResampleBlockStep_avx2_vertical_handler(const opaque_pic_buffe
 //  |r_15 r_14 r_13 r_12 r_11 r_10 r_9 r_8|r_7 r_6 r_5 r_4 r_3 r_2 r_1 r_0|
 //  where r_x = is the filterd pixel value of the xth pixel given as a 16-bit value
 //
-//Only dataX[i], where 0 < i < filter_rounds, is used.
 static __m256i apply_filter_4x8_quad_epi8_epi16(const __m256i data0, const __m256i data1, const __m256i data2, const __m256i data3, const __m256i filter0, const __m256i filter1, const __m256i filter2, const __m256i filter3)
 {
   const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0B0A, 0x0F0E, 0x0908, 0x0D0C, 0x0504, 0x0706, 0x0100, 0x0302));
@@ -2936,13 +2941,195 @@ static __m256i apply_filter_4x8_quad_epi8_epi16(const __m256i data0, const __m25
   return _mm256_shuffle_epi8(tmp0, shuffle_mask2);
 }
 
+//Takes in vectors of data and filter coeffs. Apply filter and return results for 16 pixels at a time.
+//Internal precision 16-bits
+//Data layout:
+//  dataX:=|D(7+4X) D(6+4X) D(5+4X) D(4+4X)|D(3+4X) D(2+4X) D(1+4X) D(0+4X)|
+//  where DYX:={d_(Y,X+3), d_(Y,X+2), d_(Y,X+1), d_(Y,X+0)} and d_(x,y) is the yth sample for the xth pixel given as a 8-bit value
+//
+//  filterX:=|F(7+4X) F(6+4X) F(5+4X) F(4+4X)|F(3+4X) F(2+4X) F(1+4X) F(0+4X)|
+//  where FYX:={f_(Y,X+3), f_(Y,X+2), f_(Y,X+1), f_(Y,X+0)} and f_(x,y) is the yth filter coeff for the xth pixel given as a 8-bit value
+//
+//Returns:
+//  |r_15 r_14 r_13 r_12 r_11 r_10 r_9 r_8|r_7 r_6 r_5 r_4 r_3 r_2 r_1 r_0|
+//  where r_x = is the filterd pixel value of the xth pixel given as a 16-bit value
+//
+static __m256i apply_filter_8x4_dual_epi8_epi16(const __m256i data0, const __m256i data1, const __m256i filter0, const __m256i filter1)
+{
+  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0B0A, 0x0F0E, 0x0908, 0x0D0C, 0x0504, 0x0706, 0x0100, 0x0302));
+  const __m256i shuffle_mask2 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0B0A, 0x0706, 0x0302, 0x0D0C, 0x0908, 0x0504, 0x0100));
+
+  //Multiply samples by coeffs and first add
+  __m256i tmp0 = _mm256_maddubs_epi16(data0, filter0);
+  __m256i tmp1 = _mm256_maddubs_epi16(data1, filter1);
+  //Data Layout: |hh gg ff ee|dd cc bb aa| etc
+
+  //Re-order data so that final high lane values are in the high lanes and vice versa
+  __m256i tmp2 = _mm256_inserti128_si256(tmp0, _mm256_castsi256_si128(tmp1), 1);
+  tmp1 = _mm256_inserti128_si256(tmp1, _mm256_extracti128_si256(tmp0, 1), 0);
+  //Data layout: |pp oo nn mm|dd cc bb aa|, |ll kk jj ii|hh gg ff ee|
+
+  //Re-order data for the final summation
+  tmp0 = _mm256_blend_epi16(tmp2, tmp1, /*1010 1010*/0xAA);
+  tmp1 = _mm256_shuffle_epi8(_mm256_blend_epi16(tmp2, tmp1, /*0101 0101*/0x55), shuffle_mask1);
+  //Data layout: |...|hd gc fb ea| etc.
+
+  //Final summation and re-order data to correct order
+  return _mm256_shuffle_epi8(_mm256_add_epi16(tmp0, tmp1), shuffle_mask2);
+}
+
+//Load 8 filter samples from src[sample_pos[x]] for 4 pixels (dual) into data0 (and data1)
+//Make sure samples are withing bounds indicated by low_bound (>= 0) and high_bound (<= 0)
+static void data_load_4x8_dual_8bit(const uint8_t *const src, const unsigned *const sample_pos, const int *const low_bound, const int *const high_bound, __m256i *const data0, __m256i *const data1)
+{
+  __m256i temp_mem[2];
+
+  //Lookup table for permutations used in shuffling edge data
+  static const long long shuffle_perm_lookup_lft[2][4] = {
+   {0x0706050403020100, 0x0605040302010000, 0x0504030201000000, 0x0403020100000000},
+   {0x0F0E0D0C0B0A0908, 0x0E0D0C0B0A090808, 0x0D0C0B0A09080808, 0x0C0B0A0908080808}
+  };
+  static const long long shuffle_perm_lookup_rgt[2][5] = {
+    {0x0706050403020100, 0x0606050403020100, 0x0505050403020100, 0x0404040403020100, 0x03030303020100},
+    {0x0F0E0D0C0B0A0908, 0x0E0E0D0C0B0A0908, 0x0D0D0D0C0B0A0908, 0x0C0C0C0C0B0A0908, 0x0B0B0B0B0A0908}
+  };
+#define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
+#define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
+
+  temp_mem[0] = _mm256_setr_epi64x(
+    *((long long*)&src[sample_pos[0]]),
+    *((long long*)&src[sample_pos[1]]),
+    *((long long*)&src[sample_pos[2]]),
+    *((long long*)&src[sample_pos[3]]));
+
+  temp_mem[1] = _mm256_setr_epi64x(
+    *((long long*)&src[sample_pos[4]]),
+    *((long long*)&src[sample_pos[5]]),
+    *((long long*)&src[sample_pos[6]]),
+    *((long long*)&src[sample_pos[7]]));
+
+  //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
+  if (low_bound[0] < 0) {
+    //Shuffle data from mem so that left bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi64x(
+      getShufflePermLft(low_bound[0], 0),
+      getShufflePermLft(low_bound[1], 1),
+      getShufflePermLft(low_bound[2], 0),
+      getShufflePermLft(low_bound[3], 1)
+    );
+    temp_mem[0] = _mm256_shuffle_epi8(temp_mem[0], perm);
+  }
+  if (low_bound[4] < 0) {
+    //Shuffle data from mem so that left bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi64x(
+      getShufflePermLft(low_bound[4], 0),
+      getShufflePermLft(low_bound[5], 1),
+      getShufflePermLft(low_bound[6], 0),
+      getShufflePermLft(low_bound[7], 1)
+    );
+    temp_mem[1] = _mm256_shuffle_epi8(temp_mem[1], perm);
+  }
+  if (high_bound[3] > 0) {
+    //Shuffle data from mem so that right bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi64x(
+      getShufflePermRgt(high_bound[0], 0),
+      getShufflePermRgt(high_bound[1], 1),
+      getShufflePermRgt(high_bound[2], 0),
+      getShufflePermRgt(high_bound[3], 1)
+    );
+    temp_mem[0] = _mm256_shuffle_epi8(temp_mem[0], perm);
+  }
+  if (high_bound[7] > 0) {
+    //Shuffle data from mem so that right bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi64x(
+      getShufflePermRgt(high_bound[4], 0),
+      getShufflePermRgt(high_bound[5], 1),
+      getShufflePermRgt(high_bound[6], 0),
+      getShufflePermRgt(high_bound[7], 1)
+    );
+    temp_mem[1] = _mm256_shuffle_epi8(temp_mem[1], perm);
+  }
+
+  *data0 = temp_mem[0];
+  *data1 = temp_mem[1];
+
+#undef getShufflePermLft
+#undef getShufflePermRgt
+}
+
+static void data_load_8x4_8bit(const uint8_t *const src, const unsigned *const sample_pos, const int *const low_bound, const int *const high_bound, __m256i *const data)
+{
+  __m256i temp_mem;
+
+  //Lookup table for permutations used in shuffling edge data
+  static const int shuffle_perm_lookup_lft[4][2] = {
+   {0x03020100, 0x02010000},
+   {0x07060504, 0x06050404},
+   {0x0B0A0908, 0x0A090808},
+   {0x0F0E0D0C, 0x0E0D0C0C}
+  };
+  static const int shuffle_perm_lookup_rgt[4][3] = {
+    {0x03020100, 0x02020100, 0x01010100},
+    {0x07060504, 0x06060504, 0x05050504},
+    {0x0B0A0908, 0x0A0A0908, 0x09090908},
+    {0x0F0E0D0C, 0x0E0E0D0C, 0x0D0D0D0C}
+  };
+#define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
+#define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
+
+  temp_mem = _mm256_setr_epi32(
+    *((int*)&src[sample_pos[0]]),
+    *((int*)&src[sample_pos[1]]),
+    *((int*)&src[sample_pos[2]]),
+    *((int*)&src[sample_pos[3]]),
+    *((int*)&src[sample_pos[4]]),
+    *((int*)&src[sample_pos[5]]),
+    *((int*)&src[sample_pos[6]]),
+    *((int*)&src[sample_pos[7]]));
+
+  //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
+  if (low_bound[0] < 0) {
+    //Shuffle data from mem so that left bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi32(
+      getShufflePermLft(low_bound[0], 0),
+      getShufflePermLft(low_bound[1], 1),
+      getShufflePermLft(low_bound[2], 2),
+      getShufflePermLft(low_bound[3], 3),
+      getShufflePermLft(low_bound[4], 0),
+      getShufflePermLft(low_bound[5], 1),
+      getShufflePermLft(low_bound[6], 2),
+      getShufflePermLft(low_bound[7], 3)
+    );
+    temp_mem = _mm256_shuffle_epi8(temp_mem, perm);
+  }
+  if (high_bound[3] > 0) {
+    //Shuffle data from mem so that right bound values are correctly dublicated.
+    __m256i perm = _mm256_setr_epi32(
+      getShufflePermRgt(high_bound[0], 0),
+      getShufflePermRgt(high_bound[1], 1),
+      getShufflePermRgt(high_bound[2], 2),
+      getShufflePermRgt(high_bound[3], 3),
+      getShufflePermRgt(high_bound[4], 0),
+      getShufflePermRgt(high_bound[5], 1),
+      getShufflePermRgt(high_bound[6], 2),
+      getShufflePermRgt(high_bound[7], 3)
+    );
+    temp_mem = _mm256_shuffle_epi8(temp_mem, perm);
+  }
+  
+  *data = temp_mem;
+
+#undef getShufflePermLft
+#undef getShufflePermRgt
+}
+
 //Handle 8-bit input with filter size 8
-static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const char *const filter, const int shift, const int scale, const int add, const int delta, const int src_size)
+static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const int8_t *const filter, const int is_filter_size_8, const int shift, const int scale, const int add, const int delta, const int src_size)
 {
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
   const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
-  const int filter_size = 8;
+  const int filter_size = is_filter_size_8 ? 8 : 4;
 
   const int x_bound = block_x + block_width;
   const int y_bound = block_y + block_height;
@@ -2959,27 +3146,14 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
   const __m256i ref_pos_filt_offset = _mm256_set1_epi32((filter_size >> 1) - 1);
   const __m256i over_bound = _mm256_set1_epi32(filter_size - src_size);
 
-  //Lookup table for permutations used in shuffling edge data
-
-  static const long long shuffle_perm_lookup_lft[2][4] = {
-    {0x0706050403020100, 0x0605040302010000, 0x0504030201000000, 0x0403020100000000},
-    {0x0F0E0D0C0B0A0908, 0x0E0D0C0B0A090808, 0x0D0C0B0A09080808, 0x0C0B0A0908080808}
-  };
-  static const long long shuffle_perm_lookup_rgt[2][5] = {
-    {0x0706050403020100, 0x0606050403020100, 0x0505050403020100, 0x0404040403020100, 0x03030303020100},
-    {0x0F0E0D0C0B0A0908, 0x0E0E0D0C0B0A0908, 0x0D0D0D0C0B0A0908, 0x0C0C0C0C0B0A0908, 0x0B0B0B0B0A0908}
-  };
-#define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
-#define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
-
-  __m256i temp_mem[4];
+  //__m256i temp_mem[4];
   __m256i data0[2], data1[2], filter0[2], filter1[2];
 
   //Do resampling of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < y_bound; y++) {
     
-    unsigned char* src = &((unsigned char *)src_buffer->data)[(y * src_buffer->stride + src_offset)];
-    unsigned short* trgt_row = &((unsigned short *)trgt_buffer->data)[(y * trgt_buffer->stride + trgt_offset)];
+    uint8_t* src = &((uint8_t *)src_buffer->data)[(y * src_buffer->stride + src_offset)];
+    int16_t* trgt_row = &((int16_t *)trgt_buffer->data)[(y * trgt_buffer->stride + trgt_offset)];
 
     //loop over x (target block width)
     for (int x = block_x; x < x_bound; x += t_step) {
@@ -2996,18 +3170,32 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
 
       //Pre-processing step
       //  Load filter coeffs
-      filter0[(x - block_x) % 2] = _mm256_setr_epi64x(
-         *((long long*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
-         *((long long*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
-         *((long long*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
-         *((long long*)&getFilterCoeff(filter, filter_size, phase[3], 0))
-      );
-      filter1[(x - block_x) % 2] = _mm256_setr_epi64x(
+      if (is_filter_size_8)
+      {
+        filter0[(x - block_x) % 2] = _mm256_setr_epi64x(
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
+          *((long long*)&getFilterCoeff(filter, filter_size, phase[3], 0))
+        );
+        filter1[(x - block_x) % 2] = _mm256_setr_epi64x(
           *((long long*)&getFilterCoeff(filter, filter_size, phase[4], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[5], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[6], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[7], 0))
-      );
+        );
+      } else {
+        filter0[(x - block_x) % 2] = _mm256_setr_epi32(
+          *((int*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[3], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[4], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[5], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[6], 0)),
+          *((int*)&getFilterCoeff(filter, filter_size, phase[7], 0))
+        );
+      }
 
       //Load data
         //Need to handle start/end where sample inds are out of bounds
@@ -3020,63 +3208,12 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
       const __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(ref_pos_epi32, zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
       const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
 
-      //Load src samples in as concruent 8 pixel (64-bits) values
-      temp_mem[((x - block_x) % 2) * 2] = _mm256_setr_epi64x(
-        *((long long*)&src[sample_pos[0]]),
-        *((long long*)&src[sample_pos[1]]),
-        *((long long*)&src[sample_pos[2]]),
-        *((long long*)&src[sample_pos[3]]));
-
-      temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_setr_epi64x(
-        *((long long*)&src[sample_pos[4]]),
-        *((long long*)&src[sample_pos[5]]),
-        *((long long*)&src[sample_pos[6]]),
-        *((long long*)&src[sample_pos[7]]));
-
-      //If we are at the start/end need to "extend" sample pixels (copy edge pixel)
-      if (virtual_pos_start[0] < 0) {
-        //Shuffle data from mem so that left bound values are correctly dublicated.
-        __m256i perm = _mm256_setr_epi64x(
-          getShufflePermLft(virtual_pos_start[0], 0),
-          getShufflePermLft(virtual_pos_start[1], 1),
-          getShufflePermLft(virtual_pos_start[2], 0),
-          getShufflePermLft(virtual_pos_start[3], 1)
-        );
-        temp_mem[((x - block_x) % 2) * 2] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2], perm);
+      //Load src samples in as consecutive 8 pixel (64-bits) values
+      if (is_filter_size_8) {
+        data_load_4x8_dual_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[(x - block_x) % 2], &data1[(x - block_x) % 2]);
+      } else {
+        data_load_8x4_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[(x - block_x) % 2]);
       }
-      if (virtual_pos_start[4] < 0) {
-        //Shuffle data from mem so that left bound values are correctly dublicated.
-        __m256i perm = _mm256_setr_epi64x(
-          getShufflePermLft(virtual_pos_start[4], 0),
-          getShufflePermLft(virtual_pos_start[5], 1),
-          getShufflePermLft(virtual_pos_start[6], 0),
-          getShufflePermLft(virtual_pos_start[7], 1)
-        );
-        temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2 + 1], perm);
-      }
-      if (num_over[3] > 0) {
-        //Shuffle data from mem so that right bound values are correctly dublicated.
-        __m256i perm = _mm256_setr_epi64x(
-          getShufflePermRgt(num_over[0], 0),
-          getShufflePermRgt(num_over[1], 1),
-          getShufflePermRgt(num_over[2], 0),
-          getShufflePermRgt(num_over[3], 1)
-        );
-        temp_mem[((x - block_x) % 2) * 2] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2], perm);
-      }
-      if (num_over[7] > 0) {
-        //Shuffle data from mem so that right bound values are correctly dublicated.
-        __m256i perm = _mm256_setr_epi64x(
-          getShufflePermRgt(num_over[4], 0),
-          getShufflePermRgt(num_over[5], 1),
-          getShufflePermRgt(num_over[6], 0),
-          getShufflePermRgt(num_over[7], 1)
-        );
-        temp_mem[((x - block_x) % 2) * 2 + 1] = _mm256_shuffle_epi8(temp_mem[((x - block_x) % 2) * 2 + 1], perm);
-      }
-
-      data0[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) * 2];
-      data1[(x - block_x) % 2] = temp_mem[((x - block_x) % 2) * 2 + 1];
 
       //Processing step
       //Calculate two steps worth of results at the same time so do calculation only every second loop cycle unless this is the final loop cycle
@@ -3086,12 +3223,12 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(const 
         t_num += back_shift;
 
         //Calculate results
-        __m256i filter_res_epi16 = apply_filter_4x8_quad_epi8_epi16(data0[0], data1[0], data0[1], data1[1], filter0[0], filter1[0], filter0[1], filter1[1]);
+        __m256i filter_res_epi16 = is_filter_size_8 ? apply_filter_4x8_quad_epi8_epi16(data0[0], data1[0], data0[1], data1[1], filter0[0], filter1[0], filter0[1], filter1[1])                
+                                                    : apply_filter_8x4_dual_epi8_epi16(data0[0], data0[1], filter0[0], filter0[1]);
 
         //Write back the new values for the current t_num pixels (need to shift x back to the correct index for the first of the t_num values)
         _mm256_storeu_n_epi16(&trgt_row[x - back_shift], filter_res_epi16, t_num);
       }
-
     }
   }
 }
@@ -3383,8 +3520,8 @@ static void opaqueResampleBlockStep_avx2_adapter(const opaque_pic_buffer_t* cons
 
   if (is_vertical && (src_buffer->depth == sizeof(short) || src_buffer->depth == sizeof(pic_buffer_t))) {
     //Handle vertical resampling cases
-    if (trgt_buffer->depth == sizeof(char) && filter_size == 8) {
-      opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize8(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, shift, scale, add, delta, src_size, is_upscaling);
+    if (trgt_buffer->depth == sizeof(char) && (filter_size == 8 || filter_size == 4) ) {
+      opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size == 8, shift, scale, add, delta, src_size, is_upscaling);
     }
     else
     {
@@ -3393,8 +3530,8 @@ static void opaqueResampleBlockStep_avx2_adapter(const opaque_pic_buffer_t* cons
   } 
   else if (!is_vertical && (trgt_buffer->depth == sizeof(pic_data_t) || trgt_buffer->depth == sizeof(short))) {
     //Handle horizontal resampling cases
-    if (src_buffer->depth == sizeof(char) && filter_size == 8) {
-      opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize8(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, shift, scale, add, delta, src_size);
+    if (src_buffer->depth == sizeof(char) && (filter_size == 8 || filter_size == 4)) {
+      opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size == 8, shift, scale, add, delta, src_size);
     }
     else
     {
