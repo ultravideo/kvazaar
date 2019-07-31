@@ -655,10 +655,10 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
   const vector2d_t b_ofs       = g_sao_edge_offsets[sao->eo_class][1];
 
   // All limited to [-1, 1]
-  const int8_t     a_xoff      = a_ofs.x;
-  const int8_t     a_yoff      = a_ofs.y;
-  const int8_t     b_xoff      = b_ofs.x;
-  const int8_t     b_yoff      = b_ofs.y;
+  const int32_t    a_xoff      = a_ofs.x;
+  const int32_t    a_yoff      = a_ofs.y;
+  const int32_t    b_xoff      = b_ofs.x;
+  const int32_t    b_yoff      = b_ofs.y;
 
   const uint32_t   width_db32  = block_width & ~31;
   const uint32_t   width_db4   = block_width &  ~3;
