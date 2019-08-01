@@ -53,6 +53,18 @@
 #define _mm256_loadu2_m128i(hi,low) _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((low))), _mm_loadu_si128((hi)), 0x1)
 #endif
 
+#ifndef _mm256_set_m128i
+#define _mm256_set_m128i(hi,low) _mm256_insertf128_si256(_mm256_castsi128_si256(low), (hi), 0x1)
+#endif
+
+#ifndef _mm_loadu_si32
+#define _mm_loadu_si32(p) _mm_cvtsi32_si128(*(unsigned int const*)(p))
+#endif
+
+#ifndef _mm_loadu_si64
+#define _mm_loadu_si64(p) _mm_loadl_epi64((__m128i const*)(p))
+#endif
+
 //Define macros for avx ref pos calcs
 #define avx2_calc_ref_pos_16_epi32(ind, scale, add, shift, delta) _mm256_sub_epi32(_mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(ind, scale), add), shift), delta)
 #define avx2_get_phase_epi32(ref_pos_16) _mm256_and_si256(ref_pos_16, _mm256_set1_epi32(SELECT_LOW_4_BITS))
@@ -1211,10 +1223,12 @@ static void _mm256_storeu_n_epi16(int16_t *dst, const __m256i src, const unsigne
 
   case 2:
     *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
+    break;
 
   case 3:
     *(int32_t *)dst = _mm_extract_epi32(_mm256_castsi256_si128(src), 0);
     dst[2] = _mm_extract_epi16(_mm256_castsi256_si128(src), 2);
+    break;
 
   case 4:
     *(int64_t *)dst = _mm_extract_epi64(_mm256_castsi256_si128(src), 0);
