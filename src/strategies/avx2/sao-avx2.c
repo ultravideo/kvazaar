@@ -53,7 +53,9 @@ static int32_t hsum_8x32b(const __m256i v)
 }
 
 // Mapping of edge_idx values to eo-classes, 32x8b at once
-static __m256i calc_eo_cat(__m256i a, __m256i b, __m256i c)
+static __m256i calc_eo_cat(const __m256i a,
+                           const __m256i b,
+                           const __m256i c)
 {
   // Subtract 0x80 from unsigneds to use the signed compare on them
   const __m256i epu2epi    = _mm256_set1_epi8  (0x80);
@@ -78,7 +80,8 @@ static __m256i calc_eo_cat(__m256i a, __m256i b, __m256i c)
   return              _mm256_shuffle_epi8(idx_to_cat, eo_idx);
 }
 
-static INLINE __m256i srli_epi8(const __m256i v, const uint32_t shift)
+static INLINE __m256i srli_epi8(const __m256i  v,
+                                const uint32_t shift)
 {
   const uint8_t hibit_mask     = 0xff >> shift;
   const __m256i hibit_mask_256 = _mm256_set1_epi8(hibit_mask);
@@ -89,14 +92,18 @@ static INLINE __m256i srli_epi8(const __m256i v, const uint32_t shift)
   return v_masked;
 }
 
-static INLINE void cvt_epu8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
+static INLINE void cvt_epu8_epi16(const __m256i  v,
+                                        __m256i *res_lo,
+                                        __m256i *res_hi)
 {
   const __m256i zero  = _mm256_setzero_si256();
              *res_lo  = _mm256_unpacklo_epi8(v, zero);
              *res_hi  = _mm256_unpackhi_epi8(v, zero);
 }
 
-static INLINE void cvt_epi8_epi16(const __m256i v, __m256i *res_lo, __m256i *res_hi)
+static INLINE void cvt_epi8_epi16(const __m256i  v,
+                                        __m256i *res_lo,
+                                        __m256i *res_hi)
 {
   const __m256i zero  = _mm256_setzero_si256();
         __m256i signs = _mm256_cmpgt_epi8   (zero, v);
@@ -121,7 +128,9 @@ static INLINE void diff_epi8_epi16(const __m256i  a,
 // Convert a byte-addressed mask for VPSHUFB into two word-addressed ones, for
 // example:
 // 7 3 6 2 5 1 4 0 => e f 6 7 c d 4 5 a b 2 3 8 9 0 1
-static INLINE void cvt_shufmask_epi8_epi16(__m256i v, __m256i *res_lo, __m256i *res_hi)
+static INLINE void cvt_shufmask_epi8_epi16(const __m256i  v,
+                                                 __m256i *res_lo,
+                                                 __m256i *res_hi)
 {
   const __m256i zero = _mm256_setzero_si256();
   const __m256i ones = _mm256_set1_epi8(1);
@@ -440,7 +449,8 @@ static void calc_sao_offset_array_avx2(const encoder_control_t *encoder,
   }
 }
 
-static __m256i lookup_color_band_ymm(__m256i curr_row, const __m256i *offsets)
+static __m256i lookup_color_band_ymm(const __m256i  curr_row,
+                                     const __m256i *offsets)
 {
   const __m256i select_nibble = _mm256_set1_epi8   (0x0f);
   const __m256i lo_nibbles    = _mm256_and_si256   (select_nibble, curr_row);
@@ -553,10 +563,10 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
   }
 }
 
-static __m256i do_one_nonband_ymm(__m256i a,
-                                  __m256i b,
-                                  __m256i c,
-                                  __m256i sao_offs)
+static __m256i do_one_nonband_ymm(const __m256i a,
+                                  const __m256i b,
+                                  const __m256i c,
+                                  const __m256i sao_offs)
 {
   const __m256i   zero    = _mm256_setzero_si256();
 
@@ -688,15 +698,15 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
   }
 }
 
-static void sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
- const kvz_pixel *rec_data,
- kvz_pixel *new_rec_data,
- const sao_info_t *sao,
- int stride,
- int new_stride,
- int block_width,
- int block_height,
- color_t color_i)
+static void sao_reconstruct_color_avx2(const encoder_control_t *encoder,
+                                       const kvz_pixel         *rec_data,
+                                             kvz_pixel         *new_rec_data,
+                                       const sao_info_t        *sao,
+                                             int32_t            stride,
+                                             int32_t            new_stride,
+                                             int32_t            block_width,
+                                             int32_t            block_height,
+                                             color_t            color_i)
 {
   if (sao->type == SAO_TYPE_BAND) {
     reconstruct_color_band (encoder, rec_data, new_rec_data, sao, stride, new_stride, block_width, block_height, color_i);
