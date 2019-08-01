@@ -984,6 +984,7 @@ for (int y = block_y; y < (block_y + block_height); y++) {\
 *  \brief Do resampling on opaque data buffers. Supported bit-depths: 
 *     horizontal step: {8,16,32}-bit -> {16,32}-bit
 *     vertical step: {16,32}-bit -> {8,16,32}-bit
+*    Upsampling only supports {8,16,32}-bit -> 32-bit -> {8,16,32}-bit
 */
 static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src_buffer, const opaque_pic_buffer_t *const trgt_buffer, const int src_offset, const int trgt_offset, const int block_x, const int block_y, const int block_width, const int block_height, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma, const int is_vertical) 
 {  
@@ -1059,7 +1060,7 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
         assert(0);
       }
     }
-    else if (src_buffer->depth == sizeof(short)) {
+    else if (src_buffer->depth == sizeof(short) && filter_size < 12) {
       //Handle 16-bit input buffer case
       if (trgt_buffer->depth == sizeof(pic_data_t)) {
         //Handle 32-bit input buffer case
@@ -1108,7 +1109,7 @@ static void opaqueResampleBlockStep_adapter(const opaque_pic_buffer_t* const src
         assert(0);
       }
     }
-    else if (trgt_buffer->depth == sizeof(short)) {
+    else if (trgt_buffer->depth == sizeof(short) && filter_size < 12) {
       //Handle 16-bit out buffer case
       unsigned short *tmp_trgt_data = (unsigned short *)trgt_buffer->data + block_y * trgt_buffer->stride + block_x;
 
