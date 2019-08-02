@@ -2386,7 +2386,7 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
 
           if (f_step == 8) {
 
-            for (int i = 0; i < f_step; i++) {
+            for (int i = 0; i < 8; i++) {
               //Load src samples in eight pixel chuks into registers
               temp_mem[i] = _mm256_loadu_si256((__m256i*)&src[sample_pos[i]]);
 
@@ -2462,13 +2462,13 @@ static void resampleBlockStep_avx2_v4(const pic_buffer_t* const src_buffer, cons
                 temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
               }
 
-              if (num_over[i] > 0) {
+              if (num_over[i + 4] > 0) {
                 //Shuffle data from mem so that right bound values are correctly dublicated.
-                __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i - 4], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
-                __m128i perm_hi = _mm_set1_epi32(num_over[i]); //Set the amount ids are over
+                __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
+                __m128i perm_hi = _mm_set1_epi32(num_over[i + 4]); //Set the amount ids are over
                 __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
 
-                temp_mem[f_ind + i - 4] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i - 4], perm);
+                temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
               }
 
               //Pack samples into 16-bit values. Data order will be |P6 P4|P2 P0| and |P7 P5|P3 P1|
@@ -3423,7 +3423,7 @@ static void opaqueResampleBlockStep_avx2_horizontal(const opaque_pic_buffer_t* c
 
         if (f_step == 8) {
 
-          for (int i = 0; i < f_step; i++) {
+          for (int i = 0; i < 8; i++) {
             //Load src samples in eight pixel chuks into registers
             switch (src_buffer->depth)
             {
@@ -3432,7 +3432,7 @@ static void opaqueResampleBlockStep_avx2_horizontal(const opaque_pic_buffer_t* c
                 break;
 
               case sizeof(int16_t) :
-                temp_mem[i] = _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i*)VOID_INDEX(src, sample_pos[i], src_buffer->depth)));
+                temp_mem[i] = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)VOID_INDEX(src, sample_pos[i], src_buffer->depth)));
                 break;
 
               case sizeof(uint8_t) :
@@ -3482,11 +3482,11 @@ static void opaqueResampleBlockStep_avx2_horizontal(const opaque_pic_buffer_t* c
                 break;
 
               case sizeof(int16_t) :
-                temp_mem[f_ind + i] = _mm256_set_m128i(_mm_cvtepi16_epi32(_mm_loadu_si64(VOID_INDEX(src, sample_pos[i + 4], src_buffer->depth))), _mm_cvtepi16_epi32(_mm_loadu_si64(VOID_INDEX(src, sample_pos[i], src_buffer->depth))));
+                temp_mem[f_ind + i] = _mm256_set_m128i(_mm_cvtepu16_epi32(_mm_loadu_si64(VOID_INDEX(src, sample_pos[i + 4], src_buffer->depth))), _mm_cvtepu16_epi32(_mm_loadu_si64(VOID_INDEX(src, sample_pos[i], src_buffer->depth))));
                 break;
 
               case sizeof(uint8_t) :
-                temp_mem[f_ind + i] = _mm256_set_m128i(_mm_cvtepi8_epi32(_mm_loadu_si32(VOID_INDEX(src, sample_pos[i + 4], src_buffer->depth))), _mm_cvtepi8_epi32(_mm_loadu_si32(VOID_INDEX(src, sample_pos[i], src_buffer->depth))));
+                temp_mem[f_ind + i] = _mm256_set_m128i(_mm_cvtepu8_epi32(_mm_loadu_si32(VOID_INDEX(src, sample_pos[i + 4], src_buffer->depth))), _mm_cvtepu8_epi32(_mm_loadu_si32(VOID_INDEX(src, sample_pos[i], src_buffer->depth))));
                 break;
 
             default:
@@ -3504,13 +3504,13 @@ static void opaqueResampleBlockStep_avx2_horizontal(const opaque_pic_buffer_t* c
               temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
             }
 
-            if (num_over[i] > 0) {
+            if (num_over[i + 4] > 0) {
               //Shuffle data from mem so that right bound values are correctly dublicated.
-              __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i - 4], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
-              __m128i perm_hi = _mm_set1_epi32(num_over[i]); //Set the amount ids are over
+              __m128i perm_lo = _mm_set1_epi32(SCALER_MAX(num_over[i], 0)); //Set the amount inds are over. Perm should be >= 0, permute fails if not
+              __m128i perm_hi = _mm_set1_epi32(num_over[i + 4]); //Set the amount ids are over
               __m256i perm = _mm256_max_epi32(_mm256_min_epi32(_mm256_sub_epi32(three_seven, _mm256_inserti128_si256(_mm256_castsi128_si256(perm_lo), perm_hi, 0x1)), seq), zero_four); //Maps hi/lo perms to data where lo permutes only 1st ref pos data and hi only permutes 2nd ref pos data
 
-              temp_mem[f_ind + i - 4] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i - 4], perm);
+              temp_mem[f_ind + i] = _mm256_permutevar8x32_epi32(temp_mem[f_ind + i], perm);
             }
 
             //Pack samples into 16-bit values. Data order will be |P6 P4|P2 P0| and |P7 P5|P3 P1|
@@ -3612,26 +3612,26 @@ static void opaqueResampleBlockStep_avx2_adapter(const opaque_pic_buffer_t* cons
 
   //Choose a function based on given parameters
 
-  if (is_vertical && ((src_buffer->depth == sizeof(uint16_t) && filter_size < 12) || src_buffer->depth == sizeof(pic_buffer_t))) {
+  if (is_vertical && ((src_buffer->depth == sizeof(uint16_t) && filter_size < 12) || src_buffer->depth == sizeof(pic_data_t))) {
     //Handle vertical resampling cases
-    if (trgt_buffer->depth == sizeof(char) && src_buffer->depth == sizeof(uint16_t) && (filter_size == 8 || filter_size == 4) ) {
-      opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size == 8, shift, scale, add, delta, src_size, is_upscaling);
+    if (trgt_buffer->depth == sizeof(uint8_t) && src_buffer->depth == sizeof(uint16_t) && (filter_size == 8 || filter_size == 4) ) {
+      opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, (int16_t*)filter, filter_size == 8, shift, scale, add, delta, src_size, is_upscaling);
     }
     else
     {
       kvz_prepareFilterDepth(&filter, is_upscaling, is_luma, filter_phase, sizeof(int32_t));
-      opaqueResampleBlockStep_avx2_vertical(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size, is_upscaling);
+      opaqueResampleBlockStep_avx2_vertical(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, (int32_t*)filter, filter_size, shift, scale, add, delta, src_size, is_upscaling);
     }
   } 
   else if (!is_vertical && (trgt_buffer->depth == sizeof(pic_data_t) || (trgt_buffer->depth == sizeof(uint16_t) && filter_size < 12))) {
     //Handle horizontal resampling cases
     if (src_buffer->depth == sizeof(uint8_t) && trgt_buffer->depth == sizeof(uint16_t) && (filter_size == 8 || filter_size == 4)) {
-      opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size == 8, shift, scale, add, delta, src_size);
+      opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, (int8_t*)filter, filter_size == 8, shift, scale, add, delta, src_size);
     }
     else
     {
       kvz_prepareFilterDepth(&filter, is_upscaling, is_luma, filter_phase, sizeof(int32_t));
-      opaqueResampleBlockStep_avx2_horizontal(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, filter, filter_size, shift, scale, add, delta, src_size);
+      opaqueResampleBlockStep_avx2_horizontal(src_buffer, trgt_buffer, src_offset, trgt_offset, block_x, block_y, block_width, block_height, (int32_t*)filter, filter_size, shift, scale, add, delta, src_size);
     }
   } 
   else {
