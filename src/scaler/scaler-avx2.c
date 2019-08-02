@@ -2611,7 +2611,8 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
 
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
-  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int t_step_power = 3; //8
+  const int t_step = 1 << t_step_power; //Target buffer step aka how many target buffer values are calculated in one loop
   const int f_step = 4;//SCALER_MIN(filter_size, 8); //Filter step aka how many filter coeff multiplys and accumulations done in one loop
   const int filter_size = is_filter_size_8 ? 8 : 4;
 
@@ -2653,6 +2654,7 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
 
     int16_t* src = (int16_t *)src_buffer->data + src_offset;
     uint8_t* trgt_row = &((uint8_t *)(trgt_buffer->data))[(y * trgt_buffer->stride + trgt_offset)];
+    const unsigned loop_ind_outer = (y - block_y) % 8;
 
     __m256i filter_res_epi32 = zero;
     __m256i phase_epi32 = zero;
@@ -2663,7 +2665,7 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
 
     //Calculate reference position in src pic (vertical resampling)
     //Pre-calculate for 8 pos at a time
-    if ((y - block_y) % 8 == 0)
+    if (loop_ind_outer == 0)
     {
       const __m256i t_ind_epi32 = _mm256_add_epi32(_mm256_set1_epi32(y), seq);
       const __m256i ref_pos_16_epi32 = avx2_calc_ref_pos_16_epi32(t_ind_epi32, scale_epi32, add_epi32, shift, delta_epi32);
@@ -2676,8 +2678,8 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
 
     //Pre-processing step
     //  Load filter coeffs (vertical)
-    __m256i temp_filter = _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[(y - block_y) % 8], 0),
-                                              (__m128i*)&getFilterCoeff(filter, filter_size, phase[(y - block_y) % 8], 0));
+    __m256i temp_filter = _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[loop_ind_outer], 0),
+                                              (__m128i*)&getFilterCoeff(filter, filter_size, phase[loop_ind_outer], 0));
 
     filter0[0] = _mm256_shuffle_epi32(temp_filter, /*0000 0000*/0x00);
     filter1[0] = _mm256_shuffle_epi32(temp_filter, /*0101 0101*/0x55);
@@ -2687,13 +2689,14 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
       filter1[1] = _mm256_shuffle_epi32(temp_filter, /*1111 1111*/0xFF);
     }
 
-    __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(_mm256_set1_epi32(ref_pos[(y - block_y) % 8]), seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
+    __m256i sample_pos_epi32 = _mm256_min_epu32(_mm256_max_epi32(_mm256_add_epi32(_mm256_set1_epi32(ref_pos[loop_ind_outer]), seq), zero), max_src_ind);  //Need to make sure that sample position does not lie outside [0, src_size - 1]. Clip sample pos so we load at least one edge sample
     sample_pos_epi32 = _mm256_add_epi32(_mm256_mullo_epi32(sample_pos_epi32, ref_stride_epi32), block_x_epi32); //Transform y-pos to indice and position to the start of the block
 
     //loop over x (target block width)
     for (int x = block_x; x < x_bound; x += t_step) {
 
       unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
+      const unsigned loop_ind_inner = ((x - block_x) >> t_step_power) % 4;
 
       //Calculate reference position in src pic (vertical scaling)
       if (x > block_x) {
@@ -2727,12 +2730,12 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
       //filter_res_epi32 = clip_add_avx2(0, filter_res_epi32, 0, 255);
       //Might be slightly faster to use saturation to clip to [0,255]
       //filter_res_epi32 = _mm256_cvtepu8_epi32(_mm_packus_epi16(_mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1)), _mm_setzero_si128()));
-      filter_res_temp[(x - block_x) % 4] = _mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1));
+      filter_res_temp[loop_ind_inner] = _mm_packus_epi32(_mm256_castsi256_si128(filter_res_epi32), _mm256_extracti128_si256(filter_res_epi32, 0x1));
 
       //Accumulate four loop cycles worth of results before storing unless this is the final loop cycle
-      if ((x - block_x) % 4 == 3 || x + t_step >= x_bound)
+      if (loop_ind_inner == 3 || x + t_step >= x_bound)
       {
-        const int back_shift = t_step * ((x - block_x) % 4);
+        const int back_shift = t_step * (loop_ind_inner);
         t_num += back_shift;
         
         //Finish saturating the filter res and combine for final result
@@ -3173,7 +3176,8 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(con
 {
   //Calculate outer and inner step so as to maximize lane/register usage:
   //  The accumulation can be done for 8 pixels at the same time
-  const int t_step = 8; //Target buffer step aka how many target buffer values are calculated in one loop
+  const int t_step_power = 3; //8
+  const int t_step = 1 << t_step_power; //Target buffer step aka how many target buffer values are calculated in one loop
   const int filter_size = is_filter_size_8 ? 8 : 4;
 
   const int x_bound = block_x + block_width;
@@ -3204,6 +3208,7 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(con
     for (int x = block_x; x < x_bound; x += t_step) {
 
       unsigned t_num = SCALER_CLIP(x_bound - x, 0, t_step);
+      const unsigned loop_ind = ((x - block_x) >> t_step_power) % 2;
 
       //Calculate reference position in src pic (vertical scaling)
       const __m256i t_ind_epi32 = _mm256_add_epi32(_mm256_set1_epi32(x), seq);
@@ -3217,20 +3222,20 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(con
       //  Load filter coeffs
       if (is_filter_size_8)
       {
-        filter0[(x - block_x) % 2] = _mm256_setr_epi64x(
+        filter0[loop_ind] = _mm256_setr_epi64x(
           *((long long*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[3], 0))
         );
-        filter1[(x - block_x) % 2] = _mm256_setr_epi64x(
+        filter1[loop_ind] = _mm256_setr_epi64x(
           *((long long*)&getFilterCoeff(filter, filter_size, phase[4], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[5], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[6], 0)),
           *((long long*)&getFilterCoeff(filter, filter_size, phase[7], 0))
         );
       } else {
-        filter0[(x - block_x) % 2] = _mm256_setr_epi32(
+        filter0[loop_ind] = _mm256_setr_epi32(
           *((int*)&getFilterCoeff(filter, filter_size, phase[0], 0)),
           *((int*)&getFilterCoeff(filter, filter_size, phase[1], 0)),
           *((int*)&getFilterCoeff(filter, filter_size, phase[2], 0)),
@@ -3255,16 +3260,16 @@ static void opaqueResampleBlocckStep_avx2_horizontal_8to16bit_filterSize_8_4(con
 
       //Load src samples in as consecutive 8 pixel (64-bits) values
       if (is_filter_size_8) {
-        data_load_4x8_dual_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[(x - block_x) % 2], &data1[(x - block_x) % 2]);
+        data_load_4x8_dual_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[loop_ind], &data1[loop_ind]);
       } else {
-        data_load_8x4_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[(x - block_x) % 2]);
+        data_load_8x4_8bit(src, sample_pos, virtual_pos_start, num_over, &data0[loop_ind]);
       }
 
       //Processing step
       //Calculate two steps worth of results at the same time so do calculation only every second loop cycle unless this is the final loop cycle
-      if ((x - block_x) % 2 == 1 || x + t_step >= x_bound)
+      if (loop_ind == 1 || x + t_step >= x_bound)
       {
-        int back_shift = t_step * ((x - block_x) % 2);
+        int back_shift = t_step * (loop_ind);
         t_num += back_shift;
 
         //Calculate results
