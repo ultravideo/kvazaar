@@ -427,6 +427,71 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
   //kvz_deallocateYuvBuffer(tmp);
 }
 
+static void kvzOpaqueBlockStepScalingAvx2(opaque_yuv_buffer_t* in, opaque_yuv_buffer_t** out, int tmp_depth)
+{
+  //Create picture buffers based on given kvz_pictures
+  int32_t in_y_width = in->y->width;
+  int32_t in_y_height = in->y->height;
+  int32_t out_y_width = (*out)->y->width;
+  int32_t out_y_height = (*out)->y->height;
+  int part = 1;
+
+  //assumes 420
+  //int is_420 = in->y->width != in->u->width ? 1 : 0;
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+
+  int block_width = out_y_width >> part;
+  int block_height = out_y_height >> part;
+
+  int luma_size = out_y_width * in_y_height;
+  int chroma_size = luma_size >> 2;
+
+  opaque_yuv_buffer_t* tmp;
+
+  switch (tmp_depth)
+  {
+    case sizeof(pic_data_t) :
+      tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(pic_data_t));
+      break;
+
+      case sizeof(short) :
+        tmp = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_y_width, in_y_height, out_y_width, CHROMA_420, sizeof(short));
+        break;
+
+      default:
+        return;
+        break;
+  }
+
+  int32_t in_parts = (in_y_height + block_height - 1) / block_height;
+
+  //Horizontal
+  for (size_t y = 0; y < in_parts; y++) {
+    for (size_t x = 0; x < (1 << part); x++) {
+      int block_x = block_width * x;
+      int block_y = block_height * y;
+      int bh = min(block_height, in_y_height - block_y);
+
+      kvz_opaqueYuvBlockStepScaling_adapter(tmp, in, &param, block_x, block_y,
+        block_width, bh, 0, kvz_opaque_block_step_resample_func_avx2);
+    }
+  }
+
+  //Vertical
+  for (size_t y = 0; y < (1 << part); y++) {
+    for (size_t x = 0; x < (1 << part); x++) {
+      int block_x = block_width * x;
+      int block_y = block_height * y;
+
+      kvz_opaqueYuvBlockStepScaling_adapter(*out, tmp, &param, block_x, block_y,
+        block_width, block_height, 1, kvz_opaque_block_step_resample_func_avx2);
+    }
+  }
+
+  kvz_deallocateOpaqueYuvBuffer(tmp, 1);
+  //kvz_deallocateYuvBuffer(tmp);
+}
+
 static void kvzScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
@@ -1145,17 +1210,18 @@ static void validate_test3()
 
 }
 
-static void opaque_validate_test()
+static void opaque_validate_test_avx2()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = in_width >> 1;//264;
-  int32_t out_height = in_height >> 1;//130;
+  int32_t out_width = in_width << 1;//264;
+  int32_t out_height = in_height << 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
   int frames = 10;
 
+  int is_downscaling = out_width < in_width;
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
@@ -1191,6 +1257,118 @@ static void opaque_validate_test()
   opaque_yuv_buffer_t* out4 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(pic_data_t));
   int i = 0;
 
+  opaque_yuv_buffer_t* out_array[3] = { out2, out3, out4 };
+
+  while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
+
+    //COPY_CUSTOM(data2->y->data, data->y->data, in_width * in_height, unsigned char, pic_data_t);
+    //COPY_CUSTOM(data2->u->data, data->u->data, (in_width * in_height) >> 2, unsigned char, pic_data_t);
+    //COPY_CUSTOM(data2->v->data, data->v->data, (in_width * in_height) >> 2, unsigned char, pic_data_t);
+    copyFrom((uint8_t *)data2->y->data, data->y->data, in_width * in_height);
+    copyFrom((uint8_t *)data2->u->data, data->u->data, (in_width * in_height) >> 2);
+    copyFrom((uint8_t *)data2->v->data, data->v->data, (in_width * in_height) >> 2);
+
+    COPY_CUSTOM(data3->y->data, data->y->data, in_width * in_height, short, pic_data_t);
+    COPY_CUSTOM(data3->u->data, data->u->data, (in_width * in_height) >> 2, short, pic_data_t);
+    COPY_CUSTOM(data3->v->data, data->v->data, (in_width * in_height) >> 2, short, pic_data_t);
+
+    kvzScaling(data, &out1);
+
+    for (int k = 0; k < 3; k++)
+    {
+      for (int j = is_downscaling ? sizeof(pic_data_t) : sizeof(short); j <= sizeof(pic_data_t); j++)
+      {
+        kvzOpaqueBlockStepScalingAvx2(data2, &out_array[k], j);
+        kvzOpaqueBlockStepScalingAvx2(data3, &out_array[(k + 1) % 3], j);
+        kvzOpaqueBlockStepScalingAvx2(data4, &out_array[(k + 2) % 3], j);
+
+        if (opaque_yuvcmp(op_out1, out2) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 1\n", i + 1, (k % 3) + 1, j);
+        }
+
+        if (opaque_yuvcmp(op_out1, out3) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 2\n", i + 1, (k + 1) % 3 + 1, j);
+        }
+
+        if (opaque_yuvcmp(op_out1, out4) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 3\n", i + 1, (k + 2) % 3 + 1, j);
+        }
+      }
+    }
+    //yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
+    //yuv_io_write(out_file2, (yuv_buffer_t *)out2, out2->y->width, out2->y->height);
+    //yuv_io_write(out_file3, (yuv_buffer_t *)out3, out3->y->width, out3->y->height);
+    //yuv_io_write(out_file4, (yuv_buffer_t *)out4, out4->y->width, out4->y->height);
+
+    printf("Frame number %i\r", ++i);
+  }
+  printf("Wrote %i frames.\n", i);
+
+  kvz_deallocateYuvBuffer(data);
+  kvz_deallocateOpaqueYuvBuffer(data2, 1);
+  kvz_deallocateOpaqueYuvBuffer(data3, 1);
+  kvz_deallocateOpaqueYuvBuffer(data4, 0);
+  kvz_deallocateYuvBuffer(out1);
+  kvz_deallocateOpaqueYuvBuffer(op_out1, 0);
+  kvz_deallocateOpaqueYuvBuffer(out2, 1);
+  kvz_deallocateOpaqueYuvBuffer(out3, 1);
+  kvz_deallocateOpaqueYuvBuffer(out4, 1);
+  fclose(file);
+  fclose(out_file1);
+  fclose(out_file2);
+  fclose(out_file3);
+  fclose(out_file4);
+}
+
+static void opaque_validate_test()
+{
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = in_width << 1;//264;
+  int32_t out_height = in_height << 1;//130;
+  int32_t out_chroma_width = out_width >> 1;
+  int32_t out_chroma_height = out_height >> 1;
+  int framerate = 24;
+  int frames = 10;
+
+  int is_downscaling = out_width < in_width;
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  char out_file_name1[BUFF_SIZE];
+  char out_file_name2[BUFF_SIZE];
+  char out_file_name3[BUFF_SIZE];
+  char out_file_name4[BUFF_SIZE];
+  sprintf(out_file_name1, "Kimono1_%ix%i_%i_ref.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name2, "Kimono1_%ix%i_%i_block_char_char.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name3, "Kimono1_%ix%i_%i_block_short_short.yuv", out_width, out_height, framerate);
+  sprintf(out_file_name4, "Kimono1_%ix%i_%i_block_int_int.yuv", out_width, out_height, framerate);
+
+  FILE* out_file1 = fopen(out_file_name1, "wb");
+  FILE* out_file2 = fopen(out_file_name2, "wb");
+  FILE* out_file3 = fopen(out_file_name3, "wb");
+  FILE* out_file4 = fopen(out_file_name4, "wb");
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL || out_file1 == NULL || out_file2 == NULL || out_file3 == NULL || out_file4 == NULL) {
+    perror("File open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  opaque_yuv_buffer_t* data2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(char));
+  opaque_yuv_buffer_t* data3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, in_width, in_height, in_width, CHROMA_420, sizeof(short));
+  opaque_yuv_buffer_t* data4 = kvz_newOpaqueYuvBuffer(data->y->data, data->u->data, data->v->data, in_width, in_height, in_width, CHROMA_420, sizeof(pic_data_t));
+  yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  opaque_yuv_buffer_t* op_out1 = kvz_newOpaqueYuvBuffer(out1->y->data, out1->u->data, out1->v->data, out_width, out_height, out_width, CHROMA_420, sizeof(pic_data_t));
+  opaque_yuv_buffer_t* out2 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(char));
+  opaque_yuv_buffer_t* out3 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(short));
+  opaque_yuv_buffer_t* out4 = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, out_width, out_height, out_width, CHROMA_420, sizeof(pic_data_t));
+  int i = 0;
+
+  opaque_yuv_buffer_t* out_array[3] = { out2, out3, out4 };
+
   while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
 
     //COPY_CUSTOM(data2->y->data, data->y->data, in_width * in_height, unsigned char, pic_data_t);
@@ -1206,22 +1384,25 @@ static void opaque_validate_test()
 
     kvzScaling(data, &out1);
     
-    for (int j = sizeof(short); j <= sizeof(pic_data_t); j++)
+    for (int k = 0; k < 3; k++)
     {
-      kvzOpaqueBlockStepScaling(data2, &out2, j);
-      kvzOpaqueBlockStepScaling(data3, &out3, j);
-      kvzOpaqueBlockStepScaling(data4, &out4, j);
+      for (int j = is_downscaling ? sizeof(pic_data_t) : sizeof(short); j <= sizeof(pic_data_t); j++)
+      {
+        kvzOpaqueBlockStepScaling(data2, &out_array[k], j);
+        kvzOpaqueBlockStepScaling(data3, &out_array[(k+1)%3], j);
+        kvzOpaqueBlockStepScaling(data4, &out_array[(k+2)%3], j);
 
-      if (opaque_yuvcmp(op_out1, out2) == 0) {
-        printf("Frame %i differs in block char tmp depth %i\n", i + 1, j);
-      }
+        if (opaque_yuvcmp(op_out1, out2) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 1\n", i + 1, (k % 3) + 1, j);
+        }
 
-      if (opaque_yuvcmp(op_out1, out3) == 0) {
-        printf("Frame %i differs in block short tmp depth %i\n", i + 1, j);
-      }
+        if (opaque_yuvcmp(op_out1, out3) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 2\n", i + 1, (k + 1) % 3 + 1, j);
+        }
 
-      if (opaque_yuvcmp(op_out1, out4) == 0) {
-        printf("Frame %i differs in block int tmp depth %i\n", i + 1, j);
+        if (opaque_yuvcmp(op_out1, out4) == 0) {
+          printf("Frame %i differs. In depth %i, tmp depth %i, out depth 3\n", i + 1, (k + 2) % 3 + 1, j);
+        }
       }
     }
     //yuv_io_write(out_file1, out1, out1->y->width, out1->y->height);
@@ -1312,7 +1493,7 @@ int main()
 {
   //vscaling();
   //validate_test3();
-  opaque_validate_test();
+  opaque_validate_test_avx2();
   //int r = test_avx();
   //printf("%d", r);
 
