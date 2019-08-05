@@ -2649,6 +2649,12 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
   __m256i data0[2], data1[2], filter0[2], filter1[2];
   __m128i filter_res_temp[4] = { _mm_setzero_si128(), _mm_setzero_si128(), _mm_setzero_si128(), _mm_setzero_si128() };
 
+    __m256i phase_epi32 = zero;
+    __m256i ref_pos_epi32 = zero;
+
+    const unsigned *phase = (unsigned*)&phase_epi32;
+    const unsigned *ref_pos = (unsigned*)&ref_pos_epi32;
+
   //Do resampling (vertical/horizontal) of the specified block into trgt_buffer using src_buffer
   for (int y = block_y; y < y_bound; y++) {
 
@@ -2656,12 +2662,7 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
     uint8_t* trgt_row = &((uint8_t *)(trgt_buffer->data))[(y * trgt_buffer->stride + trgt_offset)];
     const unsigned loop_ind_outer = (y - block_y) % 8;
 
-    __m256i filter_res_epi32 = zero;
-    __m256i phase_epi32 = zero;
-    __m256i ref_pos_epi32 = zero;
-
-    const unsigned *phase = (unsigned*)&phase_epi32;
-    const unsigned *ref_pos = (unsigned*)&ref_pos_epi32;
+    __m256i filter_res_epi32;
 
     //Calculate reference position in src pic (vertical resampling)
     //Pre-calculate for 8 pos at a time
@@ -2678,8 +2679,7 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
 
     //Pre-processing step
     //  Load filter coeffs (vertical)
-    __m256i temp_filter = _mm256_loadu2_m128i((__m128i*)&getFilterCoeff(filter, filter_size, phase[loop_ind_outer], 0),
-                                              (__m128i*)&getFilterCoeff(filter, filter_size, phase[loop_ind_outer], 0));
+    __m256i temp_filter = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)&getFilterCoeff(filter, filter_size, phase[loop_ind_outer], 0)));
 
     filter0[0] = _mm256_shuffle_epi32(temp_filter, /*0000 0000*/0x00);
     filter1[0] = _mm256_shuffle_epi32(temp_filter, /*0101 0101*/0x55);
@@ -2711,11 +2711,11 @@ static void opaqueResampleBlockStep_avx2_vertical_16to8bit_filterSize_8_4(const 
         //Load data
         const unsigned *sample_pos = (unsigned*)&sample_pos_epi32;
 
-        //Data gets loaded in order |p7_1 p6_1 p5_1 p4_1|p3_1 p2_1 p1_1 p0_1|p7_0 p6_0 p5_0 p4_0 p3_0 p2_0 p1_0 p0_0| etc.
-        temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 0]], (__m128i*)&src[sample_pos[f_ind + 1]]);
-        temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 2]], (__m128i*)&src[sample_pos[f_ind + 3]]);
+        //Data gets loaded in order |p7_1 p6_1 p5_1 p4_1 p3_1 p2_1 p1_1 p0_1|p7_0 p6_0 p5_0 p4_0 p3_0 p2_0 p1_0 p0_0| etc.
+        temp_mem[f_ind + 0] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 1]], (__m128i*)&src[sample_pos[f_ind + 0]]);
+        temp_mem[f_ind + 1] = _mm256_loadu2_m128i((__m128i*)&src[sample_pos[f_ind + 3]], (__m128i*)&src[sample_pos[f_ind + 2]]);
 
-        //pack and re-order data to |p7_1 p7_0 p6_1 p6_0 p5_1 p5_0 p4_1 p4_0|...| etc.
+        //re-order data to |p7_1 p7_0 p6_1 p6_0 p5_1 p5_0 p4_1 p4_0|...| etc.
         data0[filter_part] = _mm256_shuffle_epi8(_mm256_permutevar8x32_epi32(temp_mem[f_ind + 0], epi32_permute_mask), epi16_interleave_mask);
         data1[filter_part] = _mm256_shuffle_epi8(_mm256_permutevar8x32_epi32(temp_mem[f_ind + 1], epi32_permute_mask), epi16_interleave_mask);
       }
@@ -2936,10 +2936,10 @@ static void opaqueResampleBlockStep_avx2_vertical(const opaque_pic_buffer_t* con
           _mm256_storeu_n_epi8((uint8_t*)VOID_INDEX(trgt_row, x, trgt_buffer->depth), _mm256_castsi128_si256(filter_res_epi8), t_num);
           break;
 
-      default:
-        //Not a supported depth
-        assert(0);
-        break;
+        default:
+          //Not a supported depth
+          assert(0);
+          break;
       }
     }
   }
@@ -2961,7 +2961,7 @@ static void opaqueResampleBlockStep_avx2_vertical(const opaque_pic_buffer_t* con
 //
 static __m256i apply_filter_4x8_quad_epi8_epi16(const __m256i data0, const __m256i data1, const __m256i data2, const __m256i data3, const __m256i filter0, const __m256i filter1, const __m256i filter2, const __m256i filter3)
 {
-  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0B0A, 0x0F0E, 0x0908, 0x0D0C, 0x0504, 0x0706, 0x0100, 0x0302));
+  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0D0C, 0x0F0E, 0x0908, 0x0B0A, 0x0504, 0x0706, 0x0100, 0x0302));
   const __m256i shuffle_mask2 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0706, 0x0D0C, 0x0504, 0x0B0A, 0x0302, 0x0908, 0x0100));
 
   //Filtering done eight taps at a time for four pixels, so repeate until desired number of taps performed
@@ -3004,7 +3004,7 @@ static __m256i apply_filter_4x8_quad_epi8_epi16(const __m256i data0, const __m25
 //
 static __m256i apply_filter_8x4_dual_epi8_epi16(const __m256i data0, const __m256i data1, const __m256i filter0, const __m256i filter1)
 {
-  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0B0A, 0x0F0E, 0x0908, 0x0D0C, 0x0504, 0x0706, 0x0100, 0x0302));
+  const __m256i shuffle_mask1 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0D0C, 0x0F0E, 0x0908, 0x0B0A, 0x0504, 0x0706, 0x0100, 0x0302));
   const __m256i shuffle_mask2 = _mm256_broadcastsi128_si256(_mm_set_epi16(0x0F0E, 0x0B0A, 0x0706, 0x0302, 0x0D0C, 0x0908, 0x0504, 0x0100));
 
   //Multiply samples by coeffs and first add
