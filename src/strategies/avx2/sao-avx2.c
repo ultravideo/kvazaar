@@ -170,42 +170,35 @@ static INLINE __m128i truncate_epi32_epi8(const __m128i v)
   return        sbs_8;
 }
 
-static INLINE __m256i do_one_edge_ymm(const __m256i a,
-                                      const __m256i b,
-                                      const __m256i c,
-                                      const __m256i orig,
-                                      const __m256i badbyte_mask,
-                                      const __m256i offsets_256)
+// Used for edge_ddistortion and band_ddistortion
+static __m256i calc_diff_off_delta(const __m256i diff_lo,
+                                   const __m256i diff_hi,
+                                   const __m256i offsets,
+                                   const __m256i orig)
 {
-  const __m256i negate_hiword = _mm256_set1_epi32(0xffff0001);
   const __m256i zero          = _mm256_setzero_si256();
+  const __m256i negate_hiword = _mm256_set1_epi32(0xffff0001);
 
-  __m256i eo_cat = calc_eo_cat(a, b, c);
-          eo_cat = _mm256_or_si256    (eo_cat,      badbyte_mask);
-  __m256i offset = _mm256_shuffle_epi8(offsets_256, eo_cat);
+  __m256i orig_lo, orig_hi, offsets_lo, offsets_hi;
 
-  __m256i offset_lo, offset_hi;
-  cvt_epi8_epi16(offset, &offset_lo, &offset_hi);
+  cvt_epu8_epi16(orig,    &orig_lo,    &orig_hi);
+  cvt_epi8_epi16(offsets, &offsets_lo, &offsets_hi);
 
-  __m256i diff_lo, diff_hi;
-  diff_epi8_epi16(orig, c, &diff_lo, &diff_hi);
+  __m256i offsets_0_lo = _mm256_cmpeq_epi16   (offsets_lo,   zero);
+  __m256i offsets_0_hi = _mm256_cmpeq_epi16   (offsets_hi,   zero);
 
-  __m256i offset_lo_z  = _mm256_cmpeq_epi16   (offset_lo,    zero);
-  __m256i offset_hi_z  = _mm256_cmpeq_epi16   (offset_hi,    zero);
+  __m256i delta_lo     = _mm256_sub_epi16     (diff_lo,      offsets_lo);
+  __m256i delta_hi     = _mm256_sub_epi16     (diff_hi,      offsets_hi);
 
-  __m256i delta_lo     = _mm256_sub_epi16     (diff_lo,      offset_lo);
-  __m256i delta_hi     = _mm256_sub_epi16     (diff_hi,      offset_hi);
+  __m256i diff_lo_m    = _mm256_andnot_si256  (offsets_0_lo, diff_lo);
+  __m256i diff_hi_m    = _mm256_andnot_si256  (offsets_0_hi, diff_hi);
+  __m256i delta_lo_m   = _mm256_andnot_si256  (offsets_0_lo, delta_lo);
+  __m256i delta_hi_m   = _mm256_andnot_si256  (offsets_0_hi, delta_hi);
 
-          diff_lo      = _mm256_andnot_si256  (offset_lo_z,  diff_lo);
-          diff_hi      = _mm256_andnot_si256  (offset_hi_z,  diff_hi);
-
-          delta_lo     = _mm256_andnot_si256  (offset_lo_z,  delta_lo);
-          delta_hi     = _mm256_andnot_si256  (offset_hi_z,  delta_hi);
-
-  __m256i dd0_lo       = _mm256_unpacklo_epi16(delta_lo,     diff_lo);
-  __m256i dd0_hi       = _mm256_unpackhi_epi16(delta_lo,     diff_lo);
-  __m256i dd1_lo       = _mm256_unpacklo_epi16(delta_hi,     diff_hi);
-  __m256i dd1_hi       = _mm256_unpackhi_epi16(delta_hi,     diff_hi);
+  __m256i dd0_lo       = _mm256_unpacklo_epi16(delta_lo_m,   diff_lo_m);
+  __m256i dd0_hi       = _mm256_unpackhi_epi16(delta_lo_m,   diff_lo_m);
+  __m256i dd1_lo       = _mm256_unpacklo_epi16(delta_hi_m,   diff_hi_m);
+  __m256i dd1_hi       = _mm256_unpackhi_epi16(delta_hi_m,   diff_hi_m);
 
   __m256i dd0_lo_n     = _mm256_sign_epi16    (dd0_lo,       negate_hiword);
   __m256i dd0_hi_n     = _mm256_sign_epi16    (dd0_hi,       negate_hiword);
@@ -219,9 +212,27 @@ static INLINE __m256i do_one_edge_ymm(const __m256i a,
 
   __m256i sum0         = _mm256_add_epi32     (sum0_lo,      sum0_hi);
   __m256i sum1         = _mm256_add_epi32     (sum1_lo,      sum1_hi);
-  __m256i curr_sum     = _mm256_add_epi32     (sum0,         sum1);
+  return                 _mm256_add_epi32     (sum0,         sum1);
+}
 
-  return curr_sum;
+static INLINE __m256i do_one_edge_ymm(const __m256i a,
+                                      const __m256i b,
+                                      const __m256i c,
+                                      const __m256i orig,
+                                      const __m256i badbyte_mask,
+                                      const __m256i offsets_256)
+{
+  __m256i eo_cat = calc_eo_cat(a, b, c);
+          eo_cat = _mm256_or_si256    (eo_cat,      badbyte_mask);
+  __m256i offset = _mm256_shuffle_epi8(offsets_256, eo_cat);
+
+  __m256i offset_lo, offset_hi;
+  cvt_epi8_epi16(offset, &offset_lo, &offset_hi);
+
+  __m256i diff_lo, diff_hi;
+  diff_epi8_epi16(orig, c, &diff_lo, &diff_hi);
+
+  return calc_diff_off_delta(diff_lo, diff_hi, offset, orig);
 }
 
 static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
@@ -255,13 +266,14 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
 
   assert(NUM_SAO_EDGE_CATEGORIES == 5);
 
-  if (offsets_ok != 0xffff)
+  if (offsets_ok != 0xffff) {
     return sao_edge_ddistortion_generic(orig_data,
                                         rec_data,
                                         block_width,
                                         block_height,
                                         eo_class,
                                         offsets);
+  }
 
   __m128i offsets03_8b = truncate_epi32_epi8        (offsets03);
   __m128i offsets4_8b  = truncate_epi32_epi8        (offsets4);
@@ -861,7 +873,6 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
 
   const __m256i zero          = _mm256_setzero_si256();
   const __m256i threes        = _mm256_set1_epi8 (3);
-  const __m256i negate_hiword = _mm256_set1_epi32(0xffff0001);
 
   __m256i sum = _mm256_setzero_si256();
   for (uint32_t y = 0; y < block_height; y++) {
@@ -874,6 +885,9 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
       __m256i orig_lo, orig_hi, rd_lo, rd_hi;
       cvt_epu8_epi16(orig, &orig_lo, &orig_hi);
       cvt_epu8_epi16(rd,   &rd_lo,   &rd_hi);
+
+      __m256i diff_lo      = _mm256_sub_epi16     (orig_lo,      rd_lo);
+      __m256i diff_hi      = _mm256_sub_epi16     (orig_hi,      rd_hi);
 
       // The shift will clamp band to 0...31; band_pos on the other
       // hand is always between 0...32, so band will be -1...31. Anything
@@ -890,43 +904,8 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
 
       __m256i offsets      = _mm256_shuffle_epi8 (sb_256,        band);
 
-      __m256i offsets_lo, offsets_hi;
-      cvt_epi8_epi16(offsets, &offsets_lo, &offsets_hi);
-
-      __m256i offsets_0_lo = _mm256_cmpeq_epi16   (offsets_lo,   zero);
-      __m256i offsets_0_hi = _mm256_cmpeq_epi16   (offsets_hi,   zero);
-
-      __m256i diff_lo      = _mm256_sub_epi16     (orig_lo,      rd_lo);
-      __m256i diff_hi      = _mm256_sub_epi16     (orig_hi,      rd_hi);
-
-      __m256i delta_lo     = _mm256_sub_epi16     (diff_lo,      offsets_lo);
-      __m256i delta_hi     = _mm256_sub_epi16     (diff_hi,      offsets_hi);
-
-              diff_lo      = _mm256_andnot_si256  (offsets_0_lo, diff_lo);
-              diff_hi      = _mm256_andnot_si256  (offsets_0_hi, diff_hi);
-              delta_lo     = _mm256_andnot_si256  (offsets_0_lo, delta_lo);
-              delta_hi     = _mm256_andnot_si256  (offsets_0_hi, delta_hi);
-
-      __m256i dd0_lo       = _mm256_unpacklo_epi16(delta_lo,     diff_lo);
-      __m256i dd0_hi       = _mm256_unpackhi_epi16(delta_lo,     diff_lo);
-      __m256i dd1_lo       = _mm256_unpacklo_epi16(delta_hi,     diff_hi);
-      __m256i dd1_hi       = _mm256_unpackhi_epi16(delta_hi,     diff_hi);
-
-      __m256i dd0_lo_n     = _mm256_sign_epi16    (dd0_lo,       negate_hiword);
-      __m256i dd0_hi_n     = _mm256_sign_epi16    (dd0_hi,       negate_hiword);
-      __m256i dd1_lo_n     = _mm256_sign_epi16    (dd1_lo,       negate_hiword);
-      __m256i dd1_hi_n     = _mm256_sign_epi16    (dd1_hi,       negate_hiword);
-
-      __m256i sum0_lo      = _mm256_madd_epi16    (dd0_lo,       dd0_lo_n);
-      __m256i sum0_hi      = _mm256_madd_epi16    (dd0_hi,       dd0_hi_n);
-      __m256i sum1_lo      = _mm256_madd_epi16    (dd1_lo,       dd1_lo_n);
-      __m256i sum1_hi      = _mm256_madd_epi16    (dd1_hi,       dd1_hi_n);
-
-      __m256i sum0         = _mm256_add_epi32     (sum0_lo,      sum0_hi);
-      __m256i sum1         = _mm256_add_epi32     (sum1_lo,      sum1_hi);
-      __m256i curr_sum     = _mm256_add_epi32     (sum0,         sum1);
-
-              sum          = _mm256_add_epi32     (sum,          curr_sum);
+      __m256i curr_sum     = calc_diff_off_delta (diff_lo, diff_hi, offsets, orig);
+              sum          = _mm256_add_epi32    (sum,          curr_sum);
     }
   }
   return hsum_8x32b(sum);
