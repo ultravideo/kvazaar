@@ -296,8 +296,8 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
               sum    = _mm256_add_epi32(sum, curr);
     }
     if (scan_width > width_db32) {
-      const uint32_t curr_cpos   =  y           * block_width + x;
-      const uint32_t rest_cpos   =  y           * block_width + width_db4 + 1;
+      const uint32_t curr_cpos   =  y            * block_width + x;
+      const uint32_t rest_cpos   =  y            * block_width + width_db4 + 1;
 
       const  int32_t curr_apos   = (y + a_ofs.y) * block_width + x + a_ofs.x;
       const  int32_t rest_apos   = (y + a_ofs.y) * block_width + width_db4 + a_ofs.x + 1;
@@ -396,11 +396,6 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
-  int32_t a_xoff      = a_ofs.x;
-  int32_t a_yoff      = a_ofs.y;
-  int32_t b_xoff      = b_ofs.x;
-  int32_t b_yoff      = b_ofs.y;
-
   int32_t *diff_sum   = cat_sum_cnt[0];
   int32_t *hit_cnt    = cat_sum_cnt[1];
 
@@ -421,9 +416,9 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
   int32_t y, x;
   for (y = 1; y < block_height - 1; y++) {
     for (x = 1; x < width_db32 + 1; x += 32) {
-      const uint32_t a_off = (y + a_yoff) * block_width + x + a_xoff;
-      const uint32_t b_off = (y + b_yoff) * block_width + x + b_xoff;
-      const uint32_t c_off =  y           * block_width + x;
+      const uint32_t a_off = (y + a_ofs.y) * block_width + x + a_ofs.x;
+      const uint32_t b_off = (y + b_ofs.y) * block_width + x + b_ofs.x;
+      const uint32_t c_off =  y            * block_width + x;
 
       __m256i a      = _mm256_loadu_si256((const __m256i *)(rec_data  + a_off));
       __m256i b      = _mm256_loadu_si256((const __m256i *)(rec_data  + b_off));
@@ -433,14 +428,14 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
       calc_edge_dir_one_ymm(a, b, c, orig, zero, diff_accum, hit_cnt);
     }
     if (scan_width > width_db32) {
-      const uint32_t curr_cpos   =  y           * block_width + x;
-      const uint32_t rest_cpos   =  y           * block_width + width_db4 + 1;
+      const uint32_t curr_cpos   =  y            * block_width + x;
+      const uint32_t rest_cpos   =  y            * block_width + width_db4 + 1;
 
-      const  int32_t curr_apos   = (y + a_yoff) * block_width + x + a_xoff;
-      const  int32_t rest_apos   = (y + a_yoff) * block_width + width_db4 + a_xoff + 1;
+      const  int32_t curr_apos   = (y + a_ofs.y) * block_width + x + a_ofs.x;
+      const  int32_t rest_apos   = (y + a_ofs.y) * block_width + width_db4 + a_ofs.x + 1;
 
-      const  int32_t curr_bpos   = (y + b_yoff) * block_width + x + b_xoff;
-      const  int32_t rest_bpos   = (y + b_yoff) * block_width + width_db4 + b_xoff + 1;
+      const  int32_t curr_bpos   = (y + b_ofs.y) * block_width + x + b_ofs.x;
+      const  int32_t rest_bpos   = (y + b_ofs.y) * block_width + width_db4 + b_ofs.x + 1;
 
       // Same trick to read a narrow line as there is in the band SAO routine
       uint32_t a_last = 0, b_last = 0, c_last = 0, orig_last = 0;
@@ -684,7 +679,7 @@ static __m256i do_one_nonband_ymm(const __m256i a,
                                   const __m256i c,
                                   const __m256i sao_offs)
 {
-  const __m256i   zero    = _mm256_setzero_si256();
+  const __m256i zero = _mm256_setzero_si256();
 
   __m256i eo_cat = calc_eo_cat(a, b, c);
   __m256i eo_cat_lo, eo_cat_hi, c_lo, c_hi;
@@ -718,12 +713,6 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
   const vector2d_t a_ofs       = g_sao_edge_offsets[sao->eo_class][0];
   const vector2d_t b_ofs       = g_sao_edge_offsets[sao->eo_class][1];
 
-  // All limited to [-1, 1]
-  const int32_t    a_xoff      = a_ofs.x;
-  const int32_t    a_yoff      = a_ofs.y;
-  const int32_t    b_xoff      = b_ofs.x;
-  const int32_t    b_yoff      = b_ofs.y;
-
   const uint32_t   width_db32  = block_width & ~31;
   const uint32_t   width_db4   = block_width &  ~3;
   const uint32_t   width_rest  = block_width &   3;
@@ -749,8 +738,8 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
 
       // TODO: these will go negative, but that's a defect of the original
       // code already since 2013 (98f2a1aedc5f4933c2729ae15412549dea9e5549)
-      const int32_t   a_pos   = (y + a_yoff) * stride + x + a_xoff;
-      const int32_t   b_pos   = (y + b_yoff) * stride + x + b_xoff;
+      const int32_t   a_pos   = (y + a_ofs.y) * stride + x + a_ofs.x;
+      const int32_t   b_pos   = (y + b_ofs.y) * stride + x + b_ofs.x;
 
       __m256i a = _mm256_loadu_si256((const __m256i *)(rec_data + a_pos));
       __m256i b = _mm256_loadu_si256((const __m256i *)(rec_data + b_pos));
@@ -760,14 +749,14 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
       _mm256_storeu_si256((__m256i *)(new_rec_data + dst_pos), res);
     }
     if (block_width > width_db32) {
-      const uint32_t curr_srcpos = y * stride + x;
-      const uint32_t rest_srcpos = y * stride + width_db4;
+      const uint32_t curr_srcpos =  y            * stride + x;
+      const uint32_t rest_srcpos =  y            * stride + width_db4;
 
-      const  int32_t curr_apos   = (y + a_yoff) * stride + a_xoff + x;
-      const  int32_t rest_apos   = (y + a_yoff) * stride + a_xoff + width_db4;
+      const  int32_t curr_apos   = (y + a_ofs.y) * stride + a_ofs.x + x;
+      const  int32_t rest_apos   = (y + a_ofs.y) * stride + a_ofs.x + width_db4;
 
-      const  int32_t curr_bpos   = (y + b_yoff) * stride + b_xoff + x;
-      const  int32_t rest_bpos   = (y + b_yoff) * stride + b_xoff + width_db4;
+      const  int32_t curr_bpos   = (y + b_ofs.y) * stride + b_ofs.x + x;
+      const  int32_t rest_bpos   = (y + b_ofs.y) * stride + b_ofs.x + width_db4;
 
       const uint32_t curr_dstpos = y * new_stride + x;
       const uint32_t rest_dstpos = y * new_stride + width_db4;
