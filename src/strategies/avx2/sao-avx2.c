@@ -170,6 +170,32 @@ static INLINE __m128i truncate_epi32_epi8(const __m128i v)
   return        sbs_8;
 }
 
+// Read 0-3 bytes (pixels) into uint32_t
+static INLINE uint32_t load_border_bytes(const uint8_t *buf,
+                                         const int32_t  start_pos,
+                                         const int32_t  width_rest)
+{
+  uint32_t last_dword = 0;
+  for (int32_t i = 0; i < width_rest; i++) {
+    uint8_t  currb = buf[start_pos + i];
+    uint32_t currd = ((uint32_t)currb) << (i * 8);
+    last_dword |= currd;
+  }
+  return last_dword;
+}
+
+static INLINE void store_border_bytes(      uint8_t  *buf,
+                                      const uint32_t  start_pos,
+                                      const int32_t   width_rest,
+                                            uint32_t  data)
+{
+  for (uint32_t i = 0; i < width_rest; i++) {
+    uint8_t currb = data & 0xff;
+    buf[start_pos + i] = currb;
+    data >>= 8;
+  }
+}
+
 // Used for edge_ddistortion and band_ddistortion
 static __m256i calc_diff_off_delta(const __m256i diff_lo,
                                    const __m256i diff_hi,
@@ -306,23 +332,10 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
       const  int32_t rest_bpos   = (y + b_ofs.y) * block_width + width_db4 + b_ofs.x + 1;
 
       // Same trick to read a narrow line as there is in the band SAO routine
-      uint32_t a_last = 0, b_last = 0, c_last = 0, orig_last = 0;
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t  currb_a    =  rec_data[rest_apos + (int32_t)i];
-        uint8_t  currb_b    =  rec_data[rest_bpos + (int32_t)i];
-        uint8_t  currb_c    =  rec_data[rest_cpos + (int32_t)i];
-        uint8_t  currb_orig = orig_data[rest_cpos + (int32_t)i];
-
-        uint32_t currd_a    = ((uint32_t)currb_a)    << (i * 8);
-        uint32_t currd_b    = ((uint32_t)currb_b)    << (i * 8);
-        uint32_t currd_c    = ((uint32_t)currb_c)    << (i * 8);
-        uint32_t currd_orig = ((uint32_t)currb_orig) << (i * 8);
-
-        a_last    |= currd_a;
-        b_last    |= currd_b;
-        c_last    |= currd_c;
-        orig_last |= currd_orig;
-      }
+      uint32_t a_last         = load_border_bytes(rec_data,  rest_apos, width_rest);
+      uint32_t b_last         = load_border_bytes(rec_data,  rest_bpos, width_rest);
+      uint32_t c_last         = load_border_bytes(rec_data,  rest_cpos, width_rest);
+      uint32_t orig_last      = load_border_bytes(orig_data, rest_cpos, width_rest);
 
       const int32_t *a_ptr    = (const int32_t *)(rec_data  + curr_apos);
       const int32_t *b_ptr    = (const int32_t *)(rec_data  + curr_bpos);
@@ -437,29 +450,15 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
       const  int32_t curr_bpos   = (y + b_ofs.y) * block_width + x + b_ofs.x;
       const  int32_t rest_bpos   = (y + b_ofs.y) * block_width + width_db4 + b_ofs.x + 1;
 
-      // Same trick to read a narrow line as there is in the band SAO routine
-      uint32_t a_last = 0, b_last = 0, c_last = 0, orig_last = 0;
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t  currb_a    =  rec_data[rest_apos + (int32_t)i];
-        uint8_t  currb_b    =  rec_data[rest_bpos + (int32_t)i];
-        uint8_t  currb_c    =  rec_data[rest_cpos + (int32_t)i];
-        uint8_t  currb_orig = orig_data[rest_cpos + (int32_t)i];
+            uint32_t a_last      = load_border_bytes(rec_data,  rest_apos, width_rest);
+            uint32_t b_last      = load_border_bytes(rec_data,  rest_bpos, width_rest);
+            uint32_t c_last      = load_border_bytes(rec_data,  rest_cpos, width_rest);
+            uint32_t orig_last   = load_border_bytes(orig_data, rest_cpos, width_rest);
 
-        uint32_t currd_a    = ((uint32_t)currb_a)    << (i * 8);
-        uint32_t currd_b    = ((uint32_t)currb_b)    << (i * 8);
-        uint32_t currd_c    = ((uint32_t)currb_c)    << (i * 8);
-        uint32_t currd_orig = ((uint32_t)currb_orig) << (i * 8);
-
-        a_last    |= currd_a;
-        b_last    |= currd_b;
-        c_last    |= currd_c;
-        orig_last |= currd_orig;
-      }
-
-      const int32_t *a_ptr    = (const int32_t *)(rec_data  + curr_apos);
-      const int32_t *b_ptr    = (const int32_t *)(rec_data  + curr_bpos);
-      const int32_t *c_ptr    = (const int32_t *)(rec_data  + curr_cpos);
-      const int32_t *orig_ptr = (const int32_t *)(orig_data + curr_cpos);
+      const int32_t *a_ptr       = (const int32_t *)(rec_data  + curr_apos);
+      const int32_t *b_ptr       = (const int32_t *)(rec_data  + curr_bpos);
+      const int32_t *c_ptr       = (const int32_t *)(rec_data  + curr_cpos);
+      const int32_t *orig_ptr    = (const int32_t *)(orig_data + curr_cpos);
 
       __m256i a    = _mm256_maskload_epi32(a_ptr,    db4_mask);
       __m256i b    = _mm256_maskload_epi32(b_ptr,    db4_mask);
@@ -649,12 +648,8 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
       // that particular place can never be loaded into by the maskmove
       // (otherwise that vector would go through the divisible-by-32 code
       // path).
-      uint32_t last_dword = 0;
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t  currb = rec_data[rest_srcpos + i];
-        uint32_t currd = ((uint32_t)currb) << (i * 8);
-        last_dword |= currd;
-      }
+      uint32_t last_dword = load_border_bytes(rec_data, rest_srcpos, width_rest);
+
       const int32_t *src_ptr = (const int32_t *)(    rec_data + curr_srcpos);
             int32_t *dst_ptr = (      int32_t *)(new_rec_data + curr_dstpos);
 
@@ -665,11 +660,7 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
       _mm256_maskstore_epi32(dst_ptr, db4_mask, result);
       uint32_t last_dword_dst = _mm256_extract_epi32(result, 7);
 
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t currb = last_dword_dst & 0xff;
-        new_rec_data[rest_dstpos + i] = currb;
-        last_dword_dst >>= 8;
-      }
+      store_border_bytes(new_rec_data, rest_dstpos, width_rest, last_dword_dst);
     }
   }
 }
@@ -761,21 +752,10 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
       const uint32_t curr_dstpos = y * new_stride + x;
       const uint32_t rest_dstpos = y * new_stride + width_db4;
 
-      // Same trick to read a narrow line as there is in the band SAO routine
-      uint32_t a_last = 0, b_last = 0, c_last = 0;
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t  currb_a = rec_data[rest_apos   + (int32_t)i];
-        uint8_t  currb_b = rec_data[rest_bpos   + (int32_t)i];
-        uint8_t  currb_c = rec_data[rest_srcpos + (int32_t)i];
+      uint32_t a_last        = load_border_bytes(rec_data, rest_apos,   width_rest);
+      uint32_t b_last        = load_border_bytes(rec_data, rest_bpos,   width_rest);
+      uint32_t c_last        = load_border_bytes(rec_data, rest_srcpos, width_rest);
 
-        uint32_t currd_a = ((uint32_t)currb_a) << (i * 8);
-        uint32_t currd_b = ((uint32_t)currb_b) << (i * 8);
-        uint32_t currd_c = ((uint32_t)currb_c) << (i * 8);
-
-        a_last |= currd_a;
-        b_last |= currd_b;
-        c_last |= currd_c;
-      }
       const int32_t   *a_ptr = (const int32_t *)(    rec_data + curr_apos);
       const int32_t   *b_ptr = (const int32_t *)(    rec_data + curr_bpos);
       const int32_t   *c_ptr = (const int32_t *)(    rec_data + curr_srcpos);
@@ -794,11 +774,7 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
 
       uint32_t last_dword = _mm256_extract_epi32(res, 7);
 
-      for (uint32_t i = 0; i < width_rest; i++) {
-        uint8_t currb = last_dword & 0xff;
-        new_rec_data[rest_dstpos + i] = currb;
-        last_dword >>= 8;
-      }
+      store_border_bytes(new_rec_data, rest_dstpos, width_rest, last_dword);
     }
   }
 }
