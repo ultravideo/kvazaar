@@ -24,7 +24,8 @@
 #include <immintrin.h>
 #include <nmmintrin.h>
 
-#include "strategies/generic/sao_band_ddistortion.h"
+// Use a couple generic functions from here as a worst-case fallback
+#include "strategies/generic/sao_shared_generics.h"
 #include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
@@ -147,93 +148,196 @@ static INLINE void cvt_shufmask_epi8_epi16(const __m256i  v,
           *res_hi    = _mm256_unpackhi_epi8(v_lobytes, v_hibytes);
 }
 
-/*
-static int sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
- const kvz_pixel *rec_data,
- int block_width,
- int block_height,
- int eo_class,
- int offsets[NUM_SAO_EDGE_CATEGORIES])
+// Check if all 4 dwords of v are in [-128, 127] and can be truncated to
+// 8 bits each. Returns -1 if everything is fine
+static INLINE uint16_t epi32v_fits_in_epi8s(const __m128i v)
 {
-  int y, x;
+  // Compare most significant 25 bits of SAO bands to the sign bit to assert
+  // that the i32's are between -128 and 127 (only comparing 24 would fail to
+  // detect values of 128...255)
+  __m128i  v_ms25b = _mm_srai_epi32   (v,  7);
+  __m128i  v_signs = _mm_srai_epi32   (v, 31);
+  __m128i  ok_i32s = _mm_cmpeq_epi32  (v_ms25b, v_signs);
+  return             _mm_movemask_epi8(ok_i32s);
+}
+
+static INLINE __m128i truncate_epi32_epi8(const __m128i v)
+{
+  // LSBs of each dword, the values values must fit in 8 bits anyway for
+  // what this intended for (use epi32v_fits_in_epi8s to check if needed)
+  const __m128i trunc_shufmask = _mm_set1_epi32  (0x0c080400);
+        __m128i sbs_8          = _mm_shuffle_epi8(v, trunc_shufmask);
+  return        sbs_8;
+}
+
+static INLINE __m256i do_one_edge_ymm(const __m256i a,
+                                      const __m256i b,
+                                      const __m256i c,
+                                      const __m256i orig,
+                                      const __m256i badbyte_mask,
+                                      const __m256i offsets_256)
+{
+  const __m256i negate_hiword = _mm256_set1_epi32(0xffff0001);
+  const __m256i zero          = _mm256_setzero_si256();
+
+  __m256i eo_cat = calc_eo_cat(a, b, c);
+          eo_cat = _mm256_or_si256    (eo_cat,      badbyte_mask);
+  __m256i offset = _mm256_shuffle_epi8(offsets_256, eo_cat);
+
+  __m256i offset_lo, offset_hi;
+  cvt_epi8_epi16(offset, &offset_lo, &offset_hi);
+
+  __m256i diff_lo, diff_hi;
+  diff_epi8_epi16(orig, c, &diff_lo, &diff_hi);
+
+  __m256i offset_lo_z  = _mm256_cmpeq_epi16   (offset_lo,    zero);
+  __m256i offset_hi_z  = _mm256_cmpeq_epi16   (offset_hi,    zero);
+
+  __m256i delta_lo     = _mm256_sub_epi16     (diff_lo,      offset_lo);
+  __m256i delta_hi     = _mm256_sub_epi16     (diff_hi,      offset_hi);
+
+          diff_lo      = _mm256_andnot_si256  (offset_lo_z,  diff_lo);
+          diff_hi      = _mm256_andnot_si256  (offset_hi_z,  diff_hi);
+
+          delta_lo     = _mm256_andnot_si256  (offset_lo_z,  delta_lo);
+          delta_hi     = _mm256_andnot_si256  (offset_hi_z,  delta_hi);
+
+  __m256i dd0_lo       = _mm256_unpacklo_epi16(delta_lo,     diff_lo);
+  __m256i dd0_hi       = _mm256_unpackhi_epi16(delta_lo,     diff_lo);
+  __m256i dd1_lo       = _mm256_unpacklo_epi16(delta_hi,     diff_hi);
+  __m256i dd1_hi       = _mm256_unpackhi_epi16(delta_hi,     diff_hi);
+
+  __m256i dd0_lo_n     = _mm256_sign_epi16    (dd0_lo,       negate_hiword);
+  __m256i dd0_hi_n     = _mm256_sign_epi16    (dd0_hi,       negate_hiword);
+  __m256i dd1_lo_n     = _mm256_sign_epi16    (dd1_lo,       negate_hiword);
+  __m256i dd1_hi_n     = _mm256_sign_epi16    (dd1_hi,       negate_hiword);
+
+  __m256i sum0_lo      = _mm256_madd_epi16    (dd0_lo,       dd0_lo_n);
+  __m256i sum0_hi      = _mm256_madd_epi16    (dd0_hi,       dd0_hi_n);
+  __m256i sum1_lo      = _mm256_madd_epi16    (dd1_lo,       dd1_lo_n);
+  __m256i sum1_hi      = _mm256_madd_epi16    (dd1_hi,       dd1_hi_n);
+
+  __m256i sum0         = _mm256_add_epi32     (sum0_lo,      sum0_hi);
+  __m256i sum1         = _mm256_add_epi32     (sum1_lo,      sum1_hi);
+  __m256i curr_sum     = _mm256_add_epi32     (sum0,         sum1);
+
+  return curr_sum;
+}
+
+static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
+                                         const kvz_pixel *rec_data,
+                                               int32_t    block_width,
+                                               int32_t    block_height,
+                                               int32_t    eo_class,
+                                         const int32_t    offsets[NUM_SAO_EDGE_CATEGORIES])
+{
+  int32_t y, x;
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
-  __m256i offsets_epi32 = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*) offsets)), _mm_insert_epi32(_mm_setzero_si128(), offsets[4], 0), 1);
-  __m256i tmp_diff_epi32;
-  __m256i tmp_sum_epi32 = _mm256_setzero_si256();
-  __m256i tmp_offset_epi32;
-  __m256i tmp1_vec_epi32;
-  __m256i tmp2_vec_epi32;
+   int32_t scan_width = block_width -   2;
+  uint32_t width_db32 = scan_width  & ~31;
+  uint32_t width_db4  = scan_width  &  ~3;
+  uint32_t width_rest = scan_width  &   3;
 
-  int sum = 0;
-  for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 8; x+=8) {
-      const kvz_pixel *c_data = &rec_data[y * block_width + x];
+  // Form the load&store mask
+  const __m256i wdb4_256      = _mm256_set1_epi32 (width_db4 & 31);
+  const __m256i indexes       = _mm256_setr_epi32 (3, 7, 11, 15, 19, 23, 27, 31);
+  const __m256i db4_mask      = _mm256_cmpgt_epi32(wdb4_256, indexes);
 
-      __m128i vector_a_epi8 = _mm_loadl_epi64((__m128i*)&c_data[a_ofs.y * block_width + a_ofs.x]);
-      __m128i vector_c_epi8 = _mm_loadl_epi64((__m128i*)&c_data[0]);
-      __m128i vector_b_epi8 = _mm_loadl_epi64((__m128i*)&c_data[b_ofs.y * block_width + b_ofs.x]);
+  const __m256i zero          = _mm256_setzero_si256();
 
+  __m128i offsets03 = _mm_loadu_si128((const __m128i *)offsets);
+  __m128i offsets4  = _mm_cvtsi32_si128(offsets[4]);
 
-      __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
+  uint16_t offsets_ok = epi32v_fits_in_epi8s(offsets03) &
+                        epi32v_fits_in_epi8s(offsets4);
 
-      tmp_diff_epi32 = _mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i* __restrict)&(orig_data[y * block_width + x]))), _mm256_cvtepu8_epi32(vector_c_epi8));
+  assert(NUM_SAO_EDGE_CATEGORIES == 5);
 
-      tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);   
+  if (offsets_ok != 0xffff)
+    return sao_edge_ddistortion_generic(orig_data,
+                                        rec_data,
+                                        block_width,
+                                        block_height,
+                                        eo_class,
+                                        offsets);
 
-      // (diff - offset) * (diff - offset)
-      tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+  __m128i offsets03_8b = truncate_epi32_epi8        (offsets03);
+  __m128i offsets4_8b  = truncate_epi32_epi8        (offsets4);
+  __m128i offsets_8b   = _mm_unpacklo_epi32         (offsets03_8b, offsets4_8b);
+  __m256i offsets_256  = _mm256_broadcastsi128_si256(offsets_8b);
 
-      // diff * diff
-      tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
+  __m256i sum = _mm256_setzero_si256();
+  for (y = 1; y < block_height - 1; y++) {
+    for (x = 1; x < width_db32 + 1; x += 32) {
+      uint32_t c_pos =  y            * block_width + x;
+      uint32_t a_pos = (y + a_ofs.y) * block_width + x + a_ofs.x;
+      uint32_t b_pos = (y + b_ofs.y) * block_width + x + b_ofs.x;
 
-      // Offset is applied to reconstruction, so it is subtracted from diff.
-      // sum += (diff - offset) * (diff - offset) - diff * diff;
+      __m256i a      = _mm256_loadu_si256((const __m256i *)(rec_data  + a_pos));
+      __m256i b      = _mm256_loadu_si256((const __m256i *)(rec_data  + b_pos));
+      __m256i c      = _mm256_loadu_si256((const __m256i *)(rec_data  + c_pos));
+      __m256i orig   = _mm256_loadu_si256((const __m256i *)(orig_data + c_pos));
 
-      tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
+      __m256i curr   = do_one_edge_ymm(a, b, c, orig, zero, offsets_256);
+              sum    = _mm256_add_epi32(sum, curr);
     }
+    if (scan_width > width_db32) {
+      const uint32_t curr_cpos   =  y           * block_width + x;
+      const uint32_t rest_cpos   =  y           * block_width + width_db4 + 1;
 
-    // Load the last 6 pixels to use
+      const  int32_t curr_apos   = (y + a_ofs.y) * block_width + x + a_ofs.x;
+      const  int32_t rest_apos   = (y + a_ofs.y) * block_width + width_db4 + a_ofs.x + 1;
 
-    const kvz_pixel *c_data = &rec_data[y * block_width + x];
+      const  int32_t curr_bpos   = (y + b_ofs.y) * block_width + x + b_ofs.x;
+      const  int32_t rest_bpos   = (y + b_ofs.y) * block_width + width_db4 + b_ofs.x + 1;
 
-    __m128i vector_a_epi8 = load_6_pixels(&c_data[a_ofs.y * block_width + a_ofs.x]);
-    __m128i vector_c_epi8 = load_6_pixels(c_data);
-    __m128i vector_b_epi8 = load_6_pixels(&c_data[b_ofs.y * block_width + b_ofs.x]);
+      // Same trick to read a narrow line as there is in the band SAO routine
+      uint32_t a_last = 0, b_last = 0, c_last = 0, orig_last = 0;
+      for (uint32_t i = 0; i < width_rest; i++) {
+        uint8_t  currb_a    =  rec_data[rest_apos + (int32_t)i];
+        uint8_t  currb_b    =  rec_data[rest_bpos + (int32_t)i];
+        uint8_t  currb_c    =  rec_data[rest_cpos + (int32_t)i];
+        uint8_t  currb_orig = orig_data[rest_cpos + (int32_t)i];
 
-    __m256i v_cat_epi32 = sao_calc_eo_cat_avx2(&vector_a_epi8, &vector_b_epi8, &vector_c_epi8);
+        uint32_t currd_a    = ((uint32_t)currb_a)    << (i * 8);
+        uint32_t currd_b    = ((uint32_t)currb_b)    << (i * 8);
+        uint32_t currd_c    = ((uint32_t)currb_c)    << (i * 8);
+        uint32_t currd_orig = ((uint32_t)currb_orig) << (i * 8);
 
-    const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
+        a_last    |= currd_a;
+        b_last    |= currd_b;
+        c_last    |= currd_c;
+        orig_last |= currd_orig;
+      }
 
-    tmp_diff_epi32 = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
+      const int32_t *a_ptr    = (const int32_t *)(rec_data  + curr_apos);
+      const int32_t *b_ptr    = (const int32_t *)(rec_data  + curr_bpos);
+      const int32_t *c_ptr    = (const int32_t *)(rec_data  + curr_cpos);
+      const int32_t *orig_ptr = (const int32_t *)(orig_data + curr_cpos);
 
-    tmp_diff_epi32 = _mm256_sub_epi32(tmp_diff_epi32, _mm256_cvtepu8_epi32(vector_c_epi8));
+      __m256i a    = _mm256_maskload_epi32(a_ptr,    db4_mask);
+      __m256i b    = _mm256_maskload_epi32(b_ptr,    db4_mask);
+      __m256i c    = _mm256_maskload_epi32(c_ptr,    db4_mask);
+      __m256i orig = _mm256_maskload_epi32(orig_ptr, db4_mask);
 
-    tmp_offset_epi32 = _mm256_permutevar8x32_epi32(offsets_epi32, v_cat_epi32);
+              a    = _mm256_insert_epi32  (a,        a_last,    7);
+              b    = _mm256_insert_epi32  (b,        b_last,    7);
+              c    = _mm256_insert_epi32  (c,        c_last,    7);
+              orig = _mm256_insert_epi32  (orig,     orig_last, 7);
 
-    // (diff - offset) * (diff - offset)
-    tmp1_vec_epi32 = _mm256_mullo_epi32(_mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32), _mm256_sub_epi32(tmp_diff_epi32, tmp_offset_epi32));
+      // Mask all unused bytes to 0xFF, so they won't count anywhere
+      uint32_t last_okbytes = 0xffffffff >> ((4 - width_rest) * 8);
+      __m256i badbyte_imask = _mm256_insert_epi32(db4_mask, last_okbytes, 7);
+      __m256i badbyte_mask  = _mm256_cmpeq_epi8  (zero,     badbyte_imask);
 
-    // diff * diff
-    tmp2_vec_epi32 = _mm256_mullo_epi32(tmp_diff_epi32, tmp_diff_epi32);
-
-    // Offset is applied to reconstruction, so it is subtracted from diff.
-    // sum += (diff - offset) * (diff - offset) - diff * diff;
-
-    tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_sub_epi32(tmp1_vec_epi32, tmp2_vec_epi32));
-
-    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
-    tmp_sum_epi32 = _mm256_hadd_epi32(tmp_sum_epi32, tmp_sum_epi32);
-
-    tmp_sum_epi32 = _mm256_add_epi32(tmp_sum_epi32, _mm256_shuffle_epi32(tmp_sum_epi32, _MM_SHUFFLE(0, 1, 0, 1)));
-    sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(tmp_sum_epi32));
-
-    tmp_sum_epi32 = _mm256_setzero_si256();
+      __m256i curr  = do_one_edge_ymm(a, b, c, orig, badbyte_mask, offsets_256);
+              sum   = _mm256_add_epi32(sum, curr);
+    }
   }
-  return sum;
+  return hsum_8x32b(sum);
 }
-*/
 
 static void calc_edge_dir_one_ymm(const __m256i  a,
                                   const __m256i  b,
@@ -710,8 +814,7 @@ static void sao_reconstruct_color_avx2(const encoder_control_t *encoder,
 {
   if (sao->type == SAO_TYPE_BAND) {
     reconstruct_color_band (encoder, rec_data, new_rec_data, sao, stride, new_stride, block_width, block_height, color_i);
-  }
-  else {
+  } else {
     reconstruct_color_other(encoder, rec_data, new_rec_data, sao, stride, new_stride, block_width, block_height, color_i);
   }
 }
@@ -740,28 +843,15 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
 
   __m256i bp_256  = _mm256_broadcastb_epi8(bp_128);
 
-  // LSBs of each SAO band dword, the band values must fit in 8 bits anyway
-  // (this will be checked later)
-  const __m128i sb_shufmask = _mm_set1_epi32(0x0c080400);
-
   __m128i sbs_32   = _mm_loadu_si128((const __m128i *)sao_bands);
-
-  __m128i sbs_8    = _mm_shuffle_epi8            (sbs_32, sb_shufmask);
-  __m256i sb_256   = _mm256_broadcastsi128_si256 (sbs_8);
-
-  // Compare most significant 25 bits of SAO bands to the sign bit to assert
-  // that the band is between -128 and 127 (only comparing 24 would fail to
-  // detect values of 128...255)
-  __m128i sb_ms25b = _mm_srai_epi32              (sbs_32,  7);
-  __m128i sb_signs = _mm_srai_epi32              (sbs_32, 31);
-  __m128i sbs_ok_v = _mm_cmpeq_epi32             (sb_ms25b, sb_signs);
-  uint16_t sbs_ok  = _mm_movemask_epi8           (sbs_ok_v);
+  __m128i sbs_8    = truncate_epi32_epi8(sbs_32);
+  __m256i sb_256   = _mm256_broadcastsi128_si256(sbs_8);
 
   // These should trigger like, never, at least the later condition of block
   // not being a multiple of 32 wide. Rather safe than sorry though, huge SAO
   // bands are more tricky of these two because the algorithm needs a complete
   // reimplementation to work on 16-bit values.
-  if (sbs_ok != 0xffff)
+  if (epi32v_fits_in_epi8s(sbs_32) != 0xffff)
     goto use_generic;
 
   // If VVC or something will start using SAO on blocks with width a multiple
@@ -853,7 +943,7 @@ int kvz_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
   bool success = true;
 #if COMPILE_INTEL_AVX2
   if (bitdepth == 8) {
-    //success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
+    success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
     success &= kvz_strategyselector_register(opaque, "calc_sao_edge_dir", "avx2", 40, &calc_sao_edge_dir_avx2);
     success &= kvz_strategyselector_register(opaque, "sao_reconstruct_color", "avx2", 40, &sao_reconstruct_color_avx2);
     success &= kvz_strategyselector_register(opaque, "sao_band_ddistortion", "avx2", 40, &sao_band_ddistortion_avx2);
