@@ -59,7 +59,7 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->chroma_format = chroma_format;
 
   //Allocate memory
-  im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size));
+  im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size + SCALER_BUFFER_PADDING));
   if (!im->fulldata) {
     free(im);
     return NULL;
