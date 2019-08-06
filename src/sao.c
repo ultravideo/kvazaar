@@ -160,6 +160,9 @@ static float sao_mode_bits_band(const encoder_state_t * const state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
+// NOTE: There's also an AVX2 variant of this in strategies/avx2/sao-avx2.c.
+// It has to be separate, because it returns the offset array in different
+// format (an array of YMM vectors).
 void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
   int32_t val;
