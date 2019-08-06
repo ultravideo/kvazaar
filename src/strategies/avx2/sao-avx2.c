@@ -53,32 +53,36 @@ static int32_t hsum_8x32b(const __m256i v)
   return  sum9;
 }
 
+// Do the SIGN3 operation for the difference a-b
+static INLINE __m256i sign3_diff_epu8(const __m256i a, const __m256i b)
+{
+  // Subtract 0x80 from unsigneds to compare them as signed
+  const __m256i epu2epi = _mm256_set1_epi8  (0x80);
+  const __m256i ones    = _mm256_set1_epi8  (0x01);
+
+  __m256i a_signed      = _mm256_sub_epi8   (a,        epu2epi);
+  __m256i b_signed      = _mm256_sub_epi8   (b,        epu2epi);
+
+  __m256i diff          = _mm256_subs_epi8  (a_signed, b_signed);
+  return                  _mm256_sign_epi8  (ones,     diff);
+}
+
 // Mapping of edge_idx values to eo-classes, 32x8b at once
 static __m256i calc_eo_cat(const __m256i a,
                            const __m256i b,
                            const __m256i c)
 {
-  // Subtract 0x80 from unsigneds to use the signed compare on them
-  const __m256i epu2epi    = _mm256_set1_epi8  (0x80);
-  const __m256i ones       = _mm256_set1_epi8  (0x01);
   const __m256i twos       = _mm256_set1_epi8  (0x02);
   const __m256i idx_to_cat = _mm256_setr_epi64x(0x0403000201, 0,
                                                 0x0403000201, 0);
 
-  __m256i a_signed  = _mm256_sub_epi8    (a,          epu2epi);
-  __m256i b_signed  = _mm256_sub_epi8    (b,          epu2epi);
-  __m256i c_signed  = _mm256_sub_epi8    (c,          epu2epi);
+  __m256i c_a_sign         = sign3_diff_epu8    (c, a);
+  __m256i c_b_sign         = sign3_diff_epu8    (c, b);
 
-  __m256i c_minus_a = _mm256_subs_epi8   (c_signed,   a_signed);
-  __m256i c_minus_b = _mm256_subs_epi8   (c_signed,   b_signed);
+  __m256i signsum          = _mm256_add_epi8    (c_a_sign,   c_b_sign);
+  __m256i eo_idx           = _mm256_add_epi8    (signsum,    twos);
 
-  __m256i c_a_sign  = _mm256_sign_epi8   (ones,       c_minus_a);
-  __m256i c_b_sign  = _mm256_sign_epi8   (ones,       c_minus_b);
-
-  __m256i signsum   = _mm256_add_epi8    (c_a_sign,   c_b_sign);
-  __m256i eo_idx    = _mm256_add_epi8    (signsum,    twos);
-
-  return              _mm256_shuffle_epi8(idx_to_cat, eo_idx);
+  return                     _mm256_shuffle_epi8(idx_to_cat, eo_idx);
 }
 
 static INLINE __m256i srli_epi8(const __m256i  v,
