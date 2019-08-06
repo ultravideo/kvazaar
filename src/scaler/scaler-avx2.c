@@ -3038,8 +3038,8 @@ static void data_load_4x8_dual_8bit(const uint8_t *const src, const unsigned *co
    {0x0F0E0D0C0B0A0908, 0x0E0D0C0B0A090808, 0x0D0C0B0A09080808, 0x0C0B0A0908080808}
   };
   static const long long shuffle_perm_lookup_rgt[2][5] = {
-    {0x0706050403020100, 0x0606050403020100, 0x0505050403020100, 0x0404040403020100, 0x03030303020100},
-    {0x0F0E0D0C0B0A0908, 0x0E0E0D0C0B0A0908, 0x0D0D0D0C0B0A0908, 0x0C0C0C0C0B0A0908, 0x0B0B0B0B0A0908}
+    {0x0706050403020100, 0x0606050403020100, 0x0505050403020100, 0x0404040403020100, 0x0303030303020100},
+    {0x0F0E0D0C0B0A0908, 0x0E0E0D0C0B0A0908, 0x0D0D0D0C0B0A0908, 0x0C0C0C0C0B0A0908, 0x0B0B0B0B0B0A0908}
   };
 #define getShufflePermLft(ind,lookup) (ind) < 0 ? shuffle_perm_lookup_lft[(lookup)][(-ind)] : shuffle_perm_lookup_lft[(lookup)][0]
 #define getShufflePermRgt(ind,lookup) (ind) > 0 ? shuffle_perm_lookup_rgt[(lookup)][(ind)] : shuffle_perm_lookup_rgt[(lookup)][0]
@@ -3150,7 +3150,7 @@ static void data_load_8x4_8bit(const uint8_t *const src, const unsigned *const s
     );
     temp_mem = _mm256_shuffle_epi8(temp_mem, perm);
   }
-  if (high_bound[3] > 0) {
+  if (high_bound[7] > 0) {
     //Shuffle data from mem so that right bound values are correctly dublicated.
     __m256i perm = _mm256_setr_epi32(
       getShufflePermRgt(high_bound[0], 0),
