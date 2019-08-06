@@ -196,6 +196,26 @@ static INLINE void store_border_bytes(      uint8_t  *buf,
   }
 }
 
+// Mask all inexistent bytes to 0xFF for functions that count particular byte
+// values, so they won't count anywhere
+static INLINE __m256i gen_badbyte_mask(const __m256i db4_mask,
+                                       const int32_t width_rest)
+{
+  const __m256i zero    = _mm256_setzero_si256();
+
+  uint32_t last_badbytes = 0xffffffff << (width_rest << 3);
+  __m256i  badbyte_mask  = _mm256_cmpeq_epi8  (db4_mask,     zero);
+  return                   _mm256_insert_epi32(badbyte_mask, last_badbytes, 7);
+}
+
+// Ok, so the broadcast si128->si256 instruction only works with a memory
+// source operand..
+static INLINE __m256i broadcast_xmm2ymm(const __m128i v)
+{
+  __m256i res = _mm256_castsi128_si256 (v);
+  return        _mm256_inserti128_si256(res, v, 1);
+}
+
 // Used for edge_ddistortion and band_ddistortion
 static __m256i calc_diff_off_delta(const __m256i diff_lo,
                                    const __m256i diff_hi,
@@ -301,10 +321,10 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
                                         offsets);
   }
 
-  __m128i offsets03_8b = truncate_epi32_epi8        (offsets03);
-  __m128i offsets4_8b  = truncate_epi32_epi8        (offsets4);
-  __m128i offsets_8b   = _mm_unpacklo_epi32         (offsets03_8b, offsets4_8b);
-  __m256i offsets_256  = _mm256_broadcastsi128_si256(offsets_8b);
+  __m128i offsets03_8b = truncate_epi32_epi8(offsets03);
+  __m128i offsets4_8b  = truncate_epi32_epi8(offsets4);
+  __m128i offsets_8b   = _mm_unpacklo_epi32 (offsets03_8b, offsets4_8b);
+  __m256i offsets_256  = broadcast_xmm2ymm  (offsets_8b);
 
   __m256i sum = _mm256_setzero_si256();
   for (y = 1; y < block_height - 1; y++) {
@@ -353,9 +373,7 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
               orig = _mm256_insert_epi32  (orig,     orig_last, 7);
 
       // Mask all unused bytes to 0xFF, so they won't count anywhere
-      uint32_t last_okbytes = 0xffffffff >> ((4 - width_rest) * 8);
-      __m256i badbyte_imask = _mm256_insert_epi32(db4_mask, last_okbytes, 7);
-      __m256i badbyte_mask  = _mm256_cmpeq_epi8  (zero,     badbyte_imask);
+      __m256i badbyte_mask = gen_badbyte_mask(db4_mask, width_rest);
 
       __m256i curr  = do_one_edge_ymm(a, b, c, orig, badbyte_mask, offsets_256);
               sum   = _mm256_add_epi32(sum, curr);
@@ -470,10 +488,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
               c    = _mm256_insert_epi32  (c,        c_last,    7);
               orig = _mm256_insert_epi32  (orig,     orig_last, 7);
 
-      // Mask all unused bytes to 0xFF, so they won't count anywhere
-      uint32_t last_okbytes = 0xffffffff >> ((4 - width_rest) * 8);
-      __m256i badbyte_imask = _mm256_insert_epi32(db4_mask, last_okbytes, 7);
-      __m256i badbyte_mask  = _mm256_cmpeq_epi8  (zero,     badbyte_imask);
+      __m256i badbyte_mask = gen_badbyte_mask(db4_mask, width_rest);
 
       calc_edge_dir_one_ymm(a, b, c, orig, badbyte_mask, diff_accum, hit_cnt);
     }
@@ -520,9 +535,8 @@ static void calc_sao_offset_array_avx2(const encoder_control_t *encoder,
   __m128i sao_offs_lo  = _mm_loadu_si128((const __m128i *)(sao->offsets + 1));
   __m128i sao_offs_hi  = _mm_loadu_si128((const __m128i *)(sao->offsets + 6));
 
-  __m128i sao_offs_xmm = _mm_packs_epi32        (sao_offs_lo, sao_offs_hi);
-  __m256i sao_offs     = _mm256_castsi128_si256 (sao_offs_xmm);
-          sao_offs     = _mm256_inserti128_si256(sao_offs,    sao_offs_xmm, 1);
+  __m128i sao_offs_xmm = _mm_packs_epi32  (sao_offs_lo, sao_offs_hi);
+  __m256i sao_offs     = broadcast_xmm2ymm(sao_offs_xmm);
 
   for (uint32_t i = 0; i < 16; i++) {
     // bands will always be in [0, 31], and cur_bp in [0, 27], so no overflow
@@ -719,7 +733,7 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
   const __m128i    sao_offs_hi = _mm_cvtsi32_si128(sao->offsets[offset_v + 4]);
   const __m128i    sao_offs_16 = _mm_packs_epi32  (sao_offs_lo, sao_offs_hi);
 
-  const __m256i    sao_offs    = _mm256_broadcastsi128_si256(sao_offs_16);
+  const __m256i    sao_offs    = broadcast_xmm2ymm(sao_offs_16);
 
   for (uint32_t y = 0; y < block_height; y++) {
     uint32_t x;
@@ -822,7 +836,7 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
 
   __m128i sbs_32   = _mm_loadu_si128((const __m128i *)sao_bands);
   __m128i sbs_8    = truncate_epi32_epi8(sbs_32);
-  __m256i sb_256   = _mm256_broadcastsi128_si256(sbs_8);
+  __m256i sb_256   = broadcast_xmm2ymm  (sbs_8);
 
   // These should trigger like, never, at least the later condition of block
   // not being a multiple of 32 wide. Rather safe than sorry though, huge SAO
