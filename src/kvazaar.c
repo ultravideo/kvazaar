@@ -426,6 +426,45 @@ static int kvazaar_encode(kvz_encoder *enc,
 }
 
 
+//An unit delay to the encoding process
+static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+{
+  assert(layer < MAX_LAYERS);
+
+  //Store values in static variables
+  static kvz_picture* d_pic_in[MAX_LAYERS] = { NULL };
+  static kvz_data_chunk* d_data_out[MAX_LAYERS] = { NULL };
+  static uint32_t d_len_out[MAX_LAYERS] = { 0 };
+  static kvz_picture* d_pic_out[MAX_LAYERS] = { NULL };
+  static kvz_picture* d_src_out[MAX_LAYERS] = { NULL };
+  static kvz_frame_info d_info_out[MAX_LAYERS] = { { 0 } };
+
+  //Store new value and return the old one
+  void *tmp = (void *)*pic_in;
+  *pic_in = d_pic_in[layer];
+  d_pic_in[layer] = (kvz_picture *)tmp;
+
+  tmp = (void *)*data_out;
+  *data_out = d_data_out[layer];
+  d_data_out[layer] = (kvz_data_chunk *)tmp;
+
+  tmp = (void *)*pic_out;
+  *pic_out = d_pic_out[layer];
+  d_pic_out[layer] = (kvz_picture *)tmp;
+
+  tmp = (void *)*src_out;
+  *src_out = d_src_out[layer];
+  d_src_out[layer] = (kvz_picture *)tmp;
+
+  uint32_t tmp_len = *len_out;
+  *len_out = d_len_out[layer];
+  d_len_out[layer] = tmp_len;
+
+  kvz_frame_info tmp_info = *info_out;
+  *info_out = d_info_out[layer];
+  d_info_out[layer] = tmp_info;
+}
+
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //TODO: Account for pic_in containing several input images for different layers
@@ -461,15 +500,26 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   kvz_picture *cur_pic_out = NULL;
   kvz_picture *cur_src_out = NULL;
 
+  int el_tmvp_enabled = false;
+
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
     cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling, 1);
 
+    if (cur_enc->control->cfg.tmvp_enable && i > 0) {
+      encode_delay(i, &cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]));
+      el_tmvp_enabled = true;
+    }
+
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
       kvz_image_free(cur_pic_in);
       free(pics_in);
       return 0;
+    }
+
+    if (el_tmvp_enabled && i == 0) {
+      encode_delay(i, &cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]));
     }
 
     kvz_image_free(cur_pic_in);

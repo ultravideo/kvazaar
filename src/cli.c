@@ -647,7 +647,7 @@ void print_help(void)
     "                               See Required section for more info.\n"
     "      --ilr <integer>        : Set the number of inter layer reference frames\n"
     "                               for the current layer. Currently only the value\n"
-    "                               of 1 is supported. [0]\n"
+    "                               of 1 is supported. [1]\n"
     "      --debug <string>       : Specify the filename for reconstruction\n"
     "                               output. Each layer will have a debug file\n"
     "                               assosiated with it in order. See Options section\n"
