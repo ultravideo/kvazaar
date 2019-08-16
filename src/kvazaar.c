@@ -500,16 +500,16 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   kvz_picture *cur_pic_out = NULL;
   kvz_picture *cur_src_out = NULL;
 
-  int el_tmvp_enabled = false;
+  int el_tmvp_enabled = enc->next_enc->control->cfg.tmvp_enable;
 
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
     cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling, 1);
 
-    if (cur_enc->control->cfg.tmvp_enable && i > 0) {
+    if (el_tmvp_enabled && i > 0) {
+      //TODO: Account for multiple EL layers needing to be delayed (when EL references another EL)
       encode_delay(i, &cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]));
-      el_tmvp_enabled = true;
     }
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {

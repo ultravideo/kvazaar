@@ -500,7 +500,7 @@ int main(int argc, char *argv[])
   // ***********************************************
   // Modified for SHVC
   //Allocate space for some stuff
-  info_out = malloc(sizeof(kvz_frame_info) * (opts->config->shared != NULL ? opts->config->shared->max_layers : 1));
+  info_out = calloc( opts->config->shared != NULL ? opts->config->shared->max_layers : 1, sizeof(kvz_frame_info));
   len_out = calloc( opts->config->shared != NULL ? opts->config->shared->max_layers : 1, sizeof(uint32_t)); // Each layer has their own len_out
 
   input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
