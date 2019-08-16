@@ -1541,7 +1541,6 @@ static void search_pu_inter(encoder_state_t * const state,
 
       if (cfg->rdo >= 2) {
 
-        kvz_lcu_fill_trdepth(lcu, x, y, depth, depth);
         kvz_inter_recon_cu(state, lcu, x, y, width);
         mrg_costs[merge_idx] = kvz_satd_any_size(width, height,
           lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
