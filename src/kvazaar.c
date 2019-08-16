@@ -492,20 +492,22 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
     }
   }
   
-  //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters
   kvz_encoder *cur_enc = enc;
-  kvz_picture *cur_pic_in; 
-  kvz_data_chunk* cur_data_out = NULL;
-  uint32_t cur_len_out = 0;
-  kvz_picture *cur_pic_out = NULL;
-  kvz_picture *cur_src_out = NULL;
 
-  int el_tmvp_enabled = enc->next_enc->control->cfg.tmvp_enable;
+  int el_tmvp_enabled = enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
 
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
-    cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling, 1);
+    
+    //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters
+    kvz_picture *cur_pic_in = kvz_image_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling, 1);
+
+    kvz_data_chunk* cur_data_out = NULL;
+    uint32_t cur_len_out = 0;
+    kvz_picture *cur_pic_out = NULL;
+    kvz_picture *cur_src_out = NULL;
+
 
     if (el_tmvp_enabled && i > 0) {
       //TODO: Account for multiple EL layers needing to be delayed (when EL references another EL)
@@ -534,8 +536,8 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
           data_out = &(*data_out)->next;
         }
         (*data_out)->next = cur_data_out;
-        cur_data_out = NULL;
       }
+      cur_data_out = NULL;
     }
     if (len_out) len_out[i] += cur_len_out;
     if (pic_out) {
@@ -545,8 +547,8 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
         (*pic_out)->base_image = kvz_image_copy_ref(cur_pic_out);
         pic_out = &(*pic_out)->base_image;
         kvz_image_free(cur_pic_out);
-        cur_pic_out = NULL;
       }
+      cur_pic_out = NULL;
     }
     if (src_out) {
       if (*src_out == NULL) {
@@ -555,8 +557,8 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
         (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
         src_out = &(*src_out)->base_image;
         kvz_image_free(cur_src_out);
-        cur_src_out = NULL;
       }
+      cur_src_out = NULL;
     }
 
     //Update other values for the next layer
