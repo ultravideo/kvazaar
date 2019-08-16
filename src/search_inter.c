@@ -1514,8 +1514,12 @@ static void search_pu_inter(encoder_state_t * const state,
   if (cfg->early_skip && cur_cu->part_size == SIZE_2Nx2N) {
 
     int num_rdo_cands = 0;
-    int8_t mrg_cands[MRG_MAX_NUM_CANDS] = { 0, 1, 2, 3, 4 };
-    double mrg_costs[MRG_MAX_NUM_CANDS] = { MAX_DOUBLE };
+    int8_t mrg_cands[MRG_MAX_NUM_CANDS];
+    double mrg_costs[MRG_MAX_NUM_CANDS];
+    for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i) {
+      mrg_cands[i] = -1;
+      mrg_costs[i] = MAX_DOUBLE;
+    }
 
     // Check motion vector constraints and perform rough search
     for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
@@ -1544,6 +1548,7 @@ static void search_pu_inter(encoder_state_t * const state,
           lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
       }
 
+      mrg_cands[num_rdo_cands] = merge_idx;
       num_rdo_cands++;
     }
 
