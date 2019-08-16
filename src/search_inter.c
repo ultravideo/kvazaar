@@ -1442,6 +1442,46 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
 }
 
 /**
+ * \brief Check if an identical merge candidate exists in a list
+ *
+ * \param all_cand        Full list of available merge candidates
+ * \param cand_to_add     Merge candidate to be checked for duplicates
+ * \param added_idx_list  List of indices of unique merge candidates
+ * \param list_size       Size of the list
+ *
+ * \return                Does an identical candidate exist in list
+ */
+static bool merge_candidate_in_list(inter_merge_cand_t * all_cands,
+                                    inter_merge_cand_t * cand_to_add,
+                                    int8_t * added_idx_list,
+                                    int list_size)
+{
+  bool found = false;
+  for (int i = 0; i < list_size && !found; ++i) {
+    inter_merge_cand_t * list_cand = &all_cands[added_idx_list[i]];
+
+    // Check only the specified dir(s) in case
+    // something unused is left uninitialized
+    found = cand_to_add->dir == list_cand->dir;
+    if (cand_to_add->dir & 1) {
+      found = found &&
+        cand_to_add->ref[0] == list_cand->ref[0] &&
+        cand_to_add->mv[0][0] == list_cand->mv[0][0] &&
+        cand_to_add->mv[0][1] == list_cand->mv[0][1];
+    }
+
+    if (cand_to_add->dir & 2) {
+      found = found &&
+        cand_to_add->ref[1] == list_cand->ref[1] &&
+        cand_to_add->mv[1][0] == list_cand->mv[1][0] &&
+        cand_to_add->mv[1][1] == list_cand->mv[1][1];
+    }
+  }
+
+  return found;
+}
+
+/**
  * \brief Update PU to have best modes at this depth.
  *
  * \param state       encoder state
@@ -1524,17 +1564,24 @@ static void search_pu_inter(encoder_state_t * const state,
     // Check motion vector constraints and perform rough search
     for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
 
-      cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
-      cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
-      cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
-      cur_cu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
-      cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
-      cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
-      cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+      inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+      cur_cu->inter.mv_dir = cur_cand->dir;
+      cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
+      cur_cu->inter.mv_ref[1] = cur_cand->ref[1];
+      cur_cu->inter.mv[0][0] = cur_cand->mv[0][0];
+      cur_cu->inter.mv[0][1] = cur_cand->mv[0][1];
+      cur_cu->inter.mv[1][0] = cur_cand->mv[1][0];
+      cur_cu->inter.mv[1][1] = cur_cand->mv[1][1];
+
+      bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
+        mrg_cands, 
+        num_rdo_cands);
 
       // Don't try merge candidates that don't satisfy mv constraints.
+      // Don't add duplicates to list
       if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
-          !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]))
+          !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
+          is_duplicate)
       {
         continue;
       }
