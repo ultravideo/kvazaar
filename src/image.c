@@ -936,6 +936,8 @@ void kvz_opaque_block_step_scaler_worker(void * opaque_param)
         kvz_blockScalingSrcHeightRange(range, param, in_param->block_y, in_param->block_height);
         //cp_block_y = hor_block_y = range[0];
         //cp_block_height = hor_block_height = range[1] - hor_block_y + 1;
+        hor_block_y = range[0];
+        hor_block_height = range[1] - hor_block_y + 1;
       } else {
         //Do the same procedure as with horizontal range
         if (in_param->block_y - in_param->block_height < 0) {
