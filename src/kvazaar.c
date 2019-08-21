@@ -554,8 +554,10 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
       if (*src_out == NULL) {
         *src_out = cur_src_out;
       } else {
-        (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
-        src_out = &(*src_out)->base_image;
+        if (cur_src_out != *src_out) {
+          (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
+          src_out = &(*src_out)->base_image;
+        }
         kvz_image_free(cur_src_out);
       }
       cur_src_out = NULL;
