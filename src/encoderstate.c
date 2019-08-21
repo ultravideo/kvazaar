@@ -115,6 +115,7 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 *
 * - Copy ref list info to the ilr frame for TMVP
 */
+//TODO: Figure out the correct timing for this
 static void scalability_prepare(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -2328,7 +2329,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
 }
 
 //Debug stuff for printing thread info
-#if 1 && defined(linux)
+#if 0 && defined(linux)
 #define _GNU_SOURCES
 #include <sys/types.h>
 #include <unistd.h>
