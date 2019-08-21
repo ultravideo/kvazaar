@@ -38,6 +38,12 @@ valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --layer --preset
 valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --no-tmvp --layer --preset=ultrafast
 valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --no-tmvp --layer --preset=ultrafast --no-tmvp
 
+#   Test without owf
+valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --layer --preset=ultrafast --no-tmvp --owf=0
+valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --no-tmvp --layer --preset=ultrafast --owf=0
+valgrind_test 512x264 20 --preset=ultrafast --layer-res=256x132 --no-tmvp --layer --preset=ultrafast --no-tmvp --owf=0
+
+
 # Test SAO/deblock
 valgrind_test 512x264 20 --preset=ultrafast -p12  --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off 
 valgrind_test 512x264 20 --preset=ultrafast -p12 --layer-res=256x132 --no-deblock --sao=full -q30 -r3 --layer --preset=ultrafast -q28 -r2 --ilr=1  --sao=off
