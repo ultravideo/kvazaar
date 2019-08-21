@@ -494,7 +494,7 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   
   kvz_encoder *cur_enc = enc;
 
-  int el_tmvp_enabled = enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
+  int el_tmvp_enabled = false;//enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
 
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
