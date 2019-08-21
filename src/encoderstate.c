@@ -3156,7 +3156,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   // ***********************************************
   // Modified for SHVC.
   // Do scalability preparation here so that the ilr rec is set when using gop
-  scalability_prepare(state);
+  //scalability_prepare(state);
   prepare_ilr_frames(state);
   // ***********************************************
 
@@ -3234,7 +3234,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   //if (encoder->layer.layer_id > 0 && prev_state->ILR_state != NULL) {
   //    kvz_image_list_rem_ILR(state->frame->ref, prev_state->frame->poc); //Remove old ILR pics from the ref list so they don't interfere.
   //}
-  //scalability_prepare(state);
+  
 
   if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
@@ -3261,6 +3261,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
+  scalability_prepare(state);
   //add_ilr_frames(state);
 
   // Remove source and reconstructed picture.
