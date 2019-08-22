@@ -496,6 +496,20 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
 
   int el_tmvp_enabled = false;//enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
 
+  //Pre prepare statest to prevent data-races between ILR states (when copying stuff needed for tmvp)
+  while (cur_enc != NULL) {
+
+    encoder_state_t *state = &cur_enc->states[cur_enc->cur_state_num];
+
+    if (!state->frame->prepared) {
+      kvz_encoder_prepare(state);
+    }
+
+    cur_enc = cur_enc->next_enc;
+  }
+
+  cur_enc = enc;
+
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
