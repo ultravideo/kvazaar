@@ -693,7 +693,7 @@ void kvz_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
     };
 
-    if (mode_luma != -1 && depth < MAX_DEPTH) {
+    if (mode_luma != -1 && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
     if (mode_chroma != -1 && depth <= MAX_DEPTH) {
