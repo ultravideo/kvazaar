@@ -445,7 +445,18 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
          width == 32 ||
          width == 64);
 
+  // Reset CBFs because CBFs might have been set
+  // for depth earlier
+  if (luma) {
+    cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
+  }
+  if (chroma) {
+    cbf_clear(&cur_pu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_pu->cbf, depth, COLOR_V);
+  }
+
   if (depth == 0 || cur_pu->tr_depth > depth) {
+
     // Split transform and increase depth
     const int offset = width / 2;
     const int32_t x2 = x + offset;
