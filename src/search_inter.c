@@ -1460,22 +1460,13 @@ static bool merge_candidate_in_list(inter_merge_cand_t * all_cands,
   for (int i = 0; i < list_size && !found; ++i) {
     inter_merge_cand_t * list_cand = &all_cands[added_idx_list[i]];
 
-    // Check only the specified dir(s) in case
-    // something unused is left uninitialized
-    found = cand_to_add->dir == list_cand->dir;
-    if (cand_to_add->dir & 1) {
-      found = found &&
+    found = cand_to_add->dir == list_cand->dir &&
         cand_to_add->ref[0] == list_cand->ref[0] &&
         cand_to_add->mv[0][0] == list_cand->mv[0][0] &&
-        cand_to_add->mv[0][1] == list_cand->mv[0][1];
-    }
-
-    if (cand_to_add->dir & 2) {
-      found = found &&
+        cand_to_add->mv[0][1] == list_cand->mv[0][1] &&
         cand_to_add->ref[1] == list_cand->ref[1] &&
         cand_to_add->mv[1][0] == list_cand->mv[1][0] &&
         cand_to_add->mv[1][1] == list_cand->mv[1][1];
-    }
   }
 
   return found;
@@ -1550,16 +1541,17 @@ static void search_pu_inter(encoder_state_t * const state,
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);
 
-  // Early Skip Mode Decision
-  if (cfg->early_skip && cur_cu->part_size == SIZE_2Nx2N) {
+  // Merge Analysis starts here
+  int8_t mrg_cands[MRG_MAX_NUM_CANDS];
+  double mrg_costs[MRG_MAX_NUM_CANDS];
+  for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i) {
+    mrg_cands[i] = -1;
+    mrg_costs[i] = MAX_DOUBLE;
+  }
+
+  if (cur_cu->part_size == SIZE_2Nx2N) {
 
     int num_rdo_cands = 0;
-    int8_t mrg_cands[MRG_MAX_NUM_CANDS];
-    double mrg_costs[MRG_MAX_NUM_CANDS];
-    for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i) {
-      mrg_cands[i] = -1;
-      mrg_costs[i] = MAX_DOUBLE;
-    }
 
     // Check motion vector constraints and perform rough search
     for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
@@ -1573,6 +1565,7 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[1][0] = cur_cand->mv[1][0];
       cur_cu->inter.mv[1][1] = cur_cand->mv[1][1];
 
+      if (cur_cu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
       bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
         mrg_cands, 
         num_rdo_cands);
@@ -1586,65 +1579,62 @@ static void search_pu_inter(encoder_state_t * const state,
         continue;
       }
 
-      if (cfg->rdo >= 2) {
-
-        kvz_inter_recon_cu(state, lcu, x, y, width);
-        mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
-          lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
-          lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
-      }
+      kvz_inter_recon_cu(state, lcu, x, y, width);
+      mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
+        lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
+        lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
 
       mrg_cands[num_rdo_cands] = merge_idx;
       num_rdo_cands++;
     }
 
-
-    if (cfg->rdo >= 2) {
-      // Sort candidates by cost
-      kvz_sort_modes(mrg_cands, mrg_costs, num_rdo_cands);
-    }
+    // Sort candidates by cost
+    kvz_sort_modes(mrg_cands, mrg_costs, num_rdo_cands);
 
     // Limit by availability
     // TODO: Do not limit to just 1
     num_rdo_cands = MIN(1, num_rdo_cands);
+    
+    // Early Skip Mode Decision
+    if (cfg->early_skip) {
+      for (int merge_rdo_idx = 0; merge_rdo_idx < num_rdo_cands; ++merge_rdo_idx) {
 
-    // RDO search
-    for (int merge_rdo_idx = 0; merge_rdo_idx < num_rdo_cands; ++merge_rdo_idx) {
+        // Reconstruct blocks with merge candidate.
+        // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
+        // and chroma exists.
+        // Early terminate if merge candidate with zero CBF is found.
+        int merge_idx = mrg_cands[merge_rdo_idx];
+        cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
+        cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
+        cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
+        cur_cu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
+        cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
+        cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
+        cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+        kvz_inter_recon_cu(state, lcu, x, y, width);
+        kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu);
 
-      // Reconstruct blocks with merge candidate.
-      // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
-      // and chroma exists.
-      // Early terminate if merge candidate with zero CBF is found.
-      int merge_idx = mrg_cands[merge_rdo_idx];
-      cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
-      cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
-      cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
-      cur_cu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
-      cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
-      cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
-      cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
-      kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
-      kvz_inter_recon_cu(state, lcu, x, y, width);
-      kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu);
+        if (cbf_is_set(cur_cu->cbf, depth, COLOR_Y)) {
+          continue;
+        }
+        else if (state->encoder_control->chroma_format != KVZ_CSP_400) {
 
-      if (cbf_is_set(cur_cu->cbf, depth, COLOR_Y)) {
-        continue;
-      }
-      else if(state->encoder_control->chroma_format != KVZ_CSP_400) {
-
-        kvz_quantize_lcu_residual(state, false, true, x, y, depth, cur_cu, lcu);
-        if (!cbf_is_set_any(cur_cu->cbf, depth)) {
-          cur_cu->type = CU_INTER;
-          cur_cu->merge_idx = merge_idx;
-          cur_cu->skipped = true;
-          *inter_cost = 0.0;  // TODO: Check this
-          *inter_bitcost = 0; // TODO: Check this
-          return;
+          kvz_quantize_lcu_residual(state, false, true, x, y, depth, cur_cu, lcu);
+          if (!cbf_is_set_any(cur_cu->cbf, depth)) {
+            cur_cu->type = CU_INTER;
+            cur_cu->merge_idx = merge_idx;
+            cur_cu->skipped = true;
+            *inter_cost = 0.0;  // TODO: Check this
+            *inter_bitcost = 0; // TODO: Check this
+            return;
+          }
         }
       }
     }
   }
 
+  // AMVP search starts here
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
@@ -1659,6 +1649,24 @@ static void search_pu_inter(encoder_state_t * const state,
 
   if (can_use_bipred) {
     search_pu_inter_bipred(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost);
+  }
+
+  // Compare best merge cost to amvp cost
+  if (mrg_costs[0] < *inter_cost) {
+    *inter_cost = mrg_costs[0];
+    *inter_bitcost = 0; // TODO: Check this
+    int merge_idx = mrg_cands[0];
+    cur_cu->type = CU_INTER;
+    cur_cu->merge_idx = merge_idx;
+    cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
+    cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
+    cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
+    cur_cu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
+    cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
+    cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
+    cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+    cur_cu->merged = true;
+    cur_cu->skipped = false;
   }
 
   if (*inter_cost < INT_MAX && cur_cu->inter.mv_dir == 1) {
