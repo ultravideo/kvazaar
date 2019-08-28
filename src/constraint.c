@@ -1,5 +1,3 @@
-#ifndef ENCODER_STATE_CTORS_DTORS_H_
-#define ENCODER_STATE_CTORS_DTORS_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,23 +18,42 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \ingroup Control
- * \file
- * Creation and destruction of encoder_state_t.
- */
-
-#include "global.h" // IWYU pragma: keep
-#include "ml_intra_cu_depth_pred.h"
 #include "constraint.h"
 
-// Forward declare because including the header would lead  to a cyclic
-// dependency.
-struct encoder_state_t;
+ /**
+  * \brief Allocate the constraint_t structure.
+  *
+  * \param state   encoder state
+  * \return the pointer of constraint_t structure
+  */
+void * kvz_init_const(encoder_state_t* state) {
+	constraint_t* constr = NULL;
+	// Allocate the constraint_t strucutre
+	constr = MALLOC(constraint_t, 1);
+	if (!constr) {
+		fprintf(stderr, "Memory allocation failed!\n");
+		assert(0);
+	}
 
+	// Allocate the ml_intra_ctu_pred_t structure
+	constr->ml_intra_depth_ctu = NULL;
+	if (E_CONSTRAINT == 1) // TODO: Change this by a new param !!
+	{
+		constr->ml_intra_depth_ctu = kvz_init_ml_intra_depth_const();
+	}
+	return constr;
+}
 
-int kvz_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void kvz_encoder_state_finalize(struct encoder_state_t *state);
-
-
-#endif // ENCODER_STATE_CTORS_DTORS_H_
+/**
+ * \brief Deallocate the constraint_t structure.
+ *
+ * \param state   encoder state
+ */
+void kvz_end_const(encoder_state_t* state) {
+	constraint_t* constr = state->constraint;
+	if (E_CONSTRAINT == 1) // TODO: Change this by a new param !!
+	{
+		kvz_end_ml_intra_depth_const(constr->ml_intra_depth_ctu);
+	}
+	FREE_POINTER(constr);
+}
