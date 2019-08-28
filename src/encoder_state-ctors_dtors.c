@@ -681,7 +681,7 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     for (i = 0; state->children[i].encoder_control; ++i) {
       kvz_encoder_state_finalize(&state->children[i]);
     }
-    
+
     FREE_POINTER(state->children);
   }
   
@@ -706,6 +706,11 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->frame);
   }
   
+  if (!state->parent) {
+	  // End of the constraint structure
+	  kvz_end_const(state);
+  }
+
   kvz_bitstream_finalize(&state->stream);
 
   kvz_threadqueue_free_job(&state->tqj_recon_done);

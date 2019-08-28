@@ -455,6 +455,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
+  struct {
+	  int32_t min;
+	  int32_t max;
+  } pu_depth_inter, pu_depth_intra;
+
   lcu_t *const lcu = &work_tree[depth];
 
   int x_local = SUB_SCU(x);
@@ -465,6 +470,21 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Return zero cost because this CU does not have to be coded.
     return 0;
   }
+
+  // Assign correct depth limit
+  constraint_t* constr = state->constraint;
+ if(constr->ml_intra_depth_ctu) {
+	 //pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
+	 //pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
+	 pu_depth_intra.min = constr->ml_intra_depth_ctu->_mat_upper_depth[(x_local >> 3) + (y_local >> 3) * 8];
+	 pu_depth_intra.max = constr->ml_intra_depth_ctu->_mat_lower_depth[(x_local >> 3) + (y_local >> 3) * 8];
+  }
+  else {
+	  pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
+	  pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
+  }
+  pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min;
+  pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max;
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
@@ -479,12 +499,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (x + cu_width <= frame->width &&
       y + cu_width <= frame->height)
   {
-    int cu_width_inter_min = LCU_WIDTH >> ctrl->cfg.pu_depth_inter.max;
+    int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
       state->frame->slicetype != KVZ_SLICE_I &&
       depth <= MAX_DEPTH &&
       (
-        WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max) ||
+        WITHIN(depth, pu_depth_inter.min, pu_depth_inter.max) ||
         // When the split was forced because the CTU is partially outside the
         // frame, we permit inter coding even if pu_depth_inter would
         // otherwise forbid it.
@@ -543,9 +563,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                       && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
                       || (ctrl->cfg.early_skip && cur_cu->skipped);
 
-    int32_t cu_width_intra_min = LCU_WIDTH >> ctrl->cfg.pu_depth_intra.max;
+    int32_t cu_width_intra_min = LCU_WIDTH >> pu_depth_intra.max;
     bool can_use_intra =
-        WITHIN(depth, ctrl->cfg.pu_depth_intra.min, ctrl->cfg.pu_depth_intra.max) ||
+        WITHIN(depth, pu_depth_intra.min, pu_depth_intra.max) ||
         // When the split was forced because the CTU is partially outside
         // the frame, we permit intra coding even if pu_depth_intra would
         // otherwise forbid it.
@@ -677,9 +697,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
     cur_cu->type == CU_NOTSET ||
-    depth < ctrl->cfg.pu_depth_intra.max ||
+    depth < pu_depth_intra.max ||
     (state->frame->slicetype != KVZ_SLICE_I &&
-      depth < ctrl->cfg.pu_depth_inter.max);
+      depth < pu_depth_inter.max);
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
@@ -935,6 +955,14 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
   for (int depth = 1; depth <= MAX_PU_DEPTH; ++depth) {
     work_tree[depth] = work_tree[0];
+  }
+
+  // If the ML depth prediction is enabled, 
+  // generate the depth prediction interval 
+  // for the current lcu
+  constraint_t* constr = state->constraint;
+  if (constr->ml_intra_depth_ctu) {
+	  kvz_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
   }
 
   // Start search from depth 0.

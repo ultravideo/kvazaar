@@ -1,5 +1,6 @@
-#ifndef ENCODER_STATE_CTORS_DTORS_H_
-#define ENCODER_STATE_CTORS_DTORS_H_
+#ifndef ML_CLASSIFIER_INTRA_DEPTH_PRED
+#define ML_CLASSIFIER_INTRA_DEPTH_PRED
+
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,23 +21,18 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \ingroup Control
- * \file
- * Creation and destruction of encoder_state_t.
- */
-
-#include "global.h" // IWYU pragma: keep
 #include "ml_intra_cu_depth_pred.h"
-#include "constraint.h"
-
-// Forward declare because including the header would lead  to a cyclic
-// dependency.
-struct encoder_state_t;
 
 
-int kvz_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void kvz_encoder_state_finalize(struct encoder_state_t *state);
+int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
 
 
-#endif // ENCODER_STATE_CTORS_DTORS_H_
+int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+
+#endif
