@@ -427,7 +427,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
 
 //An unit delay to the encoding process
-static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+/*static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   assert(layer < MAX_LAYERS);
 
@@ -463,7 +463,7 @@ static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk**
   kvz_frame_info tmp_info = *info_out;
   *info_out = d_info_out[layer];
   d_info_out[layer] = tmp_info;
-}
+}*/
 
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
