@@ -1938,10 +1938,10 @@ static void resample2resampleBlockStep_alt2_avx2(const pic_buffer_t* const buffe
   pic_buffer_t* tmp = kvz_newPictureBuffer(param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, 0);
 
   //Vertical resampling
-  kvz_alt2_block_step_resample_func_avx2(buffer, tmp, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, param, is_upscaling, is_luma, 0);
+  kvz_alt1_block_step_resample_func_avx2(buffer, tmp, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->src_height + param->src_padding_y, param, is_upscaling, is_luma, 0);
 
   //Horizontal resampling
-  kvz_alt2_block_step_resample_func_avx2(tmp, buffer, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->trgt_height + param->trgt_padding_y, param, is_upscaling, is_luma, 1);
+  kvz_alt1_block_step_resample_func_avx2(tmp, buffer, 0, 0, 0, 0, param->trgt_width + param->trgt_padding_x, param->trgt_height + param->trgt_padding_y, param, is_upscaling, is_luma, 1);
 
   kvz_deallocatePictureBuffer(tmp);
 }

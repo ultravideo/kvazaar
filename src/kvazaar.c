@@ -469,7 +469,7 @@ static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk**
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //TODO: Account for pic_in containing several input images for different layers
 //Use this function to aggregate the results etc. but otherwise just call kvazaar_encode with the correct encoder
-static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+/*static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   if (data_out) *data_out = NULL;
   if (len_out) memset(len_out, 0, sizeof(uint32_t)*enc->control->layer.max_layers);
@@ -494,7 +494,7 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
   
   kvz_encoder *cur_enc = enc;
 
-  int el_tmvp_enabled = enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
+  int el_tmvp_enabled = false;// enc->next_enc->control->cfg.tmvp_enable && enc->control->cfg.owf > 1; //TODO: does not work when owf == 1; find a work-around
 
   //Pre prepare statest to prevent data-races between ILR states (when copying stuff needed for tmvp)
   while (cur_enc != NULL) {
@@ -585,6 +585,133 @@ static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_da
 
   free(pics_in);
   
+  return 1;
+}*/
+
+//TODO: make a note of this: Asume that info_out is an array with an element for each layer
+//TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
+//Custom encoding loop for scalable encoding
+static int kvazaar_scalable_encode(kvz_encoder *enc,
+  kvz_picture *pic_in,
+  kvz_data_chunk **data_out,
+  uint32_t *len_out,
+  kvz_picture **pic_out,
+  kvz_picture **src_out,
+  kvz_frame_info *info_out)
+{
+  if (data_out) *data_out = NULL;
+  if (len_out) memset(len_out, 0, sizeof(uint32_t)*enc->control->layer.max_layers);
+  if (pic_out) *pic_out = NULL;
+  if (src_out) *src_out = NULL;
+
+  //Pic_in should contain the input images chained using base_image.
+  //Move them to a list for easier access
+  kvz_picture *pics_in[MAX_LAYERS] = { NULL };
+  pics_in[0] = pic_in;
+  if (pic_in != NULL) {
+    for (int i = 1; pic_in->base_image != pic_in; i++) {
+      pics_in[i] = pic_in->base_image;
+      pic_in = pic_in->base_image;
+    }
+  }
+
+  //Make a list of encoders
+  kvz_encoder *enc_list[MAX_LAYERS] = { NULL };
+  int num_enc = 0;
+  while (enc != NULL) {
+    enc_list[num_enc] = enc;
+    num_enc++;
+    enc = enc->next_enc;
+  }
+
+  //Prepare current states
+  for (int i = 0; i < num_enc; i++)
+  {
+    encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
+
+    if (!state->frame->prepared) {
+      kvz_encoder_prepare(state);
+    }
+
+    //Use these to store intermediate values of each encoder and aggregate the results into the actual output parameters
+    kvz_picture *cur_pic_in = kvz_image_scaling(pics_in[enc_list[i]->control->layer.input_layer], &enc_list[i]->control->layer.downscaling, 1);
+
+    if (cur_pic_in != NULL) {
+      // FIXME: The frame number printed here is wrong when GOP is enabled.
+      CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc_list[i]->control->cfg.seek);
+    }
+
+    kvz_picture* frame = kvz_encoder_feed_frame(&enc_list[i]->input_buffer, state, cur_pic_in);
+    if (frame) {
+      assert(state->frame->num == enc_list[i]->frames_started);
+
+      kvz_scalability_prepare(state);
+
+      // Start encoding.
+      kvz_init_one_frame(state, frame);
+      kvz_start_encode_one_frame(state);
+
+      enc_list[i]->frames_started += 1;
+    }
+
+    // If we have finished encoding as many frames as we have started, we are done.
+    if (enc_list[i]->frames_done == enc_list[i]->frames_started) {
+      continue;
+    }
+
+    if (!state->frame->done) {
+      // We started encoding a frame; move to the next encoder state.
+      enc_list[i]->cur_state_num = (enc_list[i]->cur_state_num + 1) % (enc_list[i]->num_encoder_states);
+    }
+
+    encoder_state_t *output_state = &enc_list[i]->states[enc_list[i]->out_state_num];
+    if (!output_state->frame->done &&
+      (cur_pic_in == NULL || enc_list[i]->cur_state_num == enc_list[i]->out_state_num)) {
+
+      kvz_threadqueue_waitfor(enc_list[i]->control->threadqueue, output_state->tqj_bitstream_written);
+      // The job pointer must be set to NULL here since it won't be usable after
+      // the next frame is done.
+      kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
+
+      //Aggregate new stuff
+      // Get stream length before taking chunks since that clears the stream.
+      if (len_out) len_out[i] += kvz_bitstream_tell(&output_state->stream) / 8;
+      if (data_out) {
+        if (*data_out == NULL) {
+          *data_out = kvz_bitstream_take_chunks(&output_state->stream);
+        } else {
+          while ((*data_out)->next != NULL) {
+            data_out = &(*data_out)->next;
+          }
+          (*data_out)->next = kvz_bitstream_take_chunks(&output_state->stream);
+        }
+      }
+      if (pic_out) {
+        if (*pic_out == NULL) {
+          *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
+        } else if (output_state->tile->frame->rec != *pic_out) {
+          (*pic_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
+          pic_out = &(*pic_out)->base_image;
+        }
+      }
+      if (src_out) {
+        if (*src_out == NULL) {
+          *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+        } else if (output_state->tile->frame->source != *src_out) {
+          (*src_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
+          src_out = &(*src_out)->base_image;
+        }
+      }
+      if (info_out) set_frame_info(&info_out[i], output_state);
+
+      output_state->frame->done = 1;
+      output_state->frame->prepared = 0;
+      enc_list[i]->frames_done += 1;
+
+      enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
+    }
+  }
+
   return 1;
 }
 

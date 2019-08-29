@@ -110,26 +110,6 @@ int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
 // ***********************************************
 // Modified for SHVC.
 
-/**
-* Prepare the encoder state for scalability related stuff.
-*
-* - Copy ref list info to the ilr frame for TMVP
-*/
-//TODO: Figure out the correct timing for this
-static void scalability_prepare(encoder_state_t *state)
-{
-  const encoder_control_t * const encoder = state->encoder_control;
-
-  if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
-    const encoder_state_t *ILR_state = state->ILR_state;
-    // Store current ilr frames list of POCs for use in TMVP derivation
-    memcpy(ILR_state->tile->frame->rec->ref_pocs, ILR_state->frame->ref->pocs, sizeof(int32_t) * ILR_state->frame->ref->used_size);
-    // Also store image info
-    memcpy(ILR_state->tile->frame->rec->picture_info, ILR_state->frame->ref->image_info, sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
-
-  }
-}
-
 //Populate extra rps (rps[num_rps]) if existing rps cannot be used
 static void populate_local_rps(encoder_state_t *const state, kvz_rps_config *const rps)
 {
@@ -1703,17 +1683,22 @@ static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t * const s
   return cua;
 }
 
+
 /**
-* Handle adding ilr frames to the ref list.
+* Prepare the encoder state for scalability related stuff.
 *
+* - Copy ref list info to the ilr frame for TMVP
 * - Add ilr frame to the ref list if ilr is enabled
 * - Prepare scaling jobs if threads are used or do scaling
 */
-static void prepare_ilr_frames(encoder_state_t * const state)
+//TODO: Figure out the correct timing for this
+void kvz_scalability_prepare(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-    //TODO: Account for adding several ILR frames. Should ilr rec ever bee NULL?
+
   if (encoder->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
+    
+    //TODO: Account for adding several ILR frames. Should ilr rec ever bee NULL?
     //Add base layer to the reference list.
     const encoder_state_t *ILR_state = state->ILR_state;
     kvz_picture *ilr_rec = kvz_image_copy_ref(ILR_state->tile->frame->rec);
@@ -1749,10 +1734,13 @@ static void prepare_ilr_frames(encoder_state_t * const state)
     }
 
     //Copy image ref info
-    //TODO: Is there a way to determine how many refs ilr_rec has? Otherwise just copy everything to be safe
-    memcpy(scaled_pic->ref_pocs, ilr_rec->ref_pocs, sizeof(ilr_rec->ref_pocs));//sizeof(int32_t) * ILR_state->frame->ref->used_size);
-    memcpy(scaled_pic->picture_info, ilr_rec->picture_info, sizeof(ilr_rec->picture_info));//sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
-    kvz_image_free(ilr_rec);
+    // Store current ilr frames list of POCs for use in TMVP derivation
+    //memcpy(ILR_state->tile->frame->rec->ref_pocs, ILR_state->frame->ref->pocs, sizeof(int32_t) * ILR_state->frame->ref->used_size);
+    // Also store image info
+    //memcpy(ILR_state->tile->frame->rec->picture_info, ILR_state->frame->ref->image_info, sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
+    
+    memcpy(scaled_pic->ref_pocs, ILR_state->frame->ref->pocs, sizeof(int32_t) * ILR_state->frame->ref->used_size);
+    memcpy(scaled_pic->picture_info, ILR_state->frame->ref->image_info, sizeof(kvz_picture_info_t) * ILR_state->frame->ref->used_size);
 
     kvz_image_list_add(state->frame->ref,
       scaled_pic,
@@ -1763,6 +1751,8 @@ static void prepare_ilr_frames(encoder_state_t * const state)
       ILR_state->encoder_control->layer.layer_id,
       1); //Currently only ILR can be a long term references
           //TODO: Add error handling?
+
+    kvz_image_free(ilr_rec);
     kvz_image_free(scaled_pic);
     kvz_cu_array_free(&scaled_cu);
   }
@@ -3152,20 +3142,19 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
 }
 
 
-void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
+// ***********************************************
+// Modified for SHVC.
+void kvz_init_one_frame(encoder_state_t * const state, kvz_picture *frame) 
 {
-  // ***********************************************
-  // Modified for SHVC.
-  // Do scalability preparation here so that the ilr rec is set when using gop
-  //scalability_prepare(state);
-  prepare_ilr_frames(state);
-  // ***********************************************
-
   encoder_state_init_new_frame(state, frame);
   // ***********************************************
   // Modified for SHVC.
   encoder_state_set_rps(state);
   // ***********************************************
+}
+
+void kvz_start_encode_one_frame(encoder_state_t * const state)
+{
   encoder_state_encode(state);
 
   threadqueue_job_t *job =
@@ -3183,9 +3172,20 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   state->frame->done = 0;
 }
 
+void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
+{
+  // ***********************************************
+  // Modified for SHVC.
+  // Do scalability preparation here so that the ilr rec is set when using gop
+  //scalability_prepare(state);
+  //prepare_ilr_frames(state);
+  // ***********************************************
 
-// ***********************************************
-// Modified for SHVC.
+  kvz_init_one_frame(state, frame);
+
+  kvz_start_encode_one_frame(state);
+}
+
 
 /**
  * Prepare the encoder state for encoding the next frame.
@@ -3210,8 +3210,10 @@ void kvz_encoder_prepare(encoder_state_t *state)
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
     assert(!state->tile->frame->cu_array);
+
     //scalability_prepare(state);
     //add_ilr_frames(state);//Need to do this here so that the first el frame can be inter
+    //prepare_ilr_frames(state);
 
     state->frame->prepared = 1;
     return;
@@ -3262,8 +3264,9 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
-  scalability_prepare(state);
+  //scalability_prepare(state);
   //add_ilr_frames(state);
+  //prepare_ilr_frames(state);
 
   // Remove source and reconstructed picture.
   kvz_image_free(state->tile->frame->source);

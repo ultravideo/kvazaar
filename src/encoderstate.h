@@ -349,6 +349,12 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
 
 // ***********************************************
     // Modified for SHVC.
+void kvz_init_one_frame(encoder_state_t * const state, kvz_picture *frame);
+
+void kvz_start_encode_one_frame(encoder_state_t * const state);
+
+void kvz_scalability_prepare(encoder_state_t *state);
+
 int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state);
 // ***********************************************
 
