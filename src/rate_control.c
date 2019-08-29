@@ -159,8 +159,8 @@ static double pic_allocate_bits(encoder_state_t * const state)
     return state->frame->cur_gop_target_bits;
   }
 
-  const double pic_weight = encoder->gop_layer_weights[
-    encoder->cfg.gop[state->frame->gop_offset].layer - 1];
+  const double pic_weight = state->frame->poc != 0 ? encoder->gop_layer_weights[
+    encoder->cfg.gop[state->frame->gop_offset].layer - 1] : 1;
   const double pic_target_bits =
     state->frame->cur_gop_target_bits * pic_weight - pic_header_bits(state);
   // Allocate at least 100 bits for each picture like HM does.
