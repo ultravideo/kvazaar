@@ -69,7 +69,7 @@ static void update_parameters(uint32_t bits,
  * \param state   the main encoder state
  * \return        target number of bits
  */
-static double gop_allocate_bits(encoder_state_t * const state)
+static double gop_allocate_bits(encoder_state_t * const state, int gop_length)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
@@ -90,7 +90,7 @@ static double gop_allocate_bits(encoder_state_t * const state)
   // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
   double gop_target_bits =
     (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
-    * MAX(1, encoder->cfg.gop_len) / SMOOTHING_WINDOW;
+    * MAX(1, gop_length) / SMOOTHING_WINDOW;
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
@@ -148,7 +148,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
       state->frame->num == 0)
   {
     // A new GOP starts at this frame.
-    state->frame->cur_gop_target_bits = gop_allocate_bits(state);
+    state->frame->cur_gop_target_bits = gop_allocate_bits(state, state->frame->poc == 0 ? 1 : encoder->cfg.gop_len);
     state->frame->cur_gop_bits_coded  = 0;
   } else {
     state->frame->cur_gop_target_bits =
@@ -295,7 +295,8 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
 
-  } else if (ctrl->cfg.target_bitrate > 0) {
+  }
+  else if (ctrl->cfg.target_bitrate > 0) {
     lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
