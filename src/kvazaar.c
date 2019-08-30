@@ -649,6 +649,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
       // Start encoding.
       kvz_init_one_frame(state, frame);
+      frame = NULL;
       kvz_start_encode_one_frame(state);
 
       enc_list[i]->frames_started += 1;
@@ -656,6 +657,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
     // If we have finished encoding as many frames as we have started, we are done.
     if (enc_list[i]->frames_done == enc_list[i]->frames_started) {
+      kvz_image_free(cur_pic_in);
       continue;
     }
 
@@ -710,6 +712,8 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
       enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
     }
+
+    kvz_image_free(cur_pic_in);
   }
 
   return 1;
