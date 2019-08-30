@@ -625,7 +625,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
   }
 
   //For keeping track of states
-  int frame_initialized[MAX_LAYERS] = { 0 };
+  //int frame_initialized[MAX_LAYERS] = { 0 };
   int pic_in_is_null[MAX_LAYERS] = { 0 };
 
   //Prepare current states
@@ -653,7 +653,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
       kvz_scalability_prepare(state);
 
       kvz_init_one_frame(state, frame);
-      frame_initialized[i] = true;
+      //frame_initialized[i] = true;
 
       kvz_start_encode_one_frame(state);
       enc_list[i]->frames_started += 1;
