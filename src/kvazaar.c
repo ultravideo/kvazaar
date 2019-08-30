@@ -629,8 +629,8 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
   int pic_in_is_null[MAX_LAYERS] = { 0 };
 
   //Prepare current states
-  for (int i = 0; i < num_enc; i++)
-  {
+  for (int i = 0; i < num_enc; i++){
+    
     encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
 
     if (!state->frame->prepared) {
@@ -654,21 +654,24 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
       kvz_init_one_frame(state, frame);
       frame_initialized[i] = true;
+
+      kvz_start_encode_one_frame(state);
+      enc_list[i]->frames_started += 1;
     }
 
     kvz_image_free(cur_pic_in);
   }
 
-  //Start encoding frames
-  for (int i = 0; i < num_enc; i++) {
+  ////Start encoding frames
+  //for (int i = 0; i < num_enc; i++) {
 
-    encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
+  //  encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
 
-    if (frame_initialized[i]) {
-      kvz_start_encode_one_frame(state);
-      enc_list[i]->frames_started += 1;
-    }
-  }
+  //  if (frame_initialized[i]) {
+  //    kvz_start_encode_one_frame(state);
+  //    enc_list[i]->frames_started += 1;
+  //  }
+  //}
 
   //Get output and move to next state etc.
   for (int i = 0; i < num_enc; i++) {
