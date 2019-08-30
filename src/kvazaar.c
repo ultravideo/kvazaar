@@ -624,6 +624,10 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
     enc = enc->next_enc;
   }
 
+  //For keeping track of states
+  int frame_initialized[MAX_LAYERS] = { 0 };
+  int pic_in_is_null[MAX_LAYERS] = { 0 };
+
   //Prepare current states
   for (int i = 0; i < num_enc; i++)
   {
@@ -635,6 +639,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
     //Use these to store intermediate values of each encoder and aggregate the results into the actual output parameters
     kvz_picture *cur_pic_in = kvz_image_scaling(pics_in[enc_list[i]->control->layer.input_layer], &enc_list[i]->control->layer.downscaling, 1);
+    pic_in_is_null[i] = cur_pic_in == NULL;
 
     if (cur_pic_in != NULL) {
       // FIXME: The frame number printed here is wrong when GOP is enabled.
@@ -647,19 +652,33 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
       kvz_scalability_prepare(state);
 
-      // Start encoding.
       kvz_init_one_frame(state, frame);
-      frame = NULL;
-      kvz_start_encode_one_frame(state);
+      frame_initialized[i] = true;
+    }
 
+    kvz_image_free(cur_pic_in);
+  }
+
+  //Start encoding frames
+  for (int i = 0; i < num_enc; i++) {
+
+    encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
+
+    if (frame_initialized[i]) {
+      kvz_start_encode_one_frame(state);
       enc_list[i]->frames_started += 1;
     }
+  }
+
+  //Get output and move to next state etc.
+  for (int i = 0; i < num_enc; i++) {
 
     // If we have finished encoding as many frames as we have started, we are done.
     if (enc_list[i]->frames_done == enc_list[i]->frames_started) {
-      kvz_image_free(cur_pic_in);
       continue;
     }
+
+    encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
 
     if (!state->frame->done) {
       // We started encoding a frame; move to the next encoder state.
@@ -668,7 +687,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
     encoder_state_t *output_state = &enc_list[i]->states[enc_list[i]->out_state_num];
     if (!output_state->frame->done &&
-      (cur_pic_in == NULL || enc_list[i]->cur_state_num == enc_list[i]->out_state_num)) {
+      (pic_in_is_null[i] || enc_list[i]->cur_state_num == enc_list[i]->out_state_num)) {
 
       kvz_threadqueue_waitfor(enc_list[i]->control->threadqueue, output_state->tqj_bitstream_written);
       // The job pointer must be set to NULL here since it won't be usable after
@@ -712,8 +731,6 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
       enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
     }
-
-    kvz_image_free(cur_pic_in);
   }
 
   return 1;
