@@ -588,6 +588,13 @@ static int kvazaar_encode(kvz_encoder *enc,
   return 1;
 }*/
 
+//Debug stuff for printing thread info
+#if 1 && defined(linux)
+#define PRINT_INFO(name,poc,lid) fprintf(stderr, "%s: poc: %d, lid: %d\n", name, poc, lid)
+#else
+#define PRINT_INFO(name,poc,lid)
+#endif
+
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //Custom encoding loop for scalable encoding
@@ -635,6 +642,7 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
     if (!state->frame->prepared) {
       kvz_encoder_prepare(state);
+      PRINT_INFO("Prepare state", state->frame->poc, i);
     }
 
     //Use these to store intermediate values of each encoder and aggregate the results into the actual output parameters
