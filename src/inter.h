@@ -48,6 +48,15 @@ void kvz_inter_recon_cu(const encoder_state_t * const state,
                         bool predict_luma,
                         bool predict_chroma);
 
+void kvz_inter_pred_pu(const encoder_state_t * const state,
+  lcu_t *lcu,
+  int32_t x,
+  int32_t y,
+  int32_t width,
+  bool predict_luma,
+  bool predict_chroma,
+  int i_pu);
+
 void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             const kvz_picture * ref1,
                             const kvz_picture * ref2,

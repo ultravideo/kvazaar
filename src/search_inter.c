@@ -1579,7 +1579,7 @@ static void search_pu_inter(encoder_state_t * const state,
       continue;
     }
 
-    kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
+    kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
     mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
       lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
