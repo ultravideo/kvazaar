@@ -604,7 +604,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
         kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
 
-        kvz_inter_recon_cu(state, lcu, x, y, cu_width);
+        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+        kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
 
         if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
           //Calculate cost for zero coeffs
@@ -612,7 +613,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         }
 
-        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
         kvz_quantize_lcu_residual(state,
           true, has_chroma,
           x, y, depth,

@@ -548,7 +548,9 @@ static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
 	lcu_t* lcu,
 	kvz_pixel* temp_lcu_y,
 	kvz_pixel* temp_lcu_u,
-	kvz_pixel* temp_lcu_v) {
+	kvz_pixel* temp_lcu_v,
+  bool predict_luma,
+  bool predict_chroma) {
 
 	int shift = 15 - KVZ_BIT_DEPTH;
 	int offset = 1 << (shift - 1);
@@ -564,12 +566,14 @@ static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
 			y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
 			x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
 
-			int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-			int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+      if (predict_luma) {
+        int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
 
-			lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+      }
 
-			if (temp_x < width >> 1 && temp_y < height >> 1) {
+			if (predict_chroma && (temp_x < width >> 1 && temp_y < height >> 1)) {
 
 				y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
 				x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));

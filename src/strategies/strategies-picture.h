@@ -27,6 +27,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "inter.h"
 #include "kvazaar.h"
 #include "encoderstate.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
@@ -133,9 +134,9 @@ typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
 	lcu_t* lcu,
 	kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
 	kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-	kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C]);
-	
-	
+	kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C],
+    bool predict_luma,
+    bool predict_chroma);	
 
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;
