@@ -2336,7 +2336,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
 
-  PRINT_TID_LCU_JOB_INFO(lcu->position_px.x, lcu->position_px.y, lcu->size.x, lcu->size.y, lcu->id, frame->poc, encoder->layer.layer_id);
+  PRINT_TID_LCU_JOB_INFO(lcu->position_px.x, lcu->position_px.y, lcu->size.x, lcu->size.y, lcu->id, state->frame->poc, encoder->layer.layer_id);
 
   kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
