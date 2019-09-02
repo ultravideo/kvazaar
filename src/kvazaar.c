@@ -427,7 +427,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
 
 //An unit delay to the encoding process
-/*static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   assert(layer < MAX_LAYERS);
 
@@ -440,30 +440,48 @@ static int kvazaar_encode(kvz_encoder *enc,
   static kvz_frame_info d_info_out[MAX_LAYERS] = { { 0 } };
 
   //Store new value and return the old one
-  void *tmp = (void *)*pic_in;
-  *pic_in = d_pic_in[layer];
-  d_pic_in[layer] = (kvz_picture *)tmp;
+  if (pic_in)
+  {
+    void *tmp = (void *)*pic_in;
+    *pic_in = d_pic_in[layer];
+    d_pic_in[layer] = (kvz_picture *)tmp;
+  }
 
-  tmp = (void *)*data_out;
-  *data_out = d_data_out[layer];
-  d_data_out[layer] = (kvz_data_chunk *)tmp;
+  if (data_out)
+  {
+    void *tmp = (void *)*data_out;
+    *data_out = d_data_out[layer];
+    d_data_out[layer] = (kvz_data_chunk *)tmp;
+  }
 
-  tmp = (void *)*pic_out;
-  *pic_out = d_pic_out[layer];
-  d_pic_out[layer] = (kvz_picture *)tmp;
+  if (pic_out)
+  {
+    void *tmp = (void *)*pic_out;
+    *pic_out = d_pic_out[layer];
+    d_pic_out[layer] = (kvz_picture *)tmp;
+  }
 
-  tmp = (void *)*src_out;
-  *src_out = d_src_out[layer];
-  d_src_out[layer] = (kvz_picture *)tmp;
+  if (src_out)
+  {
+    void *tmp = (void *)*src_out;
+    *src_out = d_src_out[layer];
+    d_src_out[layer] = (kvz_picture *)tmp;
+  }
 
-  uint32_t tmp_len = *len_out;
-  *len_out = d_len_out[layer];
-  d_len_out[layer] = tmp_len;
+  if (len_out)
+  {
+    uint32_t tmp_len = *len_out;
+    *len_out = d_len_out[layer];
+    d_len_out[layer] = tmp_len;
+  }
 
-  kvz_frame_info tmp_info = *info_out;
-  *info_out = d_info_out[layer];
-  d_info_out[layer] = tmp_info;
-}*/
+  if (info_out)
+  {
+    kvz_frame_info tmp_info = *info_out;
+    *info_out = d_info_out[layer];
+    d_info_out[layer] = tmp_info;
+  }
+}
 
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
@@ -625,10 +643,15 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
   //Make a list of encoders
   kvz_encoder *enc_list[MAX_LAYERS] = { NULL };
   int num_enc = 0;
+  int add_delay = false;
   while (enc != NULL) {
     enc_list[num_enc] = enc;
     num_enc++;
     enc = enc->next_enc;
+
+    if (num_enc > 1) {
+      add_delay |= enc_list[num_enc - 1]->control->cfg.tmvp_enable && enc_list[num_enc - 1]->control->cfg.owf > 1 && (enc_list[num_enc - 1]->control->layer.upscaling.src_height == enc_list[num_enc - 1]->control->layer.upscaling.trgt_height && enc_list[num_enc - 1]->control->layer.upscaling.src_width == enc_list[num_enc - 1]->control->layer.upscaling.trgt_width); //TODO: does not work when owf == 1; find a work-around. Only needed if no upsampling is done?
+    }
   }
 
   //For keeping track of states
@@ -648,6 +671,11 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
     //Use these to store intermediate values of each encoder and aggregate the results into the actual output parameters
     kvz_picture *cur_pic_in = kvz_image_scaling(pics_in[enc_list[i]->control->layer.input_layer], &enc_list[i]->control->layer.downscaling, 1);
     pic_in_is_null[i] = cur_pic_in == NULL;
+
+    if (add_delay && i > 0) {
+      //TODO: Account for multiple EL layers needing to be delayed (when EL references another EL)
+      encode_delay(i, &cur_pic_in, data_out, &(len_out[i]), pic_out, src_out, &(info_out[i]));
+    }
 
     if (cur_pic_in != NULL) {
       // FIXME: The frame number printed here is wrong when GOP is enabled.
@@ -741,6 +769,10 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
       enc_list[i]->frames_done += 1;
 
       enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
+    }
+
+    if (add_delay && i == 0) {
+      encode_delay(i, NULL, data_out, &(len_out[i]), pic_out, src_out, &(info_out[i]));
     }
   }
 
