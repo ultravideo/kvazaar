@@ -53,6 +53,8 @@ typedef struct lcu_stats_t {
   //! \brief Number of bits that were spent
   uint32_t bits;
 
+  uint32_t pixels;
+
   //! \brief Weight of the LCU for rate control
   double weight;
 
@@ -140,6 +142,18 @@ typedef struct encoder_state_config_frame_t {
    * Used for rate control.
    */
   lcu_stats_t *lcu_stats;
+
+  struct
+  {
+    double *c_para[KVZ_MAX_GOP_LAYERS];
+    double *k_para[KVZ_MAX_GOP_LAYERS];
+    double pic_c_para[KVZ_MAX_GOP_LAYERS];
+    double pic_k_para[KVZ_MAX_GOP_LAYERS];
+    double *intra_slice_bpp;
+    double *intra_slice_dis;
+    double previous_lambdas[KVZ_MAX_GOP_LAYERS+1];
+    double last_frame_lambda;
+  } new_lookahead;
 
   /**
    * \brief Whether next NAL is the first NAL in the access unit.

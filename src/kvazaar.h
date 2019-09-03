@@ -64,6 +64,11 @@ extern "C" {
  */
 #define KVZ_MAX_GOP_LENGTH 32
 
+
+/**
+* Maximum amount of GoP layers.
+*/
+#define KVZ_MAX_GOP_LAYERS 6
 /**
  * Size of data chunks.
  */
@@ -389,7 +394,7 @@ typedef struct kvz_config
 
   /** \brief Enable Early Skip Mode Decision */
   uint8_t early_skip;
-
+  uint8_t frame_allocation;
 } kvz_config;
 
 /**
