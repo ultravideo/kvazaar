@@ -1565,7 +1565,11 @@ static void search_pu_inter(encoder_state_t * const state,
     cur_cu->inter.mv[1][0] = cur_cand->mv[1][0];
     cur_cu->inter.mv[1][1] = cur_cand->mv[1][1];
 
+    // If bipred is not enabled, do not try candidates with mv_dir == 3.
+    // Bipred is also forbidden for 4x8 and 8x4 blocks by the standard. 
     if (cur_cu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
+    if (cur_cu->inter.mv_dir == 3 && !(width + height > 12)) continue;
+
     bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
       mrg_cands, 
       num_rdo_cands);
