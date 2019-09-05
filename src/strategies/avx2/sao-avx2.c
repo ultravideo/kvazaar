@@ -23,6 +23,9 @@
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
 
+// Use a couple generic functions from here as a worst-case fallback
+#include "strategies/generic/sao_shared_generics.h"
+#include "strategies/missing-intel-intrinsics.h"
 #include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
