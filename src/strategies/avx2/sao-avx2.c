@@ -34,12 +34,25 @@
 #include "sao.h"
 #include "strategyselector.h"
 
+// The calling convention used by MSVC on 32-bit builds will essentially
+// disallow functions to have more than 3 XMM/YMM parameters, because it
+// will not provide more than 8-byte param alignment, and only the first
+// three vector params will be carried in SIMD registers.
+//
+// Because Win32 build is essentially legacy and these functions are all
+// static ones that are never called from more than two or three other
+// functions anyway, we can work around this by inlining them on Win32.
+#if defined _MSC_VER && defined _WIN32 && !defined _WIN64
+  #define INLINE_W32 INLINE
+#else
+  #define INLINE_W32
+#endif
 
 // These optimizations are based heavily on sao-generic.c.
 // Might be useful to check that if (when) this file
 // is difficult to understand.
 
-static int32_t hsum_8x32b(const __m256i v)
+static INLINE_W32 int32_t hsum_8x32b(const __m256i v)
 {
   __m256i sum1 = v;
   __m256i sum2 = _mm256_permute4x64_epi64(sum1, _MM_SHUFFLE(1, 0, 3, 2));
@@ -69,9 +82,9 @@ static INLINE __m256i sign3_diff_epu8(const __m256i a, const __m256i b)
 }
 
 // Mapping of edge_idx values to eo-classes, 32x8b at once
-static __m256i calc_eo_cat(const __m256i a,
-                           const __m256i b,
-                           const __m256i c)
+static INLINE_W32 __m256i calc_eo_cat(const __m256i a,
+                                      const __m256i b,
+                                      const __m256i c)
 {
   const __m256i twos       = _mm256_set1_epi8  (0x02);
   const __m256i idx_to_cat = _mm256_setr_epi64x(0x0403000201, 0,
@@ -222,10 +235,10 @@ static INLINE __m256i broadcast_xmm2ymm(const __m128i v)
 }
 
 // Used for edge_ddistortion and band_ddistortion
-static __m256i calc_diff_off_delta(const __m256i diff_lo,
-                                   const __m256i diff_hi,
-                                   const __m256i offsets,
-                                   const __m256i orig)
+static INLINE_W32 __m256i calc_diff_off_delta(const __m256i diff_lo,
+                                              const __m256i diff_hi,
+                                              const __m256i offsets,
+                                              const __m256i orig)
 {
   const __m256i zero          = _mm256_setzero_si256();
   const __m256i negate_hiword = _mm256_set1_epi32(0xffff0001);
@@ -387,13 +400,13 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
   return hsum_8x32b(sum);
 }
 
-static void calc_edge_dir_one_ymm(const __m256i  a,
-                                  const __m256i  b,
-                                  const __m256i  c,
-                                  const __m256i  orig,
-                                  const __m256i  badbyte_mask,
-                                        __m256i *diff_accum,
-                                        int32_t *hit_cnt)
+static INLINE_W32 void calc_edge_dir_one_ymm(const __m256i  a,
+                                             const __m256i  b,
+                                             const __m256i  c,
+                                             const __m256i  orig,
+                                             const __m256i  badbyte_mask,
+                                                   __m256i *diff_accum,
+                                                   int32_t *hit_cnt)
 {
   const __m256i ones_16 = _mm256_set1_epi16(1);
         __m256i eo_cat  = calc_eo_cat      (a, b, c);
@@ -684,10 +697,10 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
   }
 }
 
-static __m256i do_one_nonband_ymm(const __m256i a,
-                                  const __m256i b,
-                                  const __m256i c,
-                                  const __m256i sao_offs)
+static INLINE_W32 __m256i do_one_nonband_ymm(const __m256i a,
+                                             const __m256i b,
+                                             const __m256i c,
+                                             const __m256i sao_offs)
 {
   const __m256i zero = _mm256_setzero_si256();
 
