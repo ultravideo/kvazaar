@@ -1712,19 +1712,19 @@ void kvz_scalability_prepare(encoder_state_t *state)
       GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height) };
     cu_array_t* scaled_cu = NULL;    
     
-    if (encoder->cfg.threads > 0) {
-      scaled_pic = prepare_deferred_block_step_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
-      scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, 1);
-    }
-    else {
-      scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling, 1);
-      scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
-        state->tile->frame->width_in_lcu,
-        state->tile->frame->height_in_lcu,
-        mv_scale, pos_scale, 1,
-        !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet 
-      state->layer->scaling_started = 1;
-    }
+    //if (encoder->cfg.threads > 0) {
+    scaled_pic = prepare_deferred_block_step_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
+    scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, 1);
+    //}
+    //else {
+    //  scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling, 1);
+    //  scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
+    //    state->tile->frame->width_in_lcu,
+    //    state->tile->frame->height_in_lcu,
+    //    mv_scale, pos_scale, 1,
+    //    !state->encoder_control->cfg.tmvp_enable);//(state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT)); //pic type not set yet 
+    //  state->layer->scaling_started = 1;
+    //}
 
     if (ilr_rec == NULL || scaled_pic == NULL || scaled_cu == NULL) {
       kvz_image_free(ilr_rec);
