@@ -132,6 +132,7 @@ static const struct option long_options[] = {
   { "fast-residual-cost", required_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
+  { "multiview",          required_argument, NULL, 0 },
   { "layer",                    no_argument, NULL, 0 }, //New layer
   { "layer-res",          required_argument, NULL, 0 }, //Set resolution of layer
   { "input-layer",        required_argument, NULL, 0 }, //Manualy set the input layer the current layer uses

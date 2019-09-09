@@ -318,6 +318,7 @@ typedef struct kvz_config
 
   int32_t threads;
   int32_t cpuid;
+  int32_t multiview;
 
   struct {
     int32_t min;
@@ -415,6 +416,7 @@ typedef struct kvz_config
     int wpp;
     int owf;
     int32_t threads;
+    int32_t multiview;
 
     uint8_t max_layers; //This needs to be shared between cfgs
     uint8_t max_input_layers; //Keep trach of how many input layers there are (size of input_*s listst)
