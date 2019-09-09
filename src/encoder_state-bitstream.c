@@ -202,16 +202,21 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
   
-  uint16_t  num_scalability_types = 1; //TODO: calculate from actual mask?
+  bool scalability_mask_flag[16] = { false };
 
-  //for (int i = 0; i < 16; i++){
-    //TODO: Implement scalability mask flags in configuration?
-    //WRITE_U(stream, 0, 1, "scalability_mask_flag[i]");
-    //num_scalability_types += 0;
-  //}
-  //Write in one operation
-  //TODO: implement scalability mask proberly
-  WRITE_U(stream, 0x2000, 16, "scalability_mask_flag[i]"); // 0x2000 = 0010000000000000
+  if(state->encoder_control->cfg.multiview) {
+    scalability_mask_flag[1] = 1; // multiview
+  } else {
+    scalability_mask_flag[2] = 1; // spatial/quality scalability
+  }
+
+  uint16_t num_scalability_types = 0;
+
+  for(int i = 0;i < 16; i++) {
+    WRITE_U(stream, scalability_mask_flag[i], 1, "scalability_mask_flag[i]");
+    if(scalability_mask_flag[i])
+      num_scalability_types++;
+  }
 
   //Value from SHM
   uint8_t dimension_id_len[1] = { 1 };
@@ -1020,13 +1025,21 @@ static void write_short_term_ref_pic_set_v2(bitstream_t *stream, encoder_state_t
     WRITE_UE(stream, rps->num_positive_pics, "num_positive_pics");
     int prev = 0;
     for(int j = 0; j < rps->num_negative_pics; j++){
-      WRITE_UE(stream, prev - rps->delta_poc[j] - 1, "delta_poc_s0_minus1");
+      const int delta_poc_s0_minus1 = prev - rps->delta_poc[j] - 1;
+      // The value of delta_poc_s0_minus1 shall be
+      // in the range of 0 to 2^15 -1, inclusive
+      assert(delta_poc_s0_minus1 >= 0 && delta_poc_s0_minus1 < 32768);
+      WRITE_UE(stream, delta_poc_s0_minus1, "delta_poc_s0_minus1");
       prev = rps->delta_poc[j];
       WRITE_U(stream, rps->is_used[j], 1, "used_by_curr_pic_s0_flag");
     }
     prev = 0;
     for(int j = rps->num_negative_pics; j < rps->num_negative_pics + rps->num_positive_pics; j++){
-      WRITE_UE(stream, rps->delta_poc[j] - prev - 1, "delta_poc_s1_minus1");
+      const int delta_poc_s1_minus1 = rps->delta_poc[j] - prev - 1;
+      // The value of delta_poc_s1_minus1 shall be
+      // in the range of 0 to 2^15 -1, inclusive
+      assert(delta_poc_s1_minus1 >= 0 && delta_poc_s1_minus1 < 32768);
+      WRITE_UE(stream, delta_poc_s1_minus1, "delta_poc_s1_minus1");
       prev = rps->delta_poc[j];
       WRITE_U(stream, rps->is_used[j], 1, "used_by_curr_pic_s1_flag");
     }
