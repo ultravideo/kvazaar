@@ -408,6 +408,10 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
+	if (strncmp(opts->config->roi_file, "auto", 4) == 0) {
+		api->config_parse(opts->config, "roi-file", strcat(opts->input, ".roi"));
+	}
+
   if(opts->config->roi_file) {
     roifile = fopen(opts->config->roi_file, "rb");
     if(roifile == NULL) {
