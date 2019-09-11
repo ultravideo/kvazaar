@@ -882,7 +882,7 @@ void features_init_array(features_s* arr_features, int16_t _size, int _qp)//, in
 * \param _width     Width of the matrix.
 * \return average value of the block, -1 if error.
 */
-INLINE double vect_average_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, size_t _width)
+static INLINE double vect_average_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, size_t _width)
 {
 	if (_mat_src == NULL)
 	{
@@ -916,7 +916,7 @@ INLINE double vect_average_blck_int8(const uint8_t* _mat_src, size_t _x, size_t 
 * \param _width     Width of the matrix.
 * \return average value of the block, -1 if error.
 */
-INLINE double vect_variance_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, double _avg_blck, size_t _width)
+static INLINE double vect_variance_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, double _avg_blck, size_t _width)
 {
 	if (_mat_src == NULL)
 	{
@@ -952,7 +952,7 @@ INLINE double vect_variance_blck_int8(const uint8_t* _mat_src, size_t _x, size_t
 * \param p_variance  Pointer to be filled with the variance;
 * \return None.
 */
-INLINE static void features_var_avg_blck(uint8_t* arr_luma_px, uint32_t i_xLcu, uint32_t i_yLcu,
+static INLINE void features_var_avg_blck(uint8_t* arr_luma_px, uint32_t i_xLcu, uint32_t i_yLcu,
 	uint32_t i_xBlck, uint32_t i_yBlck, uint8_t i_blockSize,
 	int32_t i_width, int32_t i_height,
 	double* p_average, double* p_variance)
