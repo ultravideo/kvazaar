@@ -1164,6 +1164,7 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   kvz_threadqueue_free_job(&state->tqj_recon_done);
 
   //Copy the constraint pointer
+	// TODO: Try to do it in the if (state->is_leaf)
   if (state->parent != NULL) {
 	  state->constraint = state->parent->constraint;
   }
@@ -1342,7 +1343,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   assert(state->frame->done);
 
   // Intialization of the constraint structure
-  state->constraint = kvz_init_const(state->constraint);
+  state->constraint = kvz_init_constraint(state->constraint, encoder);
 
 
   if (state->frame->num == -1) {

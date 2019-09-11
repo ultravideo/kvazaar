@@ -82,8 +82,6 @@ typedef struct {
 
 typedef int (*tree_predict)(features_s*, double*, double*);
 
-#include "ml_classifier_intra_depth_pred.h"
-
 ml_intra_ctu_pred_t* kvz_init_ml_intra_depth_const(void);
 void kvz_end_ml_intra_depth_const(ml_intra_ctu_pred_t * ml_intra_depth_ctu);
 

@@ -23,10 +23,10 @@
 #include "ml_intra_cu_depth_pred.h"
 #include "encoderstate.h"
 
-#define E_CONSTRAINT 1
 
  /* Constraint structure:
-	 Each field corresponds to a constraint technique. The encoder tests if the constraint pointer is allocated to apply the technique.
+	* Each field corresponds to a constraint technique. The encoder tests if the constraint
+	* pointer is allocated to apply the technique.
  */
 typedef struct {
 	// Structure used for the CTU depth prediction using Machine Learning in All Intra 
@@ -34,7 +34,7 @@ typedef struct {
 } constraint_t;
 
 
-void * kvz_init_const(encoder_state_t* state);
-void kvz_end_const(encoder_state_t* state);
+void * kvz_init_constraint(encoder_state_t* state, encoder_control_t * const encoder);
+void kvz_constraint_free(encoder_state_t* state);
 
 #endif

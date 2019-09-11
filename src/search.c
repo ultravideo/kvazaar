@@ -474,8 +474,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   // Assign correct depth limit
   constraint_t* constr = state->constraint;
  if(constr->ml_intra_depth_ctu) {
-	 //pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
-	 //pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
 	 pu_depth_intra.min = constr->ml_intra_depth_ctu->_mat_upper_depth[(x_local >> 3) + (y_local >> 3) * 8];
 	 pu_depth_intra.max = constr->ml_intra_depth_ctu->_mat_lower_depth[(x_local >> 3) + (y_local >> 3) * 8];
   }

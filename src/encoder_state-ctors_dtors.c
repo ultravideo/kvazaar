@@ -708,7 +708,7 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   
   if (!state->parent) {
 	  // End of the constraint structure
-	  kvz_end_const(state);
+	  kvz_constraint_free(state);
   }
 
   kvz_bitstream_finalize(&state->stream);
