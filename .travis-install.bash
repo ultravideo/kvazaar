@@ -6,12 +6,12 @@ set -euvo pipefail
 
 mkdir -p "${HOME}/bin"
 
-wget http://ultravideo.cs.tut.fi/ffmpeg-release-32bit-static.tar.xz
+wget http://ultravideo.cs.tut.fi/ffmpeg-release-4.2.1-32bit-static.tar.xz
 sha256sum -c - << EOF
-4d3302ba0415e08ca10ca578dcd1f0acc48fadc9b803718283c8c670350c903e  ffmpeg-release-32bit-static.tar.xz
+226f55f8a94d71f3d231a20fe59fcbb7f6100cabf663f9bcb887d17b332a91c5  ffmpeg-release-4.2.1-32bit-static.tar.xz
 EOF
-tar xf ffmpeg-release-32bit-static.tar.xz
-cp ffmpeg-2.6.3-32bit-static/ffmpeg "${HOME}/bin/ffmpeg"
+tar xf ffmpeg-release-4.2.1-32bit-static.tar.xz
+cp ffmpeg-4.2.1-i686-static/ffmpeg "${HOME}/bin/ffmpeg"
 chmod +x "${HOME}/bin/ffmpeg"
 
 wget http://ultravideo.cs.tut.fi/ubuntu-12.04-hmdec-16.10.tgz
