@@ -26,7 +26,7 @@
   * \param state   encoder state
   * \return the pointer of constraint_t structure
   */
-void * kvz_init_constraint(encoder_state_t* state, encoder_control_t * const encoder) {
+void * kvz_init_constraint(encoder_state_t* state, encoder_control_t * encoder) {
 	constraint_t* constr = NULL;
 	// Allocate the constraint_t strucutre
 	constr = MALLOC(constraint_t, 1);
