@@ -53,6 +53,8 @@ libkvazaar_la_SOURCES = \
 	checkpoint.h \
 	cfg.c \
 	cfg.h \
+	constraint.c \
+	constraint.h \ 
 	context.c \
 	context.h \
 	cu.c \
@@ -85,6 +87,8 @@ libkvazaar_la_SOURCES = \
 	kvazaar.c \
 	kvazaar_internal.h \
 	kvz_math.h \
+	ml_intra_cu_depth_pred.c \
+	ml_intra_cu_depth_pred.h \
 	nal.c \
 	nal.h \
 	rate_control.c \

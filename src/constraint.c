@@ -26,7 +26,7 @@
   * \param state   encoder state
   * \return the pointer of constraint_t structure
   */
-void * kvz_init_const(encoder_state_t* state) {
+void * kvz_init_constraint(encoder_state_t* state, encoder_control_t * const encoder) {
 	constraint_t* constr = NULL;
 	// Allocate the constraint_t strucutre
 	constr = MALLOC(constraint_t, 1);
@@ -37,7 +37,7 @@ void * kvz_init_const(encoder_state_t* state) {
 
 	// Allocate the ml_intra_ctu_pred_t structure
 	constr->ml_intra_depth_ctu = NULL;
-	if (E_CONSTRAINT == 1) // TODO: Change this by a new param !!
+	if (encoder->cfg.ml_pu_depth_intra) // TODO: Change this by a new param !!
 	{
 		constr->ml_intra_depth_ctu = kvz_init_ml_intra_depth_const();
 	}
@@ -49,9 +49,9 @@ void * kvz_init_const(encoder_state_t* state) {
  *
  * \param state   encoder state
  */
-void kvz_end_const(encoder_state_t* state) {
+void kvz_constraint_free(encoder_state_t* state) {
 	constraint_t* constr = state->constraint;
-	if (E_CONSTRAINT == 1) // TODO: Change this by a new param !!
+	if (constr->ml_intra_depth_ctu) 
 	{
 		kvz_end_ml_intra_depth_const(constr->ml_intra_depth_ctu);
 	}

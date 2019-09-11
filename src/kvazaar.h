@@ -390,6 +390,9 @@ typedef struct kvz_config
   /** \brief Enable Early Skip Mode Decision */
   uint8_t early_skip;
 
+	/** \brief Enable Machine learning CU depth prediction for Intra encoding. */
+	uint8_t ml_pu_depth_intra;
+
 } kvz_config;
 
 /**
