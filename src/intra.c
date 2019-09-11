@@ -665,7 +665,18 @@ void kvz_intra_recon_cu(
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
+  // Reset CBFs because CBFs might have been set
+  // for depth earlier
+  if (mode_luma >= 0) {
+    cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
+  }
+  if (mode_chroma >= 0) {
+    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+  }
+
   if (depth == 0 || cur_cu->tr_depth > depth) {
+
     const int offset = width / 2;
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
@@ -682,7 +693,7 @@ void kvz_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
     };
 
-    if (mode_luma != -1 && depth < MAX_DEPTH) {
+    if (mode_luma != -1 && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
     if (mode_chroma != -1 && depth <= MAX_DEPTH) {

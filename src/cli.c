@@ -130,6 +130,13 @@ static const struct option long_options[] = {
   { "high-tier",                no_argument, NULL, 0 },
   { "me-steps",           required_argument, NULL, 0 },
   { "fast-residual-cost", required_argument, NULL, 0 },
+  { "set-qp-in-cu",             no_argument, NULL, 0 },
+  { "open-gop",                 no_argument, NULL, 0 },
+  { "no-open-gop",              no_argument, NULL, 0 },
+  { "scaling-list",       required_argument, NULL, 0 },
+  { "max-merge",          required_argument, NULL, 0 },
+  { "early-skip",               no_argument, NULL, 0 },
+  { "no-early-skip",            no_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
   { "multiview",          required_argument, NULL, 0 },
@@ -484,7 +491,12 @@ void print_help(void)
     "                                   - 8: B-frame pyramid of length 8\n"
     "                                   - lp-<string>: Low-delay P-frame GOP\n"
     "                                     (e.g. lp-g8d4t2, see README)\n"
+    "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
+    "      --scaling-list <string>: Set scaling list mode. [off]\n"
+    "                                   - off: Disable scaling lists.\n"
+    "                                   - custom: use custom list (with --cqmfile).\n"
+    "                                   - default: Use default lists.\n"
     "      --bitrate <integer>    : Target bitrate [0]\n"
     "                                   - 0: Disable rate control.\n"
     "                                   - N: Target N bits per second.\n"
@@ -499,6 +511,8 @@ void print_help(void)
     "                               the QP delta map followed by width*height delta\n"
     "                               QP values in raster order. The map can be of any\n"
     "                               size and will be scaled to the video size.\n"
+    "      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.\n"
+    "                               in PPS and slice_qp_delta in slize header zero.\n"
     "      --(no-)erp-aqp         : Use adaptive QP for 360 degree video with\n"
     "                               equirectangular projection. [disabled]\n"
     "      --level <number>       : Use the given HEVC level in the output and give\n"
@@ -567,6 +581,12 @@ void print_help(void)
     "                                   when QP is below the limit. [0]\n"
     "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
     "                               a zero coefficient CU is found. [disabled]\n"
+    "      --(no-)early-skip      : Try to find skip cu from merge candidates.\n"
+    "                               Perform no further search if skip is found.\n"
+    "                               For rd=0..1: Try the first candidate.\n"
+    "                               For rd=2.. : Try the best candidate based\n"
+    "                                            on luma satd cost. [enabled]\n"
+    "      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]\n"
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"

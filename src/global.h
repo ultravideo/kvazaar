@@ -206,7 +206,7 @@ typedef int16_t coeff_t;
 // NOTE: When making a release, check to see if incrementing libversion in 
 // configure.ac is necessary.
 #ifndef KVZ_VERSION
-#define KVZ_VERSION 1.2.0
+#define KVZ_VERSION 1.3.0
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
@@ -239,8 +239,10 @@ typedef int16_t coeff_t;
 #ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) (type *)malloc(sizeof(type) * (num) + (padding))
 #else
   #define MALLOC(type, num) malloc(sizeof(type) * (num))
+  #define MALLOC_SIMD_PADDED(type, num, padding) malloc(sizeof(type) * (num) + (padding))
 #endif
 
 // Use memset through FILL and FILL_ARRAY when appropriate, such as when

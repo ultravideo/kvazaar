@@ -86,6 +86,11 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     return 0;
   }
   
+  if (!kvz_strategy_register_encode(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_encode failed!\n");
+    return 0;
+  }
+  
   //*********************************************
   //For scalable extension.
   if (!kvz_strategy_register_resample(&strategies)) {
@@ -376,40 +381,23 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
-#  if defined(__linux__)
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/auxvec.h>
+#  if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD__ >= 12)
+#ifdef __linux__
 #include <asm/cputable.h>
+#else
+#include <machine/cpu.h>
+#endif
+#include <sys/auxv.h>
 
-//Source: http://freevec.org/function/altivec_runtime_detection_linux
 static int altivec_available(void)
 {
-    int result = 0;
-    unsigned long buf[64];
-    ssize_t count;
-    int fd, i;
- 
-    fd = open("/proc/self/auxv", O_RDONLY);
-    if (fd < 0) {
-        return 0;
-    }
-    // loop on reading
-    do {
-        count = read(fd, buf, sizeof(buf));
-        if (count < 0)
-            break;
-        for (i=0; i < (count / sizeof(unsigned long)); i += 2) {
-            if (buf[i] == AT_HWCAP) {
-                result = !!(buf[i+1] & PPC_FEATURE_HAS_ALTIVEC);
-                goto out_close;
-            } else if (buf[i] == AT_NULL)
-                goto out_close;
-        }
-    } while (count == sizeof(buf));
-out_close:
-    close(fd);
-    return result;
+    unsigned long hwcap = 0;
+#ifdef __linux__
+    hwcap = getauxval(AT_HWCAP);
+#else
+    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+#endif
+    return !!(hwcap & PPC_FEATURE_HAS_ALTIVEC);
 }
 #  elif defined(__FreeBSD__)
 #include <sys/types.h>

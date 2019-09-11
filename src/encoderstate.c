@@ -2448,7 +2448,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   const encoder_control_t *ctrl = state->encoder_control;
   const kvz_config *cfg = &ctrl->cfg;
 
-  state->last_qp = state->frame->QP;
+  // Signaled slice QP may be different to frame QP with set-qp-in-cu enabled.
+  state->last_qp = ctrl->cfg.set_qp_in_cu ? 26 : state->frame->QP;
 
   if (cfg->crypto_features) {
     state->crypto_hdl = kvz_crypto_create(cfg);
@@ -2533,6 +2534,21 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             dep_lcu = dep_lcu->right;
           }
           kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+
+          // Very spesific bug that happens when owf length is longer than the
+          // gop length. Takes care of that.
+          if(!state->encoder_control->cfg.gop_lowdelay &&
+             state->encoder_control->cfg.open_gop &&
+             state->encoder_control->cfg.gop_len != 0 &&
+             state->encoder_control->cfg.owf > state->encoder_control->cfg.gop_len &&
+             ref_state->frame->slicetype == KVZ_SLICE_I &&
+             ref_state->frame->num != 0){
+
+            while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
+              ref_state = ref_state->previous_encoder_state;
+            }
+            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+          }
         }
 
         // Add local WPP dependancy to the LCU on the left.
@@ -3012,7 +3028,7 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   if (state->is_leaf) {
     //Leaf states have cabac and context
     kvz_cabac_start(&state->cabac);
-    kvz_init_contexts(state, state->frame->QP, state->frame->slicetype);
+    kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
   }
 
   //Clear the jobs
@@ -3058,14 +3074,38 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->height
   );
 
+  // Use this flag to handle closed gop irap picture selection.
+  // If set to true, irap is already set and we avoid
+  // setting it based on the intra period
+  bool is_closed_normal_gop = false;
+
   // Set POC.
   if (state->frame->num == 0) {
     state->frame->poc = 0;
   } else if (cfg->gop_len && !cfg->gop_lowdelay) {
-    // Calculate POC according to the global frame counter and GOP structure
-    int32_t poc = state->frame->num - 1;
-    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
-    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
+
+    int32_t framenum = state->frame->num - 1;
+    // Handle closed GOP
+    // Closed GOP structure has an extra IDR between the GOPs
+    if (cfg->intra_period > 0 && !cfg->open_gop) {
+      is_closed_normal_gop = true;
+      if (framenum % (cfg->intra_period + 1) == cfg->intra_period) {
+        // Insert IDR before each new GOP after intra period in closed GOP configuration
+        state->frame->poc = 0;
+      } else {
+        // Calculate frame number again and use that for the POC
+        framenum = framenum % (cfg->intra_period + 1);
+        int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
+        state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
+        // This should not be an irap picture in closed GOP
+        state->frame->is_irap = false;
+      }
+    } else { // Open GOP
+      // Calculate POC according to the global frame counter and GOP structure
+      int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
+      state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
+    }
+    
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else if (cfg->intra_period > 0) {
     state->frame->poc = state->frame->num % cfg->intra_period;
@@ -3074,9 +3114,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   // Check whether the frame is a keyframe or not.
-  if (state->frame->num == 0) {
+  if (state->frame->num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
-  } else {
+  } else if(!is_closed_normal_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
       cfg->intra_period > 0 &&
       (state->frame->poc % cfg->intra_period) == 0;
@@ -3091,7 +3131,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     if (state->frame->num == 0 ||
         cfg->intra_period == 1 ||
         cfg->gop_len == 0 ||
-        cfg->gop_lowdelay)
+        cfg->gop_lowdelay ||
+        !cfg->open_gop) // Closed GOP uses IDR pictures
     {
       state->frame->pictype = KVZ_NAL_IDR_W_RADL;
     } else {

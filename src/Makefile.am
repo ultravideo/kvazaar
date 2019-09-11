@@ -124,8 +124,12 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/quant-generic.h \
 	strategies/generic/sao-generic.c \
 	strategies/generic/sao-generic.h \
-    strategies/generic/resample-generic.c \
-    strategies/generic/resample-generic.h \
+	strategies/generic/encode_coding_tree-generic.c \
+	strategies/generic/encode_coding_tree-generic.h \
+	strategies/missing-intel-intrinsics.h \
+	strategies/optimized_sad_func_ptr_t.h \
+	strategies/generic/resample-generic.c \
+	strategies/generic/resample-generic.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -141,8 +145,10 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-quant.h \
 	strategies/strategies-sao.c \
 	strategies/strategies-sao.h \
-    strategies/strategies-resample.c \
-    strategies/strategies-resample.h \
+	strategies/strategies-encode.c \
+	strategies/strategies-encode.h \
+	strategies/strategies-resample.c \
+	strategies/strategies-resample.h \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
@@ -151,7 +157,7 @@ libkvazaar_la_SOURCES = \
 	extras/libmd5.h \
 	extras/crypto.h \
 	scaler/scaler.h \
-    scaler/scaler-util.h \
+	scaler/scaler-util.h \
 	scaler/scaler.c \
 	scaler/scaler-util.c
 
@@ -183,6 +189,7 @@ libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.h
 
 libavx2_la_SOURCES = \
+	strategies/avx2/avx2_common_functions.h \
 	strategies/avx2/dct-avx2.c \
 	strategies/avx2/dct-avx2.h \
 	strategies/avx2/intra-avx2.c \
@@ -193,12 +200,16 @@ libavx2_la_SOURCES = \
 	strategies/avx2/picture-avx2.h \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
+	strategies/avx2/reg_sad_pow2_widths-avx2.h \
 	strategies/avx2/sao-avx2.c \
 	strategies/avx2/sao-avx2.h \
-    strategies/avx2/resample-avx2.c \
-    strategies/avx2/resample-avx2.h \
-    scaler/scaler-avx2.c \
-    scaler/scaler-avx2.h
+	strategies/avx2/encode_coding_tree-avx2.c \
+	strategies/avx2/encode_coding_tree-avx2.h \
+	strategies/avx2/sao-avx2.h \
+	strategies/avx2/resample-avx2.c \
+	strategies/avx2/resample-avx2.h \
+	scaler/scaler-avx2.c \
+	scaler/scaler-avx2.h
 
 libsse2_la_SOURCES = \
 	strategies/sse2/picture-sse2.c \
@@ -206,7 +217,8 @@ libsse2_la_SOURCES = \
 
 libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.c \
-	strategies/sse41/picture-sse41.h
+	strategies/sse41/picture-sse41.h \
+	strategies/sse41/reg_sad_pow2_widths-sse41.h
 
 if HAVE_PPC
 
@@ -219,7 +231,7 @@ endif #HAVE_PPC
 if HAVE_X86
 
 if HAVE_AVX2
-libavx2_la_CFLAGS = -mavx2
+libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mbmi2
 endif
 if HAVE_SSE4_1
 libsse41_la_CFLAGS = -msse4.1

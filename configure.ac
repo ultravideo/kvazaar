@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=4
-ver_minor=1
+ver_minor=2
 ver_release=0
 
 # Prevents configure from adding a lot of defines to the CFLAGS
@@ -49,9 +49,12 @@ AX_CHECK_COMPILE_FLAG([-maltivec],[flag_altivec="true"])
 AX_CHECK_COMPILE_FLAG([-mavx2],   [flag_avx2="true"])
 AX_CHECK_COMPILE_FLAG([-msse4.1], [flag_sse4_1="true"])
 AX_CHECK_COMPILE_FLAG([-msse2],   [flag_sse2="true"])
+AX_CHECK_COMPILE_FLAG([-mbmi],    [flag_bmi="true"])
+AX_CHECK_COMPILE_FLAG([-mabm],    [flag_abm="true"])
+AX_CHECK_COMPILE_FLAG([-mbmi2],   [flag_bmi2="true"])
 
 AM_CONDITIONAL([HAVE_ALTIVEC], [test x"$flag_altivec" = x"true"])
-AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
+AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true" -a x"$flag_bmi" = x"true" -a x"$flag_abm" = x"true" -a x"$flag_bmi2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
@@ -119,6 +122,15 @@ AS_CASE([$host_os],
         ],
         [cygwin*|msys*|mingw*], [
          CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO=1"
+         AS_IF(
+               [test "x$BITS" = "x32"], [
+                ASFLAGS="$ASFLAGS -fwin32 -DPREFIX -DHAVE_ALIGNED_STACK=0"
+               ], [
+                ASFLAGS="$ASFLAGS -fwin64 -DHAVE_ALIGNED_STACK=1"
+               ]
+         )
+        ],
+         [midipix*], [
          AS_IF(
                [test "x$BITS" = "x32"], [
                 ASFLAGS="$ASFLAGS -fwin32 -DPREFIX -DHAVE_ALIGNED_STACK=0"

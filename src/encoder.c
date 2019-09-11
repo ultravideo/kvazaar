@@ -212,6 +212,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
   encoder_control_t *encoder = NULL;
   encoder_control_t *prev_enc = NULL;
   encoder_control_t *first_enc = NULL;
+  kvz_config *prev_cfg = NULL;
 
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
@@ -340,9 +341,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
     if (encoder->cfg.threads < 0) {
       encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
-     
       
-
       if ( cfg->shared != NULL && cfg->shared->owf >= 0) {
         if (encoder->cfg.layer == 0){
           fprintf(stderr, "Layer 0:\n");
@@ -387,11 +386,29 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->vui.field_seq_flag = encoder->cfg.source_scan_type != 0;
     encoder->vui.frame_field_info_present_flag = encoder->cfg.source_scan_type != 0;
 
+    // ***********************************************
+    // Modified for SHVC.
+    // Set scaling list infering. TODO: Account for more complex ref structure
+    encoder->layer.sps_infer_scaling_list_flag = 0;
+    if(prev_cfg != NULL){
+      if((cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM && cfg->cqmfile && prev_cfg->cqmfile && strcmp(cfg->cqmfile, prev_cfg->cqmfile))
+      || (cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->scaling_list.enable)){
+        encoder->layer.sps_infer_scaling_list_flag = 1;
+      }
+      //Bitstream conformance requires that the reference scaling list is not inferred
+      if(prev_enc->layer.sps_infer_scaling_list_flag){
+        encoder->layer.sps_infer_scaling_list_flag = 0;
+      }
+    }
+
+    prev_cfg = cfg;
+    // ***********************************************
+
     // Initialize the scaling list
     kvz_scalinglist_init(&encoder->scaling_list);
 
     // CQM
-    if (cfg->cqmfile) {
+    if (cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM && cfg->cqmfile) {
       FILE* cqmfile = fopen(cfg->cqmfile, "rb");
       if (cqmfile) {
         kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
@@ -434,7 +451,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
              roi_size * sizeof(*cfg->roi.dqps));
     }
 
-  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps) {
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps || encoder->cfg.set_qp_in_cu) {
     encoder->max_qp_delta_depth = 0;
   } else {
     encoder->max_qp_delta_depth = -1;
@@ -898,6 +915,7 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
   switch (num_layers) {
     case 0:
     case 1:
+      encoder->gop_layer_weights[0] = 1;
       break;
 
     // Use the first layers of the 4-layer weights.

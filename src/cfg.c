@@ -118,10 +118,12 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->gop_lp_definition.d = 3;
   cfg->gop_lp_definition.t = 1;
+  cfg->open_gop = true;
 
   cfg->roi.width = 0;
   cfg->roi.height = 0;
   cfg->roi.dqps = NULL;
+  cfg->set_qp_in_cu = false;
 
   cfg->erp_aqp = false;
 
@@ -134,6 +136,11 @@ int kvz_config_init(kvz_config *cfg)
   cfg->high_tier = false;
 
   cfg->me_max_steps = (uint32_t)-1;
+
+  cfg->scaling_list = KVZ_SCALING_LIST_OFF;
+
+  cfg->max_merge = 5;
+  cfg->early_skip = true;
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
@@ -456,7 +463,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
-  static const char * const preset_values[11][23*2] = {
+  static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
+
+  static const char * const preset_values[11][25*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -480,7 +489,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -506,7 +517,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -532,7 +545,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "28",
+        "max-merge", "5",
         NULL
       },
       {
@@ -558,7 +573,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -584,7 +601,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -610,7 +629,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -636,7 +657,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -662,7 +685,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -688,7 +713,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       {
@@ -714,7 +741,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "cu-split-termination", "off",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
+        "early-skip", "1",
         "fast-residual-cost", "0",
+        "max-merge", "5",
         NULL
       },
       { NULL }
@@ -935,6 +964,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     FREE_POINTER(cfg->cqmfile);
     cfg->cqmfile = cqmfile;
+    cfg->scaling_list = KVZ_SCALING_LIST_CUSTOM;
+  }
+  else if OPT("scaling-list") {    
+    int8_t scaling_list = KVZ_SCALING_LIST_OFF;
+    int result = parse_enum(value, scaling_list_names, &scaling_list);
+    cfg->scaling_list = scaling_list;
+    return result;
   }
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
@@ -1223,6 +1259,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
   }
+  else if OPT("open-gop") {
+    cfg->open_gop = (bool)atobool(value);
+  }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
   else if OPT("bitrate")
@@ -1436,6 +1475,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     fclose(f);
   }
+  else if OPT("set-qp-in-cu") {
+    cfg->set_qp_in_cu = (bool)atobool(value);
+  }
   else if OPT("erp-aqp") {
     cfg->erp_aqp = (bool)atobool(value);
   }
@@ -1492,6 +1534,17 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("fast-residual-cost"))
     cfg->fast_residual_cost_limit = atoi(value);
+  else if (OPT("max-merge")) {
+    int max_merge = atoi(value);
+    if (max_merge < 1 || max_merge > 5) {
+      fprintf(stderr, "max-merge needs to be between 1 and 5\n");
+      return 0;
+    }
+    cfg->max_merge = (uint8_t)max_merge;
+  }
+  else if OPT("early-skip") {
+  cfg->early_skip = (bool)atobool(value);
+  }
   else {
     return 0;
   }
@@ -1934,6 +1987,11 @@ int kvz_config_validate(const kvz_config *const cfg)
   //For scalable extension.
   if ((cfg->slices & KVZ_SLICES_WPP) && ((cfg->shared == NULL && !cfg->wpp) || (cfg->shared != NULL && !cfg->shared->wpp))) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
+    error = 1;
+  }
+
+  if ((cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM) && !cfg->cqmfile) {
+    fprintf(stderr, "Input error: --scaling-list=custom does not work without --cqmfile=<FILE>.\n");
     error = 1;
   }
 

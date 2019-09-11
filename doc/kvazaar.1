@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "July 2018" "kvazaar v1.2.0" "User Commands"
+.TH KVAZAAR "1" "July 2019" "kvazaar v1.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -121,8 +121,17 @@ GOP structure [8]
     \- lp\-<string>: Low\-delay P\-frame GOP
       (e.g. lp\-g8d4t2, see README)
 .TP
+\fB\-\-(no\-)open\-gop
+Use open GOP configuration. [enabled]
+.TP
 \fB\-\-cqmfile <filename>  
 Read custom quantization matrices from a file.
+.TP
+\fB\-\-scaling-list <string>
+Set scaling list mode. [off]
+    \- off: Disable scaling lists.
+    \- custom: use custom list (with \-\-cqmfile).
+    \- default: Use default lists.
 .TP
 \fB\-\-bitrate <integer>   
 Target bitrate [0]
@@ -145,6 +154,10 @@ file. The file format is: width and height of
 the QP delta map followed by width*height delta
 QP values in raster order. The map can be of any
 size and will be scaled to the video size.
+.TP
+\fB\-\-set\-qp\-in\-cu        
+Set QP at CU level keeping pic_init_qp_minus26.
+in PPS and slice_qp_delta in slize header zero.
 .TP
 \fB\-\-(no\-)erp\-aqp        
 Use adaptive QP for 360 degree video with
@@ -264,6 +277,16 @@ Skip CABAC cost for residual coefficients
 \fB\-\-(no\-)intra\-rdo\-et   
 Check intra modes in rdo stage only until
 a zero coefficient CU is found. [disabled]
+.TP
+\fB\-\-(no\-)early\-skip     
+Try to find skip cu from merge candidates.
+Perform no further search if skip is found.
+For rd=0..1: Try the first candidate.
+For rd=2.. : Try the best candidate based
+             on luma satd cost. [enabled]
+.TP
+\fB\-\-max\-merge <integer> 
+Maximum number of merge candidates, 1..5 [5]
 .TP
 \fB\-\-(no\-)implicit\-rdpcm 
 Implicit residual DPCM. Currently only supported

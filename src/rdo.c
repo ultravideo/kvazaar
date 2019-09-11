@@ -30,6 +30,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "scalinglist.h"
+#include "strategyselector.h"
 #include "tables.h"
 #include "transform.h"
 
@@ -40,9 +41,6 @@
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
-
-static const double COEFF_COST_QP_FACTOR = 0.044407704;
-static const double COEFF_COST_BIAS      = 0.557323653;
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
@@ -216,8 +214,9 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
 
   } else {
     // Estimate coeff coding cost based on QP and sum of absolute coeffs.
-    const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
-    return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
+    // const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
+    // return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
+    return kvz_fast_coeff_cost(coeff, width, state->qp);
   }
 }
 
@@ -973,7 +972,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
 
   CABAC_BIN(cabac, merged, "MergeFlag");
-  num_cand = MRG_MAX_NUM_CANDS;
+  num_cand = state->encoder_control->cfg.max_merge;
   if (merged) {
     if (num_cand > 1) {
       int32_t ui;

@@ -26,6 +26,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
   - [Visual Studio](#visual-studio)
   - [Docker](#docker)
   - [Visualization (Windows only)](#visualization-windows-only)
+- [Paper](#paper)
 - [Contributing to Kvazaar](#contributing-to-kvazaar)
   - [Code documentation](#code-documentation)
   - [For version control we try to follow these conventions:](#for-version-control-we-try-to-follow-these-conventions)
@@ -117,7 +118,12 @@ Video structure:
                                    - 8: B-frame pyramid of length 8
                                    - lp-<string>: Low-delay P-frame GOP
                                      (e.g. lp-g8d4t2, see README)
+      --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
+      --scaling-list <string>: Set scaling list mode. [off]
+                                   - off: Disable scaling lists.
+                                   - custom: use custom list (with --cqmfile).
+                                   - default: Use default lists.
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.
                                    - N: Target N bits per second.
@@ -132,6 +138,8 @@ Video structure:
                                the QP delta map followed by width*height delta
                                QP values in raster order. The map can be of any
                                size and will be scaled to the video size.
+      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.
+                               in PPS and slice_qp_delta in slize header zero.
       --(no-)erp-aqp         : Use adaptive QP for 360 degree video with
                                equirectangular projection. [disabled]
       --level <number>       : Use the given HEVC level in the output and give
@@ -199,6 +207,12 @@ Compression tools:
                                    when QP is below the limit. [0]
       --(no-)intra-rdo-et    : Check intra modes in rdo stage only until
                                a zero coefficient CU is found. [disabled]
+      --(no-)early-skip      : Try to find skip cu from merge candidates.
+                               Perform no further search if skip is found.
+                               For rd=0..1: Try the first candidate.
+                               For rd=2.. : Try the best candidate based
+                                            on luma satd cost. [enabled]
+      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
@@ -339,7 +353,9 @@ where the names have been abbreviated to fit the layout in GitHub.
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| early-skip           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
 | fast-residual-cost   | 28    | 28    | 28    | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+| max-merge            | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     |
 
 
 ## Kvazaar library
@@ -358,16 +374,6 @@ If you have trouble regarding compiling the source code, please make an
 Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
-
-
-### Required libraries
-- For Visual Studio, the pthreads-w32 library is required. Platforms
-  with native POSIX thread support don't need anything.
-  - The project file expects the library to be in ../pthreads.2/
-    relative to Kvazaar. You can just extract the pre-built library
-    there.
-  - The executable needs pthreadVC2.dll to be present. Either install it
-    somewhere or ship it with the executable.
 
 
 ### Autotools
@@ -392,7 +398,7 @@ See `./configure --help` for more options.
 
 
 ### Visual Studio
-- At least VisualStudio 2013 is required.
+- At least VisualStudio 2015 is required.
 - Project files can be found under build/.
 - Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
   in %PATH%
@@ -412,12 +418,31 @@ Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SD
 
 Directory `visualizer_extras` has to be added into the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
 
-`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`) and the dll folder inside the pthreads folder (see `Required libraries`).
+`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, and `zlib1.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`).
 
 Note: The solution should be compiled on the x64 platform in visual studio.
 
 Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
 
+## Paper
+
+Please cite [this paper](https://dl.acm.org/citation.cfm?doid=2964284.2973796) for Kvazaar:
+
+```M. Viitanen, A. Koivula, A. Lemmetti, A. Ylä-Outinen, J. Vanne, and T. D. Hämäläinen, “Kvazaar: open-source HEVC/H.265 encoder,” in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
+
+Or in BibTex:
+
+```
+@inproceedings{Kvazaar2016,
+ author = {Viitanen, Marko and Koivula, Ari and Lemmetti, Ari and Yl\"{a}-Outinen, Arttu and Vanne, Jarno and H\"{a}m\"{a}l\"{a}inen, Timo D.},
+ title = {Kvazaar: Open-Source HEVC/H.265 Encoder},
+ booktitle = {Proceedings of the 24th ACM International Conference on Multimedia},
+ year = {2016},
+ isbn = {978-1-4503-3603-1},
+ location = {Amsterdam, The Netherlands},
+ url = {http://doi.acm.org/10.1145/2964284.2973796},
+}
+```
 
 ## Contributing to Kvazaar
 We are happy to look at pull requests in Github. There is still lots of work to be done.
@@ -445,7 +470,7 @@ You can generate Doxygen documentation pages by running the command
   - Uninitialized variables and such are checked with Valgrind.
   - Bitstream validity is checked with HM.
   - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
-- Windows msys2 build is checked automatically on Appveyor.
+- Windows msys2 and msvc builds are checked automatically on Appveyor.
 - If your changes change the bitstream, decode with HM to check that
   it doesn't throw checksum errors or asserts.
 - If your changes shouldn't alter the bitstream, check that they don't.
@@ -469,7 +494,7 @@ You can generate Doxygen documentation pages by running the command
 
 ### Code style
 We try to follow the following conventions:
-- C99 without features not supported by Visual Studio 2013 (VLAs).
+- C99 without features not supported by Visual Studio 2015 (VLAs).
  - // comments allowed and encouraged.
 - Follow overall conventions already established in the code.
 - Indent by 2 spaces. (no tabs)
