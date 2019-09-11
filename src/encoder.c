@@ -212,7 +212,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
   encoder_control_t *encoder = NULL;
   encoder_control_t *prev_enc = NULL;
   encoder_control_t *first_enc = NULL;
-  kvz_config *prev_cfg = NULL;
+  const kvz_config *prev_cfg = NULL;
 
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
@@ -392,7 +392,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->layer.sps_infer_scaling_list_flag = 0;
     if(prev_cfg != NULL){
       if((cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM && cfg->cqmfile && prev_cfg->cqmfile && strcmp(cfg->cqmfile, prev_cfg->cqmfile))
-      || (cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->scaling_list.enable)){
+      || (cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->cfg.scaling_list == KVZ_SCALING_LIST_DEFAULT && prev_enc->scaling_list.enable)){
         encoder->layer.sps_infer_scaling_list_flag = 1;
       }
       //Bitstream conformance requires that the reference scaling list is not inferred

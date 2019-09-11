@@ -1261,14 +1261,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
   if (encoder->scaling_list.enable) {
-    //TODO: Infer scaling list from previous layer?
-    uint8_t sps_infer_scaling_list_flag = 0;
+    
+    uint8_t sps_infer_scaling_list_flag = state->encoder_control->layer.sps_infer_scaling_list_flag;
 
     if (encoder->layer.multi_layer_ext_sps_flag) {
       WRITE_U(stream, sps_infer_scaling_list_flag, 1, "sps_infer_scaling_list_flag");
     }
     if (sps_infer_scaling_list_flag) {
-      WRITE_U(stream, state->encoder_control->layer.layer_id - 1, 6, "sps_scaling_list_ref_layer_id");
+      WRITE_U(stream, state->encoder_control->layer.layer_id - 1, 6, "sps_scaling_list_ref_layer_id");  //TODO: Handle more complex ref structure
     } else {
       // Signal scaling list data for custom lists
       WRITE_U(stream, (encoder->cfg.scaling_list == KVZ_SCALING_LIST_CUSTOM) ? 1 : 0, 1, "sps_scaling_list_data_present_flag");

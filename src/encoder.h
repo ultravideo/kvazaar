@@ -162,6 +162,7 @@ typedef struct encoder_control_t
     uint8_t list_modification_present_flag; //TODO: Move somewhere else?
     uint8_t multi_layer_ext_sps_flag;
     uint8_t sps_ext_or_max_sub_layers_minus1;
+    uint8_t sps_infer_scaling_list_flag;
 
     scaling_parameter_t upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
     scaling_parameter_t downscaling; 
