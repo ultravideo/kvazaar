@@ -21,7 +21,7 @@
 #include "ml_intra_cu_depth_pred.h"
 
 
-int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 140.3129)
 		{
@@ -150,7 +150,7 @@ int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double
 
 
 
-int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 119.4611)
 		{
@@ -259,7 +259,7 @@ int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double
 
 
 
-int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 80.1487)
 		{
@@ -336,7 +336,7 @@ int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double
 
 
 
-int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->neigh_variance_C <= 240.2773)
 		{
@@ -409,7 +409,7 @@ int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double
 
 
 
-int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 12754.7856)
 		{
@@ -515,7 +515,7 @@ int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double
 }
 
 
-int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 1138.9473)
 		{
@@ -605,7 +605,7 @@ int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double
 }
 
 
-int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 2597.4529)
 		{
@@ -700,7 +700,7 @@ int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double
 
 
 
-int tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 818.5173)
 		{
@@ -851,7 +851,7 @@ void kvz_end_ml_intra_depth_const(ml_intra_ctu_pred_t* ml_intra_depth_ctu) {
 }
 
 // Initialize to 0 all the features
-void features_init_array(features_s* arr_features, int16_t _size, int _qp)//, int _NB_pixels)
+static void features_init_array(features_s* arr_features, int16_t _size, int _qp)//, int _NB_pixels)
 {
 	int16_t i = 0;
 	for (i = 0; i < _size; ++i)
@@ -1035,7 +1035,7 @@ static INLINE double features_get_var_of_sub_mean(double* arr_avgLuma, int16_t i
 * \param _depth 		Evaluated depth.
 * \return None.
 */
-void features_var_neighbor(features_s* arr_features, int16_t _x, int16_t _y, int16_t _depth)
+static void features_var_neighbor(features_s* arr_features, int16_t _x, int16_t _y, int16_t _depth)
 {
 	int16_t i_cu0 = (_x - 1) + ((_y - 1) << _depth);
 	int16_t i_cu1 = (_x)+((_y - 1) << _depth);
@@ -1072,7 +1072,7 @@ void features_var_neighbor(features_s* arr_features, int16_t _x, int16_t _y, int
 * \param arr_avg 			Array of 16*16 average lumas.
 * \return None.
 */
-void features_compute(features_s* arr_features, uint8_t i_depth, double* arr_var, double* arr_avg)
+static void features_compute(features_s* arr_features, uint8_t i_depth, double* arr_var, double* arr_avg)
 {
 	double d_avgLumaC;
 
@@ -1121,7 +1121,7 @@ void features_compute(features_s* arr_features, uint8_t i_depth, double* arr_var
 
 * \return None.
 */
-void features_sub_var(features_s* arr_features, features_s* arr_sub_features, uint8_t i_depth)
+static void features_sub_var(features_s* arr_features, features_s* arr_sub_features, uint8_t i_depth)
 {
 	int8_t i_nbBlock = (1 << i_depth);
 
@@ -1155,7 +1155,7 @@ void features_sub_var(features_s* arr_features, features_s* arr_sub_features, ui
 
 * \return None.
 */
-void features_merge_var(features_s* arr_features, features_s* arr_up_features, uint8_t i_rdepth)
+static void features_merge_var(features_s* arr_features, features_s* arr_up_features, uint8_t i_rdepth)
 {
 	uint8_t i_depth = i_rdepth - 1;
 	int8_t 	i_nbBlock = (1 << i_depth);
@@ -1188,7 +1188,7 @@ void features_merge_var(features_s* arr_features, features_s* arr_up_features, u
 
 * \return None.
 */
-void features_var_of_sub_var(features_s* arr_features, uint8_t i_depth)
+static void features_var_of_sub_var(features_s* arr_features, uint8_t i_depth)
 {
 	int8_t i_nbBlock = (1 << i_depth);
 
@@ -1222,7 +1222,7 @@ void features_var_of_sub_var(features_s* arr_features, uint8_t i_depth)
 * \param p_features64	    Pointer to the features of depth 0.
 * \return None.
 */
-void features_compute_all(features_s* arr_features[5], uint8_t* luma_px)
+static void features_compute_all(features_s* arr_features[5], uint8_t* luma_px)
 {
 
 	uint32_t x_px = 0; /*!< Top left X of the lcu */
@@ -1315,7 +1315,7 @@ static int neighbor_constrain_bu(uint8_t* arr_depthMap, int _x, int _y, int _dep
 
 
 
-int8_t combined_tree_function(int8_t merge_prediction[4], int8_t split_prediction, uint8_t test_id, uint8_t depth)
+static int8_t combined_tree_function(int8_t merge_prediction[4], int8_t split_prediction, uint8_t test_id, uint8_t depth)
 {
 	int8_t prediction;
 	int8_t pred_merge_tmp = 0; // NUmber of sub-blocks non merge (=d)
@@ -1370,7 +1370,7 @@ int8_t combined_tree_function(int8_t merge_prediction[4], int8_t split_predictio
 }
 
 
-void fill_depth_matrix_8(uint8_t* matrix, vect_2D* cu, int8_t curr_depth, int8_t val)
+static void fill_depth_matrix_8(uint8_t* matrix, vect_2D* cu, int8_t curr_depth, int8_t val)
 {
 	//convert cu coordinate
 	int32_t x = cu->x;
@@ -1398,7 +1398,7 @@ void fill_depth_matrix_8(uint8_t* matrix, vect_2D* cu, int8_t curr_depth, int8_t
 * 							1 to use use depth features
 * \return None.
 */
-void ml_os_qt_gen(uint8_t* arr_depthMap, features_s* arr_features_cur, features_s* arr_features_up, uint8_t i_depth, int _level, uint8_t limited_flag)
+static void ml_os_qt_gen(uint8_t* arr_depthMap, features_s* arr_features_cur, features_s* arr_features_up, uint8_t i_depth, int _level, uint8_t limited_flag)
 {
 	
 
@@ -1475,7 +1475,7 @@ void ml_os_qt_gen(uint8_t* arr_depthMap, features_s* arr_features_cur, features_
 
 
 
-void os_luma_qt_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, int8_t qp, uint8_t* arr_CDM)
+static void os_luma_qt_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, int8_t qp, uint8_t* arr_CDM)
 {
 	// Features array per depth
 	features_s arr_features_4[256];
@@ -1517,7 +1517,7 @@ void os_luma_qt_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, 
 
 }
 
-void fill_matrix_with_depth(uint8_t* matrix, int32_t x, int32_t y, int8_t depth)
+static void fill_matrix_with_depth(uint8_t* matrix, int32_t x, int32_t y, int8_t depth)
 {
 	int i = 0;
 	int32_t block = depth < 4 ? (8 >> depth) : 1; //nb blocks in 8*8 block
@@ -1535,7 +1535,7 @@ void fill_matrix_with_depth(uint8_t* matrix, int32_t x, int32_t y, int8_t depth)
 * \param _mat_dst   Array of the depth merged.
 * \return 1 if blocks have been merged, 0 else.
 */
-uint8_t merge_matrix_64(uint8_t* _mat_seed, uint8_t* _mat_dst)
+static uint8_t merge_matrix_64(uint8_t* _mat_seed, uint8_t* _mat_dst)
 {
 	uint8_t i_depth = 0;
 	uint32_t nb_block = 0;
@@ -1612,7 +1612,7 @@ exit_64:
 * \param _size_h    Height of the matrix.
 * \return None.
 */
-void matrix_mask(uint8_t* _mat_mask, const uint8_t* _mat_src, size_t _size_w, size_t _size_h)
+static void matrix_mask(uint8_t* _mat_mask, const uint8_t* _mat_src, size_t _size_w, size_t _size_h)
 {
 	if (_mat_mask == NULL || _mat_src == NULL)
 	{
@@ -1639,7 +1639,7 @@ void matrix_mask(uint8_t* _mat_mask, const uint8_t* _mat_src, size_t _size_w, si
 * \param _mat_roi   	Mask used to determine which area should be modified on the _mat_inf (convention is 0 for changed area and 1 else).
 * \return None.
 */
-void matrix_add_level_roi(const uint8_t* _mat_sup, uint8_t* _mat_inf, uint8_t* _mat_sup_dst, int8_t _nb_level, const uint8_t* _mat_roi)
+static void matrix_add_level_roi(const uint8_t* _mat_sup, uint8_t* _mat_inf, uint8_t* _mat_sup_dst, int8_t _nb_level, const uint8_t* _mat_roi)
 {
 	int8_t x = 0, y = 0;
 	int8_t i_depth = 0;
@@ -1687,7 +1687,7 @@ void matrix_add_level_roi(const uint8_t* _mat_sup, uint8_t* _mat_inf, uint8_t* _
 * \param _nb_level  	 Fixed distance between the two generated depth map.
 * \return None.
 */
-void generate_interval_from_os_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* _mat_depth_MEP)
+static void generate_interval_from_os_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* _mat_depth_MEP)
 {
 	uint8_t* _mat_depth_min = ml_intra_depth_ctu->_mat_upper_depth;
 	uint8_t* _mat_depth_max = ml_intra_depth_ctu->_mat_lower_depth;
