@@ -228,9 +228,9 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
 
   //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
   //Set the trgt/src buffers when input image is recieved
-  state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, src_width, src_height, src_width, ctrl->chroma_format, 0);
-  state->layer->img_job_param.ver_tmp_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, src_height, width, ctrl->chroma_format, sizeof(int16_t));
-  state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, height, width, ctrl->chroma_format, 0);
+  state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, src_width, src_height, src_width, (chroma_format_t)ctrl->chroma_format, 0);
+  state->layer->img_job_param.ver_tmp_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, src_height, width, (chroma_format_t)ctrl->chroma_format, sizeof(int16_t));
+  state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, height, width, (chroma_format_t)ctrl->chroma_format, 0);
   
 
   state->layer->img_job_param.param = NULL;

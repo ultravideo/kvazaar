@@ -388,7 +388,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //TODO: Implement properly.
   uint16_t max_sub_layers_in_layer_set_minus1 = vps_max_sub_layers_minus1;
   //uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
-  int max_vps_dec_pic_buffering[MAX_LAYERS+1][MAX_LAYERS][MAX_TEMPORAL_LAYERS] = {0};
+  int max_vps_dec_pic_buffering[MAX_LAYERS + 1][MAX_LAYERS][MAX_TEMPORAL_LAYERS] = { {{0}} };
   //Set buffering to match values of vps_max_dec_pic_buffering. Only *[1][k][0] inds are used
   for (int i = 0; i < num_layers_in_id_list; i++) {
     memcpy(max_vps_dec_pic_buffering[1][i], vps_max_dec_pic_buffering, sizeof(int)*MAX_TEMPORAL_LAYERS);
