@@ -1165,9 +1165,9 @@ static void encoder_state_init_children(encoder_state_t * const state) {
 
   //Copy the constraint pointer
 	// TODO: Try to do it in the if (state->is_leaf)
-  if (state->parent != NULL) {
-	  state->constraint = state->parent->constraint;
-  }
+  //if (state->parent != NULL) {
+	 // state->constraint = state->parent->constraint;
+  //}
 
   for (int i = 0; state->children[i].encoder_control; ++i) {
     encoder_state_init_children(&state->children[i]);
@@ -1341,10 +1341,6 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   // The previous frame must be done before the next one is started.
   assert(state->frame->done);
-
-  // Intialization of the constraint structure
-  state->constraint = kvz_init_constraint(state->constraint, encoder);
-
 
   if (state->frame->num == -1) {
     // We're at the first frame, so don't care about all this stuff.
