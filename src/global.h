@@ -39,7 +39,6 @@
 // If you add anything to this list with export pragma, think long and
 // and hard if it's actually a good idea to incude it for every c-file.
 #include <assert.h> // IWYU pragma: export
-#include <stdbool.h> // IWYU pragma: export
 #include <stdint.h> // IWYU pragma: export
 #include <stddef.h> // IWYU pragma: export
 
@@ -48,6 +47,10 @@
 // those macros.
 #include <stdlib.h>
 #include <string.h>
+
+// Define bool, necessary because including stdbool.h causes errors when
+// using AltiVec (on ppc64 and ppc)
+typedef enum { false, true } bool;
 
 /**
  * \defgroup Bitstream
