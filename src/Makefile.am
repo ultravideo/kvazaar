@@ -206,7 +206,6 @@ libavx2_la_SOURCES = \
 	strategies/avx2/sao-avx2.h \
 	strategies/avx2/encode_coding_tree-avx2.c \
 	strategies/avx2/encode_coding_tree-avx2.h \
-	strategies/avx2/sao-avx2.h \
 	strategies/avx2/resample-avx2.c \
 	strategies/avx2/resample-avx2.h \
 	scaler/scaler-avx2.c \
