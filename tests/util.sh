@@ -95,12 +95,12 @@ valgrind_expected_test() {
     
     set +e
     print_and_run \
-        libtool execute $valgrind \
+        ../libtool execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     valgrind_status="$?"
     
     print_and_run \
-        libtool execute \
+        ../libtool execute \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     kvazaar_status="$?"
     set -e
@@ -126,7 +126,7 @@ temporal_test() {
     fi
 
     print_and_run \
-        libtool execute $valgrind \
+        ../libtool execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
