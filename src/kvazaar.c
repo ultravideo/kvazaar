@@ -437,7 +437,7 @@ static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk**
   static uint32_t d_len_out[MAX_LAYERS] = { 0 };
   static kvz_picture* d_pic_out[MAX_LAYERS] = { NULL };
   static kvz_picture* d_src_out[MAX_LAYERS] = { NULL };
-  static kvz_frame_info d_info_out[MAX_LAYERS] = { { 0 } };
+  static kvz_frame_info d_info_out[MAX_LAYERS] = { { 0, 0, 0, 0, {{0}}, {0}, 0, 0} };
 
   //Store new value and return the old one
   if (pic_in)
