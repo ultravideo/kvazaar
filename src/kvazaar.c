@@ -607,7 +607,7 @@ static void encode_delay(const int layer, kvz_picture **pic_in, kvz_data_chunk**
 }*/
 
 //Debug stuff for printing thread info
-#if 1 && defined(linux)
+#if 0 && defined(linux)
 #define PRINT_INFO(name,poc,lid) fprintf(stderr, "%s: poc: %d, lid: %d\n", name, poc, lid)
 #else
 #define PRINT_INFO(name,poc,lid)
