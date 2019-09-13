@@ -41,13 +41,13 @@
 
 #define SELECT_LOW_4_BITS 0xF
 
-#if defined(__clang__)
-#define FALLTHROUGH [[clang::fallthrough]]
-#elif defined(__GNUC__) || defined(__GNUG__)
-#define FALLTHROUGH __attribute__((fallthrough))
-#else
-#define FALLTHROUGH
-#endif
+//#if defined(__clang__)
+//#define FALLTHROUGH [[clang::fallthrough]]
+//#elif defined(__GNUC__) || defined(__GNUG__)
+//#define FALLTHROUGH __attribute__((fallthrough))
+//#else
+//#define FALLTHROUGH
+//#endif
 
 #ifndef _mm256_loadu2_m128i
 #define _mm256_loadu2_m128i(hi,low) _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((low))), _mm_loadu_si128((hi)), 0x1)
@@ -825,19 +825,26 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     case 1:
       v1 = _mm256_setzero_si256();
-      FALLTHROUGH;
+      add1 = _mm256_setzero_si256();
+      break;
+
     case 2:
       add1 = _mm256_setzero_si256();
       break;
+
     case 3:
       v3 = _mm256_setzero_si256();
       break;
+
     case 5:
       v5 = _mm256_setzero_si256();
-      FALLTHROUGH;
+      add3 = _mm256_setzero_si256();
+      break;
+
     case 6:
       add3 = _mm256_setzero_si256();
       break;
+
     case 7:
       v7 = _mm256_setzero_si256();
       break;
@@ -849,19 +856,26 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
     switch (n) {
     case 1:
       v0 = _mm256_inserti128_si256(v0, _mm_setzero_si128(), 1);
-      FALLTHROUGH;
+      add1 = _mm256_setzero_si256();
+      break;
+
     case 2:
       add1 = _mm256_setzero_si256();
       break;
+
     case 3:
       v1 = _mm256_inserti128_si256(v1, _mm_setzero_si128(), 1);
       break;
+
     case 5:
       v2 = _mm256_inserti128_si256(v2, _mm_setzero_si128(), 1);
-      FALLTHROUGH;
+      add3 = _mm256_setzero_si256();
+      break;
+
     case 6:
       add3 = _mm256_setzero_si256();
       break;
+
     case 7:
       v3 = _mm256_inserti128_si256(v3, _mm_setzero_si128(), 1);
       break;
@@ -902,54 +916,36 @@ static __m256i _mm256_accumulate_nxm_epi32(__m256i v7, __m256i v6, __m256i v5, _
 
   //First stage
   if (m < 2) {
-    switch (n) {
-    default:
-      //8 is max allowed n value
-      FALLTHROUGH;
-    case 8: FALLTHROUGH;
-    case 7:
+    if (n > 6) {
       tmp31 = _mm256_permute2x128_si256(v7, v6, HI_epi128); tmp30 = _mm256_permute2x128_si256(v7, v6, LOW_epi128);
       add3 = _mm256_add_epi32(tmp31, tmp30);
-      FALLTHROUGH;
-    case 6: FALLTHROUGH;
-    case 5: 
+    }
+    if (n > 4) {
       tmp21 = _mm256_permute2x128_si256(v5, v4, HI_epi128); tmp20 = _mm256_permute2x128_si256(v5, v4, LOW_epi128);
       add2 = _mm256_add_epi32(tmp21, tmp20);
-      FALLTHROUGH;
-    case 4: FALLTHROUGH;
-    case 3: 
+    }
+    if (n > 2) {
       tmp11 = _mm256_permute2x128_si256(v3, v2, HI_epi128); tmp10 = _mm256_permute2x128_si256(v3, v2, LOW_epi128);
       add1 = _mm256_add_epi32(tmp11, tmp10);
-      FALLTHROUGH;
-    case 2: FALLTHROUGH;
-    case 1:
+    }
+    if (n > 0) {
       tmp01 = _mm256_permute2x128_si256(v1, v0, HI_epi128); tmp00 = _mm256_permute2x128_si256(v1, v0, LOW_epi128);
       add0 = _mm256_add_epi32(tmp01, tmp00);
-      break;
-    }//END switch
-    
+    }
+
   } else if (m < 4){
-    switch (n) {
-    default:
-      //8 is max allowed n value
-      FALLTHROUGH;
-    case 8: FALLTHROUGH;
-    case 7:
+    if (n > 6) {
       add3 = v3;
-      FALLTHROUGH;
-    case 6: FALLTHROUGH;
-    case 5: 
+    }
+    if (n > 4) {
       add2 = v2;
-      FALLTHROUGH;
-    case 4: FALLTHROUGH;
-    case 3: 
+    }
+    if (n > 2) {
       add1 = v1;
-      FALLTHROUGH;
-    case 2: FALLTHROUGH;
-    case 1: 
+    }
+    if (n > 0) {
       add0 = v0;
-      break;
-    }//END switch
+    }
   }
 
   //Second stage
@@ -1089,10 +1085,13 @@ static __m256i _mm256_loadu_n_epi32(const int *src, const unsigned n)
     dst = _mm256_set_epi64x((int64_t)src[6], (((int64_t)src[5])<<32) | (int64_t)src[4], (((int64_t)src[3]) << 32) | (int64_t)src[2], (((int64_t)src[1]) << 32) | (int64_t)src[0]);
     break;
 
+  
+  case 8:
+    dst = _mm256_loadu_si256((__m256i*)src);
+    break;
+
   default:
     //Not a valid number of values to load. Only max 8 values can be loaded 
-    FALLTHROUGH;
-  case 8:
     dst = _mm256_loadu_si256((__m256i*)src);
     break;
 
@@ -1201,13 +1200,16 @@ static void _mm256_storeu_n_epi32(int32_t *dst, const __m256i src, const unsigne
     break;
   }
 
-  default:
-    //Only max 8 values can be stored
-    FALLTHROUGH;
   case 8:
     _mm256_storeu_si256((__m256i*)dst, src);
     break;
+
+  default:
+    //Only max 8 values can be stored
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
   }
+
 }
 
 //Avx store n epi16 from src to dst
@@ -1302,13 +1304,18 @@ static void _mm256_storeu_n_epi16(int16_t *dst, const __m256i src, const unsigne
     break;
   }
   
-  default:
-    //Only max 16 values can be stored
-    FALLTHROUGH;
   case 16:
     _mm256_storeu_si256((__m256i*)dst, src);
     break;
+
+  default:
+    //Only max 16 values can be stored
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
   }
+
+
+
 }
 
 //Avx store n epi8 from src to dst
@@ -1509,10 +1516,12 @@ static void _mm256_storeu_n_epi8(uint8_t *dst, const __m256i src, const unsigned
     break;
   }
 
+  case 32:
+    _mm256_storeu_si256((__m256i*)dst, src);
+    break;
+
   default:
     //Only max 32 values can be stored
-    FALLTHROUGH;
-  case 32:
     _mm256_storeu_si256((__m256i*)dst, src);
     break;
   }
