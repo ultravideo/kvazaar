@@ -19,6 +19,8 @@
 ****************************************************************************/
 
 #include "scaler-avx2.h"
+
+#if COMPILE_INTEL_AVX2
 #include "scaler-util.h"
 
 #include <stdlib.h>
@@ -3739,3 +3741,5 @@ resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2 = &ALT1_R
 resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = &ALT2_RESAMPLE_BLOCK_STEP_FUNC_AVX2;
 resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;
 resample_func *const kvz_alt_resample_func_avx2 = &ALT_RESAMPLE_FUNC_AVX2;
+
+#endif //COMPILE_INTEL_AVX2

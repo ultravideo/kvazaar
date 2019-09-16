@@ -24,15 +24,16 @@
 
 #include "strategies/avx2/resample-avx2.h"
 
+#if COMPILE_INTEL_AVX2
 #include "strategyselector.h"
 
 #include "scaler/scaler-avx2.h"
-
+#endif
 
 int kvz_strategy_register_resample_avx2(void * opaque)
 {
   bool success = true;
-
+#if COMPILE_INTEL_AVX2
   success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2_3", 42, kvz_alt2_block_step_resample_func_avx2);
   success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2_2", 43, kvz_alt1_block_step_resample_func_avx2);
   success &= kvz_strategyselector_register(opaque, "resample_block_step", "avx2", 40, kvz_default_block_step_resample_func_avx2);
@@ -41,6 +42,6 @@ int kvz_strategy_register_resample_avx2(void * opaque)
   
   success &= kvz_strategyselector_register(opaque, "resample", "avx2", 41, kvz_alt_resample_func_avx2);
   success &= kvz_strategyselector_register(opaque, "resample", "avx2", 40, kvz_default_resample_func_avx2);
-
+#endif
   return success;
 }
