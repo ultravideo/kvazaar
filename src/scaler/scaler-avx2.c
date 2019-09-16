@@ -20,7 +20,7 @@
 
 #include "scaler-avx2.h"
 
-#if COMPILE_INTEL_AVX2
+#if defined(__AVX2__)
 #include "scaler-util.h"
 
 #include <stdlib.h>
