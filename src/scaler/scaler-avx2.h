@@ -30,12 +30,12 @@
 //void resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
 //void _resample_avx2(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma);
 
-extern opaque_resample_block_step_func *const kvz_opaque_block_step_resample_func_avx2 = 0;
-extern resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = 0;
-extern resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2 = 0;
-extern resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = 0;
-extern resample_func *const kvz_default_resample_func_avx2 = 0;
-extern resample_func *const kvz_alt_resample_func_avx2 = 0;
+extern opaque_resample_block_step_func *const kvz_opaque_block_step_resample_func_avx2;
+extern resample_block_step_func *const kvz_default_block_step_resample_func_avx2;
+extern resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2;
+extern resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2;
+extern resample_func *const kvz_default_resample_func_avx2;
+extern resample_func *const kvz_alt_resample_func_avx2;
 
 //int test_avx();
 
