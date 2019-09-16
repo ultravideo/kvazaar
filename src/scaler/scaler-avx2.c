@@ -3742,4 +3742,12 @@ resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = &ALT2_R
 resample_func *const kvz_default_resample_func_avx2 = &DEFAULT_RESAMPLE_FUNC_AVX2;
 resample_func *const kvz_alt_resample_func_avx2 = &ALT_RESAMPLE_FUNC_AVX2;
 
+#else
+//Set the default resample function
+opaque_resample_block_step_func *const kvz_opaque_block_step_resample_func_avx2 = 0;
+resample_block_step_func *const kvz_default_block_step_resample_func_avx2 = 0;
+resample_block_step_func *const kvz_alt1_block_step_resample_func_avx2 = 0;
+resample_block_step_func *const kvz_alt2_block_step_resample_func_avx2 = 0;
+resample_func *const kvz_default_resample_func_avx2 = 0;
+resample_func *const kvz_alt_resample_func_avx2 = 0;
 #endif //COMPILE_INTEL_AVX2
