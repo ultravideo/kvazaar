@@ -674,9 +674,8 @@ void print_help(void)
     "                               assosiated with it in order. See Options section\n"
     "                               for more info.\n"
     "  note: The scalability functionality is still WIP, so compatibility with other\n"
-    "        parameters is limited. At least GOP and Parallel tools are not supported\n"
-    "        with Scalability features. Also, only a two layer (BL+EL) configuration\n"
-    "        have been tested, with 2x spatial and PSNR scalability.\n"
+    "        parameters is limited. Only a two layer (BL+EL) configuration\n"
+    "        has been tested, with 2x spatial and PSNR scalability.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Deprecated parameters: (might be removed at some point)\n"

@@ -291,15 +291,14 @@ Scalability extension (experimental):
                                See Required section for more info.
       --ilr <integer>        : Set the number of inter layer reference frames
                                for the current layer. Currently only the value
-                               of 1 is supported. [0]
+                               of 1 is supported. [1]
       --debug <string>       : Specify the filename for reconstruction
                                output. Each layer will have a debug file
                                assosiated with it in order. See Options section
                                for more info.
   note: The scalability functionality is still WIP, so compatibility with other
-        parameters is limited. At least GOP is not supported with Scalability
-        features. Also, only a two layer (BL+EL) configuration
-        have been tested, with 2x spatial and PSNR scalability.
+        parameters is limited. Only a two layer (BL+EL) configuration
+        has been tested, with 2x spatial and PSNR scalability.
 
 Deprecated parameters: (might be removed at some point)
   -w, --width <integer>       : Use --input-res.

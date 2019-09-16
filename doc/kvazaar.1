@@ -374,7 +374,7 @@ Specify color matrix setting [undef]
 \fB\-\-chromaloc <integer> 
 Specify chroma sample location (0 to 5) [0]
 
-.SS "Scalability extension (experimental):"
+.SS "Scalability extension:"
 .TP
 \FB\-\-layer
 Add a new layer (EL). Parameters for this layer
@@ -406,6 +406,11 @@ section for more info.
 Specify the size for the latest input.
 See Required section for more info.
 .TP
+\FB\-\-ilr <integer>
+Set the number of inter layer reference frames
+for the current layer. Currently only the value
+of 1 is supported. [1]
+.TP
 \FB\-\-debug <string>
 Specify the filename for reconstruction
 output. Each layer will have a debug file
@@ -413,6 +418,5 @@ assosiated with it in order. See Options section
 for more info.
 .TP
 note: The scalability functionality is still WIP, so compatibility with other
-      parameters is limited. At least GOP and Parallel tools are not supported
-      with Scalability features. Also, only two layer (BL+EL) configuration
-      have been tested, with 2x spatial and PSNR scalability.
+      parameters is limited. Only two layer (BL+EL) configuration
+      has been tested, with 2x spatial and PSNR scalability.
