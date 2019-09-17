@@ -13,6 +13,11 @@ TESTS = $(check_PROGRAMS) \
     test_tools.sh \
     test_weird_shapes.sh \
     test_scalability.sh \
+	test_scalability_errors.sh \
+	test_scalability_gop.sh \
+	test_scalability_SAO_deblock.sh \
+	test_scalability_SNR.sh \
+	test_scalability_tmvp.sh \
     test_temporal.sh \
     test_sequence_breaks.sh
 
@@ -29,6 +34,14 @@ EXTRA_DIST = \
     test_smp.sh \
     test_tools.sh \
     test_weird_shapes.sh \
+	test_scalability.sh \
+	test_scalability_errors.sh \
+	test_scalability_gop.sh \
+	test_scalability_SAO_deblock.sh \
+	test_scalability_SNR.sh \
+	test_scalability_tmvp.sh \
+    test_temporal.sh \
+    test_sequence_breaks.sh \
     util.sh
 
 check_PROGRAMS = kvazaar_tests
