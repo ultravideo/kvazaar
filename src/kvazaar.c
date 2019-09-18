@@ -691,6 +691,10 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
       kvz_init_one_frame(state, frame);
       frame_initialized[i] = true;
 
+      //Set only_init parameter here since frame type has been set
+      if (state->encoder_control->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL)
+        state->layer->cua_job_param.only_init |= (state->frame->pictype >= KVZ_NAL_BLA_W_LP && state->frame->pictype <= KVZ_NAL_CRA_NUT);
+
       //kvz_start_encode_one_frame(state);
       //enc_list[i]->frames_started += 1;
     }
