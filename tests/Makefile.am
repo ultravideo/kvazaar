@@ -18,6 +18,7 @@ TESTS = $(check_PROGRAMS) \
 	test_scalability_SAO_deblock.sh \
 	test_scalability_SNR.sh \
 	test_scalability_tmvp.sh \
+	test_scalability_tiles.sh \
     test_temporal.sh \
     test_sequence_breaks.sh
 
@@ -40,6 +41,7 @@ EXTRA_DIST = \
 	test_scalability_SAO_deblock.sh \
 	test_scalability_SNR.sh \
 	test_scalability_tmvp.sh \
+	test_scalability_tiles.sh \
     test_temporal.sh \
     test_sequence_breaks.sh \
     util.sh
