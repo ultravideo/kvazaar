@@ -247,6 +247,7 @@ void kvz_cu_array_upsampling_worker(void *opaque_param)
   cu_array_t *cua = param->out_cua;
   int32_t lcu_ind = param->lcu_ind;
 
+  assert(lcu_ind < nw_in_lcu * nh_in_lcu);
   PRINT_TID_CUA_JOB_INFO(lcu_ind);
 
   //Define a few basic things
@@ -416,10 +417,15 @@ void kvz_cu_array_upsampling_src_range( int32_t range[2], uint32_t lcu_low, uint
 // Make a shallow copy from src to dst, while properly handling reference counting
 void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const dst, const kvz_cua_upsampling_parameter_t * const src)
 {
-  kvz_cu_array_free(&dst->base_cua);
-  kvz_cu_array_free(&dst->out_cua);
+  //Do the copy in such a way that 
+  cu_array_t *tmp_base = dst->base_cua;
+  cu_array_t *tmp_out = dst->out_cua;
+
   dst->base_cua = src->base_cua != NULL ? kvz_cu_array_copy_ref(src->base_cua) : NULL;
   dst->out_cua = src->out_cua != NULL ? kvz_cu_array_copy_ref(src->out_cua) : NULL;
+
+  kvz_cu_array_free(&tmp_base);
+  kvz_cu_array_free(&tmp_out);
 
   dst->nw_in_lcu = src->nw_in_lcu;
   dst->nh_in_lcu = src->nh_in_lcu;
@@ -430,9 +436,10 @@ void kvz_copy_cua_upsampling_parameters(kvz_cua_upsampling_parameter_t * const d
   dst->only_init = src->only_init;
   dst->lcu_ind = src->lcu_ind;
 
-  dst->tile = src->tile;
-  dst->lcu_order = src->lcu_order;
-  dst->lcu_order_count = src->lcu_order_count;
+  dst->tile_lcu_offset_x = src->tile_lcu_offset_x;
+  dst->tile_lcu_offset_y = src->tile_lcu_offset_y;
+  dst->tile_width_in_lcu = src->tile_width_in_lcu;
+  dst->tile_height_in_lcu = src->tile_height_in_lcu;
 }
 
 #undef IND2X

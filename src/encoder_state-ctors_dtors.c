@@ -251,9 +251,10 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
   state->layer->cua_job_param.nw_in_lcu = 0;
   state->layer->cua_job_param.only_init = 0;
   state->layer->cua_job_param.lcu_ind = -1;
-  state->layer->cua_job_param.tile = NULL;
-  state->layer->cua_job_param.lcu_order = NULL;
-  state->layer->cua_job_param.lcu_order_count = 0;
+  state->layer->cua_job_param.tile_lcu_offset_x = 0;
+  state->layer->cua_job_param.tile_lcu_offset_y = 0;
+  state->layer->cua_job_param.tile_width_in_lcu = 0;
+  state->layer->cua_job_param.tile_height_in_lcu = 0;
 
   state->layer->scaling_started = 0;
 

@@ -1459,17 +1459,15 @@ static void tile_cu_array_upsampling_worker(void *opaque_param)
 {
   kvz_cua_upsampling_parameter_t *param = opaque_param;
 
-  for (int i = 0; i < param->lcu_order_count; i++) {
-    kvz_cua_upsampling_parameter_t *tmp_param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
-    kvz_copy_cua_upsampling_parameters(tmp_param, param);
-    int tile_x = ((encoder_state_config_tile_t*)param->tile)->lcu_offset_x;
-    int tile_y = ((encoder_state_config_tile_t*)param->tile)->lcu_offset_y;
-    tmp_param->lcu_ind = ((lcu_order_element_t*)param->lcu_order)[i].id + tile_x + tile_y * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
-    tmp_param->lcu_order = NULL;
-    tmp_param->tile = NULL;
-    tmp_param->lcu_order_count = 0;
+  for (int i = 0; i < param->tile_height_in_lcu; i++) {
+    for (int j = 0; j < param->tile_width_in_lcu; j++)
+    {
+      kvz_cua_upsampling_parameter_t *tmp_param = calloc(1, sizeof(kvz_cua_upsampling_parameter_t));
+      kvz_copy_cua_upsampling_parameters(tmp_param, param);
+      tmp_param->lcu_ind = j + param->tile_lcu_offset_x + (i + param->tile_lcu_offset_y) * param->nw_in_lcu; //Calculate the modified ind accounting for tile offset
 
-    kvz_cu_array_upsampling_worker(tmp_param);
+      kvz_cu_array_upsampling_worker(tmp_param);
+    }
   }
 
 }
@@ -1477,9 +1475,10 @@ static void tile_cu_array_upsampling_worker(void *opaque_param)
 //Scale tile specified part of cua
 static void cua_lcu_scaling( encoder_state_t * const state )
 {
-  state->layer->cua_job_param.tile = state->tile;
-  state->layer->cua_job_param.lcu_order = state->lcu_order;
-  state->layer->cua_job_param.lcu_order_count = state->lcu_order_count;
+  state->layer->cua_job_param.tile_lcu_offset_x = state->tile->lcu_offset_x;
+  state->layer->cua_job_param.tile_lcu_offset_y = state->tile->lcu_offset_y;
+  state->layer->cua_job_param.tile_width_in_lcu = state->tile->frame->width_in_lcu;
+  state->layer->cua_job_param.tile_height_in_lcu = state->tile->frame->height_in_lcu;
 
   tile_cu_array_upsampling_worker(&state->layer->cua_job_param);
 
@@ -1498,16 +1497,17 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
   switch (state->type) {
   case ENCODER_STATE_TYPE_TILE:
   {
-    int block_x = state->tile->offset_x + lcu->position_px.x;
-    int block_y = state->tile->offset_y + lcu->position_px.y;
-    int block_width = lcu->size.x;
-    int block_height = lcu->size.y;
+    int block_x = state->tile->offset_x;
+    int block_y = state->tile->offset_y;
+    int block_width = state->tile->frame->width;
+    int block_height = state->tile->frame->height;
     int src_width = state_param->base_cua->width;
     int src_height = state_param->base_cua->height;
 
-    state->layer->cua_job_param.tile = state->tile;
-    state->layer->cua_job_param.lcu_order = state->lcu_order;
-    state->layer->cua_job_param.lcu_order_count = state->lcu_order_count;
+    state->layer->cua_job_param.tile_lcu_offset_x = state->tile->lcu_offset_x;
+    state->layer->cua_job_param.tile_lcu_offset_y = state->tile->lcu_offset_y;
+    state->layer->cua_job_param.tile_width_in_lcu = state->tile->frame->width_in_lcu;
+    state->layer->cua_job_param.tile_height_in_lcu = state->tile->frame->height_in_lcu;
 
     kvz_threadqueue_free_job(&state->tqj_ilr_cua_upsampling_done);
     state->tqj_ilr_cua_upsampling_done = kvz_threadqueue_job_create(tile_cu_array_upsampling_worker, (void*)state_param);
