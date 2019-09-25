@@ -66,6 +66,7 @@ typedef struct lcu_stats_t {
 
   //! \brief Rate control beta parameter
   double rc_beta;
+  int8_t qp;
 } lcu_stats_t;
 
 
@@ -153,7 +154,7 @@ typedef struct encoder_state_config_frame_t {
     double *intra_slice_dis;
     double previous_lambdas[KVZ_MAX_GOP_LAYERS+1];
     double last_frame_lambda;
-  } new_lookahead;
+  } new_ratecontrol;
 
   /**
    * \brief Whether next NAL is the first NAL in the access unit.

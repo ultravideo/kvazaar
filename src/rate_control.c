@@ -167,6 +167,11 @@ static double pic_allocate_bits(encoder_state_t * const state)
   return MAX(100, pic_target_bits);
 }
 
+static int8_t lambda_to_qp(const double lambda)
+{
+  const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
+  return CLIP_TO_QP(qp);
+}
 
 static double solve_cubic_equation(const encoder_state_config_frame_t * const state,
                             int ctu_index,
@@ -190,10 +195,10 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
     double b = 0.0;
     double c = 0.0;
     double d = 0.0;
-    assert((state->new_lookahead.c_para[layer][i] <= 0) || (state->new_lookahead.k_para[layer][i] >= 0)); //Check C and K during each solution 
+    assert((state->new_ratecontrol.c_para[layer][i] <= 0) || (state->new_ratecontrol.k_para[layer][i] >= 0)); //Check C and K during each solution 
 
-    double CLCU = state->new_lookahead.c_para[layer][i];
-    double KLCU = state->new_lookahead.k_para[layer][i];
+    double CLCU = state->new_ratecontrol.c_para[layer][i];
+    double KLCU = state->new_ratecontrol.k_para[layer][i];
     a = -CLCU * KLCU / pow(state->lcu_stats[i].pixels, KLCU - 1.0);
     b = -1.0 / (KLCU - 1.0);
     d = est_lambda;
@@ -248,8 +253,8 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
 static INLINE double calculate_weights(encoder_state_t* const state, const int layer, const int ctu_count, double estLambda) {
   double total_weight = 0;
   for(int i = 0; i < ctu_count; i++) {
-    double CLCU = state->frame->new_lookahead.c_para[layer][i];
-    double KLCU = state->frame->new_lookahead.k_para[layer][i];
+    double CLCU = state->frame->new_ratecontrol.c_para[layer][i];
+    double KLCU = state->frame->new_ratecontrol.k_para[layer][i];
     double a = -CLCU * KLCU / pow(state->frame->lcu_stats[i].pixels, KLCU - 1.0);
     double b = -1.0 / (KLCU - 1.0);
     state->frame->lcu_stats[i].weight = pow(a / estLambda, b);
@@ -261,6 +266,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
   return total_weight;
 }
 
+// TODO: Missing QP calculation
 void estimatePicLambda(encoder_state_t * const state) {
   double bits = pic_allocate_bits(state);
   const int layer = state->frame->gop_offset - (state->frame->is_irap ? 1 : 0);
@@ -273,9 +279,9 @@ void estimatePicLambda(encoder_state_t * const state) {
     beta = state->frame->rc_beta;
   }
   else {
-    alpha = -state->frame->new_lookahead.pic_c_para[state->frame->gop_offset] *
-      state->frame->new_lookahead.pic_k_para[state->frame->gop_offset];
-    beta = state->frame->new_lookahead.pic_k_para[state->frame->gop_offset] - 1;
+    alpha = -state->frame->new_ratecontrol.pic_c_para[state->frame->gop_offset] *
+      state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset];
+    beta = state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset] - 1;
   }
   double estLambda;
   double bpp = bits / (state->encoder_control->cfg.width * state->encoder_control->cfg.height);
@@ -288,11 +294,11 @@ void estimatePicLambda(encoder_state_t * const state) {
   }
 
   double temp_lambda;
-  if ((temp_lambda = state->frame->new_lookahead.previous_lambdas[layer]) > 0.0) {
+  if ((temp_lambda = state->frame->new_ratecontrol.previous_lambdas[layer]) > 0.0) {
     estLambda = CLIP(temp_lambda * pow(2.0, -1), temp_lambda * 2, estLambda);
   }
 
-  if((temp_lambda = state->frame->new_lookahead.last_frame_lambda) > 0.0) {
+  if((temp_lambda = state->frame->new_ratecontrol.last_frame_lambda) > 0.0) {
     estLambda = CLIP(temp_lambda * pow(2.0, -10.0 / 3.0), temp_lambda * pow(2.0, 10.0 / 3.0), estLambda);
   }
 
@@ -310,8 +316,8 @@ void estimatePicLambda(encoder_state_t * const state) {
         taylor_e3 = 0.0;
         best_lambda = temp_lambda = solve_cubic_equation(state->frame, 0, ctu_count, layer, temp_lambda, bits);
         for (int i = 0; i < ctu_count; ++i) {
-          double CLCU = state->frame->new_lookahead.c_para[layer][i];
-          double KLCU = state->frame->new_lookahead.k_para[layer][i];
+          double CLCU = state->frame->new_ratecontrol.c_para[layer][i];
+          double KLCU = state->frame->new_ratecontrol.k_para[layer][i];
           double a = -CLCU * KLCU / pow(state->frame->lcu_stats[i].pixels, KLCU - 1.0);
           double b = -1.0 / (KLCU - 1.0);
           taylor_e3 += pow(a / best_lambda, b);
@@ -338,11 +344,150 @@ void estimatePicLambda(encoder_state_t * const state) {
 }
 
 
-static int8_t lambda_to_qp(const double lambda)
-{
-  const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
-  return CLIP_TO_QP(qp);
+static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
+  double bpp;
+  int avg_bits;
+
+  const int layer = state->frame->gop_offset - (state->frame->is_irap ? 1 : 0);
+
+  const int num_ctu = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
+  const int index = pos.x + pos.y * state->tile->frame->width_in_lcu;
+
+  if (state->frame->is_irap) {
+    // TODO: intra
+    avg_bits = state->frame->cur_pic_target_bits / ((double)state->frame->lcu_stats[index].pixels / 
+      (state->encoder_control->in.height * state->encoder_control->in.width));
+  }
+  else {
+    double totalWeight = 0;
+    const int realInfluenceLCU = MIN(4, num_ctu - index); //g_RCLCUSmoothWindowSize, the same as the original RC scheme
+    int TargetbitsForSmoothWindow = 0;
+    double bestlambda = 0.0;
+    double Templambda = state->frame->lambda;
+    double TaylorE3 = 0.0;
+    int IterationNum = 0;
+    double estLambda = Templambda;
+
+    for (int i = index; i < num_ctu; i++) {
+      totalWeight += state->frame->lcu_stats[i].weight;
+    }
+
+    int last_ctu = index + realInfluenceLCU;
+    for (int i = index; i < last_ctu; i++) {
+      TargetbitsForSmoothWindow += state->frame->lcu_stats[i].weight;
+    }
+
+    TargetbitsForSmoothWindow = MAX(TargetbitsForSmoothWindow + state->frame->total_bits_coded - (int)totalWeight, 10); //obtain the total bit-rate for the realInfluenceLCU (=4) CTUs
+
+    //just similar with the process at frame level, details can refer to the function TEncRCPic::estimatePicLambda
+    do {
+      TaylorE3 = 0.0;
+      bestlambda = solve_cubic_equation(state->frame, index, last_ctu, layer, Templambda, TargetbitsForSmoothWindow);
+      Templambda = bestlambda;
+      for (int i = index; i < last_ctu; i++) {
+
+        double CLCU = state->frame->new_ratecontrol.c_para[layer][i];
+        double KLCU = state->frame->new_ratecontrol.k_para[layer][i];
+        double a = -CLCU * KLCU / pow((double)state->frame->lcu_stats[i].pixels, KLCU - 1.0);
+        double b = -1.0 / (KLCU - 1.0);
+        TaylorE3 += pow(a / bestlambda, b);
+      }
+      IterationNum++;
+    } while (fabs(TaylorE3 - TargetbitsForSmoothWindow) > 0.01 && IterationNum < 5);
+
+    double CLCU = state->frame->new_ratecontrol.c_para[layer][index];
+    double KLCU = state->frame->new_ratecontrol.k_para[layer][index];
+    double a = -CLCU * KLCU / pow(((double)state->frame->lcu_stats[index].pixels), KLCU - 1.0);
+    double b = -1.0 / (KLCU - 1.0);
+
+    state->frame->lcu_stats[index].weight = MAX(pow(a / bestlambda, b), 0.01);
+
+    avg_bits = (int)(state->frame->lcu_stats[index].weight + 0.5);
+  }
+
+  if (avg_bits < 1) {
+    avg_bits = 1;
+  }
+  return avg_bits;
 }
+
+
+void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
+  double bits = get_ctu_bits(state, pos);
+
+  const int frame_allocation = state->encoder_control->cfg.frame_allocation;
+
+  int index = pos.x + pos.y * state->encoder_control->in.width_in_lcu;
+  double bpp = bits / state->frame->lcu_stats[index].pixels;
+
+  double alpha;
+  double beta;
+  if (state->frame->poc == 0) {
+    alpha = state->frame->rc_alpha;
+    beta = state->frame->rc_beta;
+  }
+  else {
+    alpha = -state->frame->new_ratecontrol.c_para[state->frame->gop_offset][index] *
+      state->frame->new_ratecontrol.k_para[state->frame->gop_offset][index];
+    beta = state->frame->new_ratecontrol.k_para[state->frame->gop_offset][index] - 1;
+  }
+
+  double est_lambda = alpha * pow(bpp, beta);
+  double clip_lambda = state->frame->lambda;
+
+  double clip_neighbor_lambda = -1;
+  for(int temp_index = index - 1; temp_index >= 0; --temp_index) {
+    if(state->frame->lcu_stats[index].lambda > 0) {
+      clip_neighbor_lambda = state->frame->lcu_stats[index].lambda;
+      break;
+    }
+  }
+
+  if (clip_neighbor_lambda > 0) {
+    est_lambda = CLIP(clip_neighbor_lambda * pow(2, -(1.0 + frame_allocation) / 3.0),
+      clip_neighbor_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
+      est_lambda);
+  }
+
+  if (clip_lambda > 0) {
+    est_lambda = CLIP(clip_lambda * pow(2, -(2.0 + frame_allocation) / 3.0),
+      clip_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
+      est_lambda);
+  }
+  else {
+    est_lambda = CLIP(10.0, 1000.0, est_lambda);
+  }
+
+  if (est_lambda < 0.1) {
+    est_lambda = 0.1;
+  }
+
+  int est_qp = lambda_to_qp(est_lambda);
+
+  int clip_qp = -1;
+  for (int temp_index = index - 1; temp_index >= 0; --temp_index) {
+    if (state->frame->lcu_stats[index].qp > -1) {
+      clip_qp = state->frame->lcu_stats[index].qp;
+      break;
+    }
+  }
+
+  if( clip_qp > -1) {
+    est_qp = CLIP(clip_qp - 1 - frame_allocation,
+      clip_qp + 1 + frame_allocation,
+      clip_qp);
+  }
+
+  est_qp = CLIP(state->frame->QP - 2 - frame_allocation,
+    state->frame->QP + 2 + frame_allocation,
+    est_qp);
+
+  state->lambda = est_lambda;
+  state->lambda_sqrt = sqrt(est_lambda);
+  state->qp = est_qp;
+  state->frame->lcu_stats[index].qp = est_qp;
+}
+
 
 static double qp_to_lamba(encoder_state_t * const state, int qp)
 {

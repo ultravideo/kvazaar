@@ -64,19 +64,19 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   }
 
   for(int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
-    state->frame->new_lookahead.c_para[i] = malloc(sizeof(double) * num_lcus);
-    state->frame->new_lookahead.k_para[i] = malloc(sizeof(double) * num_lcus);
-    state->frame->new_lookahead.pic_c_para[i] = 5.0;
-    state->frame->new_lookahead.pic_k_para[i] = -0.1;
+    state->frame->new_ratecontrol.c_para[i] = malloc(sizeof(double) * num_lcus);
+    state->frame->new_ratecontrol.k_para[i] = malloc(sizeof(double) * num_lcus);
+    state->frame->new_ratecontrol.pic_c_para[i] = 5.0;
+    state->frame->new_ratecontrol.pic_k_para[i] = -0.1;
     for(int j = 0; j < num_lcus; j++) {
-      state->frame->new_lookahead.c_para[i][j] = 5.0;
-      state->frame->new_lookahead.k_para[i][j] = -0.1;
+      state->frame->new_ratecontrol.c_para[i][j] = 5.0;
+      state->frame->new_ratecontrol.k_para[i][j] = -0.1;
     }
   }
-  state->frame->new_lookahead.intra_slice_bpp = calloc(num_lcus, sizeof(double));
-  state->frame->new_lookahead.intra_slice_dis = calloc(num_lcus, sizeof(double));
-  memset(state->frame->new_lookahead.previous_lambdas, 0, sizeof(state->frame->new_lookahead.previous_lambdas));
-  state->frame->new_lookahead.last_frame_lambda = 0.0;
+  state->frame->new_ratecontrol.intra_slice_bpp = calloc(num_lcus, sizeof(double));
+  state->frame->new_ratecontrol.intra_slice_dis = calloc(num_lcus, sizeof(double));
+  memset(state->frame->new_ratecontrol.previous_lambdas, 0, sizeof(state->frame->new_ratecontrol.previous_lambdas));
+  state->frame->new_ratecontrol.last_frame_lambda = 0.0;
 
   return 1;
 }
@@ -84,11 +84,11 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   if (state->frame == NULL) return;
 
-  FREE_POINTER(state->frame->new_lookahead.intra_slice_bpp);
-  FREE_POINTER(state->frame->new_lookahead.intra_slice_dis);
-  for(int i = 0; i < 6; i++) {
-    FREE_POINTER(state->frame->new_lookahead.c_para[i]);
-    FREE_POINTER(state->frame->new_lookahead.k_para[i]);
+  FREE_POINTER(state->frame->new_ratecontrol.intra_slice_bpp);
+  FREE_POINTER(state->frame->new_ratecontrol.intra_slice_dis);
+  for(int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
+    FREE_POINTER(state->frame->new_ratecontrol.c_para[i]);
+    FREE_POINTER(state->frame->new_ratecontrol.k_para[i]);
   }
 
   kvz_image_list_destroy(state->frame->ref);

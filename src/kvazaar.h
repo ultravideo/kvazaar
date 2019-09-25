@@ -394,7 +394,7 @@ typedef struct kvz_config
 
   /** \brief Enable Early Skip Mode Decision */
   uint8_t early_skip;
-  uint8_t frame_allocation;
+  int8_t frame_allocation;
 } kvz_config;
 
 /**
