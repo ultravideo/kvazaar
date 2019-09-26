@@ -1044,7 +1044,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   state->frame->total_bits_coded += newpos - curpos;
 
-    state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
+  state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 

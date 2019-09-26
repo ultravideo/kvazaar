@@ -66,7 +66,10 @@ typedef struct lcu_stats_t {
 
   //! \brief Rate control beta parameter
   double rc_beta;
+  double distortion;
+
   int8_t qp;
+  uint8_t skipped;
 } lcu_stats_t;
 
 
@@ -113,6 +116,9 @@ typedef struct encoder_state_config_frame_t {
 
   //! Number of bits written in the current GOP.
   uint64_t cur_gop_bits_coded;
+
+  //! Number of bits written in the current GOP.
+  uint64_t cur_frame_bits_coded;
 
   //! Number of bits targeted for the current GOP.
   double cur_gop_target_bits;
