@@ -156,10 +156,12 @@ typedef struct encoder_state_config_frame_t {
     double *k_para[KVZ_MAX_GOP_LAYERS];
     double pic_c_para[KVZ_MAX_GOP_LAYERS];
     double pic_k_para[KVZ_MAX_GOP_LAYERS];
-    double *intra_slice_bpp;
-    double *intra_slice_dis;
     double previous_lambdas[KVZ_MAX_GOP_LAYERS+1];
-    double last_frame_lambda;
+    double previous_frame_lambda;
+    double *intra_bpp;
+    double *intra_dis;
+    double intra_pic_distortion;
+    double intra_pic_bpp;
   } new_ratecontrol;
 
   /**
