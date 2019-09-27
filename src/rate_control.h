@@ -35,4 +35,8 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state);
 void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
                                vector2d_t pos);
 
+void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos);
+void kvz_update_after_picture(encoder_state_t * const state);
+void kvz_estimate_pic_lambda(encoder_state_t * const state);
+
 #endif // RATE_CONTROL_H_
