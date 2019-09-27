@@ -266,7 +266,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
   return total_weight;
 }
 
-// TODO: Missing QP calculation
+
 void estimatePicLambda(encoder_state_t * const state) {
   double bits = pic_allocate_bits(state);
   const int layer = state->frame->gop_offset - (state->frame->is_irap ? 1 : 0);
@@ -341,6 +341,7 @@ void estimatePicLambda(encoder_state_t * const state) {
   }
 
   state->frame->lambda = estLambda;
+  state->frame->QP = lambda_to_qp(estLambda);
 }
 
 
