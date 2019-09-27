@@ -59,8 +59,8 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {
-      state->frame->lcu_stats[x + y * encoder->in.width_in_lcu].pixels =
-        MIN(encoder->cfg.width - (x + 1)*64, 64) * MIN(encoder->cfg.height - (y + 1) * 64, 64);
+      int temp = MIN(encoder->cfg.width - x * 64, 64) * MIN(encoder->cfg.height - y * 64, 64);
+      state->frame->lcu_stats[x + y * encoder->in.width_in_lcu].pixels =temp;
     }
   }
 

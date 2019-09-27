@@ -616,7 +616,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
 
-  kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  //kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  kvz_set_ctu_qp_lambda(state, lcu->position);
 
   lcu_coeff_t coeff;
   state->coeff = &coeff;
@@ -1292,7 +1293,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     normalize_lcu_weights(state);
   }
   state->frame->cur_frame_bits_coded = 0;
-  kvz_set_picture_lambda_and_qp(state);
+  // kvz_set_picture_lambda_and_qp(state);
+  kvz_estimate_pic_lambda(state);
 
   encoder_state_init_children(state);
 }
