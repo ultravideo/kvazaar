@@ -372,7 +372,6 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     double temp_lambda = state->frame->lambda;
     double taylor_e3 = 0.0;
     int iter = 0;
-    double est_lambda = temp_lambda;
 
     for (int i = index; i < num_ctu; i++) {
       total_weight += state->frame->lcu_stats[i].weight;
