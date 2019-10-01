@@ -408,17 +408,19 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-	if (strncmp(opts->config->roi_file, "auto", 4) == 0) {
-		api->config_parse(opts->config, "roi-file", strcat(opts->input, ".roi"));
-	}
+	if (opts->config->roi_file != NULL) {
+		if (strncmp(opts->config->roi_file, "auto", 4) == 0) {
+			api->config_parse(opts->config, "roi-file", strcat(opts->input, ".roi"));
+		}
 
-  if(opts->config->roi_file) {
-    roifile = fopen(opts->config->roi_file, "rb");
-    if(roifile == NULL) {
-      fprintf(stderr, "Could not open roi file although it was required. Shutting down!\n");
-      goto exit_failure;
-    }
-  }
+		if (opts->config->roi_file) {
+			roifile = fopen(opts->config->roi_file, "rb");
+			if (roifile == NULL) {
+				fprintf(stderr, "Could not open roi file although it was required. Shutting down!\n");
+				goto exit_failure;
+			}
+		}
+	}
 
 #ifdef _WIN32
   // Set stdin and stdout to binary for pipes.
