@@ -706,15 +706,15 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
   state->frame->cur_frame_bits_coded += bits;
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
-  uint8_t not_skip = false;
-  for(int y = 0; y < 64 && not_skip; y+=8) {
-    for(int x = 0; x < 64 && not_skip; x+=8) {
-      not_skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
+  uint8_t skip = false;
+  for(int y = 0; y < 64 && !skip; y+=8) {
+    for(int x = 0; x < 64 && !skip; x+=8) {
+      skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
         lcu->position_px.x + x,
         lcu->position_px.y + y)->skipped;
     }
   }
-  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
+  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !skip;
 
   //Wavefronts need the context to be copied to the next row
   if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {

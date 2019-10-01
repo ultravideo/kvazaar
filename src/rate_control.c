@@ -272,8 +272,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
 
   double bits = pic_allocate_bits(state);
   state->frame->cur_pic_target_bits = bits;
-  const int layer = encoder->gop_layer_weights[
-    encoder->cfg.gop[state->frame->gop_offset].layer] - (state->frame->is_irap ? 1 : 0);
+  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
   const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
 
   double alpha;
@@ -326,6 +325,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
           double b = -1.0 / (KLCU - 1.0);
           taylor_e3 += pow(a / best_lambda, b);
         }
+        iteration_number++;
       }
       while (fabs(taylor_e3 - bits) > 0.01 && iteration_number <= 11);
     }
@@ -353,8 +353,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   int avg_bits;
   const encoder_control_t * const encoder = state->encoder_control;
 
-  const int layer = encoder->gop_layer_weights[
-    encoder->cfg.gop[state->frame->gop_offset].layer] - (state->frame->is_irap ? 1 : 0);
+  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
 
   const int num_ctu = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
   const int index = pos.x + pos.y * state->tile->frame->width_in_lcu;
@@ -382,7 +381,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
       target_bits += state->frame->lcu_stats[i].weight;
     }
 
-    target_bits = MAX(target_bits + state->frame->total_bits_coded - (int)total_weight, 10); //obtain the total bit-rate for the realInfluenceLCU (=4) CTUs
+    target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10); //obtain the total bit-rate for the realInfluenceLCU (=4) CTUs
 
     //just similar with the process at frame level, details can refer to the function TEncRCPic::kvz_estimate_pic_lambda
     do {
@@ -422,8 +421,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int frame_allocation = state->encoder_control->cfg.frame_allocation;
-  const int layer = encoder->gop_layer_weights[
-    encoder->cfg.gop[state->frame->gop_offset].layer] - (state->frame->is_irap ? 1 : 0);
+  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
 
   int index = pos.x + pos.y * state->encoder_control->in.width_in_lcu;
   double bpp = bits / state->frame->lcu_stats[index].pixels;
@@ -531,7 +529,7 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
   double distortion = state->frame->lcu_stats[ctu_index].distortion;
   double lambda = state->frame->lcu_stats[ctu_index].lambda;
 
-  double new_k, new_c;
+  double new_k = -1, new_c = -1;
   if (!state->frame->lcu_stats[ctu_index].skipped) {
     if (state->frame->num == 1) {
       new_k = log(distortion / state->frame->new_ratecontrol.intra_pic_distortion) /
@@ -566,8 +564,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
   double pic_bpp = (double)state->frame->cur_frame_bits_coded / (state->encoder_control->in.width * state->encoder_control->in.height);
 
   const encoder_control_t * const encoder = state->encoder_control;
-  const int layer = encoder->gop_layer_weights[
-    encoder->cfg.gop[state->frame->gop_offset].layer] - (state->frame->is_irap ? 1 : 0);
+  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
       int ctu_distortion = 0;
@@ -584,7 +581,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
     }    
   }
-
+  total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
   if (state->frame->is_irap) {
     for (int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
       for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
