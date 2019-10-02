@@ -410,7 +410,10 @@ int main(int argc, char *argv[])
 
 	if (opts->config->roi_file != NULL) {
 		if (strncmp(opts->config->roi_file, "auto", 4) == 0) {
-			api->config_parse(opts->config, "roi-file", strcat(opts->input, ".roi"));
+			char *tmp = malloc(strlen(opts->input) + 4);
+			sprintf(tmp, "%s.roi", opts->input);
+			api->config_parse(opts->config, "roi-file", tmp);
+			free(tmp);
 		}
 
 		if (opts->config->roi_file) {
