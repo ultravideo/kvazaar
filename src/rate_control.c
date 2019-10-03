@@ -276,7 +276,8 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
 
   double alpha;
-  double beta;  
+  double beta;
+  //fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
   if(state->frame->poc == 0) {
     alpha = state->frame->rc_alpha;
     beta = state->frame->rc_beta;
@@ -412,6 +413,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   if (avg_bits < 1) {
     avg_bits = 1;
   }
+  // fprintf(state->frame->bpp_d, "CTU %d\tbits:\t%d\n", index, avg_bits);
   return avg_bits;
 }
 
@@ -520,6 +522,8 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
     state->frame->new_ratecontrol.pic_c_para[layer] = new_c;
     state->frame->new_ratecontrol.pic_k_para[layer] = new_k;
   }
+  //fprintf(state->frame->c_d, "Frame %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_c, bpp, distortion, lambda);
+  //fprintf(state->frame->k_d, "Frame %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_k, bpp, distortion, lambda);
 }
 
 
@@ -555,6 +559,8 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
       state->frame->new_ratecontrol.k_para[layer][ctu_index] = new_k;
     }
   }
+  //fprintf(state->frame->c_d, "CTU %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_c, bpp, distortion, lambda);
+  //fprintf(state->frame->k_d, "CTU %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_k, bpp, distortion, lambda);
 }
 
 

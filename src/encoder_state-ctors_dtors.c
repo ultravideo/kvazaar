@@ -81,6 +81,10 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->new_ratecontrol.intra_pic_bpp = 0.0;
   state->frame->new_ratecontrol.intra_pic_distortion = 0.0;
 
+  state->frame->bpp_d = fopen("bits.txt", "wb");
+  state->frame->c_d = fopen("c.txt", "wb");
+  state->frame->k_d = fopen("k.txt", "wb");
+
   return 1;
 }
 
@@ -93,6 +97,10 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->frame->new_ratecontrol.c_para[i]);
     FREE_POINTER(state->frame->new_ratecontrol.k_para[i]);
   }
+
+  fclose(state->frame->bpp_d);
+  fclose(state->frame->c_d);
+  fclose(state->frame->k_d);
 
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);

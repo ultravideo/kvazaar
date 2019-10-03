@@ -164,6 +164,11 @@ typedef struct encoder_state_config_frame_t {
     double intra_pic_bpp;
   } new_ratecontrol;
 
+
+  FILE * bpp_d;
+  FILE * c_d;
+  FILE * k_d;
+
   /**
    * \brief Whether next NAL is the first NAL in the access unit.
    */
