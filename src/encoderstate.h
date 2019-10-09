@@ -174,7 +174,9 @@ typedef struct encoder_state_config_frame_t {
    * \brief Whether next NAL is the first NAL in the access unit.
    */
   bool first_nal;
-
+  double icost;
+  double remaining_icost;
+  double i_bits_left;
 } encoder_state_config_frame_t;
 
 typedef struct encoder_state_config_tile_t {

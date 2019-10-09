@@ -245,7 +245,15 @@ static double pic_allocate_bits(encoder_state_t * const state)
       state->previous_encoder_state->frame->cur_gop_target_bits;
   }
   if(state->frame->is_irap) {
-    
+    double bits = state->frame->cur_gop_target_bits / MAX(encoder->cfg.gop_len, 1);
+    double alpha, beta = 0.5582;
+    if (bits*40 < encoder->cfg.width * encoder->cfg.height) {
+      alpha = 0.25;
+    }
+    else {
+      alpha = 0.3;
+    }
+    return MAX(100, alpha*pow(state->frame->icost * 4 / bits, beta)*bits);
   }
 
   if (encoder->cfg.gop_len <= 0) {
@@ -363,15 +371,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
 void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  double bits = pic_allocate_bits(state);
-  state->frame->cur_pic_target_bits = bits;
-  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
-  const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
-
-  double alpha;
-  double beta;
-  //fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
-  if(state->frame->poc == 0) {
+  if(state->frame->is_irap) {
     int total_cost = 0;
     for (int y = 0; y < encoder->cfg.height; y += 8) {
       for (int x = 0; x < encoder->cfg.width; x += 8) {
@@ -380,6 +380,17 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
         kvz_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
       }
     }
+    state->frame->icost = total_cost;
+    state->frame->remaining_icost = total_cost;
+  }
+
+  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
+  const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
+
+  double alpha;
+  double beta;
+  //fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
+  if(state->frame->poc == 0) {
     alpha = state->frame->rc_alpha;
     beta = state->frame->rc_beta;
   }
@@ -388,11 +399,15 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
       state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset];
     beta = state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset] - 1;
   }
+  double bits = pic_allocate_bits(state);
+  state->frame->cur_pic_target_bits = bits;
+
   double est_lambda;
-  double bpp = bits / (state->encoder_control->cfg.width * state->encoder_control->cfg.height);
+  int32_t num_pixels = state->encoder_control->cfg.width * state->encoder_control->cfg.height;
+  double bpp = bits / num_pixels;
   if (state->frame->is_irap) {
-    // TODO: Intra
-    est_lambda = alpha * pow(bpp, beta) * 0.5;
+    double temp = pow(state->frame->icost / num_pixels, 1.2517);
+    est_lambda = alpha / 256 * pow(temp/bpp, beta);
   }
   else {
     est_lambda = alpha * pow(bpp, beta);
@@ -462,8 +477,14 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
 
   if (state->frame->is_irap) {
     // TODO: intra
-    avg_bits = state->frame->cur_pic_target_bits * ((double)state->frame->lcu_stats[index].pixels / 
-      (state->encoder_control->in.height * state->encoder_control->in.width));
+    int cus_left = num_ctu - index + 1;
+    int window = MIN(4, cus_left);
+    double mad = kvz_get_lcu_stats(state, pos.x, pos.y)->i_cost;
+    double bits_left = state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded;
+    double weighted_bits_left = (bits_left * window + (bits_left - state->frame->i_bits_left)*cus_left) / window;
+    avg_bits = mad * weighted_bits_left / state->frame->remaining_icost;
+    state->frame->remaining_icost -= mad;
+    state->frame->i_bits_left -= state->frame->cur_pic_target_bits * mad / state->frame->icost;
   }
   else {
     double total_weight = 0;
