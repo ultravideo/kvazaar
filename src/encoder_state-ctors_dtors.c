@@ -55,7 +55,7 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-  state->frame->lcu_stats = MALLOC(lcu_stats_t, num_lcus);
+  state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
 
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {

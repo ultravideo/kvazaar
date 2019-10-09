@@ -95,6 +95,96 @@ static double gop_allocate_bits(encoder_state_t * const state)
   return MAX(200, gop_target_bits);
 }
 
+static int xCalcHADs8x8_ISlice(kvz_pixel * piOrg, int y, int iStrideOrg)
+{
+  piOrg += y * iStrideOrg;
+  int i, j;
+  int diff[64], m1[8][8], m2[8][8], m3[8][8], iSumHad = 0;
+
+  for (int k = 0; k < 64; k += 8) {
+    diff[k + 0] = piOrg[0];
+    diff[k + 1] = piOrg[1];
+    diff[k + 2] = piOrg[2];
+    diff[k + 3] = piOrg[3];
+    diff[k + 4] = piOrg[4];
+    diff[k + 5] = piOrg[5];
+    diff[k + 6] = piOrg[6];
+    diff[k + 7] = piOrg[7];
+
+    piOrg += iStrideOrg;
+  }
+
+  //horizontal
+  for (j = 0; j < 8; j++) {
+    int jj = j << 3;
+    m2[j][0] = diff[jj] + diff[jj + 4];
+    m2[j][1] = diff[jj + 1] + diff[jj + 5];
+    m2[j][2] = diff[jj + 2] + diff[jj + 6];
+    m2[j][3] = diff[jj + 3] + diff[jj + 7];
+    m2[j][4] = diff[jj] - diff[jj + 4];
+    m2[j][5] = diff[jj + 1] - diff[jj + 5];
+    m2[j][6] = diff[jj + 2] - diff[jj + 6];
+    m2[j][7] = diff[jj + 3] - diff[jj + 7];
+
+    m1[j][0] = m2[j][0] + m2[j][2];
+    m1[j][1] = m2[j][1] + m2[j][3];
+    m1[j][2] = m2[j][0] - m2[j][2];
+    m1[j][3] = m2[j][1] - m2[j][3];
+    m1[j][4] = m2[j][4] + m2[j][6];
+    m1[j][5] = m2[j][5] + m2[j][7];
+    m1[j][6] = m2[j][4] - m2[j][6];
+    m1[j][7] = m2[j][5] - m2[j][7];
+
+    m2[j][0] = m1[j][0] + m1[j][1];
+    m2[j][1] = m1[j][0] - m1[j][1];
+    m2[j][2] = m1[j][2] + m1[j][3];
+    m2[j][3] = m1[j][2] - m1[j][3];
+    m2[j][4] = m1[j][4] + m1[j][5];
+    m2[j][5] = m1[j][4] - m1[j][5];
+    m2[j][6] = m1[j][6] + m1[j][7];
+    m2[j][7] = m1[j][6] - m1[j][7];
+  }
+
+  //vertical
+  for (i = 0; i < 8; i++) {
+    m3[0][i] = m2[0][i] + m2[4][i];
+    m3[1][i] = m2[1][i] + m2[5][i];
+    m3[2][i] = m2[2][i] + m2[6][i];
+    m3[3][i] = m2[3][i] + m2[7][i];
+    m3[4][i] = m2[0][i] - m2[4][i];
+    m3[5][i] = m2[1][i] - m2[5][i];
+    m3[6][i] = m2[2][i] - m2[6][i];
+    m3[7][i] = m2[3][i] - m2[7][i];
+
+    m1[0][i] = m3[0][i] + m3[2][i];
+    m1[1][i] = m3[1][i] + m3[3][i];
+    m1[2][i] = m3[0][i] - m3[2][i];
+    m1[3][i] = m3[1][i] - m3[3][i];
+    m1[4][i] = m3[4][i] + m3[6][i];
+    m1[5][i] = m3[5][i] + m3[7][i];
+    m1[6][i] = m3[4][i] - m3[6][i];
+    m1[7][i] = m3[5][i] - m3[7][i];
+
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+    m2[4][i] = m1[4][i] + m1[5][i];
+    m2[5][i] = m1[4][i] - m1[5][i];
+    m2[6][i] = m1[6][i] + m1[7][i];
+    m2[7][i] = m1[6][i] - m1[7][i];
+  }
+
+  for (i = 0; i < 8; i++) {
+    for (j = 0; j < 8; j++) {
+      iSumHad += abs(m2[i][j]);
+    }
+  }
+  iSumHad -= abs(m2[0][0]);
+  iSumHad = (iSumHad + 2) >> 2;
+  return(iSumHad);
+}
+
 /**
  * Estimate number of bits used for headers of the current picture.
  * \param state   the main encoder state
@@ -153,6 +243,9 @@ static double pic_allocate_bits(encoder_state_t * const state)
   } else {
     state->frame->cur_gop_target_bits =
       state->previous_encoder_state->frame->cur_gop_target_bits;
+  }
+  if(state->frame->is_irap) {
+    
   }
 
   if (encoder->cfg.gop_len <= 0) {
@@ -279,6 +372,14 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   double beta;
   //fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
   if(state->frame->poc == 0) {
+    int total_cost = 0;
+    for (int y = 0; y < encoder->cfg.height; y += 8) {
+      for (int x = 0; x < encoder->cfg.width; x += 8) {
+        int cost = xCalcHADs8x8_ISlice(state->tile->frame->source->y + x, y, state->tile->frame->source->stride);
+        total_cost += cost;
+        kvz_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
+      }
+    }
     alpha = state->frame->rc_alpha;
     beta = state->frame->rc_beta;
   }
@@ -495,6 +596,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   state->qp = est_qp;
   state->frame->lcu_stats[index].qp = est_qp;
   state->frame->lcu_stats[index].lambda = est_lambda;
+  state->frame->lcu_stats[index].i_cost = 0;
 }
 
 

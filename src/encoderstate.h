@@ -67,6 +67,7 @@ typedef struct lcu_stats_t {
   //! \brief Rate control beta parameter
   double rc_beta;
   double distortion;
+  int i_cost;
 
   int8_t qp;
   uint8_t skipped;
