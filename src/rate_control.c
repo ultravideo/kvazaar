@@ -658,10 +658,17 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
 
   double new_k = -1, new_c = -1;
   if (!state->frame->lcu_stats[ctu_index].skipped) {
+    distortion = MAX(distortion, 0.0001);
     if (state->frame->num == 1) {
-      new_k = log(distortion / state->frame->new_ratecontrol.intra_pic_distortion) /
-        log(bpp / state->frame->new_ratecontrol.intra_pic_bpp);
-      new_c = distortion / pow(bpp, new_k);
+      if (bpp < 0.001) {
+        new_k = state->frame->new_ratecontrol.pic_k_para[layer];
+        new_c = state->frame->new_ratecontrol.intra_dis[ctu_index] / pow(state->frame->new_ratecontrol.intra_bpp[ctu_index], new_k);
+      }
+      else {        
+        new_k = log(distortion / state->frame->new_ratecontrol.intra_pic_distortion) /
+          log(bpp / state->frame->new_ratecontrol.intra_pic_bpp);
+        new_c = distortion / pow(bpp, new_k);
+      }
     }
     else {
       bpp = CLIP(0.0001, 10.0, bpp);
