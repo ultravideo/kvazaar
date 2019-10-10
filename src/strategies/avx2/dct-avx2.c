@@ -855,7 +855,10 @@ static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t
   matmul_16x16_a_bt  (dct, tmpres, output, shift_2nd);
 }
 
-static __m256i get_overflows(const __m256i a, const __m256i b, const __m256i res, const __m256i of_adjust_mask)
+static __m256i get_overflows(const __m256i a,
+                             const __m256i b,
+                             const __m256i res,
+                             const __m256i of_adjust_mask)
 {
   const __m256i ones = _mm256_set1_epi16(1);
 
@@ -880,7 +883,8 @@ static __m256i get_overflows(const __m256i a, const __m256i b, const __m256i res
  * of_possible_mask is either all zero bits for subtraction, or all ones for
  * addition
  */
-static void sub_16_16_hilo(const __m256i a, const __m256i b, __m256i *lo, __m256i *hi)
+static void sub_16_16_hilo(const __m256i  a, const __m256i  b,
+                                 __m256i *lo,      __m256i *hi)
 {
   const __m256i zero = _mm256_setzero_si256();
 
@@ -888,7 +892,8 @@ static void sub_16_16_hilo(const __m256i a, const __m256i b, __m256i *lo, __m256
   *hi = get_overflows(a, b, *lo, zero);
 }
 
-static void add_16_16_hilo(const __m256i a, const __m256i b, __m256i *lo, __m256i *hi)
+static void add_16_16_hilo(const __m256i  a, const __m256i  b,
+                                 __m256i *lo,      __m256i *hi)
 {
   const __m256i ff     = _mm256_set1_epi8(-1);
 
@@ -896,7 +901,7 @@ static void add_16_16_hilo(const __m256i a, const __m256i b, __m256i *lo, __m256
   *hi = get_overflows(a, b, *lo, ff);
 }
 
-static __m256i reverse_16x16b_in_lanes(const __m256i v)
+static INLINE __m256i reverse_16x16b_in_lanes(const __m256i v)
 {
   const __m256i lanerev = _mm256_setr_epi16(0x0f0e, 0x0d0c, 0x0b0a, 0x0908,
                                             0x0706, 0x0504, 0x0302, 0x0100,
@@ -905,13 +910,13 @@ static __m256i reverse_16x16b_in_lanes(const __m256i v)
   return _mm256_shuffle_epi8(v, lanerev);
 }
 
-static __m256i reverse_16x16b(const __m256i v)
+static INLINE __m256i reverse_16x16b(const __m256i v)
 {
   __m256i tmp = reverse_16x16b_in_lanes(v);
   return        _mm256_permute4x64_epi64(tmp, _MM_SHUFFLE(1, 0, 3, 2));
 }
 
-static __m256i m256_from_2xm128(const __m128i lo, const __m128i hi)
+static INLINE __m256i m256_from_2xm128(const __m128i lo, const __m128i hi)
 {
   __m256i result = _mm256_castsi128_si256 (lo);
   return           _mm256_inserti128_si256(result, hi, 1);
