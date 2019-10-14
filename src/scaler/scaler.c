@@ -1299,7 +1299,8 @@ static void calculateParameters(scaling_parameter_t* const param, const int w_fa
   param->is_calculated = 1;
 }
 
-scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
+//TODO: Get rid of is_upsampling param?
+scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma, int is_upsampling)
 {
   scaling_parameter_t param = {
     .src_width = src_width,
@@ -1318,8 +1319,8 @@ scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int 
   int hor_div = param.trgt_width << 1;
   int ver_div = param.trgt_height << 1;
 
-  param.rnd_trgt_width = ((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
-  param.rnd_trgt_height = ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+  param.rnd_trgt_width = is_upsampling ? param.trgt_width : ((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+  param.rnd_trgt_height = is_upsampling ? param.trgt_height : ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
   //TODO: Why SCALER_MAX? Try using src
@@ -1467,13 +1468,14 @@ yuv_buffer_t* kvz_yuvScaling_adapter(const yuv_buffer_t* const yuv, const scalin
   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
   int max_width = SCALER_MAX(param.src_width + param.src_padding_x, param.trgt_width);
   int max_height = SCALER_MAX(param.src_height + param.src_padding_y, param.trgt_height);
-  int min_width = SCALER_MIN(param.src_width, param.trgt_width);
-  int min_height = SCALER_MIN(param.src_height, param.trgt_height);
-  int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
-  int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
-  int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
-  int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
-  pic_buffer_t* buffer = kvz_newPictureBuffer(buffer_width, buffer_height, 1);
+  //int min_width = SCALER_MIN(param.src_width, param.trgt_width);
+  //int min_height = SCALER_MIN(param.src_height, param.trgt_height);
+  //int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
+  //int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
+  //int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
+  //int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
+  //pic_buffer_t* buffer = kvz_newPictureBuffer(buffer_width, buffer_height, 1);
+  pic_buffer_t* buffer = kvz_newPictureBuffer(max_width, max_height, 1);
 
 
   /*==========Start Resampling=============*/

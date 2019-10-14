@@ -97,7 +97,8 @@ chroma_format_t kvz_getChromaFormat(int luma_width, int luma_height, int chroma_
 /**
 * \brief Function for getting initial scaling parameters given src and trgt size parameters.
 */
-scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+//TODO: Get rid of is_upsampling (it just toggles rounded width stuff that propably should not be used)
+scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma, int is_upsampling);
 /**
 * \brief Experimental. Function for getting initial scaling parameters given src and trgt size parameters.
 */

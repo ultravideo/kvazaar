@@ -765,7 +765,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
                                                       encoder->layer.input_height,
                                                       encoder->in.real_width,
                                                       encoder->in.real_height,
-                                                      csp);
+                                                      csp, 1);
     encoder->layer.downscaling.trgt_padding_x = (CU_MIN_SIZE_PIXELS - encoder->layer.downscaling.trgt_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     encoder->layer.downscaling.trgt_padding_y = (CU_MIN_SIZE_PIXELS - encoder->layer.downscaling.trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
@@ -774,14 +774,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
                                                       prev_enc->layer.upscaling.trgt_height,
                                                       encoder->in.real_width,
                                                       encoder->in.real_height,
-                                                      csp);
+                                                      csp, 1);
     }
     else {
       encoder->layer.upscaling = kvz_newScalingParameters(encoder->in.real_width,
                                                       encoder->in.real_height,
                                                       encoder->in.real_width,
                                                       encoder->in.real_height,
-                                                      csp);
+                                                      csp, 1);
     }
     //Need to set the source (target?) to the padded size (because reasons) to conform with SHM.
     //Scaling parameters need to be calculated for the true sizes.

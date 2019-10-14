@@ -256,7 +256,7 @@ static void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   *out = kvz_yuvScaling(in, &param, *out);
 }
@@ -282,7 +282,7 @@ static void kvzScaling_ver(yuv_buffer_t* in, yuv_buffer_t** out, int ver)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   *out = kvz_yuvScaling_adapter(in, &param, *out, func);
 }
@@ -298,7 +298,7 @@ static void kvzBlockScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
 
   int block_width = out_y_width >> part;
@@ -326,7 +326,7 @@ static void kvzBlockStepScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
 
   int block_width = out_y_width >> part;
@@ -373,7 +373,7 @@ static void kvzOpaqueBlockStepScaling(opaque_yuv_buffer_t* in, opaque_yuv_buffer
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   int block_width = out_y_width >> part;
   int block_height = out_y_height >> part;
@@ -438,7 +438,7 @@ static void kvzOpaqueBlockStepScalingAvx2(opaque_yuv_buffer_t* in, opaque_yuv_bu
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   int block_width = out_y_width >> part;
   int block_height = out_y_height >> part;
@@ -502,7 +502,7 @@ static void kvzScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   *out = kvz_yuvScaling_adapter(in, &param, *out, kvz_default_resample_func);
 }
@@ -533,7 +533,7 @@ static void kvzBlockStepScaling_avx2(yuv_buffer_t* in, yuv_buffer_t** out, int v
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
 
   int block_width = out_y_width >> part;
@@ -579,7 +579,7 @@ static void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420, 1);
 
   *out = kvz_yuvScaling_(in, &param, *out);
 }
@@ -1057,10 +1057,10 @@ static void validate_test()
 
 static void validate_test2()
 {
-  int32_t in_width = 1920;
-  int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t in_width = 1920;//1280;//1920;
+  int32_t in_height = 1080;//720;//1080;
+  int32_t out_width = 1280;//1920;//in_width << 1;//264;
+  int32_t out_height = 720;//1080;//in_height << 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -1116,10 +1116,10 @@ static void validate_test2()
 
 static void validate_test3()
 {
-  int32_t in_width = 1920;
-  int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t in_width = 1280;//1920;
+  int32_t in_height = 720;//1080;
+  int32_t out_width = 1920;//in_width << 1;//264;
+  int32_t out_height = 1080;//in_height << 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -1128,7 +1128,7 @@ static void validate_test3()
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
-  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+  sprintf(in_file_name, "Kimono1_%ix%i_%i_zerophase_0.9pi.yuv", in_width, in_height, framerate);
 
   char out_file_name1[BUFF_SIZE];
   char out_file_name11[BUFF_SIZE];
@@ -1212,10 +1212,10 @@ static void validate_test3()
 
 static void opaque_validate_test_avx2()
 {
-  int32_t in_width = 1920;
-  int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t in_width = 1280;//1920;
+  int32_t in_height = 720;//1080;
+  int32_t out_width = 1920;//in_width << 1;//264;
+  int32_t out_height = 1080;//in_height << 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -1225,7 +1225,7 @@ static void opaque_validate_test_avx2()
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
-  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+  sprintf(in_file_name, "Kimono1_%ix%i_%i_zerophase_0.9pi.yuv", in_width, in_height, framerate);
 
   char out_file_name1[BUFF_SIZE];
   char out_file_name2[BUFF_SIZE];
@@ -1322,10 +1322,10 @@ static void opaque_validate_test_avx2()
 
 static void opaque_validate_test()
 {
-  int32_t in_width = 1920;
-  int32_t in_height = 1080;
-  int32_t out_width = in_width << 1;//264;
-  int32_t out_height = in_height << 1;//130;
+  int32_t in_width = 1280;//1920;
+  int32_t in_height = 720;//1080;
+  int32_t out_width = 1920;//in_width << 1;//264;
+  int32_t out_height = 1080;//in_height << 1;//130;
   int32_t out_chroma_width = out_width >> 1;
   int32_t out_chroma_height = out_height >> 1;
   int framerate = 24;
@@ -1335,7 +1335,7 @@ static void opaque_validate_test()
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
-  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+  sprintf(in_file_name, "Kimono1_%ix%i_%i_zerophase_0.9pi.yuv", in_width, in_height, framerate);
 
   char out_file_name1[BUFF_SIZE];
   char out_file_name2[BUFF_SIZE];
