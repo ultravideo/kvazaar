@@ -43,6 +43,9 @@ Makefile.in
 *.o
 *.trs
 .*.swp
+.*.swo
+.swp
+.swo
 
 *.log
 .kdev4
