@@ -841,6 +841,8 @@ done:
     for (int8_t i = 0; i < opts->num_inputs; i++) {
       if (input[i])  fclose(input[i]);
     }
+  }
+  if(opts != NULL && recout != NULL){
     for (int8_t i = 0; i < opts->num_debugs; i++) {
       if (recout[i]) fclose(recout[i]);
     }
