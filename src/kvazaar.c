@@ -674,7 +674,8 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
 
     if (add_delay && i > 0) {
       //TODO: Account for multiple EL layers needing to be delayed (when EL references another EL)
-      encode_delay(i, &cur_pic_in, data_out, &(len_out[i]), pic_out, src_out, &(info_out[i]));
+      //encode_delay(i, &cur_pic_in, data_out, &(len_out[i]), pic_out, src_out, &(info_out[i]));
+      encode_delay(i, &cur_pic_in, NULL, NULL, NULL, NULL, NULL);
     }
 
     if (cur_pic_in != NULL) {
@@ -717,62 +718,61 @@ static int kvazaar_scalable_encode(kvz_encoder *enc,
   for (int i = 0; i < num_enc; i++) {
 
     // If we have finished encoding as many frames as we have started, we are done.
-    if (enc_list[i]->frames_done == enc_list[i]->frames_started) {
-      continue;
-    }
+    if (enc_list[i]->frames_done != enc_list[i]->frames_started) {
 
-    encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
+      encoder_state_t *state = &enc_list[i]->states[enc_list[i]->cur_state_num];
 
-    if (!state->frame->done) {
-      // We started encoding a frame; move to the next encoder state.
-      enc_list[i]->cur_state_num = (enc_list[i]->cur_state_num + 1) % (enc_list[i]->num_encoder_states);
-    }
+      if (!state->frame->done) {
+        // We started encoding a frame; move to the next encoder state.
+        enc_list[i]->cur_state_num = (enc_list[i]->cur_state_num + 1) % (enc_list[i]->num_encoder_states);
+      }
 
-    encoder_state_t *output_state = &enc_list[i]->states[enc_list[i]->out_state_num];
-    if (!output_state->frame->done &&
-      (pic_in_is_null[i] || enc_list[i]->cur_state_num == enc_list[i]->out_state_num)) {
+      encoder_state_t *output_state = &enc_list[i]->states[enc_list[i]->out_state_num];
+      if (!output_state->frame->done &&
+        (pic_in_is_null[i] || enc_list[i]->cur_state_num == enc_list[i]->out_state_num)) {
 
-      kvz_threadqueue_waitfor(enc_list[i]->control->threadqueue, output_state->tqj_bitstream_written);
-      // The job pointer must be set to NULL here since it won't be usable after
-      // the next frame is done.
-      kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
+        kvz_threadqueue_waitfor(enc_list[i]->control->threadqueue, output_state->tqj_bitstream_written);
+        // The job pointer must be set to NULL here since it won't be usable after
+        // the next frame is done.
+        kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
 
-      //Aggregate new stuff
-      // Get stream length before taking chunks since that clears the stream.
-      if (len_out) len_out[i] += kvz_bitstream_tell(&output_state->stream) / 8;
-      if (data_out) {
-        if (*data_out == NULL) {
-          *data_out = kvz_bitstream_take_chunks(&output_state->stream);
-        } else {
-          while ((*data_out)->next != NULL) {
-            data_out = &(*data_out)->next;
+        //Aggregate new stuff
+        // Get stream length before taking chunks since that clears the stream.
+        if (len_out) len_out[i] += kvz_bitstream_tell(&output_state->stream) / 8;
+        if (data_out) {
+          if (*data_out == NULL) {
+            *data_out = kvz_bitstream_take_chunks(&output_state->stream);
+          } else {
+            while ((*data_out)->next != NULL) {
+              data_out = &(*data_out)->next;
+            }
+            (*data_out)->next = kvz_bitstream_take_chunks(&output_state->stream);
           }
-          (*data_out)->next = kvz_bitstream_take_chunks(&output_state->stream);
         }
-      }
-      if (pic_out) {
-        if (*pic_out == NULL) {
-          *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
-        } else if (output_state->tile->frame->rec != *pic_out) {
-          (*pic_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
-          pic_out = &(*pic_out)->base_image;
+        if (pic_out) {
+          if (*pic_out == NULL) {
+            *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
+          } else if (output_state->tile->frame->rec != *pic_out) {
+            (*pic_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
+            pic_out = &(*pic_out)->base_image;
+          }
         }
-      }
-      if (src_out) {
-        if (*src_out == NULL) {
-          *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
-        } else if (output_state->tile->frame->source != *src_out) {
-          (*src_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
-          src_out = &(*src_out)->base_image;
+        if (src_out) {
+          if (*src_out == NULL) {
+            *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+          } else if (output_state->tile->frame->source != *src_out) {
+            (*src_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
+            src_out = &(*src_out)->base_image;
+          }
         }
-      }
-      if (info_out) set_frame_info(&info_out[i], output_state);
+        if (info_out) set_frame_info(&info_out[i], output_state);
 
-      output_state->frame->done = 1;
-      output_state->frame->prepared = 0;
-      enc_list[i]->frames_done += 1;
+        output_state->frame->done = 1;
+        output_state->frame->prepared = 0;
+        enc_list[i]->frames_done += 1;
 
-      enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
+        enc_list[i]->out_state_num = (enc_list[i]->out_state_num + 1) % (enc_list[i]->num_encoder_states);
+      }
     }
 
     if (add_delay && i == 0) {
