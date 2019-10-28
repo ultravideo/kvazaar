@@ -855,8 +855,6 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
                                              int16_t *dst,
                                        const int32_t  shift)
 {
-  const __m256i zero = _mm256_setzero_si256();
-
   const int32_t add    = 1 << (shift - 1);
   const __m256i debias = _mm256_set1_epi32(add);
 
@@ -864,57 +862,54 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
   const __m256i  *r_v   = (const __m256i *)right;
         __m256i  *dst_v = (      __m256i *)dst;
 
+  __m256i accu[128] = {_mm256_setzero_si256()};
   size_t i, j;
 
-  __m256i accu[128];
-  for (i = 0; i < 128; i++) {
-    accu[i] = zero;
-  }
   for (j = 0; j < 64; j += 4) {
     const __m256i r0 = r_v[j + 0];
     const __m256i r1 = r_v[j + 1];
     const __m256i r2 = r_v[j + 2];
     const __m256i r3 = r_v[j + 3];
 
-    __m256i r02l = _mm256_unpacklo_epi16(r0, r2);
-    __m256i r02h = _mm256_unpackhi_epi16(r0, r2);
-    __m256i r13l = _mm256_unpacklo_epi16(r1, r3);
-    __m256i r13h = _mm256_unpackhi_epi16(r1, r3);
+    __m256i r02l   = _mm256_unpacklo_epi16(r0, r2);
+    __m256i r02h   = _mm256_unpackhi_epi16(r0, r2);
+    __m256i r13l   = _mm256_unpacklo_epi16(r1, r3);
+    __m256i r13h   = _mm256_unpackhi_epi16(r1, r3);
 
-    __m256i r0s  = _mm256_permute2x128_si256(r02l, r02h, 0x20);
-    __m256i r1s  = _mm256_permute2x128_si256(r02l, r02h, 0x31);
+    __m256i r02_07 = _mm256_permute2x128_si256(r02l, r02h, 0x20);
+    __m256i r02_8f = _mm256_permute2x128_si256(r02l, r02h, 0x31);
 
-    __m256i r2s  = _mm256_permute2x128_si256(r13l, r13h, 0x20);
-    __m256i r3s  = _mm256_permute2x128_si256(r13l, r13h, 0x31);
+    __m256i r13_07 = _mm256_permute2x128_si256(r13l, r13h, 0x20);
+    __m256i r13_8f = _mm256_permute2x128_si256(r13l, r13h, 0x31);
 
     for (i = 0; i < 32; i += 2) {
       size_t acc_base = i << 2;
 
-      uint32_t curr_e = l_32[(i + 0) * (32 / 2) + (j >> 2)];
-      uint32_t curr_o = l_32[(i + 1) * (32 / 2) + (j >> 2)];
+      uint32_t curr_e    = l_32[(i + 0) * (32 / 2) + (j >> 2)];
+      uint32_t curr_o    = l_32[(i + 1) * (32 / 2) + (j >> 2)];
 
-      __m256i even = _mm256_set1_epi32(curr_e);
-      __m256i odd  = _mm256_set1_epi32(curr_o);
+      __m256i even       = _mm256_set1_epi32(curr_e);
+      __m256i odd        = _mm256_set1_epi32(curr_o);
 
-      __m256i p_e0 = _mm256_madd_epi16(even, r0s);
-      __m256i p_e1 = _mm256_madd_epi16(even, r1s);
-      __m256i p_e2 = _mm256_madd_epi16(even, r2s);
-      __m256i p_e3 = _mm256_madd_epi16(even, r3s);
+      __m256i p_e0       = _mm256_madd_epi16(even, r02_07);
+      __m256i p_e1       = _mm256_madd_epi16(even, r02_8f);
+      __m256i p_e2       = _mm256_madd_epi16(even, r13_07);
+      __m256i p_e3       = _mm256_madd_epi16(even, r13_8f);
 
-      __m256i p_o0 = _mm256_madd_epi16(odd,  r0s);
-      __m256i p_o1 = _mm256_madd_epi16(odd,  r1s);
-      __m256i p_o2 = _mm256_madd_epi16(odd,  r2s);
-      __m256i p_o3 = _mm256_madd_epi16(odd,  r3s);
+      __m256i p_o0       = _mm256_madd_epi16(odd,  r02_07);
+      __m256i p_o1       = _mm256_madd_epi16(odd,  r02_8f);
+      __m256i p_o2       = _mm256_madd_epi16(odd,  r13_07);
+      __m256i p_o3       = _mm256_madd_epi16(odd,  r13_8f);
 
-      accu[acc_base + 0] = _mm256_add_epi32(p_e0, accu[acc_base + 0]);
-      accu[acc_base + 1] = _mm256_add_epi32(p_e1, accu[acc_base + 1]);
-      accu[acc_base + 2] = _mm256_add_epi32(p_e2, accu[acc_base + 2]);
-      accu[acc_base + 3] = _mm256_add_epi32(p_e3, accu[acc_base + 3]);
+      accu[acc_base + 0] = _mm256_add_epi32 (p_e0, accu[acc_base + 0]);
+      accu[acc_base + 1] = _mm256_add_epi32 (p_e1, accu[acc_base + 1]);
+      accu[acc_base + 2] = _mm256_add_epi32 (p_e2, accu[acc_base + 2]);
+      accu[acc_base + 3] = _mm256_add_epi32 (p_e3, accu[acc_base + 3]);
 
-      accu[acc_base + 4] = _mm256_add_epi32(p_o0, accu[acc_base + 4]);
-      accu[acc_base + 5] = _mm256_add_epi32(p_o1, accu[acc_base + 5]);
-      accu[acc_base + 6] = _mm256_add_epi32(p_o2, accu[acc_base + 6]);
-      accu[acc_base + 7] = _mm256_add_epi32(p_o3, accu[acc_base + 7]);
+      accu[acc_base + 4] = _mm256_add_epi32 (p_o0, accu[acc_base + 4]);
+      accu[acc_base + 5] = _mm256_add_epi32 (p_o1, accu[acc_base + 5]);
+      accu[acc_base + 6] = _mm256_add_epi32 (p_o2, accu[acc_base + 6]);
+      accu[acc_base + 7] = _mm256_add_epi32 (p_o3, accu[acc_base + 7]);
     }
   }
 
@@ -922,10 +917,10 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
     size_t acc_base = i << 2;
     size_t dst_base = i << 1;
 
-    __m256i q0 = truncate(accu[acc_base + 0], debias, shift);
-    __m256i q1 = truncate(accu[acc_base + 1], debias, shift);
-    __m256i q2 = truncate(accu[acc_base + 2], debias, shift);
-    __m256i q3 = truncate(accu[acc_base + 3], debias, shift);
+    __m256i q0  = truncate(accu[acc_base + 0], debias, shift);
+    __m256i q1  = truncate(accu[acc_base + 1], debias, shift);
+    __m256i q2  = truncate(accu[acc_base + 2], debias, shift);
+    __m256i q3  = truncate(accu[acc_base + 3], debias, shift);
 
     __m256i h01 = _mm256_packs_epi32(q0, q1);
     __m256i h23 = _mm256_packs_epi32(q2, q3);
