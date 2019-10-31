@@ -873,7 +873,7 @@ void kvz_opaque_block_step_scaler_worker(void * opaque_param)
 
     int range[4] = { 0, 0, 0, 0 };
     if (in_param->use_tiles) {
-      kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
+      //kvz_blockScalingSrcWidthRange(range, param, in_param->block_x, in_param->block_width);
     } else {
       //Get range that needs to be copied from pic_in
       //range[0:1] is prev blocks range and range[2:3] is the new block range

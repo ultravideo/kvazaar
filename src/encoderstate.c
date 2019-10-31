@@ -1351,8 +1351,8 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
     kvz_propagate_image_scaling_parameters(param, state_param);
     param->block_x = state->tile->offset_x;
     param->block_y = state->tile->offset_y;
-    param->block_width = state_param->trgt_buffer->y->width; //Trgt buffer should be the size of the block
-    param->block_height = state_param->trgt_buffer->y->height;
+    param->block_width = state->tile->frame->width;
+    param->block_height = state->tile->frame->height;
 
     param->use_tiles = 1;
 
