@@ -218,26 +218,31 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
     state->layer->cua_scaling_jobs = NULL;
   }
 
+  //Allocate buffers for holding the intermediate results of scaling etc.
+  //if (state->type == ENCODER_STATE_TYPE_TILE) {
+  //Set the trgt/src buffers when input image is recieved
+  state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, scaling_param->src_width + scaling_param->src_padding_x, scaling_param->src_height + scaling_param->src_padding_y, scaling_param->src_width + scaling_param->src_padding_x, (chroma_format_t)ctrl->chroma_format, 0);
+  state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, ctrl->in.width, ctrl->in.height, ctrl->in.width, (chroma_format_t)ctrl->chroma_format, 0);
+
+ /* } else {
+
+
+    state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, src_width, src_height, src_width, (chroma_format_t)ctrl->chroma_format, 0);
+    state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, height, width, (chroma_format_t)ctrl->chroma_format, 0);
+  }*/
+
   int range[4];
   kvz_blockScalingSrcWidthRange(range, scaling_param, lcu_offset_x * LCU_WIDTH, width);
   kvz_blockScalingSrcHeightRange(range + 2, scaling_param, lcu_offset_y * LCU_WIDTH, height);
 
   int src_width = range[1] - range[0] + 1;
   int src_height = range[3] - range[2] + 1;
+  
+  //Make sure sizes are divisible by 2 for chromas sake. TODO: do only depending on the chroma format
+  src_width += src_width % 2;
+  src_height += src_height % 2;
 
-  //Allocate buffers for holding the intermediate results of scaling etc.
-  if (state->type == ENCODER_STATE_TYPE_TILE) {
-    //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
-    state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, scaling_param->src_width + scaling_param->src_padding_x, scaling_param->src_height + scaling_param->src_padding_y, scaling_param->src_width + scaling_param->src_padding_x, (chroma_format_t)ctrl->chroma_format, 0);
-    state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, ctrl->in.width, ctrl->in.height, ctrl->in.width, (chroma_format_t)ctrl->chroma_format, 0);
-
-  } else {
-
-    //Set the trgt/src buffers when input image is recieved
-    state->layer->img_job_param.src_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, src_width, src_height, src_width, (chroma_format_t)ctrl->chroma_format, 0);
-    state->layer->img_job_param.trgt_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, height, width, (chroma_format_t)ctrl->chroma_format, 0);
-  }
-
+  //Allocate buffers for holding the intermediate results of scaling etc. only for the tile
   state->layer->img_job_param.ver_tmp_buffer = kvz_newOpaqueYuvBuffer(NULL, NULL, NULL, width, src_height, width, (chroma_format_t)ctrl->chroma_format, sizeof(int16_t));
 
   state->layer->img_job_param.param = NULL;

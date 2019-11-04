@@ -81,11 +81,16 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
       {
         w_factor = 1;
         h_factor = 1;
+        //Make sure width/height is divisible by 2, else chroma size wont be an integer
+        assert((width % 2) == 0);
+        assert((height % 2) == 0);
         break;
       }
     case CHROMA_422:
       {
         w_factor = 1;
+        //Make sure width is divisible by 2, else chroma size wont be an integer
+        assert((width % 2) == 0);
         break;
       }
     case CHROMA_444:
@@ -166,11 +171,18 @@ opaque_yuv_buffer_t * kvz_newOpaqueYuvBuffer(void * const y_data, void * const u
     {
       w_factor = 1;
       h_factor = 1;
+      //Make sure width/height is divisible by 2, else chroma size wont be an integer
+      assert((width % 2) == 0);
+      assert((stride % 2) == 0);
+      assert((height % 2) == 0);
       break;
     }
     case CHROMA_422:
     {
       w_factor = 1;
+      //Make sure width is divisible by 2, else chroma size wont be an integer
+      assert((width % 2) == 0);
+      assert((stride % 2) == 0);
       break;
     }
     case CHROMA_444:
