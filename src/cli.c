@@ -30,8 +30,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
-unsigned int sum_of_qps = 0;
-unsigned int frames_done = 0;
+
 static const char short_options[] = "i:o:d:w:h:n:q:p:r:";
 static const struct option long_options[] = {
   { "input",              required_argument, NULL, 'i' },
@@ -563,11 +562,9 @@ void print_help(void)
 void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
-                      const bool print_psnr)
+                      const bool print_psnr,
+                      const double avg_qp)
 {
-  sum_of_qps += info->qp;
-  frames_done += 1;
-  double avg_qp = sum_of_qps / frames_done;
   fprintf(stderr, "POC %4d QP %2d AVG QP %.1f (%c-frame) %10d bits",
           info->poc,
           info->qp,
@@ -594,9 +591,4 @@ void print_frame_info(const kvz_frame_info *const info,
   }
 
   fprintf(stderr, "\n");
-}
-
-unsigned int return_sum_of_qps()
-{
- return sum_of_qps;
 }

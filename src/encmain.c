@@ -305,6 +305,10 @@ void output_recon_pictures(const kvz_api *const api,
   } while (picture_written);
 }
 
+static double calc_avg_qp(uint64_t qp_sum, uint32_t frames_done)
+{
+  return (double)qp_sum / (double)frames_done;
+}
 
 /**
  * \brief Program main function.
@@ -432,6 +436,7 @@ int main(int argc, char *argv[])
     uint64_t bitstream_length = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
+    uint64_t qp_sum = 0;
 
     // how many bits have been written this second? used for checking if framerate exceeds level's limits
     uint64_t bits_this_second = 0;
@@ -597,12 +602,15 @@ int main(int argc, char *argv[])
                                 opts->config->height);
         }
 
+        qp_sum      += info_out.qp;
         frames_done += 1;
+
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr);
+        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr,
+                         calc_avg_qp(qp_sum, frames_done));
       }
 
       api->picture_free(cur_in_img);
@@ -648,7 +656,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
       double bitrate = (bitstream_length * 8 * (double)(encoder->cfg.framerate_num / encoder->cfg.framerate_denom) / 1024 / frames_done / 1024);
       fprintf(stderr, " Bitrate: %.3f mbps\n", bitrate);
-      fprintf(stderr, " AVG QP: %.1f\n", (double)(return_sum_of_qps() /frames_done));
+      fprintf(stderr, " AVG QP: %.1f\n", calc_avg_qp(qp_sum, frames_done));
     }
     pthread_join(input_thread, NULL);
   }
