@@ -29,6 +29,7 @@
 static const int SMOOTHING_WINDOW = 40;
 static const double MIN_LAMBDA    = 0.1;
 static const double MAX_LAMBDA    = 10000;
+#define BETA1 1.2517
 
 /**
  * \brief Clip lambda value to a valid range.
@@ -406,7 +407,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   int32_t num_pixels = state->encoder_control->cfg.width * state->encoder_control->cfg.height;
   double bpp = bits / num_pixels;
   if (state->frame->is_irap) {
-    double temp = pow(state->frame->icost / num_pixels, 1.2517);
+    double temp = pow(state->frame->icost / num_pixels, BETA1);
     est_lambda = alpha / 256 * pow(temp/bpp, beta);
   }
   else {
@@ -548,11 +549,12 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
 
   int index = pos.x + pos.y * state->encoder_control->in.width_in_lcu;
-  double bpp = bits / state->frame->lcu_stats[index].pixels;
+  lcu_stats_t* ctu = &state->frame->lcu_stats[index];
+  double bpp = bits / ctu->pixels;
 
   double alpha;
   double beta;
-  if (state->frame->poc == 0) {
+  if (state->frame->is_irap) {
     alpha = state->frame->rc_alpha;
     beta = state->frame->rc_beta;
   }
@@ -562,62 +564,78 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     beta = state->frame->new_ratecontrol.k_para[layer][index] - 1;
   }
 
-  double est_lambda = alpha * pow(bpp, beta);
-  double clip_lambda = state->frame->lambda;
+  double est_lambda;
+  int est_qp;
+  if (state->frame->is_irap) {
+    double cost_per_pixel = (double)ctu->i_cost / ctu->pixels;
+    cost_per_pixel = pow(cost_per_pixel, BETA1);
+    est_lambda = alpha / 256.0 * pow(cost_per_pixel / bpp, beta);
+    est_qp = state->frame->QP;
+    double max_lambda = exp(((double)est_qp + 2.49 - 13.7122) / 4.2005);
+    double min_lambda = exp(((double)est_qp - 2.49 - 13.7122) / 4.2005);
+    est_lambda = CLIP(min_lambda, max_lambda, est_lambda);
 
-  double clip_neighbor_lambda = -1;
-  for(int temp_index = index - 1; temp_index >= 0; --temp_index) {
-    if(state->frame->lcu_stats[index].lambda > 0) {
-      clip_neighbor_lambda = state->frame->lcu_stats[index].lambda;
-      break;
-    }
-  }
-
-  if (clip_neighbor_lambda > 0) {
-    est_lambda = CLIP(clip_neighbor_lambda * pow(2, -(1.0 + frame_allocation) / 3.0),
-      clip_neighbor_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
-      est_lambda);
-  }
-
-  if (clip_lambda > 0) {
-    est_lambda = CLIP(clip_lambda * pow(2, -(2.0 + frame_allocation) / 3.0),
-      clip_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
-      est_lambda);
+    est_qp = lambda_to_qp(est_lambda);
   }
   else {
-    est_lambda = CLIP(10.0, 1000.0, est_lambda);
-  }
+    
+    est_lambda = alpha * pow(bpp, beta);
+    const double clip_lambda = state->frame->lambda;
 
-  if (est_lambda < 0.1) {
-    est_lambda = 0.1;
-  }
-
-  int est_qp = lambda_to_qp(est_lambda);
-
-  int clip_qp = -1;
-  for (int temp_index = index - 1; temp_index >= 0; --temp_index) {
-    if (state->frame->lcu_stats[index].qp > -1) {
-      clip_qp = state->frame->lcu_stats[index].qp;
-      break;
+    double clip_neighbor_lambda = -1;
+    for(int temp_index = index - 1; temp_index >= 0; --temp_index) {
+      if(state->frame->lcu_stats[temp_index].lambda > 0) {
+        clip_neighbor_lambda = state->frame->lcu_stats[temp_index].lambda;
+        break;
+      }
     }
-  }
 
-  if( clip_qp > -1) {
-    est_qp = CLIP(clip_qp - 1 - frame_allocation,
-      clip_qp + 1 + frame_allocation,
-      clip_qp);
-  }
+    if (clip_neighbor_lambda > 0) {
+      est_lambda = CLIP(clip_neighbor_lambda * pow(2, -(1.0 + frame_allocation) / 3.0),
+        clip_neighbor_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
+        est_lambda);
+    }
 
-  est_qp = CLIP(state->frame->QP - 2 - frame_allocation,
-    state->frame->QP + 2 + frame_allocation,
-    est_qp);
+    if (clip_lambda > 0) {
+      est_lambda = CLIP(clip_lambda * pow(2, -(2.0 + frame_allocation) / 3.0),
+        clip_lambda * pow(2.0, (1.0 + frame_allocation) / 3.0),
+        est_lambda);
+    }
+    else {
+      est_lambda = CLIP(10.0, 1000.0, est_lambda);
+    }
+
+    if (est_lambda < 0.1) {
+      est_lambda = 0.1;
+    }
+
+    est_qp = lambda_to_qp(est_lambda);
+
+    int clip_qp = -1;
+    for (int temp_index = index - 1; temp_index >= 0; --temp_index) {
+      if (state->frame->lcu_stats[temp_index].qp > -1) {
+        clip_qp = state->frame->lcu_stats[temp_index].qp;
+        break;
+      }
+    }
+
+    if( clip_qp > -1) {
+      est_qp = CLIP(clip_qp - 1 - frame_allocation,
+        clip_qp + 1 + frame_allocation,
+        clip_qp);
+    }
+
+    est_qp = CLIP(state->frame->QP - 2 - frame_allocation,
+      state->frame->QP + 2 + frame_allocation,
+      est_qp);
+  }
 
   state->lambda = est_lambda;
   state->lambda_sqrt = sqrt(est_lambda);
   state->qp = est_qp;
-  state->frame->lcu_stats[index].qp = est_qp;
-  state->frame->lcu_stats[index].lambda = est_lambda;
-  state->frame->lcu_stats[index].i_cost = 0;
+  ctu->qp = est_qp;
+  ctu->lambda = est_lambda;
+  ctu->i_cost = 0;
 }
 
 
@@ -697,10 +715,22 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
 void kvz_update_after_picture(encoder_state_t * const state) {
   double total_distortion = 0;
   double lambda = 0;
-  double pic_bpp = (double)state->frame->cur_frame_bits_coded / (state->encoder_control->in.width * state->encoder_control->in.height);
+  int32_t pixels = (state->encoder_control->in.width * state->encoder_control->in.height);
+  double pic_bpp = (double)state->frame->cur_frame_bits_coded / pixels;
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
+
+  if (state->frame->is_irap) {
+    double lnbpp = log(pow(state->frame->icost / pixels, BETA1));
+    double diff_lambda = state->frame->rc_beta * log(state->frame->cur_frame_bits_coded) - log(state->frame->cur_pic_target_bits);
+
+    diff_lambda = CLIP(-0.125, 0.125, 0.25*diff_lambda);
+
+    state->frame->rc_alpha *= exp(diff_lambda);
+    state->frame->rc_beta += diff_lambda / lnbpp;
+  }
+
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
       int ctu_distortion = 0;
