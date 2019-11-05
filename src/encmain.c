@@ -640,23 +640,38 @@ int main(int argc, char *argv[])
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
     {
+      const double mega = (double)(1 << 20);
+
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
       double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
-      fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
-      fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
 
-      double encoding_cpu = encoding_time / wall_time * 100.f;
+      double encoding_cpu = 100.0 * encoding_time / wall_time;
+      double encoding_fps = (double)frames_done   / wall_time;
+
+      double n_bits       = (double)(bitstream_length * 8);
+      double sf_num       = (double)encoder->cfg.framerate_num;
+      double sf_den       = (double)encoder->cfg.framerate_denom;
+      double sequence_fps =         sf_num / sf_den;
+
+      double sequence_t   = (double)frames_done / sequence_fps;
+      double bitrate_bps  = (double)n_bits      / sequence_t;
+      double bitrate_mbps =         bitrate_bps / mega;
+
+      double avg_qp       = calc_avg_qp(qp_sum, frames_done);
 
 #ifdef _WIN32
-      if (encoding_cpu > 100)  encoding_cpu = 100;
+      if (encoding_cpu > 100.0) {
+        encoding_cpu = 100.0;
+      }
 #endif
-      
+      fprintf(stderr, " Encoding time: %.3f s.\n",      encoding_time);
+      fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
 
-      fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_cpu);
-      fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
-      double bitrate = (bitstream_length * 8 * (double)(encoder->cfg.framerate_num / encoder->cfg.framerate_denom) / 1024 / frames_done / 1024);
-      fprintf(stderr, " Bitrate: %.3f mbps\n", bitrate);
-      fprintf(stderr, " AVG QP: %.1f\n", calc_avg_qp(qp_sum, frames_done));
+      fprintf(stderr, " Encoding CPU usage: %.2f%%\n",  encoding_cpu);
+      fprintf(stderr, " FPS: %.2f\n",                   encoding_fps);
+
+      fprintf(stderr, " Bitrate: %.3f mbps\n",          bitrate_mbps);
+      fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
     }
     pthread_join(input_thread, NULL);
   }

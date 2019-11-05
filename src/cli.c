@@ -255,6 +255,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       goto done;
     }
   }
+
   // Check for extra arguments.
   if (argc - optind > 0) {
     fprintf(stderr, "Input error: Extra argument found: \"%s\"\n", argv[optind]);
@@ -281,6 +282,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }
+
 done:
   if (!ok) {
     cmdline_opts_free(api, opts);
