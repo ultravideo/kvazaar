@@ -670,7 +670,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n",  encoding_cpu);
       fprintf(stderr, " FPS: %.2f\n",                   encoding_fps);
 
-      fprintf(stderr, " Bitrate: %.3f mbps\n",          bitrate_mbps);
+      fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
       fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
     }
     pthread_join(input_thread, NULL);
