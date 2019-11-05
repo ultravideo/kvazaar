@@ -1072,22 +1072,22 @@ static void add_ilr_frames(encoder_state_t *state)
 }*/
 
 // Scale tile specified area
-static void block_step_scaling(encoder_state_t * const state )
-{
-  //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
-  kvz_image_scaling_parameter_t * const param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
-  kvz_propagate_image_scaling_parameters(param, &state->layer->img_job_param);
-  param->block_x = state->tile->offset_x;
-  param->block_y = state->tile->offset_y;
-  param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
-  param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
-
-  param->use_tiles = 1;
-  kvz_opaque_block_step_scaler_worker(param);
-
-  //state->layer->scaling_started = 1;
-
-}
+//static void block_step_scaling(encoder_state_t * const state )
+//{
+//  //Allocate new scaling parameters to pass to the worker and set block info. Worker is in charge of deallocation.
+//  kvz_image_scaling_parameter_t * const param = calloc(1, sizeof(kvz_image_scaling_parameter_t));
+//  kvz_propagate_image_scaling_parameters(param, &state->layer->img_job_param);
+//  param->block_x = state->tile->offset_x;
+//  param->block_y = state->tile->offset_y;
+//  param->block_width = state->layer->img_job_param.trgt_buffer->y->width; //Trgt buffer should be the size of the block
+//  param->block_height = state->layer->img_job_param.trgt_buffer->y->height;
+//
+//  param->use_tiles = 1;
+//  kvz_opaque_block_step_scaler_worker(param);
+//
+//  //state->layer->scaling_started = 1;
+//
+//}
 
 // Start the block step scaling job(s) for the given state
 static void start_block_step_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
@@ -1473,17 +1473,17 @@ static void tile_cu_array_upsampling_worker(void *opaque_param)
 }
 
 //Scale tile specified part of cua
-static void cua_lcu_scaling( encoder_state_t * const state )
-{
-  state->layer->cua_job_param.tile_lcu_offset_x = state->tile->lcu_offset_x;
-  state->layer->cua_job_param.tile_lcu_offset_y = state->tile->lcu_offset_y;
-  state->layer->cua_job_param.tile_width_in_lcu = state->tile->frame->width_in_lcu;
-  state->layer->cua_job_param.tile_height_in_lcu = state->tile->frame->height_in_lcu;
-
-  tile_cu_array_upsampling_worker(&state->layer->cua_job_param);
-
-  //state->layer->scaling_started = 1;
-}
+//static void cua_lcu_scaling( encoder_state_t * const state )
+//{
+//  state->layer->cua_job_param.tile_lcu_offset_x = state->tile->lcu_offset_x;
+//  state->layer->cua_job_param.tile_lcu_offset_y = state->tile->lcu_offset_y;
+//  state->layer->cua_job_param.tile_width_in_lcu = state->tile->frame->width_in_lcu;
+//  state->layer->cua_job_param.tile_height_in_lcu = state->tile->frame->height_in_lcu;
+//
+//  tile_cu_array_upsampling_worker(&state->layer->cua_job_param);
+//
+//  //state->layer->scaling_started = 1;
+//}
 
 // Start the cu array scaling job for the given state
 static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_order_element_t * const lcu)
@@ -1757,6 +1757,70 @@ void kvz_scalability_prepare(encoder_state_t *state)
     kvz_cu_array_free(&scaled_cu);
   }
 }
+
+/**
+*  Performe ILR processing for scalability related stuff.
+*
+* - Start scaling jobs if spatial scalability is used
+* - Add dependencies related to ilr
+* - If use_wpp is specified job and lcu needs to be valid
+*/
+static void ilr_processing(encoder_state_t *state, int use_wpp, const lcu_order_element_t *const lcu, const threadqueue_job_t **const job )
+{
+  if (state->ILR_state != NULL) {
+    const encoder_control_t *ctrl = state->encoder_control;
+
+    //Set up scaling jobs
+    // Need to check if scaling jobs have been started. If not, need to do scaling first. 
+    if (state->layer != NULL && !state->layer->scaling_started) {
+      start_block_step_scaling_job(state, lcu);
+      start_cua_lcu_scaling_job(state, lcu);
+      //Don't set scaling started to true here since it prevents scaling in other lcu and wavefront rows
+      if(!use_wpp) state->layer->scaling_started = 1; //Propably no need to set it here, but shouldn't hurt either. Only set if one wavefront row or using tiles in which case layer struct should be separate.
+    }
+
+    if (use_wpp) {
+      //Add a direct dependecy from ilr states wf_job to this (only for SNR)
+      if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
+        state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width) {
+        //Account for deblock/SAO
+        const lcu_order_element_t *ilr_lcu = lcu;
+        if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) {
+          ilr_lcu = (ilr_lcu->below != NULL) ? ilr_lcu->below : ilr_lcu;
+          ilr_lcu = (ilr_lcu->right != NULL) ? ilr_lcu->right : ilr_lcu;
+        }
+        if (state->ILR_state->tile->wf_jobs[ilr_lcu->id] != NULL)
+        {
+          kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[ilr_lcu->id]);
+        }
+      } else if (state->layer != NULL) {
+        if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
+          kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
+        }
+        if (state->layer->cua_scaling_jobs[lcu->id] != NULL) {
+          //Set dep to a cua scaling job so that max inter ref is inside the dep range
+          const lcu_order_element_t *dep_lcu = lcu;
+          for (int i = 0; dep_lcu->below && i < ctrl->max_inter_ref_lcu.down; i++) {
+            dep_lcu = dep_lcu->below;
+          }
+          for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
+            dep_lcu = dep_lcu->right;
+          }
+          kvz_threadqueue_job_dep_add(job[0], state->layer->cua_scaling_jobs[dep_lcu->id]);
+        }
+      }
+    } else {
+      //Add dependency to ilr recon upscaling and cua upsampling
+      if (state->tqj_ilr_rec_scaling_done != NULL) {
+        kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->tqj_ilr_rec_scaling_done);
+      }
+      if (state->tqj_ilr_cua_upsampling_done != NULL) {
+        kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->tqj_ilr_cua_upsampling_done);
+      }
+    }
+  }
+}
+
 // ***********************************************
 
 /**
@@ -2463,12 +2527,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   if (!use_parallel_encoding) {
     //*********************************************
     //For scalable extension.
-    // Need to check if scaling jobs have been started. If not, need to do scaling first. 
-    if( state->layer != NULL && !state->layer->scaling_started ){
-      block_step_scaling(state);
-      cua_lcu_scaling(state);
-      state->layer->scaling_started = 1; //Propably no need to set it here, but shouldn't hurt either. Only set if one wavefront row or using tiles in which case layer struct should be separate.
-    }
+    ilr_processing(state, 0, NULL, NULL);
     //*********************************************
 
     // Encode every LCU in order and perform SAO reconstruction after every
@@ -2566,48 +2625,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
         //*********************************************
         //For scalable extension.
-        //Add dependency to ilr recon upscaling
-
-        if (state->ILR_state != NULL) {
-
-          //Set up scaling jobs
-          if (state->layer != NULL && !state->layer->scaling_started) {
-            start_block_step_scaling_job(state, lcu);
-            start_cua_lcu_scaling_job(state, lcu);
-            //Don't set scaling started to true here since it prevents scaling in other lcu and wavefront rows
-          }
-
-          //Add a direct dependecy from ilr states wf_job to this (only for SNR)
-          if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
-            state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width) {
-            //Account for deblock/SAO
-            const lcu_order_element_t *ilr_lcu = lcu;
-            if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) {
-              ilr_lcu = (ilr_lcu->below != NULL) ? ilr_lcu->below : ilr_lcu;
-              ilr_lcu = (ilr_lcu->right != NULL) ? ilr_lcu->right : ilr_lcu;
-            }
-            if (state->ILR_state->tile->wf_jobs[ilr_lcu->id] != NULL)
-            {
-              kvz_threadqueue_job_dep_add(job[0], state->ILR_state->tile->wf_jobs[ilr_lcu->id]);
-            }
-          } else if(state->layer != NULL) {
-            if (state->layer->image_ver_scaling_jobs[lcu->id] != NULL) {
-              kvz_threadqueue_job_dep_add(job[0], state->layer->image_ver_scaling_jobs[lcu->id]);
-            }
-            if (state->layer->cua_scaling_jobs[lcu->id] != NULL) {
-              //Set dep to a cua scaling job so that max inter ref is inside the dep range
-              const lcu_order_element_t *dep_lcu = lcu;
-              for (int i = 0; dep_lcu->below && i < ctrl->max_inter_ref_lcu.down; i++) {
-                dep_lcu = dep_lcu->below;
-              }
-              for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
-                dep_lcu = dep_lcu->right;
-              }
-              kvz_threadqueue_job_dep_add(job[0], state->layer->cua_scaling_jobs[dep_lcu->id]);
-            }
-          }
-        } 
-
+        
+        ilr_processing(state, 1, lcu, job);
         
         ////should be enough to add it to the first only?
         //if (i == 0) {
@@ -2637,6 +2656,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           //*********************************************
           //For scalable extension.
           //Set scaling job dones for good measure
+          //TODO: Could propably remove?
           if (state->layer != NULL) {
             assert(!state->tqj_ilr_rec_scaling_done);
             assert(!state->tqj_ilr_cua_upsampling_done);
@@ -2781,20 +2801,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 
           //*********************************************
           //For scalable extension.
-          //Set up scaling jobs
-          if (main_state->children[i].layer != NULL && !main_state->children[i].layer->scaling_started) {
-            start_block_step_scaling_job(&main_state->children[i], NULL);
-            start_cua_lcu_scaling_job(&main_state->children[i], NULL);
-            main_state->children[i].layer->scaling_started = 1; //Signal scaling started. Each tile should have its own layer struct so does not interfere with other tiles
-          }
-
-          //Add dependency to ilr recon upscaling and cua upsampling
-          if (main_state->children[i].tqj_ilr_rec_scaling_done != NULL) {
-            kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].tqj_ilr_rec_scaling_done);
-          }
-          if (main_state->children[i].tqj_ilr_cua_upsampling_done != NULL) {
-            kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].tqj_ilr_cua_upsampling_done);
-          }
+          ilr_processing(&main_state->children[i], 0, NULL, NULL);
           //*********************************************
 
           kvz_threadqueue_submit(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
