@@ -1765,11 +1765,11 @@ void kvz_scalability_prepare(encoder_state_t *state)
 * - Add dependencies related to ilr
 * - If use_wpp is specified job and lcu needs to be valid
 */
-static void ilr_processing(encoder_state_t *state, int use_wpp, const lcu_order_element_t *const lcu, const threadqueue_job_t **const job )
+static void ilr_processing(encoder_state_t *state, int use_wpp, const lcu_order_element_t *const lcu, threadqueue_job_t **const job )
 {
   if (state->ILR_state != NULL) {
     const encoder_control_t *ctrl = state->encoder_control;
-
+    
     //Set up scaling jobs
     // Need to check if scaling jobs have been started. If not, need to do scaling first. 
     if (state->layer != NULL && !state->layer->scaling_started) {
