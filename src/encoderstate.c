@@ -1811,10 +1811,10 @@ static void ilr_processing(encoder_state_t *state, int use_wpp, const lcu_order_
       }
     } else {
       //Add dependency to ilr recon upscaling and cua upsampling
-      if (state->tqj_ilr_rec_scaling_done != NULL) {
+      if (state->tqj_ilr_rec_scaling_done != NULL && state->tqj_recon_done != NULL) {
         kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->tqj_ilr_rec_scaling_done);
       }
-      if (state->tqj_ilr_cua_upsampling_done != NULL) {
+      if (state->tqj_ilr_cua_upsampling_done != NULL && state->tqj_recon_done != NULL) {
         kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->tqj_ilr_cua_upsampling_done);
       }
     }
