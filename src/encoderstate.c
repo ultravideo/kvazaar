@@ -1163,6 +1163,12 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   kvz_threadqueue_free_job(&state->tqj_bitstream_written);
   kvz_threadqueue_free_job(&state->tqj_recon_done);
 
+  //Copy the constraint pointer
+	// TODO: Try to do it in the if (state->is_leaf)
+  //if (state->parent != NULL) {
+	 // state->constraint = state->parent->constraint;
+  //}
+
   for (int i = 0; state->children[i].encoder_control; ++i) {
     encoder_state_init_children(&state->children[i]);
   }
@@ -1345,6 +1351,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     assert(!state->tile->frame->rec);
     assert(!state->tile->frame->cu_array);
     state->frame->prepared = 1;
+
     return;
   }
 
@@ -1395,6 +1402,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->irap_poc = prev_state->frame->irap_poc;
 
   state->frame->prepared = 1;
+
+
 }
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)

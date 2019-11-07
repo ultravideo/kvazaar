@@ -141,6 +141,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->max_merge = 5;
   cfg->early_skip = true;
 
+	cfg->ml_pu_depth_intra = false;
+
   return 1;
 }
 
@@ -1260,6 +1262,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("early-skip") {
   cfg->early_skip = (bool)atobool(value);
   }
+	else if OPT("ml-pu-depth-intra") {
+			cfg->ml_pu_depth_intra = (bool)atobool(value);
+	}
   else {
     return 0;
   }

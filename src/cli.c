@@ -137,7 +137,8 @@ static const struct option long_options[] = {
   { "max-merge",          required_argument, NULL, 0 },
   { "early-skip",               no_argument, NULL, 0 },
   { "no-early-skip",            no_argument, NULL, 0 },
-  {0, 0, 0, 0}
+	{ "ml-pu-depth-intra",        no_argument, NULL, 0 },
+	{0, 0, 0, 0}
 };
 
 /**
@@ -478,6 +479,9 @@ void print_help(void)
     "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
     "      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]\n"
     "                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4\n"
+		"			 --ml-pu-depth-intra		: Predict the pu-depth-intra using machine\n"
+		"																learning trees, overrides the\n"
+		"																 --pu-depth-intra parameter. [disabled]\n"
     "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"

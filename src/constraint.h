@@ -1,5 +1,5 @@
-#ifndef ENCODER_STATE_CTORS_DTORS_H_
-#define ENCODER_STATE_CTORS_DTORS_H_
+#ifndef CONSTRAINT_H_
+#define CONSTRAINT_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,23 +20,21 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \ingroup Control
- * \file
- * Creation and destruction of encoder_state_t.
- */
-
-#include "global.h" // IWYU pragma: keep
 #include "ml_intra_cu_depth_pred.h"
-#include "constraint.h"
-
-// Forward declare because including the header would lead  to a cyclic
-// dependency.
-struct encoder_state_t;
+#include "encoderstate.h"
 
 
-int kvz_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void kvz_encoder_state_finalize(struct encoder_state_t *state);
+ /* Constraint structure:
+	* Each field corresponds to a constraint technique. The encoder tests if the constraint
+	* pointer is allocated to apply the technique.
+ */
+typedef struct {
+	// Structure used for the CTU depth prediction using Machine Learning in All Intra 
+	ml_intra_ctu_pred_t * ml_intra_depth_ctu;
+} constraint_t;
 
 
-#endif // ENCODER_STATE_CTORS_DTORS_H_
+void * kvz_init_constraint(encoder_state_t* state, const encoder_control_t * const);
+void kvz_constraint_free(encoder_state_t* state);
+
+#endif
