@@ -568,13 +568,16 @@ void print_help(void)
 void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
-                      const bool print_psnr)
+                      const bool print_psnr,
+                      const double avg_qp)
 {
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits",
+  fprintf(stderr, "POC %4d QP %2d AVG QP %.1f (%c-frame) %10d bits",
           info->poc,
           info->qp,
+          avg_qp,
           "BPI"[info->slice_type % 3],
           bytes << 3);
+
   if (print_psnr) {
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
