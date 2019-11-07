@@ -390,23 +390,24 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
 
   double alpha;
   double beta;
-  //fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
   if(state->frame->poc == 0) {
     alpha = state->frame->rc_alpha;
     beta = state->frame->rc_beta;
   }
   else {
-    alpha = -state->frame->new_ratecontrol.pic_c_para[state->frame->gop_offset] *
-      state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset];
-    beta = state->frame->new_ratecontrol.pic_k_para[state->frame->gop_offset] - 1;
+    alpha = -state->frame->new_ratecontrol.pic_c_para[layer] *
+      state->frame->new_ratecontrol.pic_k_para[layer];
+    beta = state->frame->new_ratecontrol.pic_k_para[layer] - 1;
   }
   double bits = pic_allocate_bits(state);
+  // fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
   state->frame->cur_pic_target_bits = bits;
 
   double est_lambda;
   int32_t num_pixels = state->encoder_control->cfg.width * state->encoder_control->cfg.height;
   double bpp = bits / num_pixels;
   if (state->frame->is_irap) {
+    state->frame->i_bits_left = bits;
     double temp = pow(state->frame->icost / num_pixels, BETA1);
     est_lambda = alpha / 256 * pow(temp/bpp, beta);
   }
@@ -416,20 +417,22 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
 
   double temp_lambda;
   if ((temp_lambda = state->frame->new_ratecontrol.previous_lambdas[layer]) > 0.0) {
+    temp_lambda = CLIP(0.1, 10000.0, temp_lambda);
     est_lambda = CLIP(temp_lambda * pow(2.0, -1), temp_lambda * 2, est_lambda);
   }
 
   if((temp_lambda = state->frame->new_ratecontrol.previous_frame_lambda) > 0.0) {
+    temp_lambda = CLIP(0.1, 2000.0, temp_lambda);
     est_lambda = CLIP(temp_lambda * pow(2.0, -10.0 / 3.0), temp_lambda * pow(2.0, 10.0 / 3.0), est_lambda);
   }
 
-  est_lambda = MAX(est_lambda, 0.1);
+  est_lambda = CLIP(0.1, 10000.0, est_lambda);
 
   double total_weight = 0;
 
   if(!state->frame->is_irap) {
+    double best_lambda = est_lambda;
     if(!state->encoder_control->cfg.frame_allocation) {
-      double best_lambda = 0.0;
       temp_lambda = est_lambda;
       double taylor_e3;
       int iteration_number = 0;
@@ -447,7 +450,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
       }
       while (fabs(taylor_e3 - bits) > 0.01 && iteration_number <= 11);
     }
-    total_weight = calculate_weights(state, layer, ctu_count, est_lambda);
+    total_weight = calculate_weights(state, layer, ctu_count, best_lambda);
   }
   else {
     for (int i = 0; i < ctu_count; ++i) {
@@ -663,8 +666,8 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
     state->frame->new_ratecontrol.pic_c_para[layer] = new_c;
     state->frame->new_ratecontrol.pic_k_para[layer] = new_k;
   }
-  //fprintf(state->frame->c_d, "Frame %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_c, bpp, distortion, lambda);
-  //fprintf(state->frame->k_d, "Frame %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_k, bpp, distortion, lambda);
+  // fprintf(state->frame->c_d, "Frame %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_c, bpp, distortion, lambda);
+  // fprintf(state->frame->k_d, "Frame %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_k, bpp, distortion, lambda);
 }
 
 
@@ -707,8 +710,8 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
       state->frame->new_ratecontrol.k_para[layer][ctu_index] = new_k;
     }
   }
-  //fprintf(state->frame->c_d, "CTU %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_c, bpp, distortion, lambda);
-  //fprintf(state->frame->k_d, "CTU %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_k, bpp, distortion, lambda);
+  // fprintf(state->frame->c_d, "CTU %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_c, bpp, distortion, lambda);
+  // fprintf(state->frame->k_d, "CTU %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_k, bpp, distortion, lambda);
 }
 
 
