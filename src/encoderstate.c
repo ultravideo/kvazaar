@@ -703,9 +703,17 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     }
   }
 
+  pthread_mutex_lock(&state->frame->rc_lock);
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
   state->frame->cur_frame_bits_coded += bits;
+  // This variable is used differently by intra and inter frames and shouldn't
+  // be touched in intra frames here
+  state->frame->remaining_weight -= !state->frame->is_irap ?
+    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->weight :
+    0;
+  pthread_mutex_unlock(&state->frame->rc_lock);
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
+
   uint8_t not_skip = false;
   for(int y = 0; y < 64 && !not_skip; y+=8) {
     for(int x = 0; x < 64 && !not_skip; x+=8) {

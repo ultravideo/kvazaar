@@ -60,9 +60,11 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {
       int temp = MIN(encoder->cfg.width - x * 64, 64) * MIN(encoder->cfg.height - y * 64, 64);
-      state->frame->lcu_stats[x + y * encoder->in.width_in_lcu].pixels =temp;
+      state->frame->lcu_stats[x + y * encoder->in.width_in_lcu].pixels = temp;
     }
   }
+
+  pthread_mutex_init(&state->frame->rc_lock, NULL);
 
   for(int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
     state->frame->new_ratecontrol.c_para[i] = malloc(sizeof(double) * num_lcus);
@@ -98,6 +100,7 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->frame->new_ratecontrol.k_para[i]);
   }
 
+  pthread_mutex_destroy(&state->frame->rc_lock);
   // fclose(state->frame->bpp_d);
   // fclose(state->frame->c_d);
   // fclose(state->frame->k_d);

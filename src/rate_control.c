@@ -382,7 +382,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
       }
     }
     state->frame->icost = total_cost;
-    state->frame->remaining_icost = total_cost;
+    state->frame->remaining_weight = total_cost;
   }
 
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
@@ -451,6 +451,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
       while (fabs(taylor_e3 - bits) > 0.01 && iteration_number <= 11);
     }
     total_weight = calculate_weights(state, layer, ctu_count, best_lambda);
+    state->frame->remaining_weight = bits;
   }
   else {
     for (int i = 0; i < ctu_count; ++i) {
@@ -480,15 +481,17 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   const int index = pos.x + pos.y * state->tile->frame->width_in_lcu;
 
   if (state->frame->is_irap) {
-    // TODO: intra
     int cus_left = num_ctu - index + 1;
     int window = MIN(4, cus_left);
     double mad = kvz_get_lcu_stats(state, pos.x, pos.y)->i_cost;
+
+    pthread_mutex_lock(&state->frame->rc_lock);
     double bits_left = state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded;
     double weighted_bits_left = (bits_left * window + (bits_left - state->frame->i_bits_left)*cus_left) / window;
-    avg_bits = mad * weighted_bits_left / state->frame->remaining_icost;
-    state->frame->remaining_icost -= mad;
+    avg_bits = mad * weighted_bits_left / state->frame->remaining_weight;
+    state->frame->remaining_weight -= mad;
     state->frame->i_bits_left -= state->frame->cur_pic_target_bits * mad / state->frame->icost;
+    pthread_mutex_unlock(&state->frame->rc_lock);
   }
   else {
     double total_weight = 0;
@@ -500,16 +503,15 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     double taylor_e3 = 0.0;
     int iter = 0;
 
-    for (int i = index; i < num_ctu; i++) {
-      total_weight += state->frame->lcu_stats[i].weight;
-    }
-
     int last_ctu = index + used_ctu_count;
     for (int i = index; i < last_ctu; i++) {
       target_bits += state->frame->lcu_stats[i].weight;
     }
 
-    target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10); //obtain the total bit-rate for the realInfluenceLCU (=4) CTUs
+    pthread_mutex_lock(&state->frame->rc_lock);
+    total_weight = state->frame->remaining_weight;
+    target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
+    pthread_mutex_unlock(&state->frame->rc_lock);
 
     //just similar with the process at frame level, details can refer to the function TEncRCPic::kvz_estimate_pic_lambda
     do {
@@ -582,12 +584,14 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     est_qp = lambda_to_qp(est_lambda);
   }
   else {
+    // In case wpp is used the previous ctus may not be ready from above rows
+    const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
     
     est_lambda = alpha * pow(bpp, beta);
     const double clip_lambda = state->frame->lambda;
 
     double clip_neighbor_lambda = -1;
-    for(int temp_index = index - 1; temp_index >= 0; --temp_index) {
+    for(int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
       if(state->frame->lcu_stats[temp_index].lambda > 0) {
         clip_neighbor_lambda = state->frame->lcu_stats[temp_index].lambda;
         break;
@@ -616,7 +620,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     est_qp = lambda_to_qp(est_lambda);
 
     int clip_qp = -1;
-    for (int temp_index = index - 1; temp_index >= 0; --temp_index) {
+    for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
       if (state->frame->lcu_stats[temp_index].qp > -1) {
         clip_qp = state->frame->lcu_stats[temp_index].qp;
         break;

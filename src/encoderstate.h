@@ -151,6 +151,8 @@ typedef struct encoder_state_config_frame_t {
    */
   lcu_stats_t *lcu_stats;
 
+  pthread_mutex_t rc_lock;
+
   struct
   {
     double *c_para[KVZ_MAX_GOP_LAYERS];
@@ -175,7 +177,7 @@ typedef struct encoder_state_config_frame_t {
    */
   bool first_nal;
   double icost;
-  double remaining_icost;
+  double remaining_weight;
   double i_bits_left;
 } encoder_state_config_frame_t;
 
