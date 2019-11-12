@@ -476,7 +476,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
 
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
 
-  const int num_ctu = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
+  int num_ctu = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
   const int index = pos.x + pos.y * state->tile->frame->width_in_lcu;
 
   if (state->frame->is_irap) {
@@ -492,7 +492,8 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   }
   else {
     double total_weight = 0;
-    const int used_ctu_count = MIN(4, num_ctu - index); //g_RCLCUSmoothWindowSize, the same as the original RC scheme
+    // In case wpp is used only the ctus of the current frame are safe to use
+    const int used_ctu_count = MIN(4, (encoder->cfg.wpp ? (pos.y + 1) * encoder->in.width_in_lcu : num_ctu) - index);
     int target_bits = 0;
     double best_lambda = 0.0;
     double temp_lambda = state->frame->lambda;
