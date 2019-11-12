@@ -718,7 +718,7 @@ void kvz_block_scaler_worker(void * opaque_param)
 }
 
 //Debug stuff for printing thread info
-#if 0 && defined(linux)
+#if 1 && defined(linux)
 #include <sys/types.h>
 #include <sys/syscall.h>
 #define PRINT_TID_JOB_INFO(x,y,w,h,dir) fprintf(stderr, "TID: %ld, pos: (%d,%d), size: (%d,%d), dir: %d\n", syscall(SYS_gettid), x, y, w, h, dir)
