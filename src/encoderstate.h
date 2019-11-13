@@ -39,6 +39,7 @@
 #include "videoframe.h"
 #include "extras/crypto.h"
 
+struct kvz_rc_data;
 
 typedef enum {
   ENCODER_STATE_TYPE_INVALID = 'i',
@@ -155,19 +156,7 @@ typedef struct encoder_state_config_frame_t {
 
   pthread_mutex_t rc_lock;
 
-  struct
-  {
-    double *c_para[KVZ_MAX_GOP_LAYERS];
-    double *k_para[KVZ_MAX_GOP_LAYERS];
-    double pic_c_para[KVZ_MAX_GOP_LAYERS];
-    double pic_k_para[KVZ_MAX_GOP_LAYERS];
-    double previous_lambdas[KVZ_MAX_GOP_LAYERS+1];
-    double previous_frame_lambda;
-    double *intra_bpp;
-    double *intra_dis;
-    double intra_pic_distortion;
-    double intra_pic_bpp;
-  } new_ratecontrol;
+  struct kvz_rc_data *new_ratecontrol;
 
 
   FILE * bpp_d;

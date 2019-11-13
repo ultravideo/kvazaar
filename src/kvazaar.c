@@ -38,6 +38,7 @@
 #include "strategyselector.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "rate_control.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
@@ -64,6 +65,7 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
+    kvz_free_rc_data();
     // Discard const from the pointer.
     kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
@@ -99,6 +101,11 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   encoder->frames_started = 0;
   encoder->frames_done = 0;
 
+  // Assure that the rc data allocation was successful
+  if(!kvz_get_rc_data(encoder->control)) {
+    goto kvazaar_open_failure;
+  }
+
   kvz_init_input_frame_buffer(&encoder->input_buffer);
 
   encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
@@ -108,7 +115,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
     encoder->states[i].encoder_control = encoder->control;
-
     if (!kvz_encoder_state_init(&encoder->states[i], NULL)) {
       goto kvazaar_open_failure;
     }

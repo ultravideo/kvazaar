@@ -822,6 +822,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           }
           kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
 
+          //TODO: Preparation for the lock free implementation of the new rc
+          if (ref_state->frame->slicetype == KVZ_SLICE_I && ref_state->frame->num != 0 && state->encoder_control->cfg.owf > 1 && true) {
+            kvz_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_jobs[dep_lcu->id]);
+          }
+
           // Very spesific bug that happens when owf length is longer than the
           // gop length. Takes care of that.
           if(!state->encoder_control->cfg.gop_lowdelay &&
