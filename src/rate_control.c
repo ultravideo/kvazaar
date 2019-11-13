@@ -359,7 +359,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
     double k_lcu = state->frame->new_ratecontrol.k_para[layer][i];
     double a = -c_lcu * k_lcu / pow(state->frame->lcu_stats[i].pixels, k_lcu - 1.0);
     double b = -1.0 / (k_lcu - 1.0);
-    state->frame->lcu_stats[i].weight = pow(a / estLambda, b);
+    state->frame->lcu_stats[i].original_weight = state->frame->lcu_stats[i].weight = pow(a / estLambda, b);
     if (state->frame->lcu_stats[i].weight < 0.01) {
       state->frame->lcu_stats[i].weight = 0.01;
     }

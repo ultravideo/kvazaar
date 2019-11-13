@@ -58,6 +58,8 @@ typedef struct lcu_stats_t {
   //! \brief Weight of the LCU for rate control
   double weight;
 
+  double original_weight;
+
   //! \brief Lambda value which was used for this LCU
   double lambda;
 

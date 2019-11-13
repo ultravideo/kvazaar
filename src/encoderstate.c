@@ -709,7 +709,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   // This variable is used differently by intra and inter frames and shouldn't
   // be touched in intra frames here
   state->frame->remaining_weight -= !state->frame->is_irap ?
-    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->weight :
+    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
     0;
   pthread_mutex_unlock(&state->frame->rc_lock);
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
