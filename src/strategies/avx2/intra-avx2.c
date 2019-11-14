@@ -503,10 +503,22 @@ static void kvz_intra_pred_planar_avx2(
 
   } else {
     // Unoptimized version for reference.
+    // Only if log2_width == 2 <=> width == 4
     for (int y = 0; y < width; ++y) {
+      uint8_t  yp1     = y + 1;
+      uint16_t yp1_bl  = yp1 * bottom_left;
+      uint8_t  rl_curr = ref_left[yp1];
+
       for (int x = 0; x < width; ++x) {
-        int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
-        int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
+        uint8_t  xp1     = x + 1;
+        uint16_t xp1_tr  = xp1 * top_right;
+        uint8_t  rt_curr = ref_top[xp1];
+
+        uint8_t  rdist   = width - 1 - x;
+        uint8_t  bdist   = width - 1 - y;
+
+        int_fast16_t hor = rdist * rl_curr + xp1_tr;
+        int_fast16_t ver = bdist * rt_curr + yp1_bl;
         dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
       }
     }
