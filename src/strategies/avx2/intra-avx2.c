@@ -453,6 +453,13 @@ static void kvz_angular_pred_avx2(
   }
 }
 
+void print_128(const __m128i v)
+{
+  uint8_t buf[16];
+  _mm_storeu_si128((__m128i *)buf, v);
+  for (int i = 0; i < 16; i++)
+    printf("%.2x%c", buf[i], i == 15 ? '\n' : i == 7 ? '-' : ' ');
+}
 
 /**
  * \brief Generate planar prediction.
@@ -500,27 +507,89 @@ static void kvz_intra_pred_planar_avx2(
         _mm_storel_epi64((__m128i*)&(dst[y * width + x]), chunk);
       }
     }
-
   } else {
-    // Unoptimized version for reference.
     // Only if log2_width == 2 <=> width == 4
+    assert(width == 4);
+
+    const __m128i ones = _mm_set1_epi8(1);
+    const __m128i rl_shufmask = _mm_setr_epi32(0x04040404, 0x05050505,
+                                               0x06060606, 0x07070707);
+
+    __m128i rl_v = _mm_cvtsi32_si128(*(const uint32_t *)(ref_left + 1));
+    __m128i rt_v = _mm_cvtsi32_si128(*(const uint32_t *)(ref_top  + 1));
+
+    uint32_t rt14    = *(const uint32_t *)(ref_top  + 1);
+    uint32_t rl14    = *(const uint32_t *)(ref_left + 1);
+    uint64_t rt14_64 = (uint64_t)rt14;
+    uint64_t rl14_64 = (uint64_t)rl14;
+    uint64_t rtl14   = rt14_64 | (rl14_64 << 32);
+
+    __m128i rtl_v = _mm_cvtsi64_si128   (rtl14);
+    __m128i rt    = _mm_broadcastd_epi32(rtl_v);
+    __m128i rl    = _mm_shuffle_epi8    (rtl_v, rl_shufmask);
+
+    __m128i xp1   = _mm_set1_epi32  (0x04030201);
+    __m128i yp1   = _mm_shuffle_epi8(xp1,   rl_shufmask);
+
+    __m128i rdist = _mm_set1_epi32  (0x00010203);
+    __m128i bdist = _mm_shuffle_epi8(rdist, rl_shufmask);
+
+    ///////////////////////////////////////////////////////////////
+
+    __m128i rtrl_l = _mm_unpacklo_epi8(rt,     rl);
+    __m128i rtrl_h = _mm_unpackhi_epi8(rt,     rl);
+
+    __m128i bdrd_l = _mm_unpacklo_epi8(bdist,  rdist);
+    __m128i bdrd_h = _mm_unpackhi_epi8(bdist,  rdist);
+
+    __m128i hvs_lo = _mm_maddubs_epi16(rtrl_l, bdrd_l);
+    __m128i hvs_hi = _mm_maddubs_epi16(rtrl_h, bdrd_h);
+
+    int asdf = 0;
+    for (int i = 0; i < 4; i++) {
+      if (ref_top[width + 1 + i] == 0x80) {
+        asdf = 1;
+        break;
+      }
+    }
+    if (!asdf) {
+      /*printf("hvs_lo: ");*/ print_128(hvs_lo);
+      /*printf("hvs_hi: "); */print_128(hvs_hi);
+    }
+
+    // rt1 rt2 rt3 rt4 rl1 rl2 rl3 rl4 0 0 0 0 0 0 0 0
+    // __m128i  rtl_v   = _mm_cvtsi64_si128(rtl14);
+
     for (int y = 0; y < width; ++y) {
+
       uint8_t  yp1     = y + 1;
       uint16_t yp1_bl  = yp1 * bottom_left;
-      uint8_t  rl_curr = ref_left[yp1];
+      uint8_t  rl_curr = ref_left[y + 1]; // 1...4
+      uint8_t  bdist_s = width - 1 - y;
 
       for (int x = 0; x < width; ++x) {
         uint8_t  xp1     = x + 1;
         uint16_t xp1_tr  = xp1 * top_right;
-        uint8_t  rt_curr = ref_top[xp1];
+        uint8_t  rt_curr = ref_top[x + 1];
 
-        uint8_t  rdist   = width - 1 - x;
-        uint8_t  bdist   = width - 1 - y;
+        uint8_t  rdist_s = width - 1 - x;
 
-        int_fast16_t hor = rdist * rl_curr + xp1_tr;
-        int_fast16_t ver = bdist * rt_curr + yp1_bl;
-        dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
+        int16_t  hor     = rdist_s * rl_curr;
+        int16_t  ver     = bdist_s * rt_curr;
+        int16_t  hv_sum  = hor + ver;
+        if (!asdf) {
+          int daa = x + y * width;
+          printf("%.2x %.2x%c", hv_sum & 0xff, hv_sum >> 8, ((daa & 7) == 7) ? '\n' : ((daa & 3) == 3) ? '-' : ' ');
+        }
+                 hv_sum += width;
+                 hv_sum += xp1_tr + yp1_bl;
+
+        dst[y * width + x] = hv_sum >> (log2_width + 1);
       }
+    }
+    if (!asdf) {
+      fflush(stdout);
+      asm("int $3");
     }
   }
 }
