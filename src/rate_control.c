@@ -24,6 +24,7 @@
 
 #include "encoder.h"
 #include "kvazaar.h"
+#include "pthread.h"
 
 
 static const int SMOOTHING_WINDOW = 40;
@@ -47,6 +48,8 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
   data = calloc(1, sizeof(kvz_rc_data));
 
   if (data == NULL) return NULL;
+  pthread_mutex_init(&data->ck_frame_lock, NULL);
+  
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
     data->c_para[i] = malloc(sizeof(double) * num_lcus);
@@ -70,7 +73,9 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
 
 void kvz_free_rc_data() {
   if (data == NULL) return;
-  
+
+  pthread_mutex_destroy(&data->ck_frame_lock);
+
   FREE_POINTER(data->intra_bpp);
   FREE_POINTER(data->intra_dis);
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
@@ -413,7 +418,6 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
 
 void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
-
   if(state->frame->is_irap) {
     int total_cost = 0;
     for (int y = 0; y < encoder->cfg.height; y += 8) {
@@ -437,9 +441,11 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
     beta = state->frame->rc_beta;
   }
   else {
+    pthread_mutex_lock(&state->frame->new_ratecontrol->ck_frame_lock);
     alpha = -state->frame->new_ratecontrol->pic_c_para[layer] *
       state->frame->new_ratecontrol->pic_k_para[layer];
     beta = state->frame->new_ratecontrol->pic_k_para[layer] - 1;
+    pthread_mutex_unlock(&state->frame->new_ratecontrol->ck_frame_lock);
   }
   double bits = pic_allocate_bits(state);
   // fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);

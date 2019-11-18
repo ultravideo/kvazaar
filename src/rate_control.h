@@ -29,6 +29,7 @@
 #include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
+#include "pthread.h"
 
 typedef struct kvz_rc_data {
   double *c_para[KVZ_MAX_GOP_LAYERS];
@@ -41,6 +42,8 @@ typedef struct kvz_rc_data {
   double *intra_dis;
   double intra_pic_distortion;
   double intra_pic_bpp;
+
+  pthread_mutex_t ck_frame_lock;
 } kvz_rc_data;
 
 kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder);

@@ -54,7 +54,8 @@ static void kvazaar_close(kvz_encoder *encoder)
       kvz_picture *pic = NULL;
       while ((pic = kvz_encoder_feed_frame(&encoder->input_buffer,
                                            &encoder->states[0],
-                                           NULL)) != NULL) {
+                                           NULL,
+                                           1)) != NULL) {
         kvz_image_free(pic);
         pic = NULL;
       }
@@ -252,7 +253,8 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
-  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
+  // TODO: only when the OBA rc is used
+  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in, enc->frames_done);
   if (frame) {
     assert(state->frame->num == enc->frames_started);
     // Start encoding.
@@ -270,9 +272,11 @@ static int kvazaar_encode(kvz_encoder *enc,
     enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   }
 
+  // TODO: OBA check
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
-  if (!output_state->frame->done &&
-      (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
+  if ((!output_state->frame->done &&
+       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) 
+      || state->frame->num == 0) {
 
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
     // The job pointer must be set to NULL here since it won't be usable after
