@@ -141,6 +141,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->max_merge = 5;
   cfg->early_skip = true;
 
+  cfg->rc_algorithm = KVZ_NO_RC;
+  cfg->intra_bit_allocation = true;
   return 1;
 }
 
@@ -385,6 +387,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
+
+  static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
 
   static const char * const preset_values[11][25*2] = {
       {
@@ -928,6 +932,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_len = gop.g;
       cfg->gop_lp_definition.d = gop.d;
       cfg->gop_lp_definition.t = gop.t;
+
+      cfg->intra_bit_allocation = false;
     } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
       // GOP
@@ -979,8 +985,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
-  else if OPT("bitrate")
+  else if OPT("bitrate") {
     cfg->target_bitrate = atoi(value);
+    if (!cfg->rc_algorithm) {
+      cfg->rc_algorithm = KVZ_LAMBDA;
+    }
+  }
   else if OPT("preset") {
     int preset_line = 0;
 
@@ -1259,6 +1269,20 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("early-skip") {
   cfg->early_skip = (bool)atobool(value);
+  }
+  else if OPT("rc-algorithm") {
+    int8_t rc_algorithm = 0;
+    if (!parse_enum(value, rc_algorithm_names, &rc_algorithm)) {
+      fprintf(stderr, "Invalid rate control algorithm %s. Valid values include %s, %s, and %s\n", value, 
+        rc_algorithm_names[0],
+        rc_algorithm_names[1],
+        rc_algorithm_names[2]);
+      return 0;
+    }
+    cfg->rc_algorithm = rc_algorithm;
+  }
+  else if OPT("intra-bits") {
+    cfg->intra_bit_allocation = atobool(value);
   }
   else {
     return 0;
@@ -1569,6 +1593,11 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if (validate_hevc_level((kvz_config *const) cfg)) {
     // a level error found and it's not okay
+    error = 1;
+  }
+
+  if(cfg->target_bitrate > 0 && cfg->rc_algorithm == 0) {
+    fprintf(stderr, "Bitrate set but rc-algorithm is turned off.\n");
     error = 1;
   }
 

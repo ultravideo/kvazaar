@@ -43,6 +43,9 @@ typedef struct kvz_rc_data {
   double intra_pic_distortion;
   double intra_pic_bpp;
 
+  double intra_alpha;
+  double intra_beta;
+
   pthread_mutex_t ck_frame_lock;
 } kvz_rc_data;
 

@@ -137,6 +137,9 @@ static const struct option long_options[] = {
   { "max-merge",          required_argument, NULL, 0 },
   { "early-skip",               no_argument, NULL, 0 },
   { "no-early-skip",            no_argument, NULL, 0 },
+  { "rc-algorithm",       required_argument, NULL, 0 },
+  { "intra-bits",               no_argument, NULL, 0 },
+  { "no-intra-bits",            no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -410,6 +413,12 @@ void print_help(void)
     "      --bitrate <integer>    : Target bitrate [0]\n"
     "                                   - 0: Disable rate control.\n"
     "                                   - N: Target N bits per second.\n"
+    "      --rc-algorithm <string>: Select used rc-algorithm. [lambda]\n"
+    "                                   - lambda: rate control from:\n"
+    "                                     DOI: 10.1109/TIP.2014.2336550 \n"
+    "                                   - oba: DOI: 10.1109/TCSVT.2016.2589878\n"
+    "      --intra-bits           : Use Hadamard cost based allocation for intra\n"
+    "                               frames. Default on for gop 8 and off for lp-gop\n"
     "      --(no-)lossless        : Use lossless coding. [disabled]\n"
     "      --mv-constraint <string> : Constrain movement vectors. [none]\n"
     "                                   - none: No constraint\n"
