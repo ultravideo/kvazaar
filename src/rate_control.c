@@ -48,23 +48,34 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
   data = calloc(1, sizeof(kvz_rc_data));
 
   if (data == NULL) return NULL;
-  pthread_mutex_init(&data->ck_frame_lock, NULL);
+  if (pthread_mutex_init(&data->ck_frame_lock, NULL) != 0) return NULL;
   
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
     data->c_para[i] = malloc(sizeof(double) * num_lcus);
+    if (data->c_para[i] == NULL) return NULL;
+
     data->k_para[i] = malloc(sizeof(double) * num_lcus);
+    if (data->k_para[i] == NULL) return NULL;
+
     data->pic_c_para[i] = 5.0;
     data->pic_k_para[i] = -0.1;
+
     for (int j = 0; j < num_lcus; j++) {
       data->c_para[i][j] = 5.0;
       data->k_para[i][j] = -0.1;
     }
   }
   data->intra_bpp = calloc(num_lcus, sizeof(double));
+  if (data->intra_bpp == NULL) return NULL;
   data->intra_dis = calloc(num_lcus, sizeof(double));
+  if (data->intra_dis == NULL) return NULL;
+
   memset(data->previous_lambdas, 0, sizeof(data->previous_lambdas));
+
   data->previous_frame_lambda = 0.0;
+
   data->intra_pic_bpp = 0.0;
   data->intra_pic_distortion = 0.0;
 
@@ -78,11 +89,11 @@ void kvz_free_rc_data() {
 
   pthread_mutex_destroy(&data->ck_frame_lock);
 
-  FREE_POINTER(data->intra_bpp);
-  FREE_POINTER(data->intra_dis);
+  if (data->intra_bpp) FREE_POINTER(data->intra_bpp);
+  if (data->intra_dis) FREE_POINTER(data->intra_dis);
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
-    FREE_POINTER(data->c_para[i]);
-    FREE_POINTER(data->k_para[i]);
+    if (data->c_para[i]) FREE_POINTER(data->c_para[i]);
+    if (data->k_para[i]) FREE_POINTER(data->k_para[i]);
   }
   FREE_POINTER(data);
 }

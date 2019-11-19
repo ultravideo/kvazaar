@@ -1044,7 +1044,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     state->frame->total_bits_coded = state->previous_encoder_state->frame->total_bits_coded;
   }
   state->frame->total_bits_coded += newpos - curpos;
-  kvz_update_after_picture(state);
+  if(state->encoder_control->cfg.rc_algorithm == KVZ_OBA) {
+    kvz_update_after_picture(state);
+  }
 
   state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
