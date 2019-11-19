@@ -311,6 +311,17 @@ static double pic_allocate_bits(encoder_state_t * const state)
   }
 
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
+    int total_cost = 0;
+    for (int y = 0; y < encoder->cfg.height; y += 8) {
+      for (int x = 0; x < encoder->cfg.width; x += 8) {
+        int cost = xCalcHADs8x8_ISlice(state->tile->frame->source->y + x, y, state->tile->frame->source->stride);
+        total_cost += cost;
+        kvz_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
+      }
+    }
+    state->frame->icost = total_cost;
+    state->frame->remaining_weight = total_cost;
+
     double bits = state->frame->cur_gop_target_bits / MAX(encoder->cfg.gop_len, 1);
     double alpha, beta = 0.5582;
     if (bits * 40 < encoder->cfg.width * encoder->cfg.height) {
@@ -432,19 +443,6 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int l
 
 void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
-
-  if(encoder->cfg.intra_bit_allocation && state->frame->is_irap) {
-    int total_cost = 0;
-    for (int y = 0; y < encoder->cfg.height; y += 8) {
-      for (int x = 0; x < encoder->cfg.width; x += 8) {
-        int cost = xCalcHADs8x8_ISlice(state->tile->frame->source->y + x, y, state->tile->frame->source->stride);
-        total_cost += cost;
-        kvz_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
-      }
-    }
-    state->frame->icost = total_cost;
-    state->frame->remaining_weight = total_cost;
-  }
 
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
   const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
@@ -755,8 +753,6 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
     state->frame->new_ratecontrol->pic_c_para[layer] = new_c;
     state->frame->new_ratecontrol->pic_k_para[layer] = new_k;
   }
-  // fprintf(state->frame->c_d, "Frame %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_c, bpp, distortion, lambda);
-  // fprintf(state->frame->k_d, "Frame %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", state->frame->num, new_k, bpp, distortion, lambda);
 }
 
 

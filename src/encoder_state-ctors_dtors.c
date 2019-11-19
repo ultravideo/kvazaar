@@ -54,6 +54,7 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   state->frame->rc_alpha = 3.2003;
   state->frame->rc_beta = -1.367;
+  state->frame->icost = 0;
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
@@ -69,10 +70,6 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   pthread_mutex_init(&state->frame->rc_lock, NULL);
 
   state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
-
-  // state->frame->bpp_d = fopen("bits.txt", "wb");
-  // state->frame->c_d = fopen("c.txt", "wb");
-  // state->frame->k_d = fopen("k.txt", "wb");
 
   return 1;
 }
