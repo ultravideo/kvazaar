@@ -517,10 +517,9 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   }
   else {
     for (int i = 0; i < ctu_count; ++i) {
-      // TODO: This might be incorrect
       state->frame->lcu_stats[i].weight = MAX(0.01,
-        state->frame->lcu_stats[i].pixels * pow(est_lambda / state->frame->rc_alpha,
-                                                1.0 / state->frame->rc_beta));
+        state->frame->lcu_stats[i].pixels * pow(est_lambda / alpha,
+                                                1.0 / beta));
       total_weight += state->frame->lcu_stats[i].weight;
     }
   }
@@ -664,6 +663,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     const double clip_lambda = state->frame->lambda;
 
     double clip_neighbor_lambda = -1;
+    // TODO: Check incorrect index for better results
     for(int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
       if(state->frame->lcu_stats[temp_index].lambda > 0) {
         clip_neighbor_lambda = state->frame->lcu_stats[temp_index].lambda;
@@ -828,8 +828,9 @@ void kvz_update_after_picture(encoder_state_t * const state) {
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
     }    
   }
+
   total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
-  if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
+  if (state->frame->is_irap) {
     for (int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
       for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
         lcu_stats_t *ctu = kvz_get_lcu_stats(state, x_ctu, y_ctu);
