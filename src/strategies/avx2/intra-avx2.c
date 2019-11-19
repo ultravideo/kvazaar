@@ -416,7 +416,7 @@ static void kvz_angular_pred_avx2(
       tmp_ref[x + width] = ref_main[x];
     }
     // Get a pointer to block index 0 in tmp_ref.
-    ref_main = &tmp_ref[width];
+    ref_main = tmp_ref + width;
 
     // Extend the side reference to the negative indices of main reference.
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
@@ -555,6 +555,166 @@ static void kvz_intra_pred_planar_avx2(
   }
 }
 
+void print_256(__m256i v)
+{
+  uint16_t buf[16];
+  _mm256_storeu_si256((__m256i *)buf, v);
+  for (int i = 0; i < 16; i++)
+    printf("%.4x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
+}
+
+/**
+* \brief Generage intra DC prediction with post filtering applied.
+* \param log2_width    Log2 of width, range 2..5.
+* \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
+* \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+* \param dst           Buffer of size width*width.
+*/
+static void kvz_intra_pred_filtered_dc_avx2(
+  const int_fast8_t log2_width,
+  const kvz_pixel *const ref_top,
+  const kvz_pixel *const ref_left,
+  kvz_pixel *const out_block)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  const int_fast8_t width = 1 << log2_width;
+
+  const __m256i zero  = _mm256_setzero_si256();
+  const __m128i wid_v = _mm_cvtsi32_si128(width);
+
+  // Generate masks to load <width> first pixels using these. If log2_width
+  // is 5, start from offset 0.. if 4, offset 4, 3 -> offset 6, 2 -> 7
+  static const int32_t ldmasks[] = {
+    -1, -1, -1, -1, -1, -1, -1, -1,
+     0,  0,  0,  0,  0,  0,  0,
+  };
+  uint32_t l2w_dwords = log2_width - 2;
+  uint32_t ldm_id     = (7 >> l2w_dwords) << l2w_dwords;
+  __m256i  ldst_mask  = _mm256_loadu_si256((const __m256i *)(ldmasks + ldm_id));
+
+  __m256i rt = _mm256_maskload_epi32((const int32_t *)(ref_top  + 1), ldst_mask);
+  __m256i rl = _mm256_maskload_epi32((const int32_t *)(ref_left + 1), ldst_mask);
+
+  __m256i rts   = _mm256_sad_epu8         (rt,   zero);
+  __m256i rls   = _mm256_sad_epu8         (rl,   zero);
+  __m256i sum0  = _mm256_add_epi64        (rts,  rls);
+
+  __m256i sum1  = _mm256_permute4x64_epi64(sum0, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i sum2  = _mm256_add_epi64        (sum0, sum1);
+  __m256i sum3  = _mm256_shuffle_epi32    (sum2, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i sum4  = _mm256_add_epi64        (sum2, sum3);
+
+  __m128i sum5  = _mm256_castsi256_si128  (sum4);
+  __m128i sum6  = _mm_add_epi64           (sum5, wid_v);
+
+  __m128i l2wp1 = _mm_cvtsi32_si128       (log2_width + 1);
+  __m128i dc_32 = _mm_srl_epi32           (sum6, l2wp1);
+  __m256i dc_16 = _mm256_broadcastw_epi16 (dc_32);
+  __m256i dc_8  = _mm256_broadcastb_epi8  (dc_32);
+
+  ////////////////////////////////////////////////////////////////////
+  int_fast16_t sum = 0;
+  for (int_fast8_t i = 0; i < width; ++i) {
+    sum += ref_top[i + 1];
+    sum += ref_left[i + 1];
+  }
+  const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
+
+  // int32_t sum_s32 = _mm_cvtsi128_si32(_mm256_castsi256_si128(sum16));
+  // int16_t sum_s = (int16_t)sum_s32;
+
+  int32_t dc_s32 = _mm_cvtsi128_si32(_mm256_castsi256_si128(dc_8));
+  uint8_t dc_s   = (uint8_t)dc_s32;
+  // assert(sum_s == sum);
+  assert(dc_val == dc_s);
+  ////////////////////////////////////////////////////////////////////
+
+  const __m256i ones      = _mm256_set1_epi8( 1);
+  const __m256i twos      = _mm256_set1_epi8( 2);
+  const __m256i ff        = _mm256_set1_epi8(-1);
+
+
+  __m256i ref_lefts = _mm256_maskload_epi32((const int32_t *)(ref_left + 1), ldst_mask);
+  __m256i ref_tops  = _mm256_maskload_epi32((const int32_t *)(ref_top  + 1), ldst_mask);
+
+  // Filter top-left with ([1 2 1] / 4), rest of the boundary with ([1 3] / 4)
+  for (int_fast8_t y = 0; y < width; ++y) {
+    __m256i rt_lo, rt_hi, rl_lo, rl_hi;
+    if (y == 0) {
+      __m256i rt_radd_l = _mm256_unpacklo_epi8(ref_tops,  twos);
+      __m256i rt_radd_h = _mm256_unpackhi_epi8(ref_tops,  twos);
+
+              rt_lo     = _mm256_maddubs_epi16(rt_radd_l, ones);
+              rt_hi     = _mm256_maddubs_epi16(rt_radd_h, ones);
+    } else {
+              rt_lo     = zero;
+              rt_hi     = zero;
+    }
+
+    uint32_t which_rl_u32 = y >> 2;
+    uint32_t which_rl_u8  = y & 3;
+
+    __m256i rl_u32_mask = _mm256_insert_epi32        (zero, which_rl_u32, 1);
+    __m256i rl_u8_mask  = _mm256_insert_epi8         (ff,   which_rl_u8, 1);
+
+    __m256i curr_rl_u32 = _mm256_permutevar8x32_epi32(ref_lefts,   rl_u32_mask);
+    __m256i curr_rl     = _mm256_shuffle_epi8        (curr_rl_u32, rl_u8_mask);
+
+    // print_256(curr_rl);
+
+    for (int_fast8_t x = 0; x < width; ++x) {
+      uint32_t rl_s;
+      uint32_t rt_s;
+      uint8_t rl_add_s;
+      uint8_t rt_add_s;
+      uint8_t mult_s;
+
+      // DONE
+      if (x == 0)
+        rl_s = ref_left[y + 1];
+      else
+        rl_s = 0;
+      // /DONE
+
+      if (y == 0)
+        rl_add_s = 0;
+      else
+        rl_add_s = 2;
+
+      if (y == 0) {
+        // DONE
+        rt_s = ref_top[x + 1];
+        rt_add_s = 2;
+        // /DONE
+
+        if (x == 0) {
+          mult_s = 2;
+        } else {
+          mult_s = 3;
+        }
+      } else {
+        // DONE
+        rt_s = 0;
+        rt_add_s = 0;
+        // /DONE
+
+        if (x == 0) {
+          mult_s = 3;
+        } else {
+          mult_s = 4;
+        }
+      }
+      uint16_t dc_multd = mult_s * dc_val;
+      uint16_t rt_part  = rt_s + rt_add_s;
+      uint16_t rl_part  = rl_s + rl_add_s;
+
+      uint16_t res = rl_part + rt_part + dc_multd;
+      out_block[y * width + x] = res >> 2;
+    }
+  }
+  // asm("int $3");
+  return;
+}
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
@@ -565,6 +725,7 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
     success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
+    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &kvz_intra_pred_filtered_dc_avx2);
   }
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
