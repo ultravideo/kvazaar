@@ -555,12 +555,90 @@ static void kvz_intra_pred_planar_avx2(
   }
 }
 
+void print_128_s(const uint8_t *buf)
+{
+  for (int i = 0; i < 16; i++)
+    printf("%.2x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
+}
+
+void print_128(__m128i v)
+{
+  uint8_t buf[16];
+  _mm_storeu_si128((__m128i *)buf, v);
+  print_128_s(buf);
+}
+
 void print_256(__m256i v)
 {
   uint16_t buf[16];
   _mm256_storeu_si256((__m256i *)buf, v);
   for (int i = 0; i < 16; i++)
     printf("%.4x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
+}
+
+// Calculate the DC value for a 4x4 block. The algorithm uses slightly
+// different addends, multipliers etc for different pixels in the block,
+// but for a fixed-size implementation one vector wide, all the weights,
+// addends etc can be preinitialized for each position.
+static INLINE void pred_filtered_dc_4x4(const uint8_t *ref_top,
+                                        const uint8_t *ref_left,
+                                              uint8_t *out_block)
+{
+  const uint32_t rt_u32 = *(const uint32_t *)(ref_top  + 1);
+  const uint32_t rl_u32 = *(const uint32_t *)(ref_left + 1);
+
+  const __m128i zero    = _mm_setzero_si128();
+  const __m128i twos    = _mm_set1_epi8(2);
+
+  // Hack. Move 4 u8's to bit positions 0, 64, 128 and 192 in two regs, to
+  // expand them to 16 bits sort of "for free". Set highest bits on all the
+  // other bytes in vectors to zero those bits in the result vector.
+  const __m128i rl_shuf_lo = _mm_setr_epi32(0x80808000, 0x80808080,
+                                            0x80808001, 0x80808080);
+  const __m128i rl_shuf_hi = _mm_add_epi8  (rl_shuf_lo, twos);
+
+  // Every second multiplier is 1, because we want maddubs to calculate
+  // a + bc = 1 * a + bc (actually 2 + bc). We need to fill a vector with
+  // ((u8)2)'s for other stuff anyway, so that can also be used here.
+  const __m128i mult_lo = _mm_setr_epi32(0x01030102, 0x01030103,
+                                         0x01040103, 0x01040104);
+  const __m128i mult_hi = _mm_setr_epi32(0x01040103, 0x01040104,
+                                         0x01040103, 0x01040104);
+  __m128i four         = _mm_cvtsi32_si128  (4);
+  __m128i rt           = _mm_cvtsi32_si128  (rt_u32);
+  __m128i rl           = _mm_cvtsi32_si128  (rl_u32);
+  __m128i rtrl         = _mm_unpacklo_epi32 (rt, rl);
+
+  __m128i sad0         = _mm_sad_epu8       (rtrl, zero);
+  __m128i sad1         = _mm_shuffle_epi32  (sad0, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad2         = _mm_add_epi64      (sad0, sad1);
+  __m128i sad3         = _mm_add_epi64      (sad2, four);
+
+  __m128i dc_64        = _mm_srli_epi64     (sad3, 3);
+  __m128i dc_8         = _mm_broadcastb_epi8(dc_64);
+
+  __m128i rl_lo        = _mm_shuffle_epi8   (rl, rl_shuf_lo);
+  __m128i rl_hi        = _mm_shuffle_epi8   (rl, rl_shuf_hi);
+
+  __m128i rt_lo        = _mm_unpacklo_epi8  (rt, zero);
+  __m128i rt_hi        = zero;
+
+  __m128i dc_addend    = _mm_unpacklo_epi8(dc_8, twos);
+
+  __m128i dc_multd_lo  = _mm_maddubs_epi16(dc_addend,    mult_lo);
+  __m128i dc_multd_hi  = _mm_maddubs_epi16(dc_addend,    mult_hi);
+
+  __m128i rl_rt_lo     = _mm_add_epi16    (rl_lo,        rt_lo);
+  __m128i rl_rt_hi     = _mm_add_epi16    (rl_hi,        rt_hi);
+
+  __m128i res_lo       = _mm_add_epi16    (dc_multd_lo,  rl_rt_lo);
+  __m128i res_hi       = _mm_add_epi16    (dc_multd_hi,  rl_rt_hi);
+
+          res_lo       = _mm_srli_epi16   (res_lo,       2);
+          res_hi       = _mm_srli_epi16   (res_hi,       2);
+
+  __m128i final        = _mm_packus_epi16 (res_lo,       res_hi);
+  _mm_storeu_si128((__m128i *)out_block, final);
 }
 
 /**
@@ -637,6 +715,11 @@ static void kvz_intra_pred_filtered_dc_avx2(
   __m256i ref_lefts = _mm256_maskload_epi32((const int32_t *)(ref_left + 1), ldst_mask);
   __m256i ref_tops  = _mm256_maskload_epi32((const int32_t *)(ref_top  + 1), ldst_mask);
 
+  uint8_t mults[16];
+  uint8_t dv[16];
+  uint8_t rits[16];
+  uint8_t rils[16];
+
   // Filter top-left with ([1 2 1] / 4), rest of the boundary with ([1 3] / 4)
   for (int_fast8_t y = 0; y < width; ++y) {
     __m256i rt_lo, rt_hi, rl_lo, rl_hi;
@@ -665,9 +748,9 @@ static void kvz_intra_pred_filtered_dc_avx2(
     for (int_fast8_t x = 0; x < width; ++x) {
       uint32_t rl_s;
       uint32_t rt_s;
-      uint8_t rl_add_s;
-      uint8_t rt_add_s;
       uint8_t mult_s;
+
+      int daa = x + y * width;
 
       // DONE
       if (x == 0)
@@ -676,15 +759,10 @@ static void kvz_intra_pred_filtered_dc_avx2(
         rl_s = 0;
       // /DONE
 
-      if (y == 0)
-        rl_add_s = 0;
-      else
-        rl_add_s = 2;
-
       if (y == 0) {
         // DONE
         rt_s = ref_top[x + 1];
-        rt_add_s = 2;
+        // rt_add_s = 2;
         // /DONE
 
         if (x == 0) {
@@ -695,7 +773,7 @@ static void kvz_intra_pred_filtered_dc_avx2(
       } else {
         // DONE
         rt_s = 0;
-        rt_add_s = 0;
+        // rt_add_s = 0;
         // /DONE
 
         if (x == 0) {
@@ -704,12 +782,32 @@ static void kvz_intra_pred_filtered_dc_avx2(
           mult_s = 4;
         }
       }
-      uint16_t dc_multd = mult_s * dc_val;
-      uint16_t rt_part  = rt_s + rt_add_s;
-      uint16_t rl_part  = rl_s + rl_add_s;
+      if (width == 4) {
+        mults[daa] = mult_s;
+        dv[daa] = dc_val;
+        rits[daa] = rt_s;
+        rils[daa] = rl_s;
+      }
 
-      uint16_t res = rl_part + rt_part + dc_multd;
+      uint16_t dc_multd = mult_s * dc_val;
+      uint16_t res = rt_s + rl_s + dc_multd + 2;
       out_block[y * width + x] = res >> 2;
+    }
+  }
+  if (width == 4) {
+    uint8_t tampio[16];
+    pred_filtered_dc_4x4(ref_top, ref_left, tampio);
+    for (int i = 0; i < 16; i++) {
+      if (tampio[i] != out_block[i]) {
+        int j;
+        printf("mults c: "); print_128_s(mults);
+        printf("dv c:    "); print_128_s(dv);
+        printf("rits c:  "); print_128_s(rits);
+        printf("rils c:  "); print_128_s(rits);
+        asm("int $3");
+        pred_filtered_dc_4x4(ref_top, ref_left, tampio);
+        break;
+      }
     }
   }
   // asm("int $3");
