@@ -365,7 +365,7 @@ See `./configure --help` for more options.
 
 
 ### Visual Studio
-- At least VisualStudio 2015 is required.
+- At least VisualStudio 2015.2 is required.
 - Project files can be found under build/.
 - Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
   in %PATH%
