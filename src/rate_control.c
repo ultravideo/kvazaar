@@ -49,6 +49,8 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
 
   if (data == NULL) return NULL;
   if (pthread_mutex_init(&data->ck_frame_lock, NULL) != 0) return NULL;
+  if (pthread_mutex_init(&data->lambda_lock, NULL) != 0) return NULL;
+  if (pthread_mutex_init(&data->intra_lock, NULL) != 0) return NULL;
   for (int (i) = 0; (i) < KVZ_MAX_GOP_LAYERS; ++(i)) {
     if (pthread_rwlock_init(&data->ck_ctu_lock[i], NULL) != 0) return NULL;
   }
@@ -91,6 +93,8 @@ void kvz_free_rc_data() {
   if (data == NULL) return;
 
   pthread_mutex_destroy(&data->ck_frame_lock);
+  pthread_mutex_destroy(&data->lambda_lock);
+  pthread_mutex_destroy(&data->intra_lock);
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; ++i) {
     pthread_rwlock_destroy(&data->ck_ctu_lock[i]);
   }
@@ -456,8 +460,10 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   double alpha;
   double beta;
   if(state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
+    pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
     alpha = state->frame->new_ratecontrol->intra_alpha;
     beta = state->frame->new_ratecontrol->intra_beta;
+    pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
   else if(state->frame->poc == 0) {
     alpha = state->frame->rc_alpha;
@@ -493,6 +499,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   }
 
   double temp_lambda;
+  pthread_mutex_lock(&state->frame->new_ratecontrol->lambda_lock);
   if ((temp_lambda = state->frame->new_ratecontrol->previous_lambdas[layer]) > 0.0) {
     temp_lambda = CLIP(0.1, 10000.0, temp_lambda);
     est_lambda = CLIP(temp_lambda * pow(2.0, -1), temp_lambda * 2, est_lambda);
@@ -502,6 +509,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
     temp_lambda = CLIP(0.1, 2000.0, temp_lambda);
     est_lambda = CLIP(temp_lambda * pow(2.0, -10.0 / 3.0), temp_lambda * pow(2.0, 10.0 / 3.0), est_lambda);
   }
+  pthread_mutex_unlock(&state->frame->new_ratecontrol->lambda_lock);
 
   est_lambda = CLIP(0.1, 10000.0, est_lambda);
 
@@ -647,8 +655,10 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   double alpha;
   double beta;
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
+    pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
     alpha = state->frame->new_ratecontrol->intra_alpha;
     beta = state->frame->new_ratecontrol->intra_beta;
+    pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
   else if(state->frame->num == 0) {
     alpha = state->frame->rc_alpha;
@@ -815,12 +825,14 @@ void kvz_update_after_picture(encoder_state_t * const state) {
 
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
     double lnbpp = log(pow(state->frame->icost / pixels, BETA1));
+    pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
     double diff_lambda = state->frame->new_ratecontrol->intra_beta * log(state->frame->cur_frame_bits_coded) - log(state->frame->cur_pic_target_bits);
 
     diff_lambda = CLIP(-0.125, 0.125, 0.25*diff_lambda);
 
     state->frame->new_ratecontrol->intra_alpha *= exp(diff_lambda);
     state->frame->new_ratecontrol->intra_beta += diff_lambda / lnbpp;
+    pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
 
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
@@ -842,6 +854,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
 
   total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
   if (state->frame->is_irap) {
+    pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
     for (int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
       for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
         lcu_stats_t *ctu = kvz_get_lcu_stats(state, x_ctu, y_ctu);
@@ -853,11 +866,14 @@ void kvz_update_after_picture(encoder_state_t * const state) {
     }
     state->frame->new_ratecontrol->intra_pic_distortion = total_distortion;
     state->frame->new_ratecontrol->intra_pic_bpp = pic_bpp;
+    pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
 
+  pthread_mutex_lock(&state->frame->new_ratecontrol->lambda_lock);
   state->frame->new_ratecontrol->previous_frame_lambda = lambda;
   state->frame->new_ratecontrol->previous_lambdas[layer] = lambda;
- 
+  pthread_mutex_unlock(&state->frame->new_ratecontrol->lambda_lock);
+
   update_pic_ck(state, pic_bpp, total_distortion, lambda, layer);
   if (state->frame->num <= 4 || state->frame->is_irap){
     for (int i = 1; i < 5; ++i) {

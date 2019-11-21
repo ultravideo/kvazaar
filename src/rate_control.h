@@ -48,6 +48,8 @@ typedef struct kvz_rc_data {
 
   pthread_rwlock_t ck_ctu_lock[KVZ_MAX_GOP_LAYERS];
   pthread_mutex_t ck_frame_lock;
+  pthread_mutex_t lambda_lock;
+  pthread_mutex_t intra_lock;
 } kvz_rc_data;
 
 kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder);
