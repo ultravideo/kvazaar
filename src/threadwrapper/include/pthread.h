@@ -23,12 +23,14 @@ extern "C" {
 typedef void* pthread_cond_t;
 typedef void* pthread_cond_t;
 typedef void* pthread_mutex_t;
+typedef void* pthread_rwlock_t;
 typedef void* pthread_t;
 typedef void*(voidp_voidp_func)(void*);
 
 typedef void pthread_attr_t;
 typedef void pthread_condattr_t;
 typedef void pthread_mutexattr_t;
+typedef void pthread_rwlockattr_t;
 
 // Parameter names that have been commented away do nothing,
 // as they are always null when the functions are used in Kvazaar.
@@ -47,6 +49,12 @@ int pthread_mutex_destroy(pthread_mutex_t* mutex);
 int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t* /*attr*/);
 int pthread_mutex_lock(pthread_mutex_t* mutex);
 int pthread_mutex_unlock(pthread_mutex_t* mutex);
+
+int pthread_rwlock_init(pthread_rwlock_t* lock, const pthread_rwlockattr_t * /*attr*/);
+int pthread_rwlock_destroy(pthread_rwlock_t *rwlock);
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock);
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock);
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock);
 
 #ifdef __cplusplus
 }
