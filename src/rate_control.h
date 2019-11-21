@@ -46,6 +46,7 @@ typedef struct kvz_rc_data {
   double intra_alpha;
   double intra_beta;
 
+  pthread_rwlock_t ck_ctu_lock[KVZ_MAX_GOP_LAYERS];
   pthread_mutex_t ck_frame_lock;
 } kvz_rc_data;
 

@@ -49,7 +49,10 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
 
   if (data == NULL) return NULL;
   if (pthread_mutex_init(&data->ck_frame_lock, NULL) != 0) return NULL;
-  
+  for (int (i) = 0; (i) < KVZ_MAX_GOP_LAYERS; ++(i)) {
+    if (pthread_rwlock_init(&data->ck_ctu_lock[i], NULL) != 0) return NULL;
+  }
+
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
 
   for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
@@ -88,6 +91,9 @@ void kvz_free_rc_data() {
   if (data == NULL) return;
 
   pthread_mutex_destroy(&data->ck_frame_lock);
+  for (int i = 0; i < KVZ_MAX_GOP_LAYERS; ++i) {
+    pthread_rwlock_destroy(&data->ck_ctu_lock[i]);
+  }
 
   if (data->intra_bpp) FREE_POINTER(data->intra_bpp);
   if (data->intra_dis) FREE_POINTER(data->intra_dis);
@@ -507,6 +513,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
       temp_lambda = est_lambda;
       double taylor_e3;
       int iteration_number = 0;
+      pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
       do {
         taylor_e3 = 0.0;
         best_lambda = temp_lambda = solve_cubic_equation(state->frame, 0, ctu_count, layer, temp_lambda, bits);
@@ -520,6 +527,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
         iteration_number++;
       }
       while (fabs(taylor_e3 - bits) > 0.01 && iteration_number <= 11);
+      pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
     }
     total_weight = calculate_weights(state, layer, ctu_count, best_lambda);
     state->frame->remaining_weight = bits;
@@ -590,13 +598,13 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
     pthread_mutex_unlock(&state->frame->rc_lock);
 
+    pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
     //just similar with the process at frame level, details can refer to the function TEncRCPic::kvz_estimate_pic_lambda
     do {
       taylor_e3 = 0.0;
       best_lambda = solve_cubic_equation(state->frame, index, last_ctu, layer, temp_lambda, target_bits);
       temp_lambda = best_lambda;
       for (int i = index; i < last_ctu; i++) {
-
         double CLCU = state->frame->new_ratecontrol->c_para[layer][i];
         double KLCU = state->frame->new_ratecontrol->k_para[layer][i];
         double a = -CLCU * KLCU / pow((double)state->frame->lcu_stats[i].pixels, KLCU - 1.0);
@@ -608,6 +616,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
 
     double c_ctu = state->frame->new_ratecontrol->c_para[layer][index];
     double k_ctu = state->frame->new_ratecontrol->k_para[layer][index];
+    pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
     double a = -c_ctu * k_ctu / pow(((double)state->frame->lcu_stats[index].pixels), k_ctu - 1.0);
     double b = -1.0 / (k_ctu - 1.0);
 
@@ -646,9 +655,11 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     beta = state->frame->rc_beta;
   }
   else {
+    pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
     alpha = -state->frame->new_ratecontrol->c_para[layer][index] *
       state->frame->new_ratecontrol->k_para[layer][index];
     beta = state->frame->new_ratecontrol->k_para[layer][index] - 1;
+    pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
   }
 
   double est_lambda;
@@ -666,7 +677,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   }
   else {
     // In case wpp is used the previous ctus may not be ready from above rows
-    const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
+    // const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
     
     est_lambda = alpha * pow(bpp, beta);
     const double clip_lambda = state->frame->lambda;
@@ -848,8 +859,24 @@ void kvz_update_after_picture(encoder_state_t * const state) {
   state->frame->new_ratecontrol->previous_lambdas[layer] = lambda;
  
   update_pic_ck(state, pic_bpp, total_distortion, lambda, layer);
+  if (state->frame->num <= 4 || state->frame->is_irap){
+    for (int i = 1; i < 5; ++i) {
+      pthread_rwlock_wrlock(&state->frame->new_ratecontrol->ck_ctu_lock[i]);
+    }
+  }
+  else{
+    pthread_rwlock_wrlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
+  }
   for(int i = 0; i < state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu; i++) {
     update_ck(state, i, layer);
+  }
+  if (state->frame->num <= 4 || state->frame->is_irap){
+    for (int i = 1; i < 5; ++i) {
+      pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[i]);
+    }
+  }
+  else{
+    pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
   }
 }
 
