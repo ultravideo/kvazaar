@@ -687,14 +687,17 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   }
   else {
     // In case wpp is used the previous ctus may not be ready from above rows
-    // const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
+    const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
     
     est_lambda = alpha * pow(bpp, beta);
     const double clip_lambda = state->frame->lambda;
 
     double clip_neighbor_lambda = -1;
-    if (state->frame->lcu_stats[index].lambda > 0) {
-      clip_neighbor_lambda = state->frame->lcu_stats[index].lambda;
+    for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
+      if (state->frame->lcu_stats[temp_index].lambda > 0) {
+        clip_neighbor_lambda = state->frame->lcu_stats[temp_index].lambda;
+        break;
+      }
     }
 
     if (clip_neighbor_lambda > 0) {
@@ -718,9 +721,12 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
 
     est_qp = lambda_to_qp(est_lambda);
 
-    int clip_qp = -1;
-    if (state->frame->lcu_stats[index].qp > 0) {
-      clip_qp = state->frame->lcu_stats[index].qp;
+    int clip_qp = -1;    
+    for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
+      if (state->frame->lcu_stats[temp_index].qp > -1) {
+        clip_qp = state->frame->lcu_stats[temp_index].qp;
+        break;
+      }
     }
 
     if( clip_qp > -1) {
