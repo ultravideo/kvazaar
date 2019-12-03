@@ -739,6 +739,88 @@ static INLINE void pred_filtered_dc_8x8(const uint8_t *ref_top,
   _mm256_storeu_si256(((__m256i *)out_block) + 1, res_dn);
 }
 
+static INLINE __m256i cvt_u32_si256(const uint32_t u)
+{
+  const __m256i zero = _mm256_setzero_si256();
+  return _mm256_insert_epi32(zero, u, 0);
+}
+
+static INLINE void pred_filtered_dc_16x16(const uint8_t *ref_top,
+                                          const uint8_t *ref_left,
+                                                uint8_t *out_block)
+{
+  const __m128i rt_128 = _mm_loadu_si128((const __m128i *)(ref_top  + 1));
+  const __m128i rl_128 = _mm_loadu_si128((const __m128i *)(ref_left + 1));
+
+  const __m128i zero_128 = _mm_setzero_si128();
+  const __m256i zero     = _mm256_setzero_si256();
+  const __m256i twos     = _mm256_set1_epi8(2);
+
+  const __m256i mult_r0  = _mm256_setr_epi32(0x01030102, 0x01030103,
+                                             0x01030103, 0x01030103,
+                                             0x01030103, 0x01030103,
+                                             0x01030103, 0x01030103);
+
+  const __m256i mult_left = _mm256_set1_epi16(0x0103);
+
+  // Leftmost bytes' blend mask, to move bytes (pixels) from the leftmost
+  // column vector to the result row
+  const __m256i lm8_bmask = _mm256_setr_epi32(0xff, 0, 0, 0, 0xff, 0, 0, 0);
+
+  __m128i sixteen = _mm_cvtsi32_si128(16);
+  __m128i sad0_t  = _mm_sad_epu8 (rt_128, zero_128);
+  __m128i sad0_l  = _mm_sad_epu8 (rl_128, zero_128);
+  __m128i sad0    = _mm_add_epi64(sad0_t, sad0_l);
+
+  __m128i sad1    = _mm_shuffle_epi32      (sad0, _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sad2    = _mm_add_epi64          (sad0, sad1);
+  __m128i sad3    = _mm_add_epi64          (sad2, sixteen);
+
+  __m128i dc_64   = _mm_srli_epi64         (sad3, 5);
+  __m256i dc_8    = _mm256_broadcastb_epi8 (dc_64);
+
+  __m256i rt      = _mm256_cvtepu8_epi16   (rt_128);
+  __m256i rl      = _mm256_cvtepu8_epi16   (rl_128);
+
+  uint8_t rl0       = *(uint8_t *)(ref_left + 1);
+  __m256i rl_r0     = cvt_u32_si256((uint32_t)rl0);
+
+  __m256i rlrt_r0   = _mm256_add_epi16(rl_r0, rt);
+
+  __m256i dc_addend = _mm256_unpacklo_epi8(dc_8, twos);
+  __m256i r0        = _mm256_maddubs_epi16(dc_addend, mult_r0);
+  __m256i left_dcs  = _mm256_maddubs_epi16(dc_addend, mult_left);
+
+          r0        = _mm256_add_epi16    (r0,       rlrt_r0);
+          r0        = _mm256_srli_epi16   (r0, 2);
+  __m256i r0r0      = _mm256_packus_epi16 (r0, r0);
+          r0r0      = _mm256_permute4x64_epi64(r0r0, _MM_SHUFFLE(3, 1, 2, 0));
+
+  __m256i leftmosts = _mm256_add_epi16    (left_dcs,  rl);
+          leftmosts = _mm256_srli_epi16   (leftmosts, 2);
+
+  // Contain the leftmost column's bytes in both lanes of lm_8
+  __m256i lm_8      = _mm256_packus_epi16 (leftmosts, zero);
+          lm_8      = _mm256_permute4x64_epi64(lm_8,  _MM_SHUFFLE(2, 0, 2, 0));
+
+  __m256i lm8_r1    = _mm256_srli_epi32       (lm_8, 8);
+  __m256i r1r1      = _mm256_blendv_epi8      (dc_8, lm8_r1, lm8_bmask);
+  __m256i r0r1      = _mm256_blend_epi32      (r0r0, r1r1, 0xf0);
+
+  _mm256_storeu_si256((__m256i *)out_block, r0r1);
+
+  // Starts from 2 because row 0 (and row 1) is handled separately
+  __m256i lm8_l     = _mm256_bsrli_epi128     (lm_8, 2);
+  __m256i lm8_h     = _mm256_bsrli_epi128     (lm_8, 3);
+          lm_8      = _mm256_blend_epi32      (lm8_l, lm8_h, 0xf0);
+
+  for (uint32_t y = 2; y < 16; y += 2) {
+    __m256i curr_row = _mm256_blendv_epi8 (dc_8, lm_8, lm8_bmask);
+    _mm256_storeu_si256((__m256i *)(out_block + (y << 4)), curr_row);
+    lm_8 = _mm256_bsrli_epi128(lm_8, 2);
+  }
+}
+
 /**
 * \brief Generage intra DC prediction with post filtering applied.
 * \param log2_width    Log2 of width, range 2..5.
@@ -759,6 +841,9 @@ static void kvz_intra_pred_filtered_dc_avx2(
     return;
   } else if (log2_width == 3) {
     pred_filtered_dc_8x8(ref_top, ref_left, out_block);
+    return;
+  } else if (log2_width == 4) {
+    pred_filtered_dc_16x16(ref_top, ref_left, out_block);
     return;
   }
 
@@ -931,6 +1016,22 @@ static void kvz_intra_pred_filtered_dc_avx2(
         printf("rils c:  "); print_128_s(rits);
         asm("int $3");
         pred_filtered_dc_8x8(ref_top, ref_left, tmp);
+        break;
+      }
+    }
+  }
+  if (width == 16) {
+    uint8_t tmp[256];
+    pred_filtered_dc_16x16(ref_top, ref_left, tmp);
+    for (int i = 0; i < 256; i++) {
+      if (tmp[i] != out_block[i]) {
+        int j;
+        printf("mults c: "); print_128_s(mults);
+        printf("dv c:    "); print_128_s(dv);
+        printf("rits c:  "); print_128_s(rits);
+        printf("rils c:  "); print_128_s(rits);
+        asm("int $3");
+        pred_filtered_dc_16x16(ref_top, ref_left, tmp);
         break;
       }
     }
