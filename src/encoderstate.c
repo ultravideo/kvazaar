@@ -1401,7 +1401,7 @@ static void start_block_step_scaling_job(encoder_state_t * const state, const lc
           kvz_threadqueue_job_dep_add(state->tqj_ilr_rec_scaling_done, ilr_state->tqj_recon_done);
         }
       }
-
+      fprintf(stderr, "Start scaling job");
       //Submit job
       kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_ilr_rec_scaling_done);
     } else {
