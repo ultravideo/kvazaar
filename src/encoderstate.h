@@ -158,11 +158,6 @@ typedef struct encoder_state_config_frame_t {
 
   struct kvz_rc_data *new_ratecontrol;
 
-
-  FILE * bpp_d;
-  FILE * c_d;
-  FILE * k_d;
-
   /**
    * \brief Whether next NAL is the first NAL in the access unit.
    */
@@ -170,6 +165,9 @@ typedef struct encoder_state_config_frame_t {
   double icost;
   double remaining_weight;
   double i_bits_left;
+
+  double *c_para;
+  double *k_para;
 } encoder_state_config_frame_t;
 
 typedef struct encoder_state_config_tile_t {

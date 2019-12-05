@@ -360,7 +360,6 @@ static int8_t lambda_to_qp(const double lambda)
 static double solve_cubic_equation(const encoder_state_config_frame_t * const state,
                             int ctu_index,
                             int last_ctu,
-                            int layer,
                             double est_lambda,
                             double target_bits) 
 {
@@ -379,10 +378,10 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
     double b = 0.0;
     double c = 0.0;
     double d = 0.0;
-    assert(!((state->new_ratecontrol->c_para[layer][i] <= 0) || (state->new_ratecontrol->k_para[layer][i] >= 0))); //Check C and K during each solution 
+    assert(!((state->c_para[i] <= 0) || (state->k_para[i] >= 0))); //Check C and K during each solution 
 
-    double CLCU = state->new_ratecontrol->c_para[layer][i];
-    double KLCU = state->new_ratecontrol->k_para[layer][i];
+    double CLCU = state->c_para[i];
+    double KLCU = state->k_para[i];
     a = -CLCU * KLCU / pow(state->lcu_stats[i].pixels, KLCU - 1.0);
     b = -1.0 / (KLCU - 1.0);
     d = est_lambda;
@@ -434,14 +433,14 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
   return best_lambda;
 }
 
-static INLINE double calculate_weights(encoder_state_t* const state, const int layer, const int ctu_count, double estLambda) {
+static INLINE double calculate_weights(encoder_state_t* const state, const int ctu_count, double est_lambda) {
   double total_weight = 0;
   for(int i = 0; i < ctu_count; i++) {
-    double c_lcu = state->frame->new_ratecontrol->c_para[layer][i];
-    double k_lcu = state->frame->new_ratecontrol->k_para[layer][i];
+    double c_lcu = state->frame->c_para[i];
+    double k_lcu = state->frame->k_para[i];
     double a = -c_lcu * k_lcu / pow(state->frame->lcu_stats[i].pixels, k_lcu - 1.0);
     double b = -1.0 / (k_lcu - 1.0);
-    state->frame->lcu_stats[i].original_weight = state->frame->lcu_stats[i].weight = pow(a / estLambda, b);
+    state->frame->lcu_stats[i].original_weight = state->frame->lcu_stats[i].weight = pow(a / est_lambda, b);
     if (state->frame->lcu_stats[i].weight < 0.01) {
       state->frame->lcu_stats[i].weight = 0.01;
     }
@@ -518,16 +517,19 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
   if(!state->frame->is_irap) {
     double best_lambda = est_lambda;
     if(!state->encoder_control->cfg.frame_allocation) {
+      pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
+      memcpy(state->frame->c_para, state->frame->new_ratecontrol->c_para[layer], ctu_count * sizeof(double));
+      memcpy(state->frame->k_para, state->frame->new_ratecontrol->k_para[layer], ctu_count * sizeof(double));
+      pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
       temp_lambda = est_lambda;
       double taylor_e3;
       int iteration_number = 0;
-      pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
       do {
         taylor_e3 = 0.0;
-        best_lambda = temp_lambda = solve_cubic_equation(state->frame, 0, ctu_count, layer, temp_lambda, bits);
+        best_lambda = temp_lambda = solve_cubic_equation(state->frame, 0, ctu_count, temp_lambda, bits);
         for (int i = 0; i < ctu_count; ++i) {
-          double CLCU = state->frame->new_ratecontrol->c_para[layer][i];
-          double KLCU = state->frame->new_ratecontrol->k_para[layer][i];
+          double CLCU = state->frame->c_para[i];
+          double KLCU = state->frame->k_para[i];
           double a = -CLCU * KLCU / pow(state->frame->lcu_stats[i].pixels, KLCU - 1.0);
           double b = -1.0 / (KLCU - 1.0);
           taylor_e3 += pow(a / best_lambda, b);
@@ -535,9 +537,8 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
         iteration_number++;
       }
       while (fabs(taylor_e3 - bits) > 0.01 && iteration_number <= 11);
-      pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
     }
-    total_weight = calculate_weights(state, layer, ctu_count, best_lambda);
+    total_weight = calculate_weights(state, ctu_count, best_lambda);
     state->frame->remaining_weight = bits;
   }
   else {
@@ -561,9 +562,7 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
 static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   int avg_bits;
   const encoder_control_t * const encoder = state->encoder_control;
-
-  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
-
+  
   int num_ctu = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
   const int index = pos.x + pos.y * state->tile->frame->width_in_lcu;
 
@@ -606,15 +605,14 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
     pthread_mutex_unlock(&state->frame->rc_lock);
 
-    pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
-    //just similar with the process at frame level, details can refer to the function TEncRCPic::kvz_estimate_pic_lambda
+    //just similar with the process at frame level, details can refer to the function kvz_estimate_pic_lambda
     do {
       taylor_e3 = 0.0;
-      best_lambda = solve_cubic_equation(state->frame, index, last_ctu, layer, temp_lambda, target_bits);
+      best_lambda = solve_cubic_equation(state->frame, index, last_ctu, temp_lambda, target_bits);
       temp_lambda = best_lambda;
       for (int i = index; i < last_ctu; i++) {
-        double CLCU = state->frame->new_ratecontrol->c_para[layer][i];
-        double KLCU = state->frame->new_ratecontrol->k_para[layer][i];
+        double CLCU = state->frame->c_para[i];
+        double KLCU = state->frame->k_para[i];
         double a = -CLCU * KLCU / pow((double)state->frame->lcu_stats[i].pixels, KLCU - 1.0);
         double b = -1.0 / (KLCU - 1.0);
         taylor_e3 += pow(a / best_lambda, b);
@@ -622,9 +620,8 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
       iter++;
     } while (fabs(taylor_e3 - target_bits) > 0.01 && iter < 5);
 
-    double c_ctu = state->frame->new_ratecontrol->c_para[layer][index];
-    double k_ctu = state->frame->new_ratecontrol->k_para[layer][index];
-    pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
+    double c_ctu = state->frame->c_para[index];
+    double k_ctu = state->frame->k_para[index];
     double a = -c_ctu * k_ctu / pow(((double)state->frame->lcu_stats[index].pixels), k_ctu - 1.0);
     double b = -1.0 / (k_ctu - 1.0);
 
@@ -636,7 +633,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   if (avg_bits < 1) {
     avg_bits = 1;
   }
-  // fprintf(state->frame->bpp_d, "CTU %d\tbits:\t%d\n", index, avg_bits);
+
   return avg_bits;
 }
 
@@ -646,7 +643,6 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int frame_allocation = state->encoder_control->cfg.frame_allocation;
-  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
 
   int index = pos.x + pos.y * state->encoder_control->in.width_in_lcu;
   lcu_stats_t* ctu = &state->frame->lcu_stats[index];
@@ -665,11 +661,8 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     beta = state->frame->rc_beta;
   }
   else {
-    pthread_rwlock_rdlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
-    alpha = -state->frame->new_ratecontrol->c_para[layer][index] *
-      state->frame->new_ratecontrol->k_para[layer][index];
-    beta = state->frame->new_ratecontrol->k_para[layer][index] - 1;
-    pthread_rwlock_unlock(&state->frame->new_ratecontrol->ck_ctu_lock[layer]);
+    alpha = -state->frame->c_para[index] * state->frame->k_para[index];
+    beta = state->frame->k_para[index] - 1;
   }
 
   double est_lambda;

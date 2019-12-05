@@ -67,6 +67,15 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
     }
   }
 
+  state->frame->c_para = malloc(sizeof(double) * num_lcus);
+  if(state->frame->c_para == NULL) {
+    return 0;
+  }
+  state->frame->k_para = malloc(sizeof(double) * num_lcus);
+  if (state->frame->k_para == NULL) {
+    return 0;
+  }
+
   pthread_mutex_init(&state->frame->rc_lock, NULL);
 
   state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
@@ -78,9 +87,8 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   if (state->frame == NULL) return;
 
   pthread_mutex_destroy(&state->frame->rc_lock);
-  // fclose(state->frame->bpp_d);
-  // fclose(state->frame->c_d);
-  // fclose(state->frame->k_d);
+  if (state->frame->c_para) FREE_POINTER(state->frame->c_para);
+  if (state->frame->k_para) FREE_POINTER(state->frame->k_para);
 
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
