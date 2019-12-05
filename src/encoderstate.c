@@ -1836,11 +1836,24 @@ static void ilr_processing(encoder_state_t *state, const int is_async, const int
       //For SNR need to add ilr dependecy here
       if (state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width &&
         state->encoder_control->cfg.width == state->ILR_state->encoder_control->cfg.width) {
-        if (state->ILR_state->tqj_recon_done != NULL && state->tqj_recon_done != NULL) {
-          kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->ILR_state->tqj_recon_done);
-        }
-        if (state->ILR_state->tqj_recon_done != NULL && state->tqj_recon_done != NULL) {
-          kvz_threadqueue_job_dep_add(state->tqj_recon_done, state->ILR_state->tqj_recon_done);
+        for (int i = 0; i < state->num_ILR_states; i++)
+        {
+          const encoder_state_t *ilr_state = &state->ILR_state[i];
+          int ilr_tile_x = ilr_state->tile->offset_x;
+          int ilr_tile_y = ilr_state->tile->offset_y;
+          int tile_x = state->tile->offset_x;
+          int tile_y = state->tile->offset_y;
+
+          if (ilr_tile_x == tile_x && ilr_tile_y == tile_y && ilr_state->tqj_recon_done != NULL && state->tqj_recon_done != NULL) {
+            kvz_threadqueue_job_dep_add(state->tqj_recon_done, ilr_state->tqj_recon_done);
+          }
+          //Account for deblock/SAO. TODO: Is this necessary?
+          if (state->ILR_state->encoder_control->cfg.sao_type != KVZ_SAO_OFF || state->ILR_state->encoder_control->cfg.deblock_enable) {
+            //Need to add dependency to surrounding states (right and down)
+            if ((ilr_tile_x > tile_x || ilr_tile_y > tile_y) && ilr_state->tqj_recon_done != NULL && state->tqj_recon_done != NULL) {
+              kvz_threadqueue_job_dep_add(state->tqj_recon_done, ilr_state->tqj_recon_done);
+            }
+          }
         }
       } else {
         if (state->tqj_ilr_rec_scaling_done != NULL && state->tqj_recon_done != NULL) {
