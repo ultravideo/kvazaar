@@ -143,6 +143,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->rc_algorithm = KVZ_NO_RC;
   cfg->intra_bit_allocation = true;
+  cfg->clip_neighbour = false;
   return 1;
 }
 
@@ -1283,6 +1284,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("intra-bits") {
     cfg->intra_bit_allocation = atobool(value);
+  }
+  else if OPT("clip-neighbour") {
+    cfg->clip_neighbour = atobool(value);
   }
   else {
     return 0;

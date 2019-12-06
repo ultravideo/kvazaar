@@ -140,6 +140,8 @@ static const struct option long_options[] = {
   { "rc-algorithm",       required_argument, NULL, 0 },
   { "intra-bits",               no_argument, NULL, 0 },
   { "no-intra-bits",            no_argument, NULL, 0 },
+  { "clip-neighbour",           no_argument, NULL, 0 },
+  { "no-clip-neighbour",        no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

@@ -409,6 +409,8 @@ typedef struct kvz_config
 
   /** \brief whether to use hadamard based bit allocation for intra frames or not */
   uint8_t intra_bit_allocation;
+
+  uint8_t clip_neighbour;
 } kvz_config;
 
 /**
