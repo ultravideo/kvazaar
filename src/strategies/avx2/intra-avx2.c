@@ -555,27 +555,6 @@ static void kvz_intra_pred_planar_avx2(
   }
 }
 
-void print_128_s(const uint8_t *buf)
-{
-  for (int i = 0; i < 16; i++)
-    printf("%.2x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
-}
-
-void print_128(__m128i v)
-{
-  uint8_t buf[16];
-  _mm_storeu_si128((__m128i *)buf, v);
-  print_128_s(buf);
-}
-
-void print_256(__m256i v)
-{
-  uint16_t buf[16];
-  _mm256_storeu_si256((__m256i *)buf, v);
-  for (int i = 0; i < 16; i++)
-    printf("%.4x%c", buf[i], (i == 15) ? '\n' : (i == 7) ? '-' : ' ');
-}
-
 // Calculate the DC value for a 4x4 block. The algorithm uses slightly
 // different addends, multipliers etc for different pixels in the block,
 // but for a fixed-size implementation one vector wide, all the weights,
