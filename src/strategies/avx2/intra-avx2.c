@@ -580,9 +580,9 @@ void print_256(__m256i v)
 // different addends, multipliers etc for different pixels in the block,
 // but for a fixed-size implementation one vector wide, all the weights,
 // addends etc can be preinitialized for each position.
-static INLINE void pred_filtered_dc_4x4(const uint8_t *ref_top,
-                                        const uint8_t *ref_left,
-                                              uint8_t *out_block)
+static void pred_filtered_dc_4x4(const uint8_t *ref_top,
+                                 const uint8_t *ref_left,
+                                       uint8_t *out_block)
 {
   const uint32_t rt_u32 = *(const uint32_t *)(ref_top  + 1);
   const uint32_t rl_u32 = *(const uint32_t *)(ref_left + 1);
@@ -641,9 +641,9 @@ static INLINE void pred_filtered_dc_4x4(const uint8_t *ref_top,
   _mm_storeu_si128((__m128i *)out_block, final);
 }
 
-static INLINE void pred_filtered_dc_8x8(const uint8_t *ref_top,
-                                        const uint8_t *ref_left,
-                                              uint8_t *out_block)
+static void pred_filtered_dc_8x8(const uint8_t *ref_top,
+                                 const uint8_t *ref_left,
+                                       uint8_t *out_block)
 {
   const uint64_t rt_u64 = *(const uint64_t *)(ref_top  + 1);
   const uint64_t rl_u64 = *(const uint64_t *)(ref_left + 1);
@@ -745,9 +745,9 @@ static INLINE __m256i cvt_u32_si256(const uint32_t u)
   return _mm256_insert_epi32(zero, u, 0);
 }
 
-static INLINE void pred_filtered_dc_16x16(const uint8_t *ref_top,
-                                          const uint8_t *ref_left,
-                                                uint8_t *out_block)
+static void pred_filtered_dc_16x16(const uint8_t *ref_top,
+                                   const uint8_t *ref_left,
+                                         uint8_t *out_block)
 {
   const __m128i rt_128 = _mm_loadu_si128((const __m128i *)(ref_top  + 1));
   const __m128i rl_128 = _mm_loadu_si128((const __m128i *)(ref_left + 1));
@@ -821,9 +821,9 @@ static INLINE void pred_filtered_dc_16x16(const uint8_t *ref_top,
   }
 }
 
-static INLINE void pred_filtered_dc_32x32(const uint8_t *ref_top,
-                                          const uint8_t *ref_left,
-                                                uint8_t *out_block)
+static void pred_filtered_dc_32x32(const uint8_t *ref_top,
+                                   const uint8_t *ref_left,
+                                         uint8_t *out_block)
 {
   const __m256i rt = _mm256_loadu_si256((const __m256i *)(ref_top  + 1));
   const __m256i rl = _mm256_loadu_si256((const __m256i *)(ref_left + 1));
