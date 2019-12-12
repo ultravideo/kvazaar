@@ -26,6 +26,7 @@
 
 #include "kvazaar.h"
 #include "strategyselector.h"
+#include "strategies/missing-intel-intrinsics.h"
 
 
  /**
