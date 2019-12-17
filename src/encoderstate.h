@@ -205,6 +205,7 @@ typedef struct encoder_state_config_layer_t {
   kvz_cua_upsampling_parameter_t cua_job_param; //Hold parameters passed to cua upsampling jobs
   
   uint8_t scaling_started; //Flag for telling if scaling has been started
+  uint8_t cua_scaling_started; //Flag for telling if scaling has been started
 } encoder_state_config_layer_t;
 
 typedef struct encoder_state_config_local_rps_t {

@@ -1676,11 +1676,11 @@ static void start_cua_lcu_scaling_job(encoder_state_t * const state, const lcu_o
 static cu_array_t* prepare_deferred_cua_lcu_upsampling(encoder_state_t * const state, const int32_t mv_scale[2], const int32_t pos_scale[2], const uint8_t skip_same)
 {
   if (skip_same && pos_scale[0] == POS_SCALE_FAC_1X && pos_scale[1] == POS_SCALE_FAC_1X) {
-    state->layer->scaling_started = 1;
+    state->layer->cua_scaling_started = 1;
     return kvz_cu_array_copy_ref(state->ILR_state->tile->frame->cu_array);
   }
 
-  state->layer->scaling_started = 0;
+  state->layer->cua_scaling_started = 0;
 
   //Allocate the new cua.
   uint32_t n_width = state->tile->frame->width_in_lcu * LCU_WIDTH;
@@ -1736,7 +1736,7 @@ void kvz_scalability_prepare(encoder_state_t *state)
     
     //if (encoder->cfg.threads > 0) {
     scaled_pic = prepare_deferred_block_step_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
-    scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, 1);
+    scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, 0); //TODO: Force separate cuas for SNR here because get_temporal_merge_candidate seems to access the cua even when tmvp is disabled, causing data races. 
     //}
     //else {
     //  scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling, 1);
@@ -1795,10 +1795,13 @@ static void ilr_processing(encoder_state_t *state, const int is_async, const int
     //Set up scaling jobs
     // Need to check if scaling jobs have been started. If not, need to do scaling first. 
     if (state->layer != NULL && !state->layer->scaling_started) {
-      start_block_step_scaling_job(state, lcu, is_async);
-      start_cua_lcu_scaling_job(state, lcu, is_async);
+      if(!state->layer->scaling_started) start_block_step_scaling_job(state, lcu, is_async);
+      if(!state->layer->cua_scaling_started) start_cua_lcu_scaling_job(state, lcu, is_async);
       //Don't set scaling started to true here since it prevents scaling in other lcu and wavefront rows
-      if(!use_wpp) state->layer->scaling_started = 1; //Propably no need to set it here, but shouldn't hurt either. Only set if one wavefront row or using tiles in which case layer struct should be separate.
+      if (!use_wpp) {
+        state->layer->scaling_started = 1; //Propably no need to set it here, but shouldn't hurt either. Only set if one wavefront row or using tiles in which case layer struct should be separate.
+        state->layer->cua_scaling_started = 1;
+      }
     }
 
     if (use_wpp) {
@@ -2799,16 +2802,17 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //Propagate layer scaling parameters to children
       //TODO: Could use subimage/array for out/in(?) images/cua?
       if (main_state->layer != NULL && sub_state->layer != main_state->layer) {
-        if (!main_state->layer->scaling_started) {
-          kvz_propagate_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
+        //if (!main_state->layer->scaling_started) {
+        if (!main_state->layer->scaling_started) kvz_propagate_image_scaling_parameters(&sub_state->layer->img_job_param, &main_state->layer->img_job_param);
           //kvz_image_free(sub_state->layer->img_job_param.pic_in);
           //sub_state->layer->img_job_param.pic_in = kvz_image_copy_ref(main_state->layer->img_job_param.pic_in);
           //kvz_image_free(sub_state->layer->img_job_param.pic_out);
           //sub_state->layer->img_job_param.pic_out = kvz_image_copy_ref(main_state->layer->img_job_param.pic_out);
           //sub_state->layer->img_job_param.param = main_state->layer->img_job_param.param;
-          kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
-        }
+        if (!main_state->layer->cua_scaling_started) kvz_copy_cua_upsampling_parameters(&sub_state->layer->cua_job_param, &main_state->layer->cua_job_param);
+        //}
         sub_state->layer->scaling_started = main_state->layer->scaling_started;
+        sub_state->layer->cua_scaling_started = main_state->layer->cua_scaling_started;
       }
       //*********************************************
 

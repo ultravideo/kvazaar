@@ -269,6 +269,7 @@ static int encoder_state_config_layer_init(const encoder_state_t * const state, 
   state->layer->cua_job_param.tile_height_in_lcu = 0;
 
   state->layer->scaling_started = 0;
+  state->layer->cua_scaling_started = 0;
 
   return 1;
 }
