@@ -686,6 +686,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     const double clip_lambda = state->frame->lambda;
 
     double clip_neighbor_lambda = -1;
+    int clip_qp = -1;
     if (encoder->cfg.clip_neighbour) {
       for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
         if (state->frame->lcu_stats[temp_index].lambda > 0) {
@@ -693,10 +694,27 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
           break;
         }
       }
+      for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
+        if (state->frame->lcu_stats[temp_index].qp > -1) {
+          clip_qp = state->frame->lcu_stats[temp_index].qp;
+          break;
+        }
+      }
     }
     else {
+      encoder_state_t *previous = state->previous_encoder_state;
+      const int layer = encoder->cfg.gop[state->frame->gop_offset].layer;
+      int owf = encoder->cfg.owf;
+    
+      while (layer != encoder->cfg.gop[previous->frame->gop_offset].layer && --owf) {
+        previous = previous->previous_encoder_state;
+      }
+      
       if (state->frame->lcu_stats[index].lambda > 0) {
-        clip_neighbor_lambda = state->frame->lcu_stats[index].lambda;
+        clip_neighbor_lambda = previous->frame->lcu_stats[index].lambda;
+      }
+      if (state->frame->lcu_stats[index].qp > 0) {
+        clip_qp = previous->frame->lcu_stats[index].qp;
       }
     }
 
@@ -721,21 +739,6 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     }
 
     est_qp = lambda_to_qp(est_lambda);
-
-    int clip_qp = -1;
-    if(encoder->cfg.clip_neighbour) {
-      for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
-        if (state->frame->lcu_stats[temp_index].qp > -1) {
-          clip_qp = state->frame->lcu_stats[temp_index].qp;
-          break;
-        }
-      }
-    }
-    else {
-      if (state->frame->lcu_stats[index].qp > 0) {
-        clip_qp = state->frame->lcu_stats[index].qp;
-      }
-    }
 
     if( clip_qp > -1) {
       est_qp = CLIP(clip_qp - 1 - frame_allocation,
