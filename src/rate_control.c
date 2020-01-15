@@ -704,7 +704,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     else {
       encoder_state_t *previous = state->previous_encoder_state;
       const int layer = encoder->cfg.gop[state->frame->gop_offset].layer;
-      int owf = encoder->cfg.owf;
+      int owf = MIN(encoder->cfg.owf, state->frame->num);
     
       while (layer != encoder->cfg.gop[previous->frame->gop_offset].layer && --owf) {
         previous = previous->previous_encoder_state;
@@ -743,7 +743,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     if( clip_qp > -1) {
       est_qp = CLIP(clip_qp - 1 - frame_allocation,
         clip_qp + 1 + frame_allocation,
-        clip_qp);
+        est_qp);
     }
 
     est_qp = CLIP(state->frame->QP - 2 - frame_allocation,
