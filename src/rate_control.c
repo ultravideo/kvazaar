@@ -682,12 +682,12 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
     // In case wpp is used the previous ctus may not be ready from above rows
     const int ctu_limit = encoder->cfg.wpp ? pos.y * encoder->in.width_in_lcu : 0;
     
-    est_lambda = alpha * pow(bpp, beta);
+    est_lambda = alpha * pow(bpp, beta) * (state->frame->is_irap ? 0.5 : 1);
     const double clip_lambda = state->frame->lambda;
 
     double clip_neighbor_lambda = -1;
     int clip_qp = -1;
-    if (encoder->cfg.clip_neighbour) {
+    if (encoder->cfg.clip_neighbour || state->frame->num == 0) {
       for (int temp_index = index - 1; temp_index >= ctu_limit; --temp_index) {
         if (state->frame->lcu_stats[temp_index].lambda > 0) {
           clip_neighbor_lambda = state->frame->lcu_stats[temp_index].lambda;
@@ -705,10 +705,9 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
       encoder_state_t *previous = state;
       if((encoder->cfg.gop_lp_definition.d != 0 && 
          (encoder->cfg.owf == 1 || encoder->cfg.owf == 3)) ||
-         (encoder->cfg.gop_len != 0 && !encoder->cfg.gop_lowdelay && encoder->cfg.owf > 5)) {
+         (encoder->cfg.gop_len != 0 && !encoder->cfg.gop_lowdelay
+          && encoder->cfg.owf > 5)) {
 
-        // THis doesn't have problem with previous frame not existing because 
-        // the first frame is intra and can never get here
         previous = state->previous_encoder_state; 
         int owf = MIN(encoder->cfg.owf, state->frame->num);
 
