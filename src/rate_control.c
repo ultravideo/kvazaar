@@ -702,12 +702,21 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
       }
     }
     else {
-      encoder_state_t *previous = state->previous_encoder_state;
-      const int layer = encoder->cfg.gop[state->frame->gop_offset].layer;
-      int owf = MIN(encoder->cfg.owf, state->frame->num);
-    
-      while (layer != encoder->cfg.gop[previous->frame->gop_offset].layer && --owf) {
-        previous = previous->previous_encoder_state;
+      encoder_state_t *previous = state;
+      if((encoder->cfg.gop_lp_definition.d != 0 && 
+         (encoder->cfg.owf == 1 || encoder->cfg.owf == 3)) ||
+         (encoder->cfg.gop_len != 0 && !encoder->cfg.gop_lowdelay && encoder->cfg.owf > 5)) {
+
+        // THis doesn't have problem with previous frame not existing because 
+        // the first frame is intra and can never get here
+        previous = state->previous_encoder_state; 
+        int owf = MIN(encoder->cfg.owf, state->frame->num);
+
+        const int layer = encoder->cfg.gop[state->frame->gop_offset].layer;
+
+        while (layer != encoder->cfg.gop[previous->frame->gop_offset].layer && --owf) {
+          previous = previous->previous_encoder_state;
+        }
       }
       
       if (state->frame->lcu_stats[index].lambda > 0) {
