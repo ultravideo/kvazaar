@@ -133,6 +133,7 @@ static const struct option long_options[] = {
   { "set-qp-in-cu",             no_argument, NULL, 0 },
   { "open-gop",                 no_argument, NULL, 0 },
   { "no-open-gop",              no_argument, NULL, 0 },
+	{	"vaq",											no_argument, NULL, 0 },	
   { "scaling-list",       required_argument, NULL, 0 },
   { "max-merge",          required_argument, NULL, 0 },
   { "early-skip",               no_argument, NULL, 0 },
@@ -440,6 +441,7 @@ void print_help(void)
     "      --high-tier            : Used with --level. Use high tier bitrate limits\n"
     "                               instead of the main tier limits during encoding.\n"
     "                               High tier requires level 4 or higher.\n"
+		"      --vaq                  : Enable variance adaptive quantization.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

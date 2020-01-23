@@ -138,6 +138,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->me_max_steps = (uint32_t)-1;
 
+	cfg->vaq = false;
+
   cfg->scaling_list = KVZ_SCALING_LIST_OFF;
 
   cfg->max_merge = 5;
@@ -1247,6 +1249,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("fast-residual-cost"))
     cfg->fast_residual_cost_limit = atoi(value);
+	else if (OPT("vaq")) {
+		cfg->vaq = true;
+	}
   else if (OPT("max-merge")) {
     int max_merge = atoi(value);
     if (max_merge < 1 || max_merge > 5) {
