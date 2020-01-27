@@ -137,6 +137,7 @@ static const struct option long_options[] = {
   { "max-merge",          required_argument, NULL, 0 },
   { "early-skip",               no_argument, NULL, 0 },
   { "no-early-skip",            no_argument, NULL, 0 },
+  { "slicer",             required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
