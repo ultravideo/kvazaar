@@ -1164,9 +1164,9 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   kvz_threadqueue_free_job(&state->tqj_recon_done);
 
   //Copy the constraint pointer
-	// TODO: Try to do it in the if (state->is_leaf)
+  // TODO: Try to do it in the if (state->is_leaf)
   //if (state->parent != NULL) {
-	 // state->constraint = state->parent->constraint;
+    // state->constraint = state->parent->constraint;
   //}
 
   for (int i = 0; state->children[i].encoder_control; ++i) {

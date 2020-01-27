@@ -141,8 +141,12 @@ int kvz_config_init(kvz_config *cfg)
   cfg->max_merge = 5;
   cfg->early_skip = true;
 
-	cfg->ml_pu_depth_intra = false;
+  cfg->ml_pu_depth_intra = false;
 
+  cfg->slicer.startCTU_x = 0;
+  cfg->slicer.startCTU_y = 0;
+  cfg->slicer.fullWidth = 0;
+  cfg->slicer.fullHeight = 0;
   return 1;
 }
 
@@ -1260,11 +1264,26 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->max_merge = (uint8_t)max_merge;
   }
   else if OPT("early-skip") {
-  cfg->early_skip = (bool)atobool(value);
+    cfg->early_skip = (bool)atobool(value);
   }
-	else if OPT("ml-pu-depth-intra") {
-			cfg->ml_pu_depth_intra = (bool)atobool(value);
-	}
+  else if OPT("ml-pu-depth-intra") {
+    cfg->ml_pu_depth_intra = (bool)atobool(value);
+  }
+  else if OPT("slicer") {
+    uint8_t firstCTU_x;
+    uint8_t firstCTU_y;
+    uint16_t fullWidth;
+    uint16_t fullHeight;
+    if (4 != sscanf(value, "%u!%u!%u!%u", &firstCTU_x,
+      &firstCTU_y, &fullWidth, &fullHeight)) {
+      fprintf(stderr, "invalid slicer options. Expected \"%%u!%%u!%%u!%%u\", but got \"%s\"\n", value);
+      return 0;
+    }
+    cfg->slicer.startCTU_x = firstCTU_x;
+    cfg->slicer.startCTU_y = firstCTU_y;
+    cfg->slicer.fullWidth = fullWidth;
+    cfg->slicer.fullHeight = fullHeight;
+  }
   else {
     return 0;
   }

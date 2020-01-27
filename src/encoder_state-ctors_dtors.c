@@ -348,8 +348,8 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     if (!child_state->slice) child_state->slice = parent_state->slice;
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
-	// Intialization of the constraint structure
-	child_state->constraint = kvz_init_constraint(child_state->constraint, child_state->encoder_control);
+  // Intialization of the constraint structure
+  child_state->constraint = kvz_init_constraint(child_state->constraint, child_state->encoder_control);
 
   kvz_bitstream_init(&child_state->stream);
   
@@ -709,8 +709,8 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   }
   
   if (state->constraint) {
-	  // End of the constraint structure
-	  kvz_constraint_free(state);
+    // End of the constraint structure
+    kvz_constraint_free(state);
   }
 
   kvz_bitstream_finalize(&state->stream);

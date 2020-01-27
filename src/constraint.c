@@ -27,21 +27,21 @@
   * \return the pointer of constraint_t structure
   */
 void * kvz_init_constraint(encoder_state_t* state, const encoder_control_t * const encoder) {
-	constraint_t* constr = NULL;
-	// Allocate the constraint_t strucutre
-	constr = MALLOC(constraint_t, 1);
-	if (!constr) {
-		fprintf(stderr, "Memory allocation failed!\n");
-		assert(0);
-	}
+  constraint_t* constr = NULL;
+  // Allocate the constraint_t strucutre
+  constr = MALLOC(constraint_t, 1);
+  if (!constr) {
+    fprintf(stderr, "Memory allocation failed!\n");
+    assert(0);
+  }
 
-	// Allocate the ml_intra_ctu_pred_t structure
-	constr->ml_intra_depth_ctu = NULL;
-	if (encoder->cfg.ml_pu_depth_intra) // TODO: Change this by a new param !!
-	{
-		constr->ml_intra_depth_ctu = kvz_init_ml_intra_depth_const();
-	}
-	return constr;
+  // Allocate the ml_intra_ctu_pred_t structure
+  constr->ml_intra_depth_ctu = NULL;
+  if (encoder->cfg.ml_pu_depth_intra) // TODO: Change this by a new param !!
+  {
+    constr->ml_intra_depth_ctu = kvz_init_ml_intra_depth_const();
+  }
+  return constr;
 }
 
 /**
@@ -50,10 +50,10 @@ void * kvz_init_constraint(encoder_state_t* state, const encoder_control_t * con
  * \param state   encoder state
  */
 void kvz_constraint_free(encoder_state_t* state) {
-	constraint_t* constr = state->constraint;
-	if (constr->ml_intra_depth_ctu) 
-	{
-		kvz_end_ml_intra_depth_const(constr->ml_intra_depth_ctu);
-	}
-	FREE_POINTER(constr);
+  constraint_t* constr = state->constraint;
+  if (constr->ml_intra_depth_ctu) 
+  {
+    kvz_end_ml_intra_depth_const(constr->ml_intra_depth_ctu);
+  }
+  FREE_POINTER(constr);
 }

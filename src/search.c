@@ -456,8 +456,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cu_info_t *cur_cu;
 
   struct {
-	  int32_t min;
-	  int32_t max;
+    int32_t min;
+    int32_t max;
   } pu_depth_inter, pu_depth_intra;
 
   lcu_t *const lcu = &work_tree[depth];
@@ -474,12 +474,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   // Assign correct depth limit
   constraint_t* constr = state->constraint;
  if(constr->ml_intra_depth_ctu) {
-	 pu_depth_intra.min = constr->ml_intra_depth_ctu->_mat_upper_depth[(x_local >> 3) + (y_local >> 3) * 8];
-	 pu_depth_intra.max = constr->ml_intra_depth_ctu->_mat_lower_depth[(x_local >> 3) + (y_local >> 3) * 8];
+    pu_depth_intra.min = constr->ml_intra_depth_ctu->_mat_upper_depth[(x_local >> 3) + (y_local >> 3) * 8];
+    pu_depth_intra.max = constr->ml_intra_depth_ctu->_mat_lower_depth[(x_local >> 3) + (y_local >> 3) * 8];
   }
   else {
-	  pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
-	  pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
+    pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
+    pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
   }
   pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min;
   pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max;
@@ -538,11 +538,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         const int last_mode = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
         for (int i = first_mode; i <= last_mode; ++i) {
           kvz_search_cu_smp(state,
-		                    x, y,
-		                    depth,
-		                    mp_modes[i],
-		                    &work_tree[depth + 1],
-		                    &mode_cost, &mode_bitcost);
+                            x, y,
+                            depth,
+                            mp_modes[i],
+                            &work_tree[depth + 1],
+                            &mode_cost, &mode_bitcost);
           if (mode_cost < cost) {
             cost = mode_cost;
             inter_bitcost = mode_bitcost;
@@ -960,7 +960,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // for the current lcu
   constraint_t* constr = state->constraint;
   if (constr->ml_intra_depth_ctu) {
-	  kvz_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
+    kvz_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
   }
 
   // Start search from depth 0.

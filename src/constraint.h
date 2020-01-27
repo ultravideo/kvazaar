@@ -25,12 +25,12 @@
 
 
  /* Constraint structure:
-	* Each field corresponds to a constraint technique. The encoder tests if the constraint
-	* pointer is allocated to apply the technique.
+  * Each field corresponds to a constraint technique. The encoder tests if the constraint
+  * pointer is allocated to apply the technique.
  */
 typedef struct {
-	// Structure used for the CTU depth prediction using Machine Learning in All Intra 
-	ml_intra_ctu_pred_t * ml_intra_depth_ctu;
+  // Structure used for the CTU depth prediction using Machine Learning in All Intra 
+  ml_intra_ctu_pred_t * ml_intra_depth_ctu;
 } constraint_t;
 
 
