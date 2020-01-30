@@ -335,46 +335,31 @@ static uint32_t coeff_abs_sum_generic(const coeff_t *coeffs, size_t length)
   return sum;
 }
 
-static INLINE int16_t to_q88(float f)
+static INLINE void get_coeff_weights(int32_t qp, uint16_t *weights)
 {
-  return (int16_t)(f * 256.0f);
+  uint64_t wts_packed = fast_coeff_cost_wts[qp];
+  weights[0] = (wts_packed >>  0) & 0xffff;
+  weights[1] = (wts_packed >> 16) & 0xffff;
+  weights[2] = (wts_packed >> 32) & 0xffff;
+  weights[3] = (wts_packed >> 48) & 0xffff;
 }
 
 static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int32_t qp)
 {
+  assert(qp >= MIN_FAST_COEFF_COST_QP && qp <= MAX_FAST_COEFF_COST_QP);
   uint32_t sum = 0;
-#define NUM_BUCKETS 5
-  const int16_t wt_m[NUM_BUCKETS] = {
-    to_q88(-0.004916),
-    to_q88(0.010806),
-    to_q88(0.055562),
-    to_q88(0.033436),
-    to_q88(-0.007690),
-  };
-  const int16_t wt_c[NUM_BUCKETS] = {
-    to_q88(0.172024),
-    to_q88(3.421462),
-    to_q88(2.879506),
-    to_q88(5.585471),
-    to_q88(0.256772),
-  };
-
-  int16_t wt[NUM_BUCKETS];
-  for (int32_t i = 0; i < NUM_BUCKETS; i++)
-    wt[i] = wt_m[i] * qp + wt_c[i];
+  uint16_t weights[4];
+  get_coeff_weights(qp, weights);
 
   for (int32_t i = 0; i < width * width; i++) {
-    int16_t curr = coeff[i];
-    int16_t signmask = curr >> 15;
-    int16_t curr_abs = (curr ^ signmask) - signmask;
-    if (curr_abs > 3)
+     int16_t curr = coeff[i];
+    uint32_t curr_abs = abs(curr);
+    if (curr_abs > 3) {
       curr_abs = 3;
-
-    sum += wt[curr_abs];
+    }
+    sum += weights[curr_abs];
   }
-  sum += wt[NUM_BUCKETS - 1] * width;
   return sum >> 8;
-#undef NUM_BUCKETS
 }
 
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)

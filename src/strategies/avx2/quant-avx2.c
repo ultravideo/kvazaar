@@ -882,7 +882,7 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 #endif // KVZ_BIT_DEPTH == 8
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
-  success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
+  // success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
