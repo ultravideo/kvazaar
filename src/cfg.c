@@ -143,10 +143,10 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->ml_pu_depth_intra = false;
 
-  cfg->slicer.startCTU_x = 0;
-  cfg->slicer.startCTU_y = 0;
-  cfg->slicer.fullWidth = 0;
-  cfg->slicer.fullHeight = 0;
+  cfg->partial_coding.startCTU_x = 0;
+  cfg->partial_coding.startCTU_y = 0;
+  cfg->partial_coding.fullWidth = 0;
+  cfg->partial_coding.fullHeight = 0;
   return 1;
 }
 
@@ -1269,20 +1269,20 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("ml-pu-depth-intra") {
     cfg->ml_pu_depth_intra = (bool)atobool(value);
   }
-  else if OPT("slicer") {
+  else if OPT("partial-coding") {
     uint8_t firstCTU_x;
     uint8_t firstCTU_y;
     uint16_t fullWidth;
     uint16_t fullHeight;
     if (4 != sscanf(value, "%u!%u!%u!%u", &firstCTU_x,
       &firstCTU_y, &fullWidth, &fullHeight)) {
-      fprintf(stderr, "invalid slicer options. Expected \"%%u!%%u!%%u!%%u\", but got \"%s\"\n", value);
+      fprintf(stderr, "invalid partial-coding options. Expected \"%%u!%%u!%%u!%%u\", but got \"%s\"\n", value);
       return 0;
     }
-    cfg->slicer.startCTU_x = firstCTU_x;
-    cfg->slicer.startCTU_y = firstCTU_y;
-    cfg->slicer.fullWidth = fullWidth;
-    cfg->slicer.fullHeight = fullHeight;
+    cfg->partial_coding.startCTU_x = firstCTU_x;
+    cfg->partial_coding.startCTU_y = firstCTU_y;
+    cfg->partial_coding.fullWidth = fullWidth;
+    cfg->partial_coding.fullHeight = fullHeight;
   }
   else {
     return 0;

@@ -138,7 +138,7 @@ static const struct option long_options[] = {
   { "early-skip",               no_argument, NULL, 0 },
   { "no-early-skip",            no_argument, NULL, 0 },
   { "ml-pu-depth-intra",        no_argument, NULL, 0 },
-  { "slicer",             required_argument, NULL, 0 },
+  { "partial-coding",     required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -536,6 +536,12 @@ void print_help(void)
     "                                   - tiles: Put tiles in independent slices.\n"
     "                                   - wpp: Put rows in dependent slices.\n"
     "                                   - tiles+wpp: Do both.\n"
+    "      --partial-coding <x-offset>!<y-offset>!<slice-width>!<slice-height>\n"
+    "                             : Encode partial frame.\n" 
+    "                               Parts must be merged to form a valid bitstream.\n"
+    "                               X and Y are CTU offsets.\n"
+    "                               Slice width and height must be divisible by CTU\n"
+    "                               in pixels unless it is the last CTU row/column."
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video Usability Information:\n"

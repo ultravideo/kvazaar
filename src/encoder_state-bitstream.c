@@ -346,9 +346,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  if (encoder->cfg.slicer.fullWidth != 0) {
-    WRITE_UE(stream, encoder->cfg.slicer.fullWidth, "pic_width_in_luma_samples");
-    WRITE_UE(stream, encoder->cfg.slicer.fullHeight, "pic_height_in_luma_samples");
+  if (encoder->cfg.partial_coding.fullWidth != 0) {
+    WRITE_UE(stream, encoder->cfg.partial_coding.fullWidth, "pic_width_in_luma_samples");
+    WRITE_UE(stream, encoder->cfg.partial_coding.fullHeight, "pic_height_in_luma_samples");
   }
   else {
     WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
@@ -838,9 +838,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
   printf("=========== Slice ===========\n");
 #endif
 
-  if (encoder->cfg.slicer.fullWidth != 0) {
-    state->slice->start_in_rs = encoder->cfg.slicer.startCTU_x +
-      CEILDIV(encoder->cfg.slicer.fullWidth, 64) * encoder->cfg.slicer.startCTU_y;
+  if (encoder->cfg.partial_coding.fullWidth != 0) {
+    state->slice->start_in_rs = encoder->cfg.partial_coding.startCTU_x +
+      CEILDIV(encoder->cfg.partial_coding.fullWidth, 64) * encoder->cfg.partial_coding.startCTU_y;
   }
 
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
@@ -865,8 +865,8 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
 
     int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-    if (encoder->cfg.slicer.fullWidth != 0) {
-      lcu_cnt = CEILDIV(encoder->cfg.slicer.fullWidth, 64) * CEILDIV(encoder->cfg.slicer.fullHeight, 64);
+    if (encoder->cfg.partial_coding.fullWidth != 0) {
+      lcu_cnt = CEILDIV(encoder->cfg.partial_coding.fullWidth, 64) * CEILDIV(encoder->cfg.partial_coding.fullHeight, 64);
     }
     int num_bits = kvz_math_ceil_log2(lcu_cnt);
     int slice_start_rs = state->slice->start_in_rs;
