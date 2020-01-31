@@ -194,6 +194,9 @@ Compression tools:
                                    - 0, 1, 2, 3: from 64x64 to 8x8
       --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]
                                    - 0, 1, 2, 3, 4: from 64x64 to 4x4
+      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine
+                                learning trees, overrides the
+                                --pu-depth-intra parameter. [disabled]
       --tr-depth-intra <int> : Transform split depth for intra blocks [0]
       --(no-)bipred          : Bi-prediction [disabled]
       --cu-split-termination <string> : CU split search termination [zero]
@@ -246,7 +249,12 @@ Parallel processing:
                                    - tiles: Put tiles in independent slices.
                                    - wpp: Put rows in dependent slices.
                                    - tiles+wpp: Do both.
-
+      --partial-coding <x-offset>!<y-offset>!<slice-width>!<slice-height>
+                             : Encode partial frame.
+                               Parts must be merged to form a valid bitstream.
+                               X and Y are CTU offsets.
+                               Slice width and height must be divisible by CTU
+                               in pixels unless it is the last CTU row/column.
 Video Usability Information:
       --sar <width:height>   : Specify sample aspect ratio
       --overscan <string>    : Specify crop overscan setting [undef]
