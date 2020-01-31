@@ -255,6 +255,8 @@ Parallel processing:
                                X and Y are CTU offsets.
                                Slice width and height must be divisible by CTU
                                in pixels unless it is the last CTU row/column.
+                               This parameter is used by kvaShare.
+
 Video Usability Information:
       --sar <width:height>   : Specify sample aspect ratio
       --overscan <string>    : Specify crop overscan setting [undef]

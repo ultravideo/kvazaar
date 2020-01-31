@@ -541,7 +541,8 @@ void print_help(void)
     "                               Parts must be merged to form a valid bitstream.\n"
     "                               X and Y are CTU offsets.\n"
     "                               Slice width and height must be divisible by CTU\n"
-    "                               in pixels unless it is the last CTU row/column."
+    "                               in pixels unless it is the last CTU row/column.\n"
+    "                               This parameter is used by kvaShare.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video Usability Information:\n"
