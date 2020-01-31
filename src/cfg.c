@@ -1270,10 +1270,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->ml_pu_depth_intra = (bool)atobool(value);
   }
   else if OPT("partial-coding") {
-    uint8_t firstCTU_x;
-    uint8_t firstCTU_y;
-    uint16_t fullWidth;
-    uint16_t fullHeight;
+    uint32_t firstCTU_x;
+    uint32_t firstCTU_y;
+    uint32_t fullWidth;
+    uint32_t fullHeight;
     if (4 != sscanf(value, "%u!%u!%u!%u", &firstCTU_x,
       &firstCTU_y, &fullWidth, &fullHeight)) {
       fprintf(stderr, "invalid partial-coding options. Expected \"%%u!%%u!%%u!%%u\", but got \"%s\"\n", value);
