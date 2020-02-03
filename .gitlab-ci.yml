@@ -15,8 +15,6 @@ test-kvazaar: &test-template
     - src/kvazaar
     - src/.libs
     expire_in: 1 week
-  variables:
-    KVAZAAR_OVERRIDE_inter_recon_bipred: generic
 
 test-asan:
   <<: *test-template
@@ -28,19 +26,16 @@ test-asan:
     # AddressSanitizer adds some extra symbols so we expect a failure from
     # the external symbols test.
     XFAIL_TESTS: test_external_symbols.sh
-    KVAZAAR_OVERRIDE_inter_recon_bipred: generic
 
 test-tsan:
   <<: *test-template
   variables:
     CFLAGS: '-fsanitize=thread'
-    KVAZAAR_OVERRIDE_inter_recon_bipred: generic
 
 test-ubsan:
   <<: *test-template
   variables:
     CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
-    KVAZAAR_OVERRIDE_inter_recon_bipred: generic
 
 test-valgrind:
   <<: *test-template
@@ -49,5 +44,4 @@ test-valgrind:
     KVAZAAR_OVERRIDE_sao_band_ddistortion: generic
     KVAZAAR_OVERRIDE_sao_edge_ddistortion: generic
     KVAZAAR_OVERRIDE_calc_sao_edge_dir: generic
-    KVAZAAR_OVERRIDE_inter_recon_bipred: generic
     KVZ_TEST_VALGRIND: 1
