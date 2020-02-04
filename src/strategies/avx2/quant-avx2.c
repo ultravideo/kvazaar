@@ -817,14 +817,14 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   for (int i = 0; i < width * width; i += 32) {
     __m256i curr_lo      = _mm256_loadu_si256 ((const __m256i *)(coeff + i));
     __m256i curr_abs_lo  = _mm256_abs_epi16   (curr_lo);
-    __m256i curr_max3_lo = _mm256_min_epi16   (curr_abs_lo, threes);
+    __m256i curr_max3_lo = _mm256_min_epu16   (curr_abs_lo, threes);
 
     // 4x4 blocks only have 16 coeffs, so handle them separately
     __m256i curr_max3_hi;
     if (width >= 8) {
       __m256i curr_hi      = _mm256_loadu_si256 ((const __m256i *)(coeff + i + 16));
       __m256i curr_abs_hi  = _mm256_abs_epi16   (curr_hi);
-              curr_max3_hi = _mm256_min_epi16   (curr_abs_hi, threes);
+              curr_max3_hi = _mm256_min_epu16   (curr_abs_hi, threes);
               curr_max3_hi = _mm256_slli_epi16  (curr_max3_hi, 8);
     } else {
       // Set MSBs for high bytes if they're meaningless, so shuffles will
