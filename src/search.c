@@ -625,7 +625,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
         kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
 
-        if (!ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
+        if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
           //Calculate cost for zero coeffs
           inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
 
@@ -668,7 +668,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     cost += mode_bits * state->lambda;
 
-    if (inter_zero_coeff_cost <= cost) {
+    if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
       cost = inter_zero_coeff_cost;
 
       // Restore saved pixels from lower level of the working tree.

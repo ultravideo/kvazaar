@@ -147,6 +147,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->partial_coding.startCTU_y = 0;
   cfg->partial_coding.fullWidth = 0;
   cfg->partial_coding.fullHeight = 0;
+
+  cfg->zero_coeff_rdo = true;
   return 1;
 }
 
@@ -1283,6 +1285,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->partial_coding.startCTU_y = firstCTU_y;
     cfg->partial_coding.fullWidth = fullWidth;
     cfg->partial_coding.fullHeight = fullHeight;
+  }
+  else if OPT("zero-coeff-rdo") {
+  cfg->zero_coeff_rdo = (bool)atobool(value);
   }
   else {
     return 0;

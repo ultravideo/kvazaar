@@ -173,6 +173,8 @@ Compression tools:
                                         chroma mode search.
       --(no-)mv-rdo          : Rate-distortion optimized motion vector costs
                                [disabled]
+      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero
+                               residual improves the RD cost. [enabled]
       --(no-)full-intra-search : Try all intra modes during rough search.
                                [disabled]
       --(no-)transform-skip  : Try transform skip [disabled]

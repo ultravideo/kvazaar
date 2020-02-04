@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "January 2020" "kvazaar v1.3.0" "User Commands"
+.TH KVAZAAR "1" "February 2020" "kvazaar v1.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -216,6 +216,10 @@ Intra mode search complexity [0]
 \fB\-\-(no\-)mv\-rdo         
 Rate\-distortion optimized motion vector costs
 [disabled]
+.TP
+\fB\-\-(no\-)zero\-coeff\-rdo 
+If a CU is set inter, check if forcing zero
+residual improves the RD cost. [enabled]
 .TP
 \fB\-\-(no\-)full\-intra\-search
 Try all intra modes during rough search.

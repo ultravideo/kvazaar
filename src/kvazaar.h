@@ -401,6 +401,9 @@ typedef struct kvz_config
     uint16_t fullHeight;
   } partial_coding;
 
+  /** \brief Always consider CU without any quantized residual */
+  uint8_t zero_coeff_rdo;
+
 } kvz_config;
 
 /**

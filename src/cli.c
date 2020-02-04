@@ -139,6 +139,8 @@ static const struct option long_options[] = {
   { "no-early-skip",            no_argument, NULL, 0 },
   { "ml-pu-depth-intra",        no_argument, NULL, 0 },
   { "partial-coding",     required_argument, NULL, 0 },
+  { "zero-coeff-rdo",           no_argument, NULL, 0 },
+  { "no-zero-coeff-rdo",        no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -459,6 +461,8 @@ void print_help(void)
     "                                        chroma mode search.\n"
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
+    "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
+    "                               residual is improves the RD cost. [enabled]\n"
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
