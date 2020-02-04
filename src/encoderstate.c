@@ -1190,6 +1190,31 @@ static void normalize_lcu_weights(encoder_state_t * const state)
   }
 }
 
+// Calculate pixel value variance. Takes in arrays of kvz_pixel
+static double pixel_var(kvz_pixel * const arr, const uint32_t len) {
+  double var = 0;
+  double arr_mean = 0;
+
+  // Calculate array mean
+  int i = 0;
+  double sum = 0;
+
+  for (; i < len; ++i) {
+    sum += arr[i];
+  }
+  arr_mean = sum / (double)len;
+
+  // Calculate array variance  
+  for (i = 0; i < len; ++i) {
+    double tmp = (double)arr[i] - arr_mean;
+    var += tmp*tmp;
+  }
+
+  var /= len;
+
+  return var;
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1202,6 +1227,39 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->width,
       state->tile->frame->height
   );
+
+  // Variance adaptive quantization
+  if (cfg->vaq) {
+    double d = 1.5; // Empirically decided constant. Affects delta-QP strength
+    
+    // Calculate frame pixel variance
+    uint32_t len = state->tile->frame->width * state->tile->frame->height;
+    double frame_var = pixel_var(state->tile->frame->source->y, len);
+
+    // Loop through LCUs
+    // For each LCU calculate: D * (log(LCU pixel variance) - log(frame pixel variance))
+    int x = 0;
+    int y = 0;
+    unsigned x_lim = state->tile->frame->width_in_lcu;
+    unsigned y_lim = state->tile->frame->height_in_lcu;
+    
+    unsigned id = 0;
+    for (; y < y_lim; ++y) {
+      for (; x < x_lim; ++x) {
+        kvz_pixel tmp[LCU_LUMA_SIZE];
+        int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
+        int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
+        // blit pixel array
+        kvz_pixels_blit(&state->tile->frame->source->y[x + y * state->tile->frame->source->stride], tmp,
+          x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
+        
+        double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);
+        state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
+        id++; 
+      }
+    }
+  }
+  // Variance adaptive quantization - END
 
   // Use this flag to handle closed gop irap picture selection.
   // If set to true, irap is already set and we avoid
