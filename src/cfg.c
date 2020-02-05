@@ -141,9 +141,19 @@ int kvz_config_init(kvz_config *cfg)
   cfg->max_merge = 5;
   cfg->early_skip = true;
 
+  cfg->ml_pu_depth_intra = false;
+
+  cfg->partial_coding.startCTU_x = 0;
+  cfg->partial_coding.startCTU_y = 0;
+  cfg->partial_coding.fullWidth = 0;
+  cfg->partial_coding.fullHeight = 0;
+
+  cfg->zero_coeff_rdo = true;
+
   cfg->rc_algorithm = KVZ_NO_RC;
   cfg->intra_bit_allocation = true;
   cfg->clip_neighbour = false;
+
   return 1;
 }
 
@@ -1269,7 +1279,28 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->max_merge = (uint8_t)max_merge;
   }
   else if OPT("early-skip") {
-  cfg->early_skip = (bool)atobool(value);
+    cfg->early_skip = (bool)atobool(value);
+  }
+  else if OPT("ml-pu-depth-intra") {
+    cfg->ml_pu_depth_intra = (bool)atobool(value);
+  }
+  else if OPT("partial-coding") {
+    uint32_t firstCTU_x;
+    uint32_t firstCTU_y;
+    uint32_t fullWidth;
+    uint32_t fullHeight;
+    if (4 != sscanf(value, "%u!%u!%u!%u", &firstCTU_x,
+      &firstCTU_y, &fullWidth, &fullHeight)) {
+      fprintf(stderr, "invalid partial-coding options. Expected \"%%u!%%u!%%u!%%u\", but got \"%s\"\n", value);
+      return 0;
+    }
+    cfg->partial_coding.startCTU_x = firstCTU_x;
+    cfg->partial_coding.startCTU_y = firstCTU_y;
+    cfg->partial_coding.fullWidth = fullWidth;
+    cfg->partial_coding.fullHeight = fullHeight;
+  }
+  else if OPT("zero-coeff-rdo") {
+  cfg->zero_coeff_rdo = (bool)atobool(value);
   }
   else if OPT("rc-algorithm") {
     int8_t rc_algorithm = 0;

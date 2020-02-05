@@ -137,6 +137,10 @@ static const struct option long_options[] = {
   { "max-merge",          required_argument, NULL, 0 },
   { "early-skip",               no_argument, NULL, 0 },
   { "no-early-skip",            no_argument, NULL, 0 },
+  { "ml-pu-depth-intra",        no_argument, NULL, 0 },
+  { "partial-coding",     required_argument, NULL, 0 },
+  { "zero-coeff-rdo",           no_argument, NULL, 0 },
+  { "no-zero-coeff-rdo",        no_argument, NULL, 0 },
   { "rc-algorithm",       required_argument, NULL, 0 },
   { "intra-bits",               no_argument, NULL, 0 },
   { "no-intra-bits",            no_argument, NULL, 0 },
@@ -468,6 +472,8 @@ void print_help(void)
     "                                        chroma mode search.\n"
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
+    "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
+    "                               residual is improves the RD cost. [enabled]\n"
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
@@ -489,6 +495,9 @@ void print_help(void)
     "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
     "      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]\n"
     "                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4\n"
+    "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
+    "                                learning trees, overrides the\n"
+    "                                --pu-depth-intra parameter. [disabled]\n"
     "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"
@@ -542,6 +551,13 @@ void print_help(void)
     "                                   - tiles: Put tiles in independent slices.\n"
     "                                   - wpp: Put rows in dependent slices.\n"
     "                                   - tiles+wpp: Do both.\n"
+    "      --partial-coding <x-offset>!<y-offset>!<slice-width>!<slice-height>\n"
+    "                             : Encode partial frame.\n" 
+    "                               Parts must be merged to form a valid bitstream.\n"
+    "                               X and Y are CTU offsets.\n"
+    "                               Slice width and height must be divisible by CTU\n"
+    "                               in pixels unless it is the last CTU row/column.\n"
+    "                               This parameter is used by kvaShare.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video Usability Information:\n"
@@ -575,13 +591,16 @@ void print_help(void)
 void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
-                      const bool print_psnr)
+                      const bool print_psnr,
+                      const double avg_qp)
 {
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits",
+  fprintf(stderr, "POC %4d QP %2d AVG QP %.1f (%c-frame) %10d bits",
           info->poc,
           info->qp,
+          avg_qp,
           "BPI"[info->slice_type % 3],
           bytes << 3);
+
   if (print_psnr) {
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);

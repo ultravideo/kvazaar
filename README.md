@@ -173,6 +173,8 @@ Compression tools:
                                         chroma mode search.
       --(no-)mv-rdo          : Rate-distortion optimized motion vector costs
                                [disabled]
+      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero
+                               residual improves the RD cost. [enabled]
       --(no-)full-intra-search : Try all intra modes during rough search.
                                [disabled]
       --(no-)transform-skip  : Try transform skip [disabled]
@@ -194,6 +196,9 @@ Compression tools:
                                    - 0, 1, 2, 3: from 64x64 to 8x8
       --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]
                                    - 0, 1, 2, 3, 4: from 64x64 to 4x4
+      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine
+                                learning trees, overrides the
+                                --pu-depth-intra parameter. [disabled]
       --tr-depth-intra <int> : Transform split depth for intra blocks [0]
       --(no-)bipred          : Bi-prediction [disabled]
       --cu-split-termination <string> : CU split search termination [zero]
@@ -246,6 +251,13 @@ Parallel processing:
                                    - tiles: Put tiles in independent slices.
                                    - wpp: Put rows in dependent slices.
                                    - tiles+wpp: Do both.
+      --partial-coding <x-offset>!<y-offset>!<slice-width>!<slice-height>
+                             : Encode partial frame.
+                               Parts must be merged to form a valid bitstream.
+                               X and Y are CTU offsets.
+                               Slice width and height must be divisible by CTU
+                               in pixels unless it is the last CTU row/column.
+                               This parameter is used by kvaShare.
 
 Video Usability Information:
       --sar <width:height>   : Specify sample aspect ratio

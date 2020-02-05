@@ -53,6 +53,8 @@ libkvazaar_la_SOURCES = \
 	checkpoint.h \
 	cfg.c \
 	cfg.h \
+	constraint.c \
+	constraint.h \ 
 	context.c \
 	context.h \
 	cu.c \
@@ -85,6 +87,8 @@ libkvazaar_la_SOURCES = \
 	kvazaar.c \
 	kvazaar_internal.h \
 	kvz_math.h \
+	ml_intra_cu_depth_pred.c \
+	ml_intra_cu_depth_pred.h \
 	nal.c \
 	nal.h \
 	rate_control.c \
@@ -128,6 +132,7 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/encode_coding_tree-generic.h \
 	strategies/missing-intel-intrinsics.h \
 	strategies/optimized_sad_func_ptr_t.h \
+	strategies/sao_shared_generics.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \

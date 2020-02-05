@@ -27,6 +27,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "inter.h"
 #include "kvazaar.h"
 #include "encoderstate.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
@@ -121,21 +122,21 @@ typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_
                                 uint32_t ref_stride, uint32_t left, uint32_t right);
 
 typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
-	const int hi_prec_luma_rec1,
-	const int hi_prec_chroma_rec0,
-	const int hi_prec_chroma_rec1,
-	int height,
-	int width,
-	int ypos,
-	int xpos,
-	const hi_prec_buf_t*high_precision_rec0,
-	const hi_prec_buf_t*high_precision_rec1,
-	lcu_t* lcu,
-	kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
-	kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-	kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C]);
-	
-	
+    const int hi_prec_luma_rec1,
+    const int hi_prec_chroma_rec0,
+    const int hi_prec_chroma_rec1,
+    int height,
+    int width,
+    int ypos,
+    int xpos,
+    const hi_prec_buf_t*high_precision_rec0,
+    const hi_prec_buf_t*high_precision_rec1,
+    lcu_t* lcu,
+    kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
+    kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
+    kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C],
+    bool predict_luma,
+    bool predict_chroma);  
 
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;

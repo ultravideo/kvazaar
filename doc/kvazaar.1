@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "July 2019" "kvazaar v1.3.0" "User Commands"
+.TH KVAZAAR "1" "February 2020" "kvazaar v1.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -121,14 +121,13 @@ GOP structure [8]
     \- lp\-<string>: Low\-delay P\-frame GOP
       (e.g. lp\-g8d4t2, see README)
 .TP
-\fB\-\-(no\-)open\-gop
+\fB\-\-(no\-)open\-gop       
 Use open GOP configuration. [enabled]
 .TP
 \fB\-\-cqmfile <filename>  
 Read custom quantization matrices from a file.
 .TP
-\fB\-\-scaling-list <string>
-Set scaling list mode. [off]
+\fB\-\-scaling\-list <string>: Set scaling list mode. [off]
     \- off: Disable scaling lists.
     \- custom: use custom list (with \-\-cqmfile).
     \- default: Use default lists.
@@ -218,6 +217,10 @@ Intra mode search complexity [0]
 Rate\-distortion optimized motion vector costs
 [disabled]
 .TP
+\fB\-\-(no\-)zero\-coeff\-rdo 
+If a CU is set inter, check if forcing zero
+residual improves the RD cost. [enabled]
+.TP
 \fB\-\-(no\-)full\-intra\-search
 Try all intra modes during rough search.
 [disabled]
@@ -253,6 +256,11 @@ Inter prediction units sizes [0\-3]
 Intra prediction units sizes [1\-4]
     \- 0, 1, 2, 3, 4: from 64x64 to 4x4
 .TP
+\fB\-\-ml\-pu\-depth\-intra   
+Predict the pu\-depth\-intra using machine
+ learning trees, overrides the
+ \-\-pu\-depth\-intra parameter. [disabled]
+.TP
 \fB\-\-tr\-depth\-intra <int>
 Transform split depth for intra blocks [0]
 .TP
@@ -282,7 +290,8 @@ a zero coefficient CU is found. [disabled]
 Try to find skip cu from merge candidates.
 Perform no further search if skip is found.
 For rd=0..1: Try the first candidate.
-For rd=2.. : Try the best candidate based
+For rd=2..
+Try the best candidate based
              on luma satd cost. [enabled]
 .TP
 \fB\-\-max\-merge <integer> 
@@ -336,6 +345,15 @@ Control how slices are used.
     \- tiles: Put tiles in independent slices.
     \- wpp: Put rows in dependent slices.
     \- tiles+wpp: Do both.
+.TP
+\fB\-\-partial\-coding <x\-offset>!<y\-offset>!<slice\-width>!<slice\-height>
+                            
+Encode partial frame.
+Parts must be merged to form a valid bitstream.
+X and Y are CTU offsets.
+Slice width and height must be divisible by CTU
+in pixels unless it is the last CTU row/column.
+This parameter is used by kvaShare.
 
 .SS "Video Usability Information:"
 .TP
