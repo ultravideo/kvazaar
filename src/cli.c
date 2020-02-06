@@ -133,7 +133,7 @@ static const struct option long_options[] = {
   { "set-qp-in-cu",             no_argument, NULL, 0 },
   { "open-gop",                 no_argument, NULL, 0 },
   { "no-open-gop",              no_argument, NULL, 0 },
-	{	"vaq",											no_argument, NULL, 0 },	
+  {	"vaq",                      no_argument, NULL, 0 },
   { "no-vaq",                   no_argument, NULL, 0 },
   { "scaling-list",       required_argument, NULL, 0 },
   { "max-merge",          required_argument, NULL, 0 },
