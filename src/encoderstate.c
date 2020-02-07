@@ -1215,6 +1215,11 @@ static double pixel_var(kvz_pixel * const arr, const uint32_t len) {
   return var;
 }
 
+// Vaq strength
+#ifndef VAQ_STRENGTH
+# define VAQ_STRENGTH 1.5
+#endif
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1230,7 +1235,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Variance adaptive quantization
   if (cfg->vaq) {
-    double d = 1.5; // Empirically decided constant. Affects delta-QP strength
+    double d = VAQ_STRENGTH; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
