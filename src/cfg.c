@@ -138,7 +138,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->me_max_steps = (uint32_t)-1;
 
-	cfg->vaq = false;
+	cfg->vaq = 0;
 
   cfg->scaling_list = KVZ_SCALING_LIST_OFF;
 
@@ -1250,7 +1250,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if (OPT("fast-residual-cost"))
     cfg->fast_residual_cost_limit = atoi(value);
 	else if (OPT("vaq")) {
-		cfg->vaq = (bool)atobool(value);
+		cfg->vaq = (int)atoi(value);
 	}
   else if (OPT("max-merge")) {
     int max_merge = atoi(value);
@@ -1395,6 +1395,11 @@ static int validate_hevc_level(kvz_config *const cfg);
 int kvz_config_validate(const kvz_config *const cfg)
 {
   int error = 0;
+
+  if (cfg->vaq < 0) {
+    fprintf(stderr, "vaq strength must be positive\n");
+    error = 1;
+  }
 
   if (cfg->width <= 0) {
     fprintf(stderr, "Input error: width must be positive\n");
