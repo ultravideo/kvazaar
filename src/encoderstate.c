@@ -1238,19 +1238,19 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
     // Loop through LCUs
     // For each LCU calculate: D * (log(LCU pixel variance) - log(frame pixel variance))
-    int x = 0;
-    int y = 0;
     unsigned x_lim = state->tile->frame->width_in_lcu;
     unsigned y_lim = state->tile->frame->height_in_lcu;
     
     unsigned id = 0;
-    for (; y < y_lim; ++y) {
-      for (; x < x_lim; ++x) {
+    for (int y = 0; y < y_lim; ++y) {
+      for (int x = 0; x < x_lim; ++x) {
         kvz_pixel tmp[LCU_LUMA_SIZE];
+        int pxl_x = x * LCU_WIDTH;
+        int pxl_y = y * LCU_WIDTH;
         int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
         int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
         // blit pixel array
-        kvz_pixels_blit(&state->tile->frame->source->y[x + y * state->tile->frame->source->stride], tmp,
+        kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
           x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
         
         double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);

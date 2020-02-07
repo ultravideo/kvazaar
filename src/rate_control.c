@@ -325,4 +325,19 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->lambda      = state->frame->lambda;
     state->lambda_sqrt = sqrt(state->frame->lambda);
   }
+
+  // Apply variance adaptive quantization
+  if (ctrl->cfg.vaq) {
+    vector2d_t lcu = {
+      pos.x + state->tile->lcu_offset_x,
+      pos.y + state->tile->lcu_offset_y
+    };
+    int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+    int aq_offset = (int)state->frame->aq_offsets[id]; // TODO: Number stored in aq_offsets may need rounding
+    state->qp = CLIP_TO_QP(state->frame->QP + aq_offset);
+    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda_sqrt = sqrt(state->lambda);
+    
+    
+  }
 }
