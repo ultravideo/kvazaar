@@ -1230,6 +1230,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Variance adaptive quantization
   if (cfg->vaq) {
+    const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
     double d = cfg->vaq * 0.1; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
@@ -1247,13 +1248,31 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         kvz_pixel tmp[LCU_LUMA_SIZE];
         int pxl_x = x * LCU_WIDTH;
         int pxl_y = y * LCU_WIDTH;
-        int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
-        int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
-        // blit pixel array
+        int x_max = MIN(pxl_x + LCU_WIDTH, frame->width) - pxl_x;
+        int y_max = MIN(pxl_y + LCU_WIDTH, frame->height) - pxl_y;
+        
+        // Luma variance
         kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
           x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
-        
+
         double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);
+
+        // UNCOMMENT AND CONTINUE HERE
+        /*
+        if (has_chroma) {
+          // Add chroma variance if not monochrome
+          int32_t c_stride = state->tile->frame->source->stride >> 1;
+          kvz_pixel c_tmp[LCU_CHROMA_SIZE];
+          int lcu_chroma_width = LCU_WIDTH / 2;
+          int c_pxl_x = x * lcu_chroma_width;
+          int c_pxl_y = y * lcu_chroma_width;
+          int c_x_max = 0;
+          int c_y_max = 0;
+
+          kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], c_tmp, c_x_max, c_y_max, c_stride, LCU_WIDTH >> 1);
+        }
+        */
+        
         state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
         id++; 
       }
