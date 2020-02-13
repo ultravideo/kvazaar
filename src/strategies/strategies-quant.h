@@ -37,7 +37,7 @@
 #define FAST_COEFF_QP_COUNT ((MAX_FAST_COEFF_COST_QP) - (MIN_FAST_COEFF_COST_QP) + (1))
 
 // Note: Assumes that costs are non-negative, for pretty obvious reasons
-#define TO_Q88(f) ((uint16_t)((f) * (256.0f)))
+#define TO_Q88(f) ((uint16_t)((f) * (256.0f) + (0.5f)))
 
 #define TO_4XQ88(f0,f1,f2,f3) ( \
                                 ((uint64_t)TO_Q88((f0)) <<  0) | \

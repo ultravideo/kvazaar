@@ -796,7 +796,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
 {
   assert(qp >= MIN_FAST_COEFF_COST_QP && qp <= MAX_FAST_COEFF_COST_QP);
 
-  const uint64_t *curr_wts = fast_coeff_cost_wts + qp;
+  const uint64_t *curr_wts = fast_coeff_cost_wts + qp - MIN_FAST_COEFF_COST_QP;
 
   const __m256i zero           = _mm256_setzero_si256();
   const __m256i threes         = _mm256_set1_epi16(3);

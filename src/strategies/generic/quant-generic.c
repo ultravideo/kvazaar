@@ -337,7 +337,7 @@ static uint32_t coeff_abs_sum_generic(const coeff_t *coeffs, size_t length)
 
 static INLINE void get_coeff_weights(int32_t qp, uint16_t *weights)
 {
-  uint64_t wts_packed = fast_coeff_cost_wts[qp];
+  uint64_t wts_packed = fast_coeff_cost_wts[qp - MIN_FAST_COEFF_COST_QP];
   weights[0] = (wts_packed >>  0) & 0xffff;
   weights[1] = (wts_packed >> 16) & 0xffff;
   weights[2] = (wts_packed >> 32) & 0xffff;
