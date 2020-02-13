@@ -209,14 +209,12 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
-  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit) {
-    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
-
-  } else {
-    // Estimate coeff coding cost based on QP and sum of absolute coeffs.
-    // const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
-    // return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
+  if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
+      state->qp >= MIN_FAST_COEFF_COST_QP &&
+      state->qp <= MAX_FAST_COEFF_COST_QP) {
     return kvz_fast_coeff_cost(coeff, width, state->qp);
+  } else {
+    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
   }
 }
 
