@@ -387,9 +387,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
     WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
   } else {
+    // Clip to non-negative values to prevent problems with GOP=0
     const int dpb = MIN(16, encoder->cfg.gop_len);
-    WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, encoder->cfg.gop_len - 1, "sps_max_num_reorder_pics");
+    WRITE_UE(stream, MAX(dpb - 1, 0), "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, MAX(encoder->cfg.gop_len - 1, 0), "sps_max_num_reorder_pics");
   }
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
