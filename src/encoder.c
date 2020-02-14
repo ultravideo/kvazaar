@@ -732,7 +732,8 @@ void kvz_encoder_control_input_init(encoder_control_t * const encoder,
  * \return 1 on success, 0 on failure.
  *
  * Selects appropriate weights for layers according to the target bpp.
- * Only GOP structures with exactly four layers are supported.
+ * Only GOP structures with exactly four layers are supported with the.
+ * exception of experimental GOP 16.
  */
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const encoder)
 {
@@ -807,8 +808,17 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
       break;
 
     default:
-      fprintf(stderr, "Unsupported number of GOP layers (%d)\n", num_layers);
-      return 0;
+      if (!encoder->cfg.gop_lowdelay && encoder->cfg.gop_len == 16) {
+        fprintf(stdout, 
+                "Rate control: Using experimental weights for GOP layers (%d)\n",
+                num_layers);
+        for (int i = 0; i < MAX_GOP_LAYERS; ++i) {
+          encoder->gop_layer_weights[i] = (i == 0) ? 10 : 2;
+        }
+      } else {
+        fprintf(stderr, "Unsupported number of GOP layers (%d)\n", num_layers);
+        return 0;
+      }
   }
 
   // Normalize weights so that the sum of weights in a GOP is one.
