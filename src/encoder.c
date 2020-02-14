@@ -241,6 +241,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
         kvz_config_process_lp_gop(&encoder->cfg);
       }
     }
+  } 
+  
+  // Disable GOP and QP offset for all-intra coding
+  if (encoder->cfg.intra_period == 1) {
+    encoder->cfg.gop_len = 0;
+    encoder->cfg.intra_qp_offset = 0;
   }
 
   encoder->poc_lsb_bits = MAX(4, kvz_math_ceil_log2(encoder->cfg.gop_len * 2 + 1));
