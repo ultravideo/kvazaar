@@ -173,7 +173,7 @@ static int8_t lambda_to_qp(const double lambda)
   return CLIP_TO_QP(qp);
 }
 
-static double qp_to_lamba(encoder_state_t * const state, int qp)
+static double qp_to_lambda(encoder_state_t * const state, int qp)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
   const int gop_len = ctrl->cfg.gop_len;
@@ -246,7 +246,7 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
       state->frame->QP = ctrl->cfg.qp;
     }
 
-    state->frame->lambda = qp_to_lamba(state, state->frame->QP);
+    state->frame->lambda = qp_to_lambda(state, state->frame->QP);
   }
 }
 
@@ -292,7 +292,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
     int dqp = ctrl->cfg.roi.dqps[roi_index];
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
-    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
 
   } else if (ctrl->cfg.target_bitrate > 0) {
