@@ -334,7 +334,11 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     };
     int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
     int aq_offset = (int)state->frame->aq_offsets[id]; // TODO: Number stored in aq_offsets may need rounding
-    state->qp = CLIP_TO_QP(state->qp + aq_offset);
+    state->qp += aq_offset;    
+    // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
+    state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+    state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
   }
