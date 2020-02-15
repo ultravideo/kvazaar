@@ -41,7 +41,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
-  cfg->intra_qp_offset = -3;
+  cfg->intra_qp_offset = 0;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
@@ -396,7 +396,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
-  static const char * const preset_values[11][25*2] = {
+  static const char * const preset_values[11][26*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -404,6 +404,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -432,6 +433,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -460,6 +462,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -488,6 +491,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -516,6 +520,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "2",
         "bipred", "0",
         "deblock", "0:0",
@@ -544,6 +549,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "0",
         "deblock", "0:0",
@@ -572,6 +578,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -600,6 +607,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -628,6 +636,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -656,6 +665,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -958,6 +968,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
     }
+  }
+  else if OPT("intra-qp-offset") {
+    cfg->intra_qp_offset = atoi(value);
   }
   else if OPT("open-gop") {
     cfg->open_gop = (bool)atobool(value);
@@ -1481,6 +1494,11 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->qp != CLIP_TO_QP(cfg->qp)) {
       fprintf(stderr, "Input error: --qp parameter out of range [0..51]\n");
       error = 1;
+  }
+
+  if (abs(cfg->intra_qp_offset) > 51) {
+    fprintf(stderr, "Input error: --intra-qp-offset out of range [-51..51]\n");
+    error = 1;
   }
 
   if (cfg->target_bitrate < 0) {

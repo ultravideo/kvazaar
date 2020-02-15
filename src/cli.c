@@ -141,6 +141,7 @@ static const struct option long_options[] = {
   { "partial-coding",     required_argument, NULL, 0 },
   { "zero-coeff-rdo",           no_argument, NULL, 0 },
   { "no-zero-coeff-rdo",        no_argument, NULL, 0 },
+  { "intra-qp-offset",    required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -405,6 +406,7 @@ void print_help(void)
     "                                   - 8: B-frame pyramid of length 8\n"
     "                                   - lp-<string>: Low-delay P-frame GOP\n"
     "                                     (e.g. lp-g8d4t2, see README)\n"
+    "      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [0]\n"
     "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
     "      --scaling-list <string>: Set scaling list mode. [off]\n"
