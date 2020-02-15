@@ -19,6 +19,7 @@
  ****************************************************************************/
 
 #include "cfg.h"
+#include "gop.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -40,6 +41,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
+  cfg->intra_qp_offset = 0;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
@@ -394,7 +396,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
-  static const char * const preset_values[11][25*2] = {
+  static const char * const preset_values[11][26*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -402,6 +404,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -430,6 +433,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -458,6 +462,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -486,6 +491,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -514,6 +520,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
+        "intra-qp-offset", "0",
         "ref", "2",
         "bipred", "0",
         "deblock", "0:0",
@@ -542,6 +549,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "0",
         "deblock", "0:0",
@@ -570,6 +578,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -598,6 +607,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -626,6 +636,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -654,6 +665,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "8",
+        "intra-qp-offset", "-2",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -938,39 +950,14 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_lp_definition.t = gop.t;
     } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
-      // GOP
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;
-      cfg->gop[0].ref_pos_count = 0;
-      cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16;
+      cfg->gop_len = sizeof(kvz_gop_ra8) / sizeof(kvz_gop_ra8[0]);
+      memcpy(cfg->gop, kvz_gop_ra8, sizeof(kvz_gop_ra8));
 
-      cfg->gop[1].poc_offset = 4; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.3536; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 4; cfg->gop[1].ref_neg[1] = 8;
-      cfg->gop[1].ref_pos_count = 1; cfg->gop[1].ref_pos[0] = 4;
+    } else if (atoi(value) == 16) {
+      cfg->gop_lowdelay = 0;
+      cfg->gop_len = sizeof(kvz_gop_ra16) / sizeof(kvz_gop_ra16[0]);
+      memcpy(cfg->gop, kvz_gop_ra16, sizeof(kvz_gop_ra16));
 
-      cfg->gop[2].poc_offset = 2; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.3536; cfg->gop[2].is_ref = 1;
-      cfg->gop[2].ref_neg_count = 2; cfg->gop[2].ref_neg[0] = 2; cfg->gop[2].ref_neg[1] = 6;
-      cfg->gop[2].ref_pos_count = 2; cfg->gop[2].ref_pos[0] = 2; cfg->gop[2].ref_pos[1] = 6;
-
-      cfg->gop[3].poc_offset = 1; cfg->gop[3].qp_offset = 4; cfg->gop[3].layer = 4; cfg->gop[3].qp_factor = 0.68;   cfg->gop[3].is_ref = 0;
-      cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 1;
-      cfg->gop[3].ref_pos_count = 3; cfg->gop[3].ref_pos[0] = 1; cfg->gop[3].ref_pos[1] = 3; cfg->gop[3].ref_pos[2] = 7;
-
-      cfg->gop[4].poc_offset = 3; cfg->gop[4].qp_offset = 4; cfg->gop[4].layer = 4; cfg->gop[4].qp_factor = 0.68;   cfg->gop[4].is_ref = 0;
-      cfg->gop[4].ref_neg_count = 2; cfg->gop[4].ref_neg[0] = 1; cfg->gop[4].ref_neg[1] = 3;
-      cfg->gop[4].ref_pos_count = 2; cfg->gop[4].ref_pos[0] = 1; cfg->gop[4].ref_pos[1] = 5;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 3; cfg->gop[5].layer = 3; cfg->gop[5].qp_factor = 0.3536; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 2; cfg->gop[5].ref_neg[0] = 2; cfg->gop[5].ref_neg[1] = 6;
-      cfg->gop[5].ref_pos_count = 1; cfg->gop[5].ref_pos[0] = 2;
-
-      cfg->gop[6].poc_offset = 5; cfg->gop[6].qp_offset = 4; cfg->gop[6].layer = 4; cfg->gop[6].qp_factor = 0.68;   cfg->gop[6].is_ref = 0;
-      cfg->gop[6].ref_neg_count = 2;  cfg->gop[6].ref_neg[0] = 1; cfg->gop[6].ref_neg[1] = 5;
-      cfg->gop[6].ref_pos_count = 2; cfg->gop[6].ref_pos[0] = 1; cfg->gop[6].ref_pos[1] = 3;
-
-      cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
-      cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
-      cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
     } else if (atoi(value) == 0) {
       //Disable gop
       cfg->gop_len = 0;
@@ -981,6 +968,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
     }
+  }
+  else if OPT("intra-qp-offset") {
+    cfg->intra_qp_offset = atoi(value);
   }
   else if OPT("open-gop") {
     cfg->open_gop = (bool)atobool(value);
@@ -1504,6 +1494,11 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->qp != CLIP_TO_QP(cfg->qp)) {
       fprintf(stderr, "Input error: --qp parameter out of range [0..51]\n");
       error = 1;
+  }
+
+  if (abs(cfg->intra_qp_offset) > 51) {
+    fprintf(stderr, "Input error: --intra-qp-offset out of range [-51..51]\n");
+    error = 1;
   }
 
   if (cfg->target_bitrate < 0) {
