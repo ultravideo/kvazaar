@@ -74,6 +74,7 @@ libkvazaar_la_SOURCES = \
 	filter.c \
 	filter.h \
 	global.h \
+	gop.h \
 	image.c \
 	image.h \
 	imagelist.c \
