@@ -115,11 +115,14 @@ How often the video parameter set is re\-sent [0]
 Number of reference frames, in range 1..15 [4]
 .TP
 \fB\-\-gop <string>        
-GOP structure [8]
-    \- 0: Disabled
-    \- 8: B\-frame pyramid of length 8
-    \- lp\-<string>: Low\-delay P\-frame GOP
+GOP structure [lp\-g4d3t1]
+    \-  0: Disabled
+    \-  8: B\-frame pyramid of length 8
+    \- 16: B\-frame pyramid of length 16
+    \- lp\-<string>: Low\-delay P/B\-frame GOP
       (e.g. lp\-g8d4t2, see README)
+.TP
+\fB\-\-intra\-qp\-offset <int>: QP offset for intra frames [\-51..51] [0]
 .TP
 \fB\-\-(no\-)open\-gop       
 Use open GOP configuration. [enabled]
