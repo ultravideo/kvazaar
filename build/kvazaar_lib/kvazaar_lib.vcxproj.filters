@@ -468,6 +468,9 @@
     <ClInclude Include="..\..\src\ml_intra_cu_depth_pred.h">
       <Filter>Constraint</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\gop.h">
+      <Filter>Control</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

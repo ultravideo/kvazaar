@@ -205,6 +205,7 @@
     <ClInclude Include="..\..\src\cu.h" />
     <ClInclude Include="..\..\src\extras\crypto.h" />
     <ClInclude Include="..\..\src\extras\libmd5.h" />
+    <ClInclude Include="..\..\src\gop.h" />
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />
     <ClCompile Include="..\..\src\strategies\altivec\picture-altivec.c" />
