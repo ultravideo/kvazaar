@@ -175,33 +175,15 @@ static int8_t lambda_to_qp(const double lambda)
 
 static double qp_to_lambda(encoder_state_t * const state, int qp)
 {
-  const encoder_control_t * const ctrl = state->encoder_control;
-  const int gop_len = ctrl->cfg.gop_len;
-  const int period = gop_len > 0 ? gop_len : ctrl->cfg.intra_period;
+  const int shift_qp = 12;
+  double lambda = 0.57 * pow(2.0, (qp - shift_qp) / 3.0);
 
-  kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
-
-  double lambda = pow(2.0, (qp - 12) / 3.0);
-
-  if (state->frame->slicetype == KVZ_SLICE_I) {
-    lambda *= 0.57;
-
-    // Reduce lambda for I-frames according to the number of references.
-    if (period == 0) {
-      lambda *= 0.5;
-    } else {
-      lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (period - 1));
-    }
-  } else if (gop_len > 0) {
-    lambda *= gop->qp_factor;
-  } else {
-    lambda *= 0.4624;
-  }
-
-  // Increase lambda if not key-frame.
-  if (period > 0 && state->frame->poc % period != 0) {
-    lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
-  }
+  // NOTE: HM adjusts lambda for inter according to Hadamard usage in ME.
+  //       SATD is currently always enabled for ME, so this has no effect.
+  // bool hadamard_me = true;
+  // if (!hadamard_me && state->frame->slicetype != KVZ_SLICE_I) {
+  //   lambda *= 0.95;
+  // }
 
   return lambda;
 }
