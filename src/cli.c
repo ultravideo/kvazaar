@@ -462,7 +462,7 @@ void print_help(void)
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
     "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
-    "                               residual is improves the RD cost. [enabled]\n"
+    "                               residual improves the RD cost. [enabled]\n"
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
