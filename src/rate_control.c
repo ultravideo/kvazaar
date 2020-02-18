@@ -316,10 +316,6 @@ static double pic_allocate_bits(encoder_state_t * const state)
       state->previous_encoder_state->frame->cur_gop_target_bits;
   }
 
-  if (encoder->cfg.gop_len <= 0) {
-    return state->frame->cur_gop_target_bits;
-  }
-
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
     int total_cost = 0;
     for (int y = 0; y < encoder->cfg.height; y += 8) {
@@ -341,6 +337,10 @@ static double pic_allocate_bits(encoder_state_t * const state)
       alpha = 0.3;
     }
     return MAX(100, alpha*pow(state->frame->icost * 4 / bits, beta)*bits);
+  }
+
+  if (encoder->cfg.gop_len <= 0) {
+    return state->frame->cur_gop_target_bits;
   }
 
   const double pic_weight = encoder->gop_layer_weights[
