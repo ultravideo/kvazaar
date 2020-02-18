@@ -922,35 +922,17 @@ void kvz_update_after_picture(encoder_state_t * const state) {
 }
 
 
-static double qp_to_lamba(encoder_state_t * const state, int qp)
+static double qp_to_lambda(encoder_state_t * const state, int qp)
 {
-  const encoder_control_t * const ctrl = state->encoder_control;
-  const int gop_len = ctrl->cfg.gop_len;
-  const int period = gop_len > 0 ? gop_len : ctrl->cfg.intra_period;
+  const int shift_qp = 12;
+  double lambda = 0.57 * pow(2.0, (qp - shift_qp) / 3.0);
 
-  kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
-
-  double lambda = pow(2.0, (qp - 12) / 3.0);
-
-  if (state->frame->slicetype == KVZ_SLICE_I) {
-    lambda *= 0.57;
-
-    // Reduce lambda for I-frames according to the number of references.
-    if (period == 0) {
-      lambda *= 0.5;
-    } else {
-      lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (period - 1));
-    }
-  } else if (gop_len > 0) {
-    lambda *= gop->qp_factor;
-  } else {
-    lambda *= 0.4624;
-  }
-
-  // Increase lambda if not key-frame.
-  if (period > 0 && state->frame->poc % period != 0) {
-    lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
-  }
+  // NOTE: HM adjusts lambda for inter according to Hadamard usage in ME.
+  //       SATD is currently always enabled for ME, so this has no effect.
+  // bool hadamard_me = true;
+  // if (!hadamard_me && state->frame->slicetype != KVZ_SLICE_I) {
+  //   lambda *= 0.95;
+  // }
 
   return lambda;
 }
@@ -990,12 +972,17 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     const int gop_len = ctrl->cfg.gop_len;
 
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + gop->qp_offset);
-    } else {
-      state->frame->QP = ctrl->cfg.qp;
+      double qp = ctrl->cfg.qp;
+      qp += gop->qp_offset;
+      qp += CLIP(0.0, 3.0, qp * gop->qp_model_scale + gop->qp_model_offset);
+      state->frame->QP = CLIP_TO_QP((int)(qp + 0.5));
+
+    }
+    else {
+      state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + ctrl->cfg.intra_qp_offset);
     }
 
-    state->frame->lambda = qp_to_lamba(state, state->frame->QP);
+    state->frame->lambda = qp_to_lambda(state, state->frame->QP);
   }
 }
 
@@ -1041,7 +1028,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
     int dqp = ctrl->cfg.roi.dqps[roi_index];
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
-    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
 
   }

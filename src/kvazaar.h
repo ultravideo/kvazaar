@@ -240,6 +240,8 @@ typedef struct kvz_gop_config {
   int8_t ref_pos[16];  /*!< \brief reference picture offset list */
   int8_t ref_neg_count;/*!< \brief Reference picture count */
   int8_t ref_neg[16];  /*!< \brief reference picture offset list */
+  double qp_model_offset;
+  double qp_model_scale;
 } kvz_gop_config;
 
 /**
@@ -382,6 +384,9 @@ typedef struct kvz_config
 
   /** \brief Maximum steps that hexagonal and diagonal motion estimation can use. -1 to disable */
   uint32_t me_max_steps;
+
+  /** \brief Offset to add to QP for intra frames */
+  int8_t intra_qp_offset;
 
   /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
   int8_t fast_residual_cost_limit;

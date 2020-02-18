@@ -1139,11 +1139,13 @@ static void search_frac(inter_search_info_t *info)
 /**
  * \brief Perform inter search for a single reference frame.
  */
-static bool search_pu_inter_ref(inter_search_info_t *info,
+static void search_pu_inter_ref(inter_search_info_t *info,
                                 int depth,
                                 lcu_t *lcu, cu_info_t *cur_cu,
                                 double *inter_cost,
-                                uint32_t *inter_bitcost)
+                                uint32_t *inter_bitcost,
+                                double *best_LX_cost,
+                                cu_info_t *unipred_LX)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
 
@@ -1302,9 +1304,24 @@ static bool search_pu_inter_ref(inter_search_info_t *info,
 
     *inter_cost = info->best_cost;
     *inter_bitcost = info->best_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
-    return true; // Valid mv was found
   }
-  return false; // No valid prediction
+
+
+  // Update best unipreds for biprediction
+  if (info->best_cost < best_LX_cost[ref_list]) {
+    bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
+    if (valid_mv) {
+      // Map reference index to L0/L1 pictures
+      unipred_LX[ref_list].inter.mv_dir = ref_list + 1;
+      unipred_LX[ref_list].inter.mv_ref[ref_list] = LX_idx;
+      unipred_LX[ref_list].inter.mv[ref_list][0] = (int16_t)mv.x;
+      unipred_LX[ref_list].inter.mv[ref_list][1] = (int16_t)mv.y;
+
+      CU_SET_MV_CAND(&unipred_LX[ref_list], ref_list, cu_mv_cand);
+
+      best_LX_cost[ref_list] = info->best_cost;
+    }
+  }
 }
 
 
@@ -1643,30 +1660,15 @@ static void search_pu_inter(encoder_state_t * const state,
   // AMVP search starts here
 
   // Store unipred information of L0 and L1 for biprediction
-  // Initialize dir to zero. If valid mv is found, dir is set.
+  // Best cost will be left at MAX_DOUBLE if no valid CU is found
+  double best_cost_LX[2] = { MAX_DOUBLE, MAX_DOUBLE };
   cu_info_t unipreds[2];
-  unipreds[0].inter.mv_dir = 0;
-  unipreds[1].inter.mv_dir = 0;
 
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
-    bool update = search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost);
-    if (update) {
-      // TODO: make this process more intelligent.
-      // Now finding the vectors is pretty much based on luck.
-      uint8_t ref_list = cur_cu->inter.mv_dir - 1;
-      unipreds[ref_list].inter.mv_dir = cur_cu->inter.mv_dir;
-      unipreds[ref_list].inter.mv[0][0] = cur_cu->inter.mv[0][0];
-      unipreds[ref_list].inter.mv[0][1] = cur_cu->inter.mv[0][1];
-      unipreds[ref_list].inter.mv[1][0] = cur_cu->inter.mv[1][0];
-      unipreds[ref_list].inter.mv[1][1] = cur_cu->inter.mv[1][1];
-      unipreds[ref_list].inter.mv_ref[0] = cur_cu->inter.mv_ref[0];
-      unipreds[ref_list].inter.mv_ref[1] = cur_cu->inter.mv_ref[1];
-      unipreds[ref_list].inter.mv_cand0 = cur_cu->inter.mv_cand0;
-      unipreds[ref_list].inter.mv_cand1 = cur_cu->inter.mv_cand1;
-    }
+    search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost, best_cost_LX, unipreds);
   }
 
   // Search bi-pred positions
@@ -1676,8 +1678,8 @@ static void search_pu_inter(encoder_state_t * const state,
 
   if (can_use_bipred) {
 
-    // Try biprediction from acquired unipreds. If mv_dir is set, mv is valid.
-    if (unipreds[0].inter.mv_dir == 1 && unipreds[1].inter.mv_dir == 2) {
+    // Try biprediction from valid acquired unipreds.
+    if (best_cost_LX[0] != MAX_DOUBLE && best_cost_LX[1] != MAX_DOUBLE) {
 
       // TODO: logic is copy paste from search_pu_inter_bipred.
       // Get rid of duplicate code asap.
@@ -1718,8 +1720,8 @@ static void search_pu_inter(encoder_state_t * const state,
         NULL, 0, 0,
         &bitcost[0]);
       cost += info.mvd_cost_func(info.state,
-        unipreds[0].inter.mv[1][0],
-        unipreds[0].inter.mv[1][1],
+        unipreds[1].inter.mv[1][0],
+        unipreds[1].inter.mv[1][1],
         0,
         info.mv_cand,
         NULL, 0, 0,

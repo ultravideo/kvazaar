@@ -113,11 +113,13 @@ Video structure:
                                    - 0: Only send VPS with the first frame.
                                    - N: Send VPS with every Nth intra frame.
   -r, --ref <integer>        : Number of reference frames, in range 1..15 [4]
-      --gop <string>         : GOP structure [8]
-                                   - 0: Disabled
-                                   - 8: B-frame pyramid of length 8
-                                   - lp-<string>: Low-delay P-frame GOP
+      --gop <string>         : GOP structure [lp-g4d3t1]
+                                   -  0: Disabled
+                                   -  8: B-frame pyramid of length 8
+                                   - 16: B-frame pyramid of length 16
+                                   - lp-<string>: Low-delay P/B-frame GOP
                                      (e.g. lp-g8d4t2, see README)
+      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [0]
       --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
       --scaling-list <string>: Set scaling list mode. [off]
@@ -316,6 +318,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | pu-depth-inter       | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    |
 | gop                  | g4d4t1| g4d4t1| g4d4t1| g4d4t1| g4d4t1| 8     | 8     | 8     | 8     | 8     |
+| intra-qp-offset      | 0     | 0     | 0     | 0     | 0     | -2    | -2    | -2    | -2    | -2    |
 | ref                  | 1     | 1     | 1     | 1     | 2     | 4     | 4     | 4     | 4     | 4     |
 | bipred               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     |
 | deblock              | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |

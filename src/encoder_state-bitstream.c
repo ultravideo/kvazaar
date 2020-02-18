@@ -378,18 +378,22 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
-  WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_UE(stream, encoder->poc_lsb_bits - 4, "log2_max_pic_order_cnt_lsb_minus4");
+
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
   if (encoder->cfg.gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, 0, "sps_num_reorder_pics");
+    const int dpb = encoder->cfg.ref_frames;
+    WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
   } else {
-    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    // Clip to non-negative values to prevent problems with GOP=0
+    const int dpb = MIN(16, encoder->cfg.gop_len);
+    WRITE_UE(stream, MAX(dpb - 1, 0), "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, MAX(encoder->cfg.gop_len - 1, 0), "sps_max_num_reorder_pics");
   }
-  WRITE_UE(stream, 0, "sps_max_latency_increase");
+  WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
   WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
@@ -716,16 +720,18 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
       && state->frame->pictype != KVZ_NAL_IDR_N_LP)
   {
+    const int poc_lsb = state->frame->poc & ((1 << encoder->poc_lsb_bits) - 1);
+    WRITE_U(stream, poc_lsb, encoder->poc_lsb_bits, "pic_order_cnt_lsb");
+
     int last_poc = 0;
     int poc_shift = 0;
 
-      WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
-      WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
-      WRITE_UE(stream, ref_negative, "num_negative_pics");
-      WRITE_UE(stream, ref_positive, "num_positive_pics");
-    for (j = 0; j < ref_negative; j++) {      
+    WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
+    WRITE_UE(stream, ref_negative, "num_negative_pics");
+    WRITE_UE(stream, ref_positive, "num_positive_pics");
+    for (j = 0; j < ref_negative; j++) {
       int8_t delta_poc = 0;
-      
+
       if (encoder->cfg.gop_len) {
         int8_t found = 0;
         do {

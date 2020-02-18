@@ -141,6 +141,7 @@ static const struct option long_options[] = {
   { "partial-coding",     required_argument, NULL, 0 },
   { "zero-coeff-rdo",           no_argument, NULL, 0 },
   { "no-zero-coeff-rdo",        no_argument, NULL, 0 },
+  { "intra-qp-offset",    required_argument, NULL, 0 },
   { "rc-algorithm",       required_argument, NULL, 0 },
   { "intra-bits",               no_argument, NULL, 0 },
   { "no-intra-bits",            no_argument, NULL, 0 },
@@ -405,11 +406,13 @@ void print_help(void)
     "                                   - 0: Only send VPS with the first frame.\n"
     "                                   - N: Send VPS with every Nth intra frame.\n"
     "  -r, --ref <integer>        : Number of reference frames, in range 1..15 [4]\n"
-    "      --gop <string>         : GOP structure [8]\n"
-    "                                   - 0: Disabled\n"
-    "                                   - 8: B-frame pyramid of length 8\n"
-    "                                   - lp-<string>: Low-delay P-frame GOP\n"
+    "      --gop <string>         : GOP structure [lp-g4d3t1]\n"
+    "                                   -  0: Disabled\n"
+    "                                   -  8: B-frame pyramid of length 8\n"
+    "                                   - 16: B-frame pyramid of length 16\n"
+    "                                   - lp-<string>: Low-delay P/B-frame GOP\n"
     "                                     (e.g. lp-g8d4t2, see README)\n"
+    "      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [0]\n"
     "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
     "      --scaling-list <string>: Set scaling list mode. [off]\n"
@@ -473,7 +476,7 @@ void print_help(void)
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
     "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
-    "                               residual is improves the RD cost. [enabled]\n"
+    "                               residual improves the RD cost. [enabled]\n"
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"

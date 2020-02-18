@@ -133,6 +133,8 @@ typedef struct encoder_control_t
     int down;
   } max_inter_ref_lcu;
 
+  int32_t poc_lsb_bits;
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);
