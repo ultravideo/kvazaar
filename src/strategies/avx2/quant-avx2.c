@@ -850,7 +850,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   __m256i sum4   = _mm256_add_epi64        (sum2, sum3);
 
   __m128i sum128 = _mm256_castsi256_si128  (sum4);
-  return _mm_cvtsi128_si32(sum128) >> 8;
+  return (_mm_cvtsi128_si32(sum128) + (1 << 7)) >> 8;
 }
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

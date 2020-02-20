@@ -47,7 +47,7 @@
                               )
 
 // Weights for 4 buckets (coeff 0, coeff 1, coeff 2, coeff >= 3), for QPs from
-// 0 to 50 with ultrafast encoding
+// MIN_FAST_COEFF_COST_QP to MAX_FAST_COEFF_COST_QP with ultrafast encoding
 static const uint64_t fast_coeff_cost_wts[FAST_COEFF_QP_COUNT] = {
   TO_4XQ88(0.134012, 4.207784, 3.431633, 6.556149),
   TO_4XQ88(0.122972, 4.278606, 3.398710, 6.527168),

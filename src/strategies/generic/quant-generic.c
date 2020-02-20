@@ -359,7 +359,7 @@ static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int
     }
     sum += weights[curr_abs];
   }
-  return sum >> 8;
+  return (sum + (1 << 7)) >> 8;
 }
 
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)
