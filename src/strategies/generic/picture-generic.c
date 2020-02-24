@@ -675,6 +675,32 @@ static uint32_t hor_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_
   return result;
 }
 
+// Calculate pixel value variance. Takes in arrays of kvz_pixel
+static double pixel_var_generic(const kvz_pixel *arr, const uint32_t len)
+{
+  double var = 0;
+  double arr_mean = 0;
+
+  // Calculate array mean
+  int i = 0;
+  double sum = 0;
+
+  for (; i < len; ++i) {
+    sum += arr[i];
+  }
+  arr_mean = sum / (double)len;
+
+  // Calculate array variance
+  for (i = 0; i < len; ++i) {
+    double tmp = (double)arr[i] - arr_mean;
+    var += tmp*tmp;
+  }
+
+  var /= len;
+
+  return var;
+}
+
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -713,6 +739,8 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
   success &= kvz_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);
   success &= kvz_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
+
+  success &= kvz_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
 
   return success;
 }

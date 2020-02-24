@@ -37,6 +37,8 @@
 #include "tables.h"
 #include "threadqueue.h"
 
+#include "strategies/strategies-picture.h"
+
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -1190,31 +1192,6 @@ static void normalize_lcu_weights(encoder_state_t * const state)
   }
 }
 
-// Calculate pixel value variance. Takes in arrays of kvz_pixel
-static double pixel_var(kvz_pixel * const arr, const uint32_t len) {
-  double var = 0;
-  double arr_mean = 0;
-
-  // Calculate array mean
-  int i = 0;
-  double sum = 0;
-
-  for (; i < len; ++i) {
-    sum += arr[i];
-  }
-  arr_mean = sum / (double)len;
-
-  // Calculate array variance  
-  for (i = 0; i < len; ++i) {
-    double tmp = (double)arr[i] - arr_mean;
-    var += tmp*tmp;
-  }
-
-  var /= len;
-
-  return var;
-}
-
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1235,7 +1212,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
-    double frame_var = pixel_var(state->tile->frame->source->y, len);
+    double frame_var = kvz_pixel_var(state->tile->frame->source->y, len);
 
     // Loop through LCUs
     // For each LCU calculate: D * (log(LCU pixel variance) - log(frame pixel variance))
@@ -1255,7 +1232,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
           x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
 
-        double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);
+        double lcu_var = kvz_pixel_var(tmp, LCU_LUMA_SIZE);
 
         // UNCOMMENT AND CONTINUE HERE
         /*
