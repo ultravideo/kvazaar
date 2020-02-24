@@ -1257,22 +1257,23 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
         double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);
 
-        // UNCOMMENT AND CONTINUE HERE
-        /*
         if (has_chroma) {
           // Add chroma variance if not monochrome
           int32_t c_stride = state->tile->frame->source->stride >> 1;
-          kvz_pixel c_tmp[LCU_CHROMA_SIZE];
-          int lcu_chroma_width = LCU_WIDTH / 2;
+          kvz_pixel chromau_tmp[LCU_CHROMA_SIZE];
+          kvz_pixel chromav_tmp[LCU_CHROMA_SIZE];
+          int lcu_chroma_width = LCU_WIDTH >> 1;
           int c_pxl_x = x * lcu_chroma_width;
           int c_pxl_y = y * lcu_chroma_width;
-          int c_x_max = 0;
-          int c_y_max = 0;
+          int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width >> 1) - c_pxl_x;
+          int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height >> 1) - c_pxl_y;
 
-          kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], c_tmp, c_x_max, c_y_max, c_stride, LCU_WIDTH >> 1);
+          kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+          kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+          lcu_var += pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
+          lcu_var += pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
         }
-        */
-        
+                
         state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
         id++; 
       }
