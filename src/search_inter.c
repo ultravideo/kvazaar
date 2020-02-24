@@ -1606,6 +1606,9 @@ static void search_pu_inter(encoder_state_t * const state,
     mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
       lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
+    
+    // Add cost of coding the merge index
+    mrg_costs[num_rdo_cands] += merge_idx * info.state->lambda_sqrt;
 
     mrg_cands[num_rdo_cands] = merge_idx;
     num_rdo_cands++;
@@ -1650,7 +1653,7 @@ static void search_pu_inter(encoder_state_t * const state,
           cur_cu->merge_idx = merge_idx;
           cur_cu->skipped = true;
           *inter_cost = 0.0;  // TODO: Check this
-          *inter_bitcost = 0; // TODO: Check this
+          *inter_bitcost = merge_idx; // TODO: Check this
           return;
         }
       }
