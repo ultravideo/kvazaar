@@ -339,7 +339,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
     state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
-    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
   }
 }
