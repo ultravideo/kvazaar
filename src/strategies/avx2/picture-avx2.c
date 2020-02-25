@@ -1069,6 +1069,82 @@ static uint32_t hor_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
                                    pic_stride, ref_stride, left, right);
 }
 
+static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
+{
+  const float len_f  = (float)len;
+  const __m256i zero = _mm256_setzero_si256();
+
+  size_t i;
+  __m256i sums = zero;
+  for (i = 0; i < len; i += 32) {
+    __m256i curr = _mm256_loadu_si256((const __m256i *)(buf + i));
+    __m256i curr_sum = _mm256_sad_epu8(curr, zero);
+            sums = _mm256_add_epi64(sums, curr_sum);
+  }
+  __m128i sum_lo = _mm256_castsi256_si128  (sums);
+  __m128i sum_hi = _mm256_extracti128_si256(sums,   1);
+  __m128i sum_3  = _mm_add_epi64           (sum_lo, sum_hi);
+  __m128i sum_4  = _mm_shuffle_epi32       (sum_3,  _MM_SHUFFLE(1, 0, 3, 2));
+  __m128i sum_5  = _mm_add_epi64           (sum_3,  sum_4);
+
+  int64_t sum    = _mm_cvtsi128_si64(sum_5);
+  float   mean_f = (float)sum / len_f;
+  __m256  mean   = _mm256_set1_ps(mean_f);
+  __m256  accum  = _mm256_setzero_ps();
+
+  for (i = 0; i < len; i += 32) {
+    __m128i curr0    = _mm_loadl_epi64((const __m128i *)(buf + i +  0));
+    __m128i curr1    = _mm_loadl_epi64((const __m128i *)(buf + i +  8));
+    __m128i curr2    = _mm_loadl_epi64((const __m128i *)(buf + i + 16));
+    __m128i curr3    = _mm_loadl_epi64((const __m128i *)(buf + i + 24));
+
+    __m256i curr0_32 = _mm256_cvtepu8_epi32(curr0);
+    __m256i curr1_32 = _mm256_cvtepu8_epi32(curr1);
+    __m256i curr2_32 = _mm256_cvtepu8_epi32(curr2);
+    __m256i curr3_32 = _mm256_cvtepu8_epi32(curr3);
+
+    __m256  curr0_f  = _mm256_cvtepi32_ps  (curr0_32);
+    __m256  curr1_f  = _mm256_cvtepi32_ps  (curr1_32);
+    __m256  curr2_f  = _mm256_cvtepi32_ps  (curr2_32);
+    __m256  curr3_f  = _mm256_cvtepi32_ps  (curr3_32);
+
+    __m256  curr0_sd = _mm256_sub_ps       (curr0_f,  mean);
+    __m256  curr1_sd = _mm256_sub_ps       (curr1_f,  mean);
+    __m256  curr2_sd = _mm256_sub_ps       (curr2_f,  mean);
+    __m256  curr3_sd = _mm256_sub_ps       (curr3_f,  mean);
+
+    __m256  curr0_v  = _mm256_mul_ps       (curr0_sd, curr0_sd);
+    __m256  curr1_v  = _mm256_mul_ps       (curr1_sd, curr1_sd);
+    __m256  curr2_v  = _mm256_mul_ps       (curr2_sd, curr2_sd);
+    __m256  curr3_v  = _mm256_mul_ps       (curr3_sd, curr3_sd);
+
+    __m256  curr01   = _mm256_add_ps       (curr0_v,  curr1_v);
+    __m256  curr23   = _mm256_add_ps       (curr2_v,  curr3_v);
+    __m256  curr     = _mm256_add_ps       (curr01,   curr23);
+            accum    = _mm256_add_ps       (accum,    curr);
+  }
+  __m256d accum_d  = _mm256_castps_pd     (accum);
+  __m256d accum2_d = _mm256_permute4x64_pd(accum_d, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256  accum2   = _mm256_castpd_ps     (accum2_d);
+
+  __m256  accum3   = _mm256_add_ps        (accum,  accum2);
+  __m256  accum4   = _mm256_permute_ps    (accum3, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256  accum5   = _mm256_add_ps        (accum3, accum4);
+  __m256  accum6   = _mm256_permute_ps    (accum5, _MM_SHUFFLE(2, 3, 0, 1));
+  __m256  accum7   = _mm256_add_ps        (accum5, accum6);
+
+  float   var_sum  = _mm256_cvtss_f32     (accum7);
+  return  var_sum / len_f;
+}
+
+static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
+{
+  assert(sizeof(*buf) == 1);
+  assert((len & 31) == 0);
+
+  return pixel_var_avx2_largebuf(buf, len);
+}
+
 #endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
@@ -1106,6 +1182,8 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
     success &= kvz_strategyselector_register(opaque, "ver_sad", "avx2", 40, &ver_sad_avx2);
     success &= kvz_strategyselector_register(opaque, "hor_sad", "avx2", 40, &hor_sad_avx2);
+
+    success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
 
   }
 #endif
