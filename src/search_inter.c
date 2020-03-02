@@ -1242,14 +1242,30 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       mv.x = ref_cu->inter.mv[1][0];
       mv.y = ref_cu->inter.mv[1][1];
     }
-    if (true) {
+    if (info->state->frame->ref_LX_size[ref_list] > 0) {
+      int col_list = ref_list;
+      for (int i = 0; i < info->state->frame->ref->used_size; i++) {
+        if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
+          col_list = 1;
+          break;
+        }
+      }
+
+      if ((ref_cu->inter.mv_dir & (col_list + 1)) == 0) {
+        // Use the other list if the colocated PU does not have a MV for the
+        // primary list.
+        col_list = 1 - col_list;
+      }
+
       apply_mv_scaling(
         info->state->frame->poc,
         info->state->frame->ref->pocs[temp_ref_idx],
         info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
         info->state->frame->ref->images[info->state->frame->ref_LX[ref_list][LX_idx]]->ref_pocs[
           info->state->frame->ref->ref_LXs[info->state->frame->ref_LX[ref_list][LX_idx]]
-            [ref_list][ref_cu->inter.mv_ref[ref_list]]],
+          [col_list]
+          [ref_cu->inter.mv_ref[col_list]]
+        ],
         &mv
       );
     }
