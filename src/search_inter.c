@@ -1136,16 +1136,45 @@ static void search_frac(inter_search_info_t *info)
 }
 
 
+static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+{
+  int32_t scaled = scale * mv;
+  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+}
+
+static void apply_mv_scaling(int32_t current_poc,
+  int32_t current_ref_poc,
+  int32_t neighbor_poc,
+  int32_t neighbor_ref_poc,
+  vector2d_t* mv_cand)
+{
+  int32_t diff_current = current_poc - current_ref_poc;
+  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
+
+  if (diff_current == diff_neighbor) return;
+  if (diff_neighbor == 0) return;
+
+  diff_current = CLIP(-128, 127, diff_current);
+  diff_neighbor = CLIP(-128, 127, diff_neighbor);
+
+  int scale = CLIP(-4096, 4095,
+    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
+
+  mv_cand->x = get_scaled_mv(mv_cand->x, scale);
+  mv_cand->y = get_scaled_mv(mv_cand->y, scale);
+}
+
+
 /**
  * \brief Perform inter search for a single reference frame.
  */
 static void search_pu_inter_ref(inter_search_info_t *info,
-                                int depth,
-                                lcu_t *lcu, cu_info_t *cur_cu,
-                                double *inter_cost,
-                                uint32_t *inter_bitcost,
-                                double *best_LX_cost,
-                                cu_info_t *unipred_LX)
+  int depth,
+  lcu_t *lcu, cu_info_t *cur_cu,
+  double *inter_cost,
+  uint32_t *inter_bitcost,
+  double *best_LX_cost,
+  cu_info_t *unipred_LX)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
 
@@ -1155,20 +1184,20 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   int8_t LX_idx;
   // max value of LX_idx plus one
   const int8_t LX_IDX_MAX_PLUS_1 = MAX(info->state->frame->ref_LX_size[0],
-                                       info->state->frame->ref_LX_size[1]);
+    info->state->frame->ref_LX_size[1]);
 
   for (LX_idx = 0; LX_idx < LX_IDX_MAX_PLUS_1; LX_idx++)
   {
     // check if ref_idx is in L0
     if (LX_idx < info->state->frame->ref_LX_size[0] &&
-        info->state->frame->ref_LX[0][LX_idx] == info->ref_idx) {
+      info->state->frame->ref_LX[0][LX_idx] == info->ref_idx) {
       ref_list = 0;
       break;
     }
 
     // check if ref_idx is in L1
     if (LX_idx < info->state->frame->ref_LX_size[1] &&
-        info->state->frame->ref_LX[1][LX_idx] == info->ref_idx) {
+      info->state->frame->ref_LX[1][LX_idx] == info->ref_idx) {
       ref_list = 1;
       break;
     }
@@ -1196,22 +1225,33 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
   vector2d_t mv = { 0, 0 };
-  {
-    // Take starting point for MV search from previous frame.
-    // When temporal motion vector candidates are added, there is probably
-    // no point to this anymore, but for now it helps.
-    const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
-    const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
-    const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
-    const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
-    if (ref_cu->type == CU_INTER) {
-      if (ref_cu->inter.mv_dir & 1) {
-        mv.x = ref_cu->inter.mv[0][0];
-        mv.y = ref_cu->inter.mv[0][1];
-      } else {
-        mv.x = ref_cu->inter.mv[1][0];
-        mv.y = ref_cu->inter.mv[1][1];
-      }
+
+  // Take starting point for MV search from previous frame.
+  // When temporal motion vector candidates are added, there is probably
+  // no point to this anymore, but for now it helps.
+  const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
+  const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
+  const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
+  const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
+  if (ref_cu->type == CU_INTER) {
+    if (ref_cu->inter.mv_dir & 1) {
+      mv.x = ref_cu->inter.mv[0][0];
+      mv.y = ref_cu->inter.mv[0][1];
+    }
+    else {
+      mv.x = ref_cu->inter.mv[1][0];
+      mv.y = ref_cu->inter.mv[1][1];
+    }
+    if (true) {
+      apply_mv_scaling(
+        info->state->frame->poc,
+        info->state->frame->ref->pocs[temp_ref_idx],
+        info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
+        info->state->frame->ref->images[info->state->frame->ref_LX[ref_list][LX_idx]]->ref_pocs[
+          info->state->frame->ref->ref_LXs[info->state->frame->ref_LX[ref_list][LX_idx]]
+            [ref_list][ref_cu->inter.mv_ref[ref_list]]],
+        &mv
+      );
     }
   }
 
