@@ -1137,6 +1137,8 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   return  var_sum / len_f;
 }
 
+#ifdef INACCURATE_VARIANCE_CALCULATION
+
 // Assumes that u is a power of two
 static INLINE uint32_t ilog2(uint32_t u)
 {
@@ -1219,6 +1221,15 @@ static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
 
   return (float)vars * varsum_to_f;
 }
+
+#else // INACCURATE_VARIANCE_CALCULATION
+
+static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
+{
+  return pixel_var_avx2_largebuf(buf, len);
+}
+
+#endif // !INACCURATE_VARIANCE_CALCULATION
 
 #endif //COMPILE_INTEL_AVX2
 
