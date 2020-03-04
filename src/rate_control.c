@@ -775,10 +775,9 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
       log(bpp / state->frame->new_ratecontrol->intra_pic_bpp);
     new_c = distortion / pow(bpp, new_k);
   }
-  if (new_k >= 0) {
-    new_k = -bpp * lambda / distortion;
-    new_c = distortion / pow(bpp, new_k);
-  }
+  new_k = -bpp * lambda / distortion;
+  new_c = distortion / pow(bpp, new_k);
+
   new_c = CLIP(+.1, 100.0, new_c);
   new_k = CLIP(-3.0, -0.001, new_k);
 
@@ -804,22 +803,11 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
   double new_k = 0, new_c = -1;
   if (!state->frame->lcu_stats[ctu_index].skipped) {
     distortion = MAX(distortion, 0.0001);
-    if (state->frame->num == 1) {
-      if (bpp < 0.001) {
-        new_k = state->frame->new_ratecontrol->pic_k_para[layer];
-        new_c = state->frame->new_ratecontrol->intra_dis[ctu_index] / pow(state->frame->new_ratecontrol->intra_bpp[ctu_index], new_k);
-      }
-      else {        
-        new_k = log(distortion / state->frame->new_ratecontrol->intra_pic_distortion) /
-          log(bpp / state->frame->new_ratecontrol->intra_pic_bpp);
-        new_c = distortion / pow(bpp, new_k);
-      }
-    }
-    if(new_k >= 0) {
-      bpp = CLIP(0.0001, 10.0, bpp);
-      new_k = -bpp * lambda / distortion;
-      new_c = distortion / pow(bpp, new_k);
-    }
+
+    bpp = CLIP(0.0001, 10.0, bpp);
+    new_k = -bpp * lambda / distortion;
+    new_c = distortion / pow(bpp, new_k);
+    
     new_c = CLIP(+.1, 100.0, new_c);
     new_k = CLIP(-3.0, -0.001, new_k);
 
