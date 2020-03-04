@@ -769,13 +769,13 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
 
 
 static void update_pic_ck(encoder_state_t * const state, double bpp, double distortion, double lambda, int layer) {
-  double new_k, new_c;
+  double new_k = 0, new_c;
   if(state->frame->num == 1) {
     new_k = log(distortion / state->frame->new_ratecontrol->intra_pic_distortion) /
       log(bpp / state->frame->new_ratecontrol->intra_pic_bpp);
     new_c = distortion / pow(bpp, new_k);
   }
-  else {
+  if (new_k >= 0) {
     new_k = -bpp * lambda / distortion;
     new_c = distortion / pow(bpp, new_k);
   }
@@ -801,7 +801,7 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
   double distortion = state->frame->lcu_stats[ctu_index].distortion;
   double lambda = state->frame->lcu_stats[ctu_index].lambda;
 
-  double new_k = -1, new_c = -1;
+  double new_k = 0, new_c = -1;
   if (!state->frame->lcu_stats[ctu_index].skipped) {
     distortion = MAX(distortion, 0.0001);
     if (state->frame->num == 1) {
@@ -815,7 +815,7 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
         new_c = distortion / pow(bpp, new_k);
       }
     }
-    else {
+    if(new_k >= 0) {
       bpp = CLIP(0.0001, 10.0, bpp);
       new_k = -bpp * lambda / distortion;
       new_c = distortion / pow(bpp, new_k);
