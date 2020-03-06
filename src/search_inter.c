@@ -1135,13 +1135,23 @@ static void search_frac(inter_search_info_t *info)
   if (src.malloc_used) free(src.buffer);
 }
 
-
+/**
+* \brief Calculate the scaled MV
+*/
 static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
 {
   int32_t scaled = scale * mv;
   return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
 }
-
+/**
+* \brief Scale the MV according to the POC difference
+*
+* \param current_poc        POC of current frame
+* \param current_ref_poc    POC of reference frame
+* \param neighbor_poc       POC of neighbor frame
+* \param neighbor_ref_poc   POC of neighbors reference frame
+* \param mv_cand            MV candidates to scale
+*/
 static void apply_mv_scaling(int32_t current_poc,
   int32_t current_ref_poc,
   int32_t neighbor_poc,
@@ -1242,7 +1252,14 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       mv.x = ref_cu->inter.mv[1][0];
       mv.y = ref_cu->inter.mv[1][1];
     }
+    // Apply mv scaling if neighbor poc is available
     if (info->state->frame->ref_LX_size[ref_list] > 0) {
+      // When there are reference pictures from the future (POC > current POC)
+      // in L0 or L1, the primary list for the colocated PU is the inverse of
+      // collocated_from_l0_flag. Otherwise it is equal to reflist.
+      //
+      // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+      // there are future references.
       int col_list = ref_list;
       for (int i = 0; i < info->state->frame->ref->used_size; i++) {
         if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
@@ -1250,19 +1267,20 @@ static void search_pu_inter_ref(inter_search_info_t *info,
           break;
         }
       }
-
       if ((ref_cu->inter.mv_dir & (col_list + 1)) == 0) {
         // Use the other list if the colocated PU does not have a MV for the
         // primary list.
         col_list = 1 - col_list;
       }
 
+      uint8_t neighbor_poc_index = info->state->frame->ref_LX[ref_list][LX_idx];
+      // Scaling takes current POC, reference POC, neighbor POC and neighbor reference POC as argument
       apply_mv_scaling(
         info->state->frame->poc,
-        info->state->frame->ref->pocs[temp_ref_idx],
         info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
-        info->state->frame->ref->images[info->state->frame->ref_LX[ref_list][LX_idx]]->ref_pocs[
-          info->state->frame->ref->ref_LXs[info->state->frame->ref_LX[ref_list][LX_idx]]
+        info->state->frame->ref->pocs[neighbor_poc_index],
+        info->state->frame->ref->images[neighbor_poc_index]->ref_pocs[
+          info->state->frame->ref->ref_LXs[neighbor_poc_index]
           [col_list]
           [ref_cu->inter.mv_ref[col_list]]
         ],
