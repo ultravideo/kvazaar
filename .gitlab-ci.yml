@@ -10,6 +10,7 @@ test-kvazaar: &test-template
     - ./configure --enable-werror || (cat config.log && false)
     - make --jobs=8
     - make check --jobs=8 VERBOSE=1
+    - make distcheck
   artifacts:
     paths:
     - src/kvazaar
