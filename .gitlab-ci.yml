@@ -10,7 +10,6 @@ test-kvazaar: &test-template
     - ./configure --enable-werror || (cat config.log && false)
     - make --jobs=8
     - make check --jobs=8 VERBOSE=1
-    - make distcheck
   artifacts:
     paths:
     - src/kvazaar
@@ -48,3 +47,14 @@ test-valgrind:
     KVAZAAR_OVERRIDE_sao_edge_ddistortion: generic
     KVAZAAR_OVERRIDE_calc_sao_edge_dir: generic
     KVZ_TEST_VALGRIND: 1
+
+# TODO: If someone knows YAML better, there has to be some better way to
+# concatenate stuff into the test-template script than just manually copy
+# pasting
+test-distcheck:
+  <<: *test-template
+  script:
+    - export PATH="${HOME}/bin:${PATH}"
+    - ./autogen.sh
+    - ./configure --enable-werror || (cat config.log && false)
+    - make --jobs=8 VERBOSE=1 distcheck
