@@ -133,7 +133,7 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/encode_coding_tree-generic.h \
 	strategies/missing-intel-intrinsics.h \
 	strategies/optimized_sad_func_ptr_t.h \
-	strategies/sao_shared_generics.h \
+	strategies/generic/sao_shared_generics.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
