@@ -471,6 +471,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     return 0;
   }
 
+  int gop_layer = ctrl->cfg.gop_len != 1 ? ctrl->cfg.gop[state->frame->gop_offset].layer - 1 : 0;
+
   // Assign correct depth limit
   constraint_t* constr = state->constraint;
  if(constr->ml_intra_depth_ctu) {
@@ -478,11 +480,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     pu_depth_intra.max = constr->ml_intra_depth_ctu->_mat_lower_depth[(x_local >> 3) + (y_local >> 3) * 8];
   }
   else {
-    pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min;
-    pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max;
+    pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.min[gop_layer] : ctrl->cfg.pu_depth_intra.min[0];
+    pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.max[gop_layer] : ctrl->cfg.pu_depth_intra.max[0];
   }
-  pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min;
-  pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max;
+  pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.min[gop_layer] : ctrl->cfg.pu_depth_inter.min[0];
+  pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.max[gop_layer] : ctrl->cfg.pu_depth_inter.max[0];
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth

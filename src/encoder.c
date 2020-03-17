@@ -608,11 +608,16 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 #endif //KVZ_DEBUG
   }
 
-  assert(WITHIN(encoder->cfg.pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
+  for( size_t i = 0; i < MAX_GOP_LAYERS; i++ )
+  {
+      if( encoder->cfg.pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
+      assert( WITHIN( encoder->cfg.pu_depth_inter.min[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) );
+      assert( WITHIN( encoder->cfg.pu_depth_inter.max[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) );
 
+      if( encoder->cfg.pu_depth_intra.min[i] < 0 || cfg->pu_depth_intra.max[i] < 0 ) continue;
+      assert( WITHIN( encoder->cfg.pu_depth_intra.min[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) );
+      assert( WITHIN( encoder->cfg.pu_depth_intra.max[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) );
+  }
   // Disable in-loop filters, sign hiding and transform skip when using
   // lossless coding.
   if (encoder->cfg.lossless) {

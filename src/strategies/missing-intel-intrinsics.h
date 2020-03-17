@@ -20,6 +20,9 @@
 
 // Some Visual Studio headers apparently lack these pseudoinstructions
 #if COMPILE_INTEL_AVX2
+  #ifndef _mm256_bsrli_epi128
+    #define _mm256_bsrli_epi128(a, imm8) _mm256_srli_si256((a), (imm8))
+  #endif
   #ifndef _mm256_insert_epi32
     #define _mm256_insert_epi32(a, i, index) (_mm256_blend_epi32((a), _mm256_set1_epi32(i), (1 << (index))))
   #endif

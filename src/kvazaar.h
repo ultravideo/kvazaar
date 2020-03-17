@@ -308,8 +308,8 @@ typedef struct kvz_config
   int32_t cpuid;
 
   struct {
-    int32_t min;
-    int32_t max;
+    int32_t min[KVZ_MAX_GOP_LENGTH];
+    int32_t max[KVZ_MAX_GOP_LENGTH];
   } pu_depth_inter, pu_depth_intra;
 
   int32_t add_encoder_info;

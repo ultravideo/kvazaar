@@ -100,10 +100,14 @@ int kvz_config_init(kvz_config *cfg)
   cfg->cpuid = 1;
 
   // Defaults for what sizes of PUs are tried.
-  cfg->pu_depth_inter.min = 2; // 0-3
-  cfg->pu_depth_inter.max = 3; // 0-3
-  cfg->pu_depth_intra.min = 2; // 0-4
-  cfg->pu_depth_intra.max = 3; // 0-4
+  memset( cfg->pu_depth_inter.min, -1, sizeof( cfg->pu_depth_inter.min ) );
+  memset( cfg->pu_depth_inter.max, -1, sizeof( cfg->pu_depth_inter.max ) );
+  memset( cfg->pu_depth_intra.min, -1, sizeof( cfg->pu_depth_intra.min ) );
+  memset( cfg->pu_depth_intra.max, -1, sizeof( cfg->pu_depth_intra.max ) );
+  *cfg->pu_depth_inter.min = 2; // 0-3
+  *cfg->pu_depth_inter.max = 3; // 0-3
+  *cfg->pu_depth_intra.min = 2; // 0-4
+  *cfg->pu_depth_intra.max = 3; // 0-4
 
   cfg->add_encoder_info = true;
   cfg->calc_psnr = true;
@@ -305,6 +309,41 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
   }
   free(key);
   return 1;
+}
+
+static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t *depths_max, int size )
+{
+    char *list = strdup( array );
+    char *token;
+    int i = 0;
+    int ptr = -1;
+    int len = strlen( list );
+    int retval = 1;
+
+    token = strtok( list, "," );
+    while( ptr < len && list[ptr + 1] == ',' )
+    {
+        i++;
+        ptr++;
+    }
+    while( retval && token != NULL && i < size ) {
+        retval &= (sscanf( token, "%d-%d", &depths_min[i], &depths_max[i] ) == 2);
+        ptr += (retval ? 4 : 0);
+        i++;
+        token = strtok( NULL, "," );
+        while(ptr < len && list[ptr + 1] == ',' ){
+          i++;
+          ptr++;
+        }
+    }
+
+    if( i >= size && ( token != NULL ) ) {
+        fprintf( stderr, "parsing failed : too many values.\n" );
+        retval = 0;
+    }
+    
+    free( list );
+    return retval;
 }
 
 static int parse_slice_specification(const char* const arg, int32_t * const nslices, int32_t** const array) {
@@ -912,9 +951,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("cpuid")
     cfg->cpuid = atobool(value);
   else if OPT("pu-depth-inter")
-    return sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max) == 2;
+    return parse_pu_depth_list(value, cfg->pu_depth_inter.min, cfg->pu_depth_inter.max, KVZ_MAX_GOP_LENGTH);
   else if OPT("pu-depth-intra")
-    return sscanf(value, "%d-%d", &cfg->pu_depth_intra.min, &cfg->pu_depth_intra.max) == 2;
+    return parse_pu_depth_list(value, cfg->pu_depth_intra.min, cfg->pu_depth_intra.max, KVZ_MAX_GOP_LENGTH);
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
@@ -1506,28 +1545,39 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
   }
 
-  if (!WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX) ||
-      !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX))
+  for( size_t i = 0; i < MAX_GOP_LAYERS; i++ )
   {
-    fprintf(stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)\n",
-            cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
-    error = 1;
-  } else if (cfg->pu_depth_inter.min > cfg->pu_depth_inter.max) {
-    fprintf(stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
-            cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
-    error = 1;
-  }
+      if( cfg->pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
 
-  if (!WITHIN(cfg->pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX) ||
-      !WITHIN(cfg->pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX))
-  {
-    fprintf(stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)\n",
-      cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
-    error = 1;
-  } else if (cfg->pu_depth_intra.min > cfg->pu_depth_intra.max) {
-    fprintf(stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
-            cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
-    error = 1;
+      if( !WITHIN( cfg->pu_depth_inter.min[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) ||
+          !WITHIN( cfg->pu_depth_inter.max[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) )
+      {
+          fprintf( stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)\n",
+                   cfg->pu_depth_inter.min[i], cfg->pu_depth_inter.max[i] );
+          error = 1;
+      }
+      else if( cfg->pu_depth_inter.min[i] > cfg->pu_depth_inter.max[i] )
+      {
+          fprintf( stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
+                   cfg->pu_depth_inter.min[i], cfg->pu_depth_inter.max[i] );
+          error = 1;
+      }
+
+      if( cfg->pu_depth_intra.min[i] < 0 || cfg->pu_depth_intra.max[i] < 0 ) continue;
+
+      if( !WITHIN( cfg->pu_depth_intra.min[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) ||
+          !WITHIN( cfg->pu_depth_intra.max[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) )
+      {
+          fprintf( stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)\n",
+                   cfg->pu_depth_intra.min[i], cfg->pu_depth_intra.max[i] );
+          error = 1;
+      }
+      else if( cfg->pu_depth_intra.min[i] > cfg->pu_depth_intra.max[i] )
+      {
+          fprintf( stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
+                   cfg->pu_depth_intra.min[i], cfg->pu_depth_intra.max[i] );
+          error = 1;
+      }
   }
 
   // Tile separation should be at round position in terms of LCU, should be monotonic, and should not start by 0
