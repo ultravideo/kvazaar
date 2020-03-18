@@ -471,7 +471,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     return 0;
   }
 
-  int gop_layer = ctrl->cfg.gop_len != 1 ? ctrl->cfg.gop[state->frame->gop_offset].layer - 1 : 0;
+  int gop_layer = ctrl->cfg.gop_len != 0 ? ctrl->cfg.gop[state->frame->gop_offset].layer - 1 : 0;
 
   // Assign correct depth limit
   constraint_t* constr = state->constraint;
