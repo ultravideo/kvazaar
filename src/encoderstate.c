@@ -1241,6 +1241,17 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   // setting it based on the intra period
   bool is_closed_normal_gop = false;
 
+  encoder_state_t *previous = state->previous_encoder_state;
+  int owf = MIN(state->encoder_control->cfg.owf, state->frame->num);
+
+  const int layer = state->encoder_control->cfg.gop[state->frame->gop_offset].layer;
+
+  while (--owf > 0 && layer != state->encoder_control->cfg.gop[previous->frame->gop_offset].layer) {
+    previous = previous->previous_encoder_state;
+  }
+
+  if (owf == 0) previous = state;
+  state->frame->previous_layer_state = previous;
   // Set POC.
   if (state->frame->num == 0) {
     state->frame->poc = 0;

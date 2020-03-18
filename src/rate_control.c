@@ -702,27 +702,12 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
       }
     }
     else {
-      encoder_state_t *previous = state;
-      if((encoder->cfg.gop_lp_definition.d != 0 && 
-         (encoder->cfg.owf == 1 || encoder->cfg.owf == 3)) ||
-         (encoder->cfg.gop_len != 0 && !encoder->cfg.gop_lowdelay
-          && encoder->cfg.owf > 5)) {
-
-        previous = state->previous_encoder_state; 
-        int owf = MIN(encoder->cfg.owf, state->frame->num);
-
-        const int layer = encoder->cfg.gop[state->frame->gop_offset].layer;
-
-        while (layer != encoder->cfg.gop[previous->frame->gop_offset].layer && --owf) {
-          previous = previous->previous_encoder_state;
-        }
-      }
       
       if (state->frame->lcu_stats[index].lambda > 0) {
-        clip_neighbor_lambda = previous->frame->lcu_stats[index].lambda;
+        clip_neighbor_lambda = state->frame->previous_layer_state->frame->lcu_stats[index].lambda;
       }
       if (state->frame->lcu_stats[index].qp > 0) {
-        clip_qp = previous->frame->lcu_stats[index].qp;
+        clip_qp = state->frame->previous_layer_state->frame->lcu_stats[index].qp;
       }
     }
 

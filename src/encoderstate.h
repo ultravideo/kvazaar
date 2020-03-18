@@ -158,6 +158,8 @@ typedef struct encoder_state_config_frame_t {
 
   struct kvz_rc_data *new_ratecontrol;
 
+  struct encoder_state_t *previous_layer_state;
+
   /**
    * \brief Whether next NAL is the first NAL in the access unit.
    */
@@ -258,7 +260,7 @@ typedef struct encoder_state_t {
   
   //Pointer to the encoder_state of the previous frame
   struct encoder_state_t *previous_encoder_state;
-  
+    
   encoder_state_config_frame_t  *frame;
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
