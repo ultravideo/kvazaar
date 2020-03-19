@@ -121,7 +121,7 @@ typedef struct encoder_state_config_frame_t {
   //! Number of bits written in the current GOP.
   uint64_t cur_gop_bits_coded;
 
-  //! Number of bits written in the current GOP.
+  //! Number of bits written in the current frame.
   uint64_t cur_frame_bits_coded;
 
   //! Number of bits targeted for the current GOP.
@@ -158,7 +158,7 @@ typedef struct encoder_state_config_frame_t {
 
   struct kvz_rc_data *new_ratecontrol;
 
-  struct encoder_state_t *previous_layer_state;
+  struct encoder_state_t const *previous_layer_state;
 
   /**
    * \brief Whether next NAL is the first NAL in the access unit.

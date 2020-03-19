@@ -153,8 +153,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->zero_coeff_rdo = true;
 
   cfg->rc_algorithm = KVZ_NO_RC;
-  cfg->intra_bit_allocation = true;
-  cfg->clip_neighbour = false;
+  cfg->intra_bit_allocation = false;
+  cfg->clip_neighbour = true;
 
   return 1;
 }
@@ -956,16 +956,21 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_lp_definition.d = gop.d;
       cfg->gop_lp_definition.t = gop.t;
 
-      cfg->intra_bit_allocation = false;
+      cfg->intra_bit_allocation = true;
+      cfg->clip_neighbour = false;
     } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
       cfg->gop_len = sizeof(kvz_gop_ra8) / sizeof(kvz_gop_ra8[0]);
       memcpy(cfg->gop, kvz_gop_ra8, sizeof(kvz_gop_ra8));
+      cfg->intra_bit_allocation = false;
+      cfg->clip_neighbour = true;
 
     } else if (atoi(value) == 16) {
       cfg->gop_lowdelay = 0;
       cfg->gop_len = sizeof(kvz_gop_ra16) / sizeof(kvz_gop_ra16[0]);
       memcpy(cfg->gop, kvz_gop_ra16, sizeof(kvz_gop_ra16));
+      cfg->intra_bit_allocation = false;
+      cfg->clip_neighbour = true;
 
     } else if (atoi(value) == 0) {
       //Disable gop
@@ -1626,8 +1631,13 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if(cfg->target_bitrate > 0 && cfg->rc_algorithm == 0) {
+  if(cfg->target_bitrate > 0 && cfg->rc_algorithm == KVZ_NO_RC) {
     fprintf(stderr, "Bitrate set but rc-algorithm is turned off.\n");
+    error = 1;
+  }
+
+  if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
+    fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
     error = 1;
   }
 
