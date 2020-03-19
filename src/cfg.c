@@ -138,7 +138,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->me_max_steps = (uint32_t)-1;
 
-	cfg->vaq = 0;
+  cfg->vaq = 0;
 
   cfg->scaling_list = KVZ_SCALING_LIST_OFF;
 
