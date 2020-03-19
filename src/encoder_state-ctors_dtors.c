@@ -34,6 +34,7 @@
 #include "kvazaar.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "rate_control.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -46,22 +47,49 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->num = 0;
   state->frame->poc = 0;
   state->frame->total_bits_coded = 0;
+  state->frame->cur_frame_bits_coded = 0;
   state->frame->cur_gop_bits_coded = 0;
   state->frame->prepared = 0;
   state->frame->done = 1;
+
   state->frame->rc_alpha = 3.2003;
   state->frame->rc_beta = -1.367;
+  state->frame->icost = 0;
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-  state->frame->lcu_stats = MALLOC(lcu_stats_t, num_lcus);
+  state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
   state->frame->aq_offsets = MALLOC(double, num_lcus);
+
+  for (int y = 0; y < encoder->in.height_in_lcu; y++) {
+    for (int x = 0; x < encoder->in.width_in_lcu; x++) {
+      int temp = MIN(encoder->cfg.width - x * 64, 64) * MIN(encoder->cfg.height - y * 64, 64);
+      state->frame->lcu_stats[x + y * encoder->in.width_in_lcu].pixels = temp;
+    }
+  }
+
+  state->frame->c_para = malloc(sizeof(double) * num_lcus);
+  if(state->frame->c_para == NULL) {
+    return 0;
+  }
+  state->frame->k_para = malloc(sizeof(double) * num_lcus);
+  if (state->frame->k_para == NULL) {
+    return 0;
+  }
+
+  pthread_mutex_init(&state->frame->rc_lock, NULL);
+
+  state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
 
   return 1;
 }
 
 static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   if (state->frame == NULL) return;
+
+  pthread_mutex_destroy(&state->frame->rc_lock);
+  if (state->frame->c_para) FREE_POINTER(state->frame->c_para);
+  if (state->frame->k_para) FREE_POINTER(state->frame->k_para);
 
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);

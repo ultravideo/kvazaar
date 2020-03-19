@@ -1135,17 +1135,56 @@ static void search_frac(inter_search_info_t *info)
   if (src.malloc_used) free(src.buffer);
 }
 
+/**
+* \brief Calculate the scaled MV
+*/
+static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+{
+  int32_t scaled = scale * mv;
+  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+}
+/**
+* \brief Scale the MV according to the POC difference
+*
+* \param current_poc        POC of current frame
+* \param current_ref_poc    POC of reference frame
+* \param neighbor_poc       POC of neighbor frame
+* \param neighbor_ref_poc   POC of neighbors reference frame
+* \param mv_cand            MV candidates to scale
+*/
+static void apply_mv_scaling(int32_t current_poc,
+  int32_t current_ref_poc,
+  int32_t neighbor_poc,
+  int32_t neighbor_ref_poc,
+  vector2d_t* mv_cand)
+{
+  int32_t diff_current = current_poc - current_ref_poc;
+  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
+
+  if (diff_current == diff_neighbor) return;
+  if (diff_neighbor == 0) return;
+
+  diff_current = CLIP(-128, 127, diff_current);
+  diff_neighbor = CLIP(-128, 127, diff_neighbor);
+
+  int scale = CLIP(-4096, 4095,
+    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
+
+  mv_cand->x = get_scaled_mv(mv_cand->x, scale);
+  mv_cand->y = get_scaled_mv(mv_cand->y, scale);
+}
+
 
 /**
  * \brief Perform inter search for a single reference frame.
  */
 static void search_pu_inter_ref(inter_search_info_t *info,
-                                int depth,
-                                lcu_t *lcu, cu_info_t *cur_cu,
-                                double *inter_cost,
-                                uint32_t *inter_bitcost,
-                                double *best_LX_cost,
-                                cu_info_t *unipred_LX)
+  int depth,
+  lcu_t *lcu, cu_info_t *cur_cu,
+  double *inter_cost,
+  uint32_t *inter_bitcost,
+  double *best_LX_cost,
+  cu_info_t *unipred_LX)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
 
@@ -1155,20 +1194,20 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   int8_t LX_idx;
   // max value of LX_idx plus one
   const int8_t LX_IDX_MAX_PLUS_1 = MAX(info->state->frame->ref_LX_size[0],
-                                       info->state->frame->ref_LX_size[1]);
+    info->state->frame->ref_LX_size[1]);
 
   for (LX_idx = 0; LX_idx < LX_IDX_MAX_PLUS_1; LX_idx++)
   {
     // check if ref_idx is in L0
     if (LX_idx < info->state->frame->ref_LX_size[0] &&
-        info->state->frame->ref_LX[0][LX_idx] == info->ref_idx) {
+      info->state->frame->ref_LX[0][LX_idx] == info->ref_idx) {
       ref_list = 0;
       break;
     }
 
     // check if ref_idx is in L1
     if (LX_idx < info->state->frame->ref_LX_size[1] &&
-        info->state->frame->ref_LX[1][LX_idx] == info->ref_idx) {
+      info->state->frame->ref_LX[1][LX_idx] == info->ref_idx) {
       ref_list = 1;
       break;
     }
@@ -1196,22 +1235,57 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
   vector2d_t mv = { 0, 0 };
-  {
-    // Take starting point for MV search from previous frame.
-    // When temporal motion vector candidates are added, there is probably
-    // no point to this anymore, but for now it helps.
-    const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
-    const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
-    const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
-    const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
-    if (ref_cu->type == CU_INTER) {
-      if (ref_cu->inter.mv_dir & 1) {
-        mv.x = ref_cu->inter.mv[0][0];
-        mv.y = ref_cu->inter.mv[0][1];
-      } else {
-        mv.x = ref_cu->inter.mv[1][0];
-        mv.y = ref_cu->inter.mv[1][1];
+
+  // Take starting point for MV search from previous frame.
+  // When temporal motion vector candidates are added, there is probably
+  // no point to this anymore, but for now it helps.
+  const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
+  const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
+  const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
+  const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
+  if (ref_cu->type == CU_INTER) {
+    if (ref_cu->inter.mv_dir & 1) {
+      mv.x = ref_cu->inter.mv[0][0];
+      mv.y = ref_cu->inter.mv[0][1];
+    }
+    else {
+      mv.x = ref_cu->inter.mv[1][0];
+      mv.y = ref_cu->inter.mv[1][1];
+    }
+    // Apply mv scaling if neighbor poc is available
+    if (info->state->frame->ref_LX_size[ref_list] > 0) {
+      // When there are reference pictures from the future (POC > current POC)
+      // in L0 or L1, the primary list for the colocated PU is the inverse of
+      // collocated_from_l0_flag. Otherwise it is equal to reflist.
+      //
+      // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+      // there are future references.
+      int col_list = ref_list;
+      for (int i = 0; i < info->state->frame->ref->used_size; i++) {
+        if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
+          col_list = 1;
+          break;
+        }
       }
+      if ((ref_cu->inter.mv_dir & (col_list + 1)) == 0) {
+        // Use the other list if the colocated PU does not have a MV for the
+        // primary list.
+        col_list = 1 - col_list;
+      }
+
+      uint8_t neighbor_poc_index = info->state->frame->ref_LX[ref_list][LX_idx];
+      // Scaling takes current POC, reference POC, neighbor POC and neighbor reference POC as argument
+      apply_mv_scaling(
+        info->state->frame->poc,
+        info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
+        info->state->frame->ref->pocs[neighbor_poc_index],
+        info->state->frame->ref->images[neighbor_poc_index]->ref_pocs[
+          info->state->frame->ref->ref_LXs[neighbor_poc_index]
+          [col_list]
+          [ref_cu->inter.mv_ref[col_list]]
+        ],
+        &mv
+      );
     }
   }
 
