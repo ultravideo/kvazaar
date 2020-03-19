@@ -616,7 +616,17 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
 
-  kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  switch (encoder->cfg.rc_algorithm) {
+    case KVZ_NO_RC:
+    case KVZ_LAMBDA:
+      kvz_set_lcu_lambda_and_qp(state, lcu->position);
+      break;
+    case KVZ_OBA:
+      kvz_set_ctu_qp_lambda(state, lcu->position);
+      break;
+    default:
+      assert(0);
+  }
 
   lcu_coeff_t coeff;
   state->coeff = &coeff;
@@ -702,8 +712,26 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     }
   }
 
+  pthread_mutex_lock(&state->frame->rc_lock);
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  state->frame->cur_frame_bits_coded += bits;
+  // This variable is used differently by intra and inter frames and shouldn't
+  // be touched in intra frames here
+  state->frame->remaining_weight -= !state->frame->is_irap ?
+    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
+    0;
+  pthread_mutex_unlock(&state->frame->rc_lock);
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
+
+  uint8_t not_skip = false;
+  for(int y = 0; y < 64 && !not_skip; y+=8) {
+    for(int x = 0; x < 64 && !not_skip; x+=8) {
+      not_skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
+        lcu->position_px.x + x,
+        lcu->position_px.y + y)->skipped;
+    }
+  }
+  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
 
   //Wavefronts need the context to be copied to the next row
   if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
@@ -802,6 +830,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             dep_lcu = dep_lcu->right;
           }
           kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+
+          //TODO: Preparation for the lock free implementation of the new rc
+          if (ref_state->frame->slicetype == KVZ_SLICE_I && ref_state->frame->num != 0 && state->encoder_control->cfg.owf > 1 && true) {
+            kvz_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_jobs[dep_lcu->id]);
+          }
 
           // Very spesific bug that happens when owf length is longer than the
           // gop length. Takes care of that.
@@ -1208,6 +1241,17 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   // setting it based on the intra period
   bool is_closed_normal_gop = false;
 
+  encoder_state_t *previous = state->previous_encoder_state;
+  int owf = MIN(state->encoder_control->cfg.owf, state->frame->num);
+
+  const int layer = state->encoder_control->cfg.gop[state->frame->gop_offset].layer;
+
+  while (--owf > 0 && layer != state->encoder_control->cfg.gop[previous->frame->gop_offset].layer) {
+    previous = previous->previous_encoder_state;
+  }
+
+  if (owf == 0) previous = state;
+  state->frame->previous_layer_state = previous;
   // Set POC.
   if (state->frame->num == 0) {
     state->frame->poc = 0;
@@ -1287,8 +1331,20 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
     normalize_lcu_weights(state);
   }
-  kvz_set_picture_lambda_and_qp(state);
+  state->frame->cur_frame_bits_coded = 0;
 
+  switch (state->encoder_control->cfg.rc_algorithm) {
+    case KVZ_NO_RC:
+    case KVZ_LAMBDA:
+      kvz_set_picture_lambda_and_qp(state);
+      break;
+    case KVZ_OBA:
+      kvz_estimate_pic_lambda(state);
+      break;
+    default:
+      assert(0);
+  }
+ 
   encoder_state_init_children(state);
 }
 

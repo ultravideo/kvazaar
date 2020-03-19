@@ -17,8 +17,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "pthread.h"
 #include <condition_variable>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 
+typedef struct {
+  std::shared_mutex *lock;
+  bool write_lock;
+} rw_lock_internal;
 
 int pthread_cond_broadcast(pthread_cond_t* cond) {
     static_cast<std::condition_variable*>(*cond)->notify_all();
@@ -85,4 +90,44 @@ int pthread_mutex_lock(pthread_mutex_t* mutex) {
 int pthread_mutex_unlock(pthread_mutex_t* mutex) {
     static_cast<std::mutex*>(*mutex)->unlock();
     return 0;
+}
+
+int pthread_rwlock_init(pthread_rwlock_t * lock, const pthread_rwlockattr_t *)
+{
+  *lock = new rw_lock_internal;
+  static_cast<rw_lock_internal*>(*lock)->lock = new std::shared_mutex;
+  static_cast<rw_lock_internal*>(*lock)->write_lock = false;
+  return 0;
+}
+
+int pthread_rwlock_destroy(pthread_rwlock_t* rwlock)
+{
+  delete static_cast<rw_lock_internal*>(*rwlock)->lock;
+  delete static_cast<rw_lock_internal*>(*rwlock);
+  return 0;
+}
+
+int pthread_rwlock_rdlock(pthread_rwlock_t* rwlock)
+{
+  static_cast<rw_lock_internal*>(*rwlock)->lock->lock_shared();
+  return 0;
+}
+
+int pthread_rwlock_wrlock(pthread_rwlock_t* rwlock)
+{
+  static_cast<rw_lock_internal*>(*rwlock)->lock->lock();
+  static_cast<rw_lock_internal*>(*rwlock)->write_lock = true;
+  return 0;
+}
+
+int pthread_rwlock_unlock(pthread_rwlock_t* rwlock)
+{
+  if (static_cast<rw_lock_internal*>(*rwlock)->write_lock) {
+    static_cast<rw_lock_internal*>(*rwlock)->write_lock = false;
+    static_cast<rw_lock_internal*>(*rwlock)->lock->unlock();
+  }
+  else {
+    static_cast<rw_lock_internal*>(*rwlock)->lock->unlock_shared();
+  }
+  return 0;
 }
