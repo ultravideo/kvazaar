@@ -640,6 +640,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
 
 void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   double bits = get_ctu_bits(state, pos);
+  const encoder_control_t* const ctrl = state->encoder_control;
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int frame_allocation = state->encoder_control->cfg.frame_allocation;
@@ -750,6 +751,26 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   ctu->qp = est_qp;
   ctu->lambda = est_lambda;
   ctu->i_cost = 0;
+
+  // Apply variance adaptive quantization
+  if (ctrl->cfg.vaq) {
+      vector2d_t lcu = {
+        pos.x + state->tile->lcu_offset_x,
+        pos.y + state->tile->lcu_offset_y
+      };
+      int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+      int aq_offset = round(state->frame->aq_offsets[id]);
+      state->qp += aq_offset;
+      // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+      // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
+      state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+      state->qp = CLIP_TO_QP(state->qp);
+      state->lambda = qp_to_lambda(state, state->qp);
+      state->lambda_sqrt = sqrt(state->lambda);
+
+      ctu->qp = state->qp;
+      ctu->lambda = state->lambda;
+  }
 }
 
 
