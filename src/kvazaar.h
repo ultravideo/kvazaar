@@ -63,6 +63,10 @@ extern "C" {
  * Maximum length of a GoP structure.
  */
 #define KVZ_MAX_GOP_LENGTH 32
+//Also defined in global.h
+#ifndef MAX_GOP_LAYERS
+#define MAX_GOP_LAYERS 6
+#endif
 
 /**
  * Size of data chunks.
@@ -308,8 +312,8 @@ typedef struct kvz_config
   int32_t cpuid;
 
   struct {
-    int32_t min[KVZ_MAX_GOP_LENGTH];
-    int32_t max[KVZ_MAX_GOP_LENGTH];
+    int32_t min[MAX_GOP_LAYERS];
+    int32_t max[MAX_GOP_LAYERS];
   } pu_depth_inter, pu_depth_intra;
 
   int32_t add_encoder_info;
