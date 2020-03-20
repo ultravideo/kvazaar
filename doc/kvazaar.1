@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "February 2020" "kvazaar v1.3.0" "User Commands"
+.TH KVAZAAR "1" "March 2020" "kvazaar v1.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -254,10 +254,18 @@ Fractional pixel motion estimation level [4]
 \fB\-\-pu\-depth\-inter <int>\-<int>
 Inter prediction units sizes [0\-3]
     \- 0, 1, 2, 3: from 64x64 to 8x8
+    \- Accepts a list of values separated by ','
+      for setting separate depths per GOP layer
+      (values can be omitted to use the first
+      value for the respective layer).
 .TP
 \fB\-\-pu\-depth\-intra <int>\-<int>
 Intra prediction units sizes [1\-4]
     \- 0, 1, 2, 3, 4: from 64x64 to 4x4
+    \- Accepts a list of values separated by ','
+      for setting separate depths per GOP layer
+      (values can be omitted to use the first
+      value for the respective layer).
 .TP
 \fB\-\-ml\-pu\-depth\-intra   
 Predict the pu\-depth\-intra using machine
