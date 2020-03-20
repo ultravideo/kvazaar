@@ -608,7 +608,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 #endif //KVZ_DEBUG
   }
 
-  for( size_t i = 0; i < MAX_GOP_LAYERS; i++ )
+  for( size_t i = 0; i < KVZ_MAX_GOP_LAYERS; i++ )
   {
       if( encoder->cfg.pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
       assert( WITHIN( encoder->cfg.pu_depth_inter.min[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) );

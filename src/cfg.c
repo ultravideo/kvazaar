@@ -951,9 +951,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("cpuid")
     cfg->cpuid = atobool(value);
   else if OPT("pu-depth-inter")
-    return parse_pu_depth_list(value, cfg->pu_depth_inter.min, cfg->pu_depth_inter.max, MAX_GOP_LAYERS);
+    return parse_pu_depth_list(value, cfg->pu_depth_inter.min, cfg->pu_depth_inter.max, KVZ_MAX_GOP_LAYERS);
   else if OPT("pu-depth-intra")
-    return parse_pu_depth_list(value, cfg->pu_depth_intra.min, cfg->pu_depth_intra.max, MAX_GOP_LAYERS);
+    return parse_pu_depth_list(value, cfg->pu_depth_intra.min, cfg->pu_depth_intra.max, KVZ_MAX_GOP_LAYERS);
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
@@ -1545,7 +1545,7 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
   }
 
-  for( size_t i = 0; i < MAX_GOP_LAYERS; i++ )
+  for( size_t i = 0; i < KVZ_MAX_GOP_LAYERS; i++ )
   {
       if( cfg->pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
 
