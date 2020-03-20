@@ -652,9 +652,8 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
   return lambda;
 }
 
-void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
+ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   double bits = get_ctu_bits(state, pos);
-  const encoder_control_t* const ctrl = state->encoder_control;
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int frame_allocation = state->encoder_control->cfg.frame_allocation;
@@ -767,7 +766,7 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   ctu->i_cost = 0;
 
   // Apply variance adaptive quantization
-  if (ctrl->cfg.vaq) {
+  if (encoder->cfg.vaq) {
     vector2d_t lcu = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
