@@ -196,8 +196,16 @@ Compression tools:
                                    - 4: + 1/4-pixel diagonal
       --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]
                                    - 0, 1, 2, 3: from 64x64 to 8x8
+                                   - Accepts a list of values separated by ','
+                                     for setting separate depths per GOP layer
+                                     (values can be omitted to use the first
+                                     value for the respective layer).
       --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]
                                    - 0, 1, 2, 3, 4: from 64x64 to 4x4
+                                   - Accepts a list of values separated by ','
+                                     for setting separate depths per GOP layer
+                                     (values can be omitted to use the first
+                                     value for the respective layer).
       --ml-pu-depth-intra    : Predict the pu-depth-intra using machine
                                 learning trees, overrides the
                                 --pu-depth-intra parameter. [disabled]
