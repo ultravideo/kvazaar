@@ -817,7 +817,21 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
         }
       }
       break;
-
+    case 5:
+      if(!encoder->cfg.gop_lowdelay) {
+        // These are obtained by running HM with RA GOP 16 collecting the ratio of bits spent for each
+        // layer from the CTC sequences and then fitting power curve
+        encoder->gop_layer_weights[0] = 13.0060187535 * pow(encoder->target_avg_bpp, -0.3727651453);
+        encoder->gop_layer_weights[1] = 7.3654107392 * pow(encoder->target_avg_bpp, -0.0854329266);
+        encoder->gop_layer_weights[2] = 3.6563990701 * pow(encoder->target_avg_bpp, -0.0576990493);
+        encoder->gop_layer_weights[3] = 2.1486937288 * pow(encoder->target_avg_bpp, -0.0155389471);
+        encoder->gop_layer_weights[4] = 1;        
+      } 
+      else {
+        fprintf(stderr, "Unsupported amount of layers (%d) for lowdelay GOP\n", num_layers);
+        return 0;
+      }
+      break;
     default:
       if (!encoder->cfg.gop_lowdelay && encoder->cfg.gop_len == 16) {
         fprintf(stdout, 

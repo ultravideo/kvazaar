@@ -155,7 +155,8 @@ void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,i
   int32_t  j,k;
   for (j = 0; j < block_size; j++) {
     for(k = 0; k < block_size; k ++) {
-      coeff[j * block_size + k] = block[j * block_size + k] << shift;
+      // Casting back and forth to make UBSan not trigger due to left-shifting negatives
+      coeff[j * block_size + k] = (int16_t)((uint16_t)(block[j * block_size + k]) << shift);
     }
   }
 }

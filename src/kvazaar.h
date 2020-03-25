@@ -218,6 +218,12 @@ enum kvz_scalinglist {
   KVZ_SCALING_LIST_DEFAULT = 2,  
 };
 
+enum kvz_rc_algorithm
+{
+  KVZ_NO_RC = 0,
+  KVZ_LAMBDA = 1,
+  KVZ_OBA = 2,
+};
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -414,6 +420,16 @@ typedef struct kvz_config
   /** \brief Always consider CU without any quantized residual */
   uint8_t zero_coeff_rdo;
 
+  /** \brief Currently unused parameter for OBA rc */
+  int8_t frame_allocation;
+
+  /** \brief used rc scheme, 0 for QP */
+  int8_t rc_algorithm;
+
+  /** \brief whether to use hadamard based bit allocation for intra frames or not */
+  uint8_t intra_bit_allocation;
+
+  uint8_t clip_neighbour;
 } kvz_config;
 
 /**
