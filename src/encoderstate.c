@@ -1268,7 +1268,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
+    uint32_t c_len = len / 4;
     double frame_var = pixel_var(state->tile->frame->source->y, len);
+    if (has_chroma) {
+      frame_var += pixel_var(state->tile->frame->source->u, c_len);
+      frame_var += pixel_var(state->tile->frame->source->v, c_len);
+    }
 
     // Loop through LCUs
     // For each LCU calculate: D * (log(LCU pixel variance) - log(frame pixel variance))
