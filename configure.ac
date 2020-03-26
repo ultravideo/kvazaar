@@ -51,10 +51,15 @@ AX_CHECK_COMPILE_FLAG([-msse4.1], [flag_sse4_1="true"])
 AX_CHECK_COMPILE_FLAG([-msse2],   [flag_sse2="true"])
 AX_CHECK_COMPILE_FLAG([-mbmi],    [flag_bmi="true"])
 AX_CHECK_COMPILE_FLAG([-mabm],    [flag_abm="true"])
+AX_CHECK_COMPILE_FLAG([-mpopcnt], [flag_popcnt="true"])
+AX_CHECK_COMPILE_FLAG([-mlzcnt],  [flag_lzcnt="true"])
 AX_CHECK_COMPILE_FLAG([-mbmi2],   [flag_bmi2="true"])
 
+# Do we need -mpopcnt and -mlzcnt, or -mabm to use POPCNT and LZCNT
+# instructions? Ask GCC and Clang, and they have different answers.
 AM_CONDITIONAL([HAVE_ALTIVEC], [test x"$flag_altivec" = x"true"])
-AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true" -a x"$flag_bmi" = x"true" -a x"$flag_abm" = x"true" -a x"$flag_bmi2" = x"true"])
+AM_CONDITIONAL([HAVE_AVX2_GCC], [test x"$flag_avx2" = x"true" -a x"$flag_bmi" = x"true" -a x"$flag_abm" = x"true" -a x"$flag_bmi2" = x"true"])
+AM_CONDITIONAL([HAVE_AVX2_CLANG], [test x"$flag_avx2" = x"true" -a x"$flag_bmi" = x"true" -a x"$flag_popcnt" = x"true" -a x"$flag_lzcnt" = x"true" -a x"$flag_bmi2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
