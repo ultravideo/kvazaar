@@ -781,8 +781,8 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
 
-    ctu->qp = state->qp;
-    ctu->lambda = state->lambda;
+    //ctu->qp = state->qp;
+    //ctu->lambda = state->lambda;
   }
 }
 
