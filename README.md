@@ -129,6 +129,15 @@ Video structure:
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.
                                    - N: Target N bits per second.
+      --rc-algorithm <string>: Select used rc-algorithm. [lambda]
+                                   - lambda: rate control from:
+                                     DOI: 10.1109/TIP.2014.2336550 
+                                   - oba: DOI: 10.1109/TCSVT.2016.2589878
+      --(no-)intra-bits      : Use Hadamard cost based allocation for intra
+                               frames. Default on for gop 8 and off for lp-gop
+      --(no-)clip-neighbour  : On oba based rate control whether to clip 
+                               lambda values to same frame's ctus or previous'.
+                               Default on for RA GOPS and disabled for LP.
       --(no-)lossless        : Use lossless coding. [disabled]
       --mv-constraint <string> : Constrain movement vectors. [none]
                                    - none: No constraint
