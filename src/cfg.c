@@ -326,6 +326,10 @@ static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t 
     int len = strlen( list );
     int retval = 1;
 
+    //Reset depths in case multiple pu depth parameters are given
+    memset( depths_max, -1, size * sizeof( *depths_max ) );
+    memset( depths_min, -1, size * sizeof( *depths_min ) );
+
     token = strtok( list, "," );
     while( ptr < len && list[ptr + 1] == ',' )
     {
