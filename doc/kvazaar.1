@@ -122,7 +122,10 @@ GOP structure [lp\-g4d3t1]
     \- lp\-<string>: Low\-delay P/B\-frame GOP
       (e.g. lp\-g8d4t2, see README)
 .TP
-\fB\-\-intra\-qp\-offset <int>: QP offset for intra frames [\-51..51] [0]
+\fB\-\-intra\-qp\-offset <int>: QP offset for intra frames [\-51..51] [auto]
+    \- N: Set QP offset to N.
+    \- auto: Select offset automatically based
+      on GOP length.
 .TP
 \fB\-\-(no\-)open\-gop       
 Use open GOP configuration. [enabled]

@@ -415,7 +415,7 @@ void print_help(void)
     "      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [auto]\n"
     "                                   - N: Set QP offset to N.\n"
     "                                   - auto: Select offset automatically based\n"
-    "                                     on GOP length."
+    "                                     on GOP length.\n"
     "      --(no-)open-gop        : Use open GOP configuration. [enabled]\n"
     "      --cqmfile <filename>   : Read custom quantization matrices from a file.\n"
     "      --scaling-list <string>: Set scaling list mode. [off]\n"

@@ -119,7 +119,10 @@ Video structure:
                                    - 16: B-frame pyramid of length 16
                                    - lp-<string>: Low-delay P/B-frame GOP
                                      (e.g. lp-g8d4t2, see README)
-      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [0]
+      --intra-qp-offset <int>: QP offset for intra frames [-51..51] [auto]
+                                   - N: Set QP offset to N.
+                                   - auto: Select offset automatically based
+                                     on GOP length.
       --(no-)open-gop        : Use open GOP configuration. [enabled]
       --cqmfile <filename>   : Read custom quantization matrices from a file.
       --scaling-list <string>: Set scaling list mode. [off]
