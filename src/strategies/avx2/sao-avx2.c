@@ -26,6 +26,7 @@
 
 // Use a couple generic functions from here as a worst-case fallback
 #include "strategies/generic/sao_shared_generics.h"
+#include "strategies/avx2/avx2_common_functions.h"
 #include "strategies/missing-intel-intrinsics.h"
 #include "cu.h"
 #include "encoder.h"
@@ -34,36 +35,9 @@
 #include "sao.h"
 #include "strategyselector.h"
 
-// The calling convention used by MSVC on 32-bit builds will essentially
-// disallow functions to have more than 3 XMM/YMM parameters, because it
-// will not provide more than 8-byte param alignment, and only the first
-// three vector params will be carried in SIMD registers. Now the
-// vectorcall convention could probably be problematic in globally visible
-// funcitons, but likely not in static ones.
-#if defined _MSC_VER && defined _WIN32 && !defined _WIN64
-  #define FIX_W32 __vectorcall
-#else
-  #define FIX_W32
-#endif
-
 // These optimizations are based heavily on sao-generic.c.
 // Might be useful to check that if (when) this file
 // is difficult to understand.
-
-static int32_t FIX_W32 hsum_8x32b(const __m256i v)
-{
-  __m256i sum1 = v;
-  __m256i sum2 = _mm256_permute4x64_epi64(sum1, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i sum3 = _mm256_add_epi32        (sum1, sum2);
-  __m256i sum4 = _mm256_shuffle_epi32    (sum3, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i sum5 = _mm256_add_epi32        (sum3, sum4);
-  __m256i sum6 = _mm256_shuffle_epi32    (sum5, _MM_SHUFFLE(2, 3, 0, 1));
-  __m256i sum7 = _mm256_add_epi32        (sum5, sum6);
-
-  __m128i sum8 = _mm256_castsi256_si128  (sum7);
-  int32_t sum9 = _mm_cvtsi128_si32       (sum8);
-  return  sum9;
-}
 
 // Do the SIGN3 operation for the difference a-b
 static INLINE __m256i sign3_diff_epu8(const __m256i a, const __m256i b)

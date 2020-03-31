@@ -37,6 +37,8 @@
 #include "tables.h"
 #include "threadqueue.h"
 
+#include "strategies/strategies-picture.h"
+
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -1223,31 +1225,6 @@ static void normalize_lcu_weights(encoder_state_t * const state)
   }
 }
 
-// Calculate pixel value variance. Takes in arrays of kvz_pixel
-static double pixel_var(kvz_pixel * const arr, const uint32_t len) {
-  double var = 0;
-  double arr_mean = 0;
-
-  // Calculate array mean
-  int i = 0;
-  double sum = 0;
-
-  for (; i < len; ++i) {
-    sum += arr[i];
-  }
-  arr_mean = sum / (double)len;
-
-  // Calculate array variance  
-  for (i = 0; i < len; ++i) {
-    double tmp = (double)arr[i] - arr_mean;
-    var += tmp*tmp;
-  }
-
-  var /= len;
-
-  return var;
-}
-
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1269,10 +1246,10 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
     uint32_t c_len = len / 4;
-    double frame_var = pixel_var(state->tile->frame->source->y, len);
+    double frame_var = kvz_pixel_var(state->tile->frame->source->y, len);
     if (has_chroma) {
-      frame_var += pixel_var(state->tile->frame->source->u, c_len);
-      frame_var += pixel_var(state->tile->frame->source->v, c_len);
+      frame_var += kvz_pixel_var(state->tile->frame->source->u, c_len);
+      frame_var += kvz_pixel_var(state->tile->frame->source->v, c_len);
     }
 
     // Loop through LCUs
@@ -1293,7 +1270,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
           x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
 
-        double lcu_var = pixel_var(tmp, LCU_LUMA_SIZE);
+        double lcu_var = kvz_pixel_var(tmp, LCU_LUMA_SIZE);
 
         if (has_chroma) {
           // Add chroma variance if not monochrome
@@ -1308,8 +1285,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
           kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
           kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
-          lcu_var += pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
-          lcu_var += pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
+          lcu_var += kvz_pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
+          lcu_var += kvz_pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
         }
                 
         state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
