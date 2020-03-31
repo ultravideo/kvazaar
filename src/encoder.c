@@ -243,6 +243,10 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     }
   } 
   
+  if( encoder->cfg.intra_qp_offset_auto ) {
+      encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? -kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1 : 0;
+  }
+
   // Disable GOP and QP offset for all-intra coding
   if (encoder->cfg.intra_period == 1) {
     encoder->cfg.gop_len = 0;

@@ -387,6 +387,7 @@ typedef struct kvz_config
 
   /** \brief Offset to add to QP for intra frames */
   int8_t intra_qp_offset;
+  uint8_t intra_qp_offset_auto;
 
   /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
   int8_t fast_residual_cost_limit;

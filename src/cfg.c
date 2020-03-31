@@ -42,6 +42,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
   cfg->intra_qp_offset = 0;
+  cfg->intra_qp_offset_auto = false;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
@@ -1024,6 +1025,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("intra-qp-offset") {
     cfg->intra_qp_offset = atoi(value);
+    if( cfg->intra_qp_offset == 0 && !strcmp( value, "auto" ) )
+    {
+        cfg->intra_qp_offset_auto = true;
+    }
   }
   else if OPT("open-gop") {
     cfg->open_gop = (bool)atobool(value);
