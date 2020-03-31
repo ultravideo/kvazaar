@@ -442,7 +442,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
   static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
-  static const char * const preset_values[11][26*2] = {
+  static const char * const preset_values[11][25*2] = {
 
       {
         "ultrafast",
@@ -451,7 +451,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -480,7 +479,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -509,7 +507,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -538,7 +535,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -567,7 +563,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "auto",
         "ref", "2",
         "bipred", "0",
         "deblock", "0:0",
@@ -596,7 +591,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "0",
         "deblock", "0:0",
@@ -625,7 +619,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -654,7 +647,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -683,7 +675,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
-        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -712,7 +703,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
-        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
