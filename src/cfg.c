@@ -42,7 +42,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
   cfg->intra_qp_offset = 0;
-  cfg->intra_qp_offset_auto = false;
+  cfg->intra_qp_offset_auto = true;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
@@ -451,7 +451,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "0",
+        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -480,7 +480,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "2-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "0",
+        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -509,7 +509,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "0",
+        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -538,7 +538,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "0",
+        "intra-qp-offset", "auto",
         "ref", "1",
         "bipred", "0",
         "deblock", "0:0",
@@ -567,7 +567,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "1-3",
         "me", "hexbs",
         "gop", "lp-g4d4t1",
-        "intra-qp-offset", "0",
+        "intra-qp-offset", "auto",
         "ref", "2",
         "bipred", "0",
         "deblock", "0:0",
@@ -596,7 +596,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "-2",
+        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "0",
         "deblock", "0:0",
@@ -625,7 +625,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "-2",
+        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -654,7 +654,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "8",
-        "intra-qp-offset", "-2",
+        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -683,7 +683,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
-        "intra-qp-offset", "-3",
+        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -712,7 +712,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
-        "intra-qp-offset", "-3",
+        "intra-qp-offset", "auto",
         "ref", "4",
         "bipred", "1",
         "deblock", "0:0",
@@ -1028,6 +1028,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if( cfg->intra_qp_offset == 0 && !strcmp( value, "auto" ) )
     {
         cfg->intra_qp_offset_auto = true;
+    } else {
+        cfg->intra_qp_offset_auto = false;
     }
   }
   else if OPT("open-gop") {
