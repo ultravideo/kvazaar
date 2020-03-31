@@ -790,11 +790,7 @@ bool predict_chroma)
     if (predict_luma) {
       bool use_8_elements = ((temp_x + 8) <= width);
 
-      switch (use_8_elements)
-      {
-
-      case false:
-
+      if (!use_8_elements) {
         if (width < 4) {
           // If width is smaller than 4 there's no need to use SIMD
           for (int temp_i = 0; temp_i < width; ++temp_i) {
@@ -842,9 +838,7 @@ bool predict_chroma)
           }
 
         }
-        break;
-
-      default:
+      } else {
         // Load total of 8 elements from memory to vector
         sample0_epi32 = hi_prec_luma_rec0 ? _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i*) &(high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu]))) :
           _mm256_slli_epi32(_mm256_cvtepu8_epi32((_mm_loadl_epi64((__m128i*) &(temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu])))), 14 - KVZ_BIT_DEPTH);
@@ -864,8 +858,6 @@ bool predict_chroma)
 
         // Store 64-bits from vector to memory
         _mm_storel_epi64((__m128i*)&(lcu->rec.y[(y_in_lcu)* LCU_WIDTH + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
-        break;
       }
     }
    }
@@ -899,10 +891,7 @@ bool predict_chroma)
 
         __m256i temp_u_epi32, temp_v_epi32;
 
-        switch (use_8_elements)
-        {
-
-        case false:
+        if (!use_8_elements) {
           // Load 4 pixels to vector
           sample0_epi32 = hi_prec_chroma_rec0 ? _mm256_cvtepi16_epi32(_mm_loadl_epi64((__m128i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
             _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_cvtsi32_si128(*(int32_t*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), 14 - KVZ_BIT_DEPTH);
@@ -957,11 +946,7 @@ bool predict_chroma)
             int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
             lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
           }
-
-
-          break;
-
-        default:
+        } else {
           // Load 8 pixels to vector
           sample0_epi32 = hi_prec_chroma_rec0 ? _mm256_cvtepi16_epi32(_mm_loadu_si128((__m128i*) &(high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))) :
             _mm256_slli_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*) &(temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu]))), 14 - KVZ_BIT_DEPTH);
@@ -999,9 +984,6 @@ bool predict_chroma)
 
           // Store 64-bit integer into memory
           _mm_storel_epi64((__m128i*)&(lcu->rec.v[(y_in_lcu)* LCU_WIDTH_C + x_in_lcu]), _mm256_castsi256_si128(temp_epi8));
-
-
-          break;
         }
       }
     }
