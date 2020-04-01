@@ -456,7 +456,8 @@ void print_help(void)
     "      --high-tier            : Used with --level. Use high tier bitrate limits\n"
     "                               instead of the main tier limits during encoding.\n"
     "                               High tier requires level 4 or higher.\n"
-		"      --vaq                  : Enable variance adaptive quantization.\n"
+		"      --vaq <integer>        : Enable variance adaptive quantization with given\n"
+    "                               strength, in range 1..20.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"
