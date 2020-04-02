@@ -123,6 +123,7 @@ static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t
   *last = (31 - (int32_t)_lzcnt_u32(nonzero_bytes)) >> 1;
 }
 
+/* MOVED TO SAO-AVX2.C WHERE THIS IS USED
 int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
 {
   __m256i sum1 = v;
@@ -137,5 +138,5 @@ int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
   int32_t sum9 = _mm_cvtsi128_si32       (sum8);
   return  sum9;
 }
-
+*/
 #endif
