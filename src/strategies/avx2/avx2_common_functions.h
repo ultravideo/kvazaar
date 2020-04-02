@@ -123,7 +123,7 @@ static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t
   *last = (31 - (int32_t)_lzcnt_u32(nonzero_bytes)) >> 1;
 }
 
-static int32_t FIX_W32 hsum_8x32b(const __m256i v)
+int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
 {
   __m256i sum1 = v;
   __m256i sum2 = _mm256_permute4x64_epi64(sum1, _MM_SHUFFLE(1, 0, 3, 2));
