@@ -1225,6 +1225,21 @@ static void normalize_lcu_weights(encoder_state_t * const state)
   }
 }
 
+// Check if lcu is edge lcu. Return false if frame dimensions are 64 divisible
+bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
+{
+  if (xdiv64 && ydiv64) {
+    return false;
+  }
+  int last_row_first_id = (lcus_y - 1) * lcus_x;
+  if ((id % lcus_x == lcus_x - 1 && !xdiv64) || (id >= last_row_first_id && !ydiv64)) {
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1266,10 +1281,26 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         int x_max = MIN(pxl_x + LCU_WIDTH, frame->width) - pxl_x;
         int y_max = MIN(pxl_y + LCU_WIDTH, frame->height) - pxl_y;
         
-        // Luma variance
-        kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
-          x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
+        bool xdiv64 = false;
+        bool ydiv64 = false;
+        if (frame->width % 64 == 0) xdiv64 = true;
+        if (frame->height % 64 == 0) ydiv64 = true;
 
+        // Luma variance
+        if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
+          kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
+            x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
+        } else {
+          // Extend edge pixels for edge lcus
+          for (int y = 0; y < LCU_WIDTH; y++) {
+            for (int x = 0; x < LCU_WIDTH; x++) {
+              int src_y = CLIP(0, frame->height - 1, pxl_y + y);
+              int src_x = CLIP(0, frame->width - 1, pxl_x + x);
+              tmp[y * LCU_WIDTH + x] = state->tile->frame->source->y[src_y * state->tile->frame->source->stride + src_x];
+            }
+          }
+        }
+        
         double lcu_var = kvz_pixel_var(tmp, LCU_LUMA_SIZE);
 
         if (has_chroma) {
@@ -1283,8 +1314,20 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width >> 1) - c_pxl_x;
           int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height >> 1) - c_pxl_y;
 
-          kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
-          kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+          if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
+            kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+            kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+          }
+          else {
+            for (int y = 0; y < lcu_chroma_width; y++) {
+              for (int x = 0; x < lcu_chroma_width; x++) {
+                int src_y = CLIP(0, (frame->height >> 1) - 1, c_pxl_y + y);
+                int src_x = CLIP(0, (frame->width >> 1) - 1, c_pxl_x + x);
+                chromau_tmp[y * lcu_chroma_width + x] = state->tile->frame->source->u[src_y * c_stride + src_x];
+                chromav_tmp[y * lcu_chroma_width + x] = state->tile->frame->source->v[src_y * c_stride + src_x];
+              }
+            }
+          }
           lcu_var += kvz_pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
           lcu_var += kvz_pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
         }
