@@ -21,6 +21,8 @@
 // Tell 'em we actually want to do that, it's not an accident.
 #if defined __GNUC__ || defined __clang__ || defined __MINGW32__ || defined __MINGW64__
   #define FIX_UNUSED __attribute__((unused))
+#else
+  #define FIX_UNUSED
 #endif
 
 #define FIX_NOINLINE FIX_W32 FIX_UNUSED
