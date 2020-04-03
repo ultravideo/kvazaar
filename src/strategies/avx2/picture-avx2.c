@@ -1076,7 +1076,7 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
 
   size_t i;
   __m256i sums = zero;
-  for (i = 0; i < len; i += 32) {
+  for (i = 0; i + 31 < len; i += 32) {
     __m256i curr = _mm256_loadu_si256((const __m256i *)(buf + i));
     __m256i curr_sum = _mm256_sad_epu8(curr, zero);
             sums = _mm256_add_epi64(sums, curr_sum);
@@ -1088,11 +1088,17 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   __m128i sum_5  = _mm_add_epi64           (sum_3,  sum_4);
 
   int64_t sum    = _mm_cvtsi128_si64(sum_5);
+
+  // Remaining len mod 32 pixels
+  for (; i < len; ++i) {
+    sum += buf[i];
+  }
+
   float   mean_f = (float)sum / len_f;
   __m256  mean   = _mm256_set1_ps(mean_f);
   __m256  accum  = _mm256_setzero_ps();
 
-  for (i = 0; i < len; i += 32) {
+  for (i = 0; i + 31 < len; i += 32) {
     __m128i curr0    = _mm_loadl_epi64((const __m128i *)(buf + i +  0));
     __m128i curr1    = _mm_loadl_epi64((const __m128i *)(buf + i +  8));
     __m128i curr2    = _mm_loadl_epi64((const __m128i *)(buf + i + 16));
@@ -1134,6 +1140,13 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   __m256  accum7   = _mm256_add_ps        (accum5, accum6);
 
   float   var_sum  = _mm256_cvtss_f32     (accum7);
+
+  // Remaining len mod 32 pixels
+  for (; i < len; ++i) {
+    float diff = buf[i] - mean_f;
+    var_sum += diff * diff;
+  }
+
   return  var_sum / len_f;
 }
 
