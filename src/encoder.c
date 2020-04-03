@@ -376,7 +376,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   // for SMP and AMP partition units.
   encoder->tr_depth_inter = 0;
 
-  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps || encoder->cfg.set_qp_in_cu) {
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps || encoder->cfg.set_qp_in_cu || encoder->cfg.vaq) {
     encoder->max_qp_delta_depth = 0;
   } else {
     encoder->max_qp_delta_depth = -1;

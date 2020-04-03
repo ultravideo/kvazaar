@@ -637,8 +637,22 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
   return avg_bits;
 }
 
+static double qp_to_lambda(encoder_state_t* const state, int qp)
+{
+  const int shift_qp = 12;
+  double lambda = 0.57 * pow(2.0, (qp - shift_qp) / 3.0);
 
-void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
+  // NOTE: HM adjusts lambda for inter according to Hadamard usage in ME.
+  //       SATD is currently always enabled for ME, so this has no effect.
+  // bool hadamard_me = true;
+  // if (!hadamard_me && state->frame->slicetype != KVZ_SLICE_I) {
+  //   lambda *= 0.95;
+  // }
+
+  return lambda;
+}
+
+ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   double bits = get_ctu_bits(state, pos);
 
   const encoder_control_t * const encoder = state->encoder_control;
@@ -750,6 +764,26 @@ void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   ctu->qp = est_qp;
   ctu->lambda = est_lambda;
   ctu->i_cost = 0;
+
+  // Apply variance adaptive quantization
+  if (encoder->cfg.vaq) {
+    vector2d_t lcu = {
+      pos.x + state->tile->lcu_offset_x,
+      pos.y + state->tile->lcu_offset_y
+    };
+    int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+    int aq_offset = round(state->frame->aq_offsets[id]);
+    state->qp += aq_offset;
+    // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
+    state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+    state->qp = CLIP_TO_QP(state->qp);
+    state->lambda = qp_to_lambda(state, state->qp);
+    state->lambda_sqrt = sqrt(state->lambda);
+
+    //ctu->qp = state->qp;
+    //ctu->lambda = state->lambda;
+  }
 }
 
 
@@ -894,22 +928,6 @@ void kvz_update_after_picture(encoder_state_t * const state) {
   }
 }
 
-
-static double qp_to_lambda(encoder_state_t * const state, int qp)
-{
-  const int shift_qp = 12;
-  double lambda = 0.57 * pow(2.0, (qp - shift_qp) / 3.0);
-
-  // NOTE: HM adjusts lambda for inter according to Hadamard usage in ME.
-  //       SATD is currently always enabled for ME, so this has no effect.
-  // bool hadamard_me = true;
-  // if (!hadamard_me && state->frame->slicetype != KVZ_SLICE_I) {
-  //   lambda *= 0.95;
-  // }
-
-  return lambda;
-}
-
 /**
  * \brief Allocate bits and set lambda and QP for the current picture.
  * \param state the main encoder state
@@ -1048,5 +1066,22 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->qp          = state->frame->QP;
     state->lambda      = state->frame->lambda;
     state->lambda_sqrt = sqrt(state->frame->lambda);
+  }
+
+  // Apply variance adaptive quantization
+  if (ctrl->cfg.vaq) {
+    vector2d_t lcu = {
+      pos.x + state->tile->lcu_offset_x,
+      pos.y + state->tile->lcu_offset_y
+    };
+    int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+    int aq_offset = round(state->frame->aq_offsets[id]);
+    state->qp += aq_offset;    
+    // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
+    state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+    state->qp = CLIP_TO_QP(state->qp);
+    state->lambda = qp_to_lambda(state, state->qp);
+    state->lambda_sqrt = sqrt(state->lambda);
   }
 }

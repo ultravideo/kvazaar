@@ -161,6 +161,11 @@ typedef struct encoder_state_config_frame_t {
   struct encoder_state_t const *previous_layer_state;
 
   /**
+  * \brief Calculated adaptive QP offset for each LCU.
+  */
+  double *aq_offsets;
+
+  /**
    * \brief Whether next NAL is the first NAL in the access unit.
    */
   bool first_nal;

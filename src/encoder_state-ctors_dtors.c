@@ -59,6 +59,7 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
   state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
+  state->frame->aq_offsets = MALLOC(double, num_lcus);
 
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {
@@ -92,6 +93,7 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
 
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
+  FREE_POINTER(state->frame->aq_offsets);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 
