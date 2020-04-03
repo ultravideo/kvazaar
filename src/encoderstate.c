@@ -1226,7 +1226,7 @@ static void normalize_lcu_weights(encoder_state_t * const state)
 }
 
 // Check if lcu is edge lcu. Return false if frame dimensions are 64 divisible
-bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
+static bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
 {
   if (xdiv64 && ydiv64) {
     return false;
