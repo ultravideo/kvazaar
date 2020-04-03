@@ -15,6 +15,16 @@
   #define FIX_W32
 #endif
 
+// Non-inline functions defined in this header are likely to trigger a
+// warning for each module including this header that does NOT use them,
+// at least on unix-ish platforms (GCC/Clang both on native Unix and MinGW).
+// Tell 'em we actually want to do that, it's not an accident.
+#if defined __GNUC__ || defined __clang__ || defined __MINGW32__ || defined __MINGW64__
+  #define FIX_UNUSED __attribute__((unused))
+#endif
+
+#define FIX_NOINLINE FIX_W32 FIX_UNUSED
+
 /*
  * Reorder coefficients from raster to scan order
  * Fun fact: Once upon a time, doing this in a loop looked like this:
@@ -123,8 +133,7 @@ static INLINE void get_first_last_nz_int16(__m256i ints, int32_t *first, int32_t
   *last = (31 - (int32_t)_lzcnt_u32(nonzero_bytes)) >> 1;
 }
 
-/* MOVED TO SAO-AVX2.C WHERE THIS IS USED
-int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
+static int32_t FIX_NOINLINE hsum_8x32b(const __m256i v)
 {
   __m256i sum1 = v;
   __m256i sum2 = _mm256_permute4x64_epi64(sum1, _MM_SHUFFLE(1, 0, 3, 2));
@@ -138,5 +147,5 @@ int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
   int32_t sum9 = _mm_cvtsi128_si32       (sum8);
   return  sum9;
 }
-*/
+
 #endif

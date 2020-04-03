@@ -271,21 +271,6 @@ static INLINE __m256i FIX_W32 do_one_edge_ymm(const __m256i a,
   return calc_diff_off_delta(diff_lo, diff_hi, offset, orig);
 }
 
-int32_t FIX_W32 kvz_hsum_8x32b(const __m256i v)
-{
-  __m256i sum1 = v;
-  __m256i sum2 = _mm256_permute4x64_epi64(sum1, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i sum3 = _mm256_add_epi32(sum1, sum2);
-  __m256i sum4 = _mm256_shuffle_epi32(sum3, _MM_SHUFFLE(1, 0, 3, 2));
-  __m256i sum5 = _mm256_add_epi32(sum3, sum4);
-  __m256i sum6 = _mm256_shuffle_epi32(sum5, _MM_SHUFFLE(2, 3, 0, 1));
-  __m256i sum7 = _mm256_add_epi32(sum5, sum6);
-
-  __m128i sum8 = _mm256_castsi256_si128(sum7);
-  int32_t sum9 = _mm_cvtsi128_si32(sum8);
-  return  sum9;
-}
-
 static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
                                          const kvz_pixel *rec_data,
                                                int32_t    block_width,
@@ -384,7 +369,7 @@ static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
               sum   = _mm256_add_epi32(sum, curr);
     }
   }
-  return kvz_hsum_8x32b(sum);
+  return hsum_8x32b(sum);
 }
 
 static void FIX_W32 calc_edge_dir_one_ymm(const __m256i  a,
@@ -499,7 +484,7 @@ static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
     }
   }
   for (uint32_t i = 0; i < 5; i++) {
-    int32_t sum = kvz_hsum_8x32b(diff_accum[i]);
+    int32_t sum = hsum_8x32b(diff_accum[i]);
     diff_sum[i] += sum;
   }
 }
@@ -892,7 +877,7 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
               sum          = _mm256_add_epi32    (sum,          curr_sum);
     }
   }
-  return kvz_hsum_8x32b(sum);
+  return hsum_8x32b(sum);
 
 use_generic:
   return sao_band_ddistortion_generic(state, orig_data, rec_data, block_width,
