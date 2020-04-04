@@ -101,6 +101,28 @@ typedef void(kvz_sample_octpel_chroma_func)(const encoder_control_t * const enco
 typedef void(kvz_sample_quarterpel_luma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
 typedef void(kvz_sample_octpel_chroma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
 
+typedef void(kvz_sample_14bit_quarterpel_luma_func)(const encoder_control_t * const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  int16_t *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2]);
+
+typedef void(kvz_sample_14bit_octpel_chroma_func)(const encoder_control_t *const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  int16_t *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2]);
+
 // Declare function pointers.
 extern ipol_blocks_func * kvz_filter_hpel_blocks_hor_ver_luma;
 extern ipol_blocks_func * kvz_filter_hpel_blocks_diag_luma;

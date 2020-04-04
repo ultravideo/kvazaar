@@ -97,6 +97,8 @@ typedef uint8_t kvz_pixel;
 typedef uint16_t kvz_pixel;
 #endif
 
+typedef int16_t kvz_pixel_ip;
+
 /**
  * \brief Opaque data structure representing one instance of the encoder.
  */

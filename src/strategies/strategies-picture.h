@@ -133,22 +133,19 @@ typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_
                                 int32_t width, int32_t height, uint32_t pic_stride,
                                 uint32_t ref_stride, uint32_t left, uint32_t right);
 
-typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
-    const int hi_prec_luma_rec1,
-    const int hi_prec_chroma_rec0,
-    const int hi_prec_chroma_rec1,
-    int height,
-    int width,
-    int ypos,
-    int xpos,
-    const hi_prec_buf_t*high_precision_rec0,
-    const hi_prec_buf_t*high_precision_rec1,
-    lcu_t* lcu,
-    kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
-    kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-    kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C],
-    bool predict_luma,
-    bool predict_chroma);  
+typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
+  const yuv_t *const px_L0,
+  const yuv_t *const px_L1,
+  const yuv_ip_t *const ip_L0,
+  const yuv_ip_t *const ip_L1,
+  const unsigned pu_x,
+  const unsigned pu_y,
+  const unsigned pu_w,
+  const unsigned pu_h,
+  const unsigned ip_flags_L0,
+  const unsigned ip_flags_L1,
+  const bool predict_luma,
+  const bool predict_chroma);
 
 typedef double (pixel_var_func)(const kvz_pixel *buf, const uint32_t len);
 

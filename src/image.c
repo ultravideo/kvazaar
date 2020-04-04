@@ -218,27 +218,6 @@ void kvz_yuv_t_free(yuv_t *yuv)
   FREE_POINTER(yuv);
 }
 
-hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
-{
-  // Get buffers with separate mallocs in order to take advantage of
-  // automatic buffer overrun checks.
-  hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
-  yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
-  yuv->v = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
-  yuv->size = luma_size;
-
-  return yuv;
-}
-
-void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
-{
-  free(yuv->y);
-  free(yuv->u);
-  free(yuv->v);
-  free(yuv);
-}
-
 static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, const kvz_pixel * const data2,
                                   const int32_t width, const int32_t height, const uint32_t stride1,
                                   const uint32_t stride2, optimized_sad_func_ptr_t optimized_sad)

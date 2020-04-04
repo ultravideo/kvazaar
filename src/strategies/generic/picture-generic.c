@@ -547,55 +547,52 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
   return ssd >> (2*(KVZ_BIT_DEPTH-8));
 }
 
-static void inter_recon_bipred_generic(const int hi_prec_luma_rec0,
-  const int hi_prec_luma_rec1,
-  const int hi_prec_chroma_rec0,
-  const int hi_prec_chroma_rec1,
-  int32_t height,
-  int32_t width,
-  int32_t ypos,
-  int32_t xpos,
-  const hi_prec_buf_t*high_precision_rec0,
-  const hi_prec_buf_t*high_precision_rec1,
-  lcu_t* lcu,
-  kvz_pixel* temp_lcu_y,
-  kvz_pixel* temp_lcu_u,
-  kvz_pixel* temp_lcu_v,
-  bool predict_luma,
-  bool predict_chroma) {
+static void inter_recon_bipred_generic(lcu_t *const lcu,
+  const yuv_t *const px_L0,
+  const yuv_t *const px_L1,
+  const yuv_ip_t *const ip_L0,
+  const yuv_ip_t *const ip_L1,
+  const unsigned pu_x,
+  const unsigned pu_y,
+  const unsigned pu_w,
+  const unsigned pu_h,
+  const unsigned ip_flags_L0,
+  const unsigned ip_flags_L1,
+  const bool predict_luma,
+  const bool predict_chroma) {
 
   int shift = 15 - KVZ_BIT_DEPTH;
   int offset = 1 << (shift - 1);
+
+  const unsigned pu_w_c = pu_w >> 1;
 
   int y_in_lcu;
   int x_in_lcu;
 
   //After reconstruction, merge the predictors by taking an average of each pixel
-  for (int temp_y = 0; temp_y < height; ++temp_y) {
-
-
-    for (int temp_x = 0; temp_x < width; ++temp_x) {
-      y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
-      x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+  for (int y = 0; y < pu_h; ++y) {
+    for (int x = 0; x < pu_w; ++x) {
+      y_in_lcu = (pu_y + y) & (LCU_WIDTH-1);
+      x_in_lcu = (pu_x + x) & (LCU_WIDTH-1);
 
       if (predict_luma) {
-        int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample0_y = ((ip_flags_L0 & 1) ? ip_L0->y[y * pu_w + x] : (px_L0->y[y * pu_w + x] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample1_y = ((ip_flags_L1 & 1) ? ip_L1->y[y * pu_w + x] : (px_L1->y[y * pu_w + x] << (14 - KVZ_BIT_DEPTH)));
 
         lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
       }
 
-      if (predict_chroma && (temp_x < width >> 1 && temp_y < height >> 1)) {
+      if (predict_chroma && (x < (pu_w >> 1) && y < (pu_h >> 1))) {
 
-        y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
-        x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+        y_in_lcu = SUB_SCU(pu_y) / 2 + y;
+        x_in_lcu = SUB_SCU(pu_x) / 2 + x;
 
-        int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample0_u = ((ip_flags_L0 & 2) ? ip_L0->u[y * pu_w_c + x] : (px_L0->u[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample1_u = ((ip_flags_L1 & 2) ? ip_L1->u[y * pu_w_c + x] : (px_L1->u[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
         lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
 
-        int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample0_v = ((ip_flags_L0 & 2) ? ip_L0->v[y * pu_w_c + x] : (px_L0->v[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
+        int16_t sample1_v = ((ip_flags_L1 & 2) ? ip_L1->v[y * pu_w_c + x] : (px_L1->v[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
         lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
       }
     }

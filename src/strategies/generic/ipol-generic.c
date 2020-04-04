@@ -131,7 +131,16 @@ int32_t kvz_four_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int
   return temp;
 }
 
-void kvz_sample_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void kvz_sample_quarterpel_luma_generic(const encoder_control_t * const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -669,7 +678,16 @@ void kvz_filter_qpel_blocks_diag_luma_generic(const encoder_control_t * encoder,
   }
 }
 
-void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height,kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
