@@ -547,6 +547,69 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
   return ssd >> (2*(KVZ_BIT_DEPTH-8));
 }
 
+static void bipred_average_px_px(kvz_pixel *dst,
+  kvz_pixel *px_L0,
+  kvz_pixel *px_L1,
+  unsigned pu_w,
+  unsigned pu_h,
+  unsigned dst_stride)
+{
+  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t offset = 1 << (shift - 1);
+
+  for (int i = 0; i < pu_w * pu_h; ++i)
+  {
+    int y = i / pu_w;
+    int x = i % pu_w;
+    int16_t sample_L0 = px_L0[i] << (14 - KVZ_BIT_DEPTH);
+    int16_t sample_L1 = px_L1[i] << (14 - KVZ_BIT_DEPTH);
+    int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
+    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+  }
+}
+
+static void bipred_average_ip_ip(kvz_pixel *dst,
+  kvz_pixel_ip *ip_L0,
+  kvz_pixel_ip *ip_L1,
+  unsigned pu_w,
+  unsigned pu_h,
+  unsigned dst_stride)
+{
+  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t offset = 1 << (shift - 1);
+
+  for (int i = 0; i < pu_w * pu_h; ++i)
+  {
+    int y = i / pu_w;
+    int x = i % pu_w;
+    int16_t sample_L0 = ip_L0[i];
+    int16_t sample_L1 = ip_L1[i];
+    int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
+    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+  }
+}
+
+static void bipred_average_px_ip(kvz_pixel *dst,
+  kvz_pixel *px,
+  kvz_pixel_ip *ip,
+  unsigned pu_w,
+  unsigned pu_h,
+  unsigned dst_stride)
+{
+  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t offset = 1 << (shift - 1);
+
+  for (int i = 0; i < pu_w * pu_h; ++i)
+  {
+    int y = i / pu_w;
+    int x = i % pu_w;
+    int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
+    int16_t sample_ip = ip[i];
+    int32_t rounded = (sample_px + sample_ip + offset) >> shift;
+    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+  }
+}
+
 static void bipred_average_generic(lcu_t *const lcu,
   const yuv_t *const px_L0,
   const yuv_t *const px_L1,
@@ -561,43 +624,44 @@ static void bipred_average_generic(lcu_t *const lcu,
   const bool predict_luma,
   const bool predict_chroma) {
 
-  int shift = 15 - KVZ_BIT_DEPTH;
-  int offset = 1 << (shift - 1);
-
-  const unsigned pu_w_c = pu_w >> 1;
-
-  int y_in_lcu;
-  int x_in_lcu;
-
   //After reconstruction, merge the predictors by taking an average of each pixel
-  for (int y = 0; y < pu_h; ++y) {
-    for (int x = 0; x < pu_w; ++x) {
-      y_in_lcu = (pu_y + y) & (LCU_WIDTH-1);
-      x_in_lcu = (pu_x + x) & (LCU_WIDTH-1);
+  if (predict_luma) {
+    unsigned pb_offset = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
 
-      if (predict_luma) {
-        int16_t sample0_y = ((ip_flags_L0 & 1) ? ip_L0->y[y * pu_w + x] : (px_L0->y[y * pu_w + x] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_y = ((ip_flags_L1 & 1) ? ip_L1->y[y * pu_w + x] : (px_L1->y[y * pu_w + x] << (14 - KVZ_BIT_DEPTH)));
+    if (!(ip_flags_L0 & 1) && !(ip_flags_L1 & 1)) {
+      bipred_average_px_px(lcu->rec.y + pb_offset, px_L0->y, px_L1->y, pu_w, pu_h, LCU_WIDTH);
 
-        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
-      }
+    } else if ((ip_flags_L0 & 1) && (ip_flags_L1 & 1)) {
+      bipred_average_ip_ip(lcu->rec.y + pb_offset, ip_L0->y, ip_L1->y, pu_w, pu_h, LCU_WIDTH);
 
-      if (predict_chroma && (x < (pu_w >> 1) && y < (pu_h >> 1))) {
-
-        y_in_lcu = SUB_SCU(pu_y) / 2 + y;
-        x_in_lcu = SUB_SCU(pu_x) / 2 + x;
-
-        int16_t sample0_u = ((ip_flags_L0 & 2) ? ip_L0->u[y * pu_w_c + x] : (px_L0->u[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_u = ((ip_flags_L1 & 2) ? ip_L1->u[y * pu_w_c + x] : (px_L1->u[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
-        lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
-
-        int16_t sample0_v = ((ip_flags_L0 & 2) ? ip_L0->v[y * pu_w_c + x] : (px_L0->v[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
-        int16_t sample1_v = ((ip_flags_L1 & 2) ? ip_L1->v[y * pu_w_c + x] : (px_L1->v[y * pu_w_c + x] << (14 - KVZ_BIT_DEPTH)));
-        lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
-      }
+    } else {
+      kvz_pixel    *src_px = (ip_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      kvz_pixel_ip *src_ip = (ip_flags_L0 & 1) ? ip_L0->y : ip_L1->y;
+      bipred_average_px_ip(lcu->rec.y + pb_offset, src_px, src_ip, pu_w, pu_h, LCU_WIDTH);
     }
   }
+  if (predict_chroma) {
+    unsigned pb_offset = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+    unsigned pb_w = pu_w / 2;
+    unsigned pb_h = pu_h / 2;
 
+    if (!(ip_flags_L0 & 2) && !(ip_flags_L1 & 2)) {
+      bipred_average_px_px(lcu->rec.u + pb_offset, px_L0->u, px_L1->u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_px_px(lcu->rec.v + pb_offset, px_L0->v, px_L1->v, pb_w, pb_h, LCU_WIDTH_C);
+
+    } else if ((ip_flags_L0 & 2) && (ip_flags_L1 & 2)) {
+      bipred_average_ip_ip(lcu->rec.u + pb_offset, ip_L0->u, ip_L1->u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_ip_ip(lcu->rec.v + pb_offset, ip_L0->v, ip_L1->v, pb_w, pb_h, LCU_WIDTH_C);
+
+    } else {
+      kvz_pixel    *src_px_u = (ip_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      kvz_pixel_ip *src_ip_u = (ip_flags_L0 & 2) ? ip_L0->u : ip_L1->u;
+      kvz_pixel    *src_px_v = (ip_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      kvz_pixel_ip *src_ip_v = (ip_flags_L0 & 2) ? ip_L0->v : ip_L1->v;
+      bipred_average_px_ip(lcu->rec.u + pb_offset, src_px_u, src_ip_u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_px_ip(lcu->rec.v + pb_offset, src_px_v, src_ip_v, pb_w, pb_h, LCU_WIDTH_C);
+    }
+  }
 }
 
 
