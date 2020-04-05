@@ -540,10 +540,10 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
                                              &px_L1, &ip_L1, predict_luma, predict_chroma);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  kvz_inter_recon_bipred_blend(lcu, &px_L0, &px_L1, &ip_L0, &ip_L1,
-                               pu_x, pu_y, pu_w, pu_h,
-                               ip_flags_L0, ip_flags_L1,
-                               predict_luma, predict_chroma);
+  kvz_bipred_average(lcu, &px_L0, &px_L1, &ip_L0, &ip_L1,
+                     pu_x, pu_y, pu_w, pu_h,
+                     ip_flags_L0, ip_flags_L1,
+                     predict_luma, predict_chroma);
 }
 
 

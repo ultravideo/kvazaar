@@ -547,7 +547,7 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
   return ssd >> (2*(KVZ_BIT_DEPTH-8));
 }
 
-static void inter_recon_bipred_generic(lcu_t *const lcu,
+static void bipred_average_generic(lcu_t *const lcu,
   const yuv_t *const px_L0,
   const yuv_t *const px_L1,
   const yuv_ip_t *const ip_L0,
@@ -743,7 +743,7 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
 
   success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
-  success &= kvz_strategyselector_register(opaque, "inter_recon_bipred", "generic", 0, &inter_recon_bipred_generic);
+  success &= kvz_strategyselector_register(opaque, "bipred_average", "generic", 0, &bipred_average_generic);
 
   success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
   success &= kvz_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);

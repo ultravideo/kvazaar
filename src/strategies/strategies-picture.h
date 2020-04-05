@@ -181,7 +181,7 @@ extern cost_pixel_any_size_multi_func *kvz_satd_any_size_quad;
 
 extern pixels_calc_ssd_func *kvz_pixels_calc_ssd;
 
-extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
+extern inter_recon_bipred_func * kvz_bipred_average;
 
 extern get_optimized_sad_func *kvz_get_optimized_sad;
 extern ver_sad_func *kvz_ver_sad;
@@ -220,7 +220,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_64x64_dual", (void**) &kvz_satd_64x64_dual}, \
   {"satd_any_size_quad", (void**) &kvz_satd_any_size_quad}, \
   {"pixels_calc_ssd", (void**) &kvz_pixels_calc_ssd}, \
-  {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
+  {"bipred_average", (void**) &kvz_bipred_average}, \
   {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
   {"ver_sad", (void**) &kvz_ver_sad}, \
   {"hor_sad", (void**) &kvz_hor_sad}, \
