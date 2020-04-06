@@ -1121,7 +1121,8 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   __m256  accum6   = _mm256_permute_ps    (accum5, _MM_SHUFFLE(2, 3, 0, 1));
   __m256  accum7   = _mm256_add_ps        (accum5, accum6);
 
-  float   var_sum  = _mm256_cvtss_f32     (accum7);
+  __m128  accum8   = _mm256_castps256_ps128(accum7);
+  float   var_sum  = _mm_cvtss_f32         (accum8);
 
   // Remaining len mod 32 pixels
   for (; i < len; ++i) {
