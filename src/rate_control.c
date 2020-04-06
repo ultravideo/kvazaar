@@ -476,7 +476,6 @@ void kvz_estimate_pic_lambda(encoder_state_t * const state) {
     pthread_mutex_unlock(&state->frame->new_ratecontrol->ck_frame_lock);
   }
   double bits = pic_allocate_bits(state);
-  // fprintf(state->frame->bpp_d, "Frame %d\tbits:\t%f\n", state->frame->num, bits);
   state->frame->cur_pic_target_bits = bits;
 
   double est_lambda;
@@ -825,10 +824,10 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
 
     bpp = CLIP(0.0001, 10.0, bpp);
     new_k = -bpp * lambda / distortion;
+    new_k = CLIP(-3.0, -0.001, new_k);
     new_c = distortion / pow(bpp, new_k);
     
     new_c = CLIP(+.1, 100.0, new_c);
-    new_k = CLIP(-3.0, -0.001, new_k);
 
     if (state->frame->is_irap || state->frame->num <= (4 - state->encoder_control->cfg.frame_allocation)) {
       for (int i = 1; i < 5; i++) {
@@ -841,8 +840,6 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
       state->frame->new_ratecontrol->k_para[layer][ctu_index] = new_k;
     }
   }
-  // fprintf(state->frame->c_d, "CTU %d\tC:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_c, bpp, distortion, lambda);
-  // fprintf(state->frame->k_d, "CTU %d\tK:\t%f\tbpp\t%f\tdistortion\t%f\tlambda\t%f\n", ctu_index, new_k, bpp, distortion, lambda);
 }
 
 
