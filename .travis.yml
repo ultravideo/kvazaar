@@ -19,7 +19,7 @@ matrix:
 
   include:
     - compiler: clang
-      env: KVZ_TEST_VALGRIND=1
+      env: KVZ_TEST_VALGRIND=1 KVAZAAR_OVERRIDE_angular_pred=generic
 
     - compiler: clang
       env: CFLAGS='-fsanitize=thread'
