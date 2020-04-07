@@ -1056,6 +1056,7 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   const float len_f  = (float)len;
   const __m256i zero = _mm256_setzero_si256();
 
+  int64_t sum;
   size_t i;
   __m256i sums = zero;
   for (i = 0; i + 31 < len; i += 32) {
@@ -1069,7 +1070,7 @@ static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
   __m128i sum_4  = _mm_shuffle_epi32       (sum_3,  _MM_SHUFFLE(1, 0, 3, 2));
   __m128i sum_5  = _mm_add_epi64           (sum_3,  sum_4);
 
-  int64_t sum    = _mm_cvtsi128_si64(sum_5);
+  _mm_storel_epi64((__m128i *)&sum, sum_5);
 
   // Remaining len mod 32 pixels
   for (; i < len; ++i) {
@@ -1172,6 +1173,7 @@ static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
   const __m256i zero      = _mm256_setzero_si256();
   const __m256i himask_15 = _mm256_set1_epi16(0x7f00);
 
+  uint64_t vars;
   size_t i;
   __m256i sums = zero;
   for (i = 0; i < len; i += 32) {
@@ -1213,7 +1215,8 @@ static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
   __m256i accum4 = _mm256_permute4x64_epi64(accum3, _MM_SHUFFLE(2, 3, 1, 0));
   __m256i v_tot  = _mm256_add_epi64        (accum3, accum4);
   __m128i vt128  = _mm256_castsi256_si128  (v_tot);
-  uint64_t vars  = _mm_cvtsi128_si64       (vt128);
+
+  _mm_storel_epi64((__m128i *)&vars, vt128);
 
   return (float)vars * varsum_to_f;
 }
