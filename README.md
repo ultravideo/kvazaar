@@ -22,6 +22,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 - [Compiling Kvazaar](#compiling-kvazaar)
   - [Required libraries](#required-libraries)
   - [Autotools](#autotools)
+  - [Autotools on MinGW](#autotools-on-mingw)
   - [OS X](#os-x)
   - [Visual Studio](#visual-studio)
   - [Docker](#docker)
@@ -393,6 +394,12 @@ Run the following commands to compile and install Kvazaar.
 
 See `./configure --help` for more options.
 
+### Autotools on MinGW
+It is recommended to use Clang instead of GCC in MinGW environments. GCC also works, but AVX2 optimizations will be disabled because of a known GCC issue from 2012, so performance will suffer badly. Instead of `./configure`, run
+
+    CC=clang ./configure
+
+to build Kvazaar using Clang.
 
 ### OS X
 - Install Homebrew
