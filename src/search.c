@@ -637,7 +637,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           true, has_chroma,
           x, y, depth,
           NULL,
-          lcu);
+          lcu,
+          false);
 
         int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 

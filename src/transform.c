@@ -247,14 +247,14 @@ int kvz_quantize_residual_trskip(
   noskip.has_coeffs = kvz_quantize_residual(
       state, cur_cu, width, color, scan_order,
       0, in_stride, 4,
-      ref_in, pred_in, noskip.rec, noskip.coeff);
+      ref_in, pred_in, noskip.rec, noskip.coeff, false);
   noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
   noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, 4,
-    ref_in, pred_in, skip.rec, skip.coeff);
+    ref_in, pred_in, skip.rec, skip.coeff, false);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
   skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
@@ -278,6 +278,8 @@ int kvz_quantize_residual_trskip(
 
 /**
  * Calculate the residual coefficients for a single TU.
+ *
+ * \param early_skip if this is used for early skip, bypass IT and IQ
  */
 static void quantize_tr_residual(encoder_state_t * const state,
                                  const color_t color,
@@ -285,7 +287,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                  const int32_t y,
                                  const uint8_t depth,
                                  cu_info_t *cur_pu,
-                                 lcu_t* lcu)
+                                 lcu_t* lcu,
+                                 bool early_skip)
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
@@ -398,7 +401,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        ref,
                                        pred,
                                        pred,
-                                       coeff);
+                                       coeff,
+                                       early_skip);
   }
 
   if (has_coeffs) {
@@ -412,9 +416,10 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * kvantized residual. Processes the TU tree recursively.
  *
  * Inputs are:
- * - lcu->rec  pixels after prediction for the area
- * - lcu->ref  reference pixels for the area
- * - lcu->cu   for the area
+ * - lcu->rec   pixels after prediction for the area
+ * - lcu->ref   reference pixels for the area
+ * - lcu->cu    for the area
+ * - early_skip if this is used for early skip, bypass IT and IQ
  *
  * Outputs are:
  * - lcu->rec               reconstruction after quantized residual
@@ -429,7 +434,8 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
                                const int32_t y,
                                const uint8_t depth,
                                cu_info_t *cur_pu,
-                               lcu_t* lcu)
+                               lcu_t* lcu,
+                               bool early_skip)
 {
   const int32_t width = LCU_WIDTH >> depth;
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
@@ -463,10 +469,10 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu);
+    kvz_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu, early_skip);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -484,11 +490,11 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
   } else {
     // Process a leaf TU.
     if (luma) {
-      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu);
+      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip);
     }
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu);
+      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
     }
   }
 }

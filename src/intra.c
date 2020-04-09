@@ -671,6 +671,6 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_V);
     }
 
-    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu);
+    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
   }
 }
