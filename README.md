@@ -337,16 +337,16 @@ where the names have been abbreviated to fit the layout in GitHub.
 
 |                      | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p   |
 | -------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 2     | 2     | 2     |
+| rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 2     | 2     | 2     |
 | pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 1-4   |
-| pu-depth-inter       | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
+| pu-depth-inter       | 1-2   | 1-2   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    |
-| gop                  | g4d4t1| g4d4t1| g4d4t1| g4d4t1| g4d4t1| 8     | 8     | 8     | 16    | 16    |
+| gop                  | 8     | 8     | 8     | 8     | 8     | 16    | 16    | 16    | 16    | 16    |
 | ref                  | 1     | 1     | 1     | 1     | 2     | 4     | 4     | 4     | 4     | 4     |
-| bipred               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     |
+| bipred               | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
 | deblock              | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
 | signhide             | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     |
-| subme                | 2     | 2     | 2     | 4     | 4     | 4     | 4     | 4     | 4     | 4     |
+| subme                | 0     | 2     | 2     | 4     | 4     | 4     | 4     | 4     | 4     | 4     |
 | sao                  | off   | full  | full  | full  | full  | full  | full  | full  | full  | full  |
 | rdoq                 | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     |
 | rdoq-skip            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
@@ -358,7 +358,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-| early-skip           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
+| early-skip           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 0     |
 | fast-residual-cost   | 28    | 28    | 28    | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | max-merge            | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     |
 
