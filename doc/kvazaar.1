@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "March 2020" "kvazaar v1.3.0" "User Commands"
+.TH KVAZAAR "1" "April 2020" "kvazaar v1.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -196,9 +196,10 @@ Used with \-\-level. Use high tier bitrate limits
 instead of the main tier limits during encoding.
 High tier requires level 4 or higher.
 .TP
-\fB\-\-vaq <integer>       
+\fB\-\-(no\-)vaq <integer>
 Enable variance adaptive quantization with given
-strength, in range 1..20.
+strength, in range 1..20. Recommended: 5.
+[disabled]
 
 .SS "Compression tools:"
 .TP

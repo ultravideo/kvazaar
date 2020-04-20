@@ -165,8 +165,9 @@ Video structure:
       --high-tier            : Used with --level. Use high tier bitrate limits
                                instead of the main tier limits during encoding.
                                High tier requires level 4 or higher.
-      --vaq <integer>        : Enable variance adaptive quantization with given
-                               strength, in range 1..20.
+      --(no-)vaq <integer>   : Enable variance adaptive quantization with given
+                               strength, in range 1..20. Recommended: 5.
+                               [disabled]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]

@@ -399,7 +399,7 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
 
   delta = para_bb * para_bb - 4 * para_aa*para_cc;
 
-  if (delta > 0.0)	//Check whether delta is right
+  if (delta > 0.0)  //Check whether delta is right
   {
     double temp_x = 0.0;
     double part1 = 0.0;
@@ -426,7 +426,7 @@ static double solve_cubic_equation(const encoder_state_config_frame_t * const st
     best_lambda = exp(temp_x);
   }
   else {
-    best_lambda = est_lambda;		//Use the original picture estimated lambda for the current CTU
+    best_lambda = est_lambda;  //Use the original picture estimated lambda for the current CTU
   }
   best_lambda = CLIP(0.001, 100000000.0, best_lambda);
 
