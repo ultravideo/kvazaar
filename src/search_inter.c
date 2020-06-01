@@ -1244,13 +1244,14 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
   const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
   if (ref_cu->type == CU_INTER) {
+    vector2d_t mv_previous = { 0, 0 };
     if (ref_cu->inter.mv_dir & 1) {
-      mv.x = ref_cu->inter.mv[0][0];
-      mv.y = ref_cu->inter.mv[0][1];
+      mv_previous.x = ref_cu->inter.mv[0][0];
+      mv_previous.y = ref_cu->inter.mv[0][1];
     }
     else {
-      mv.x = ref_cu->inter.mv[1][0];
-      mv.y = ref_cu->inter.mv[1][1];
+      mv_previous.x = ref_cu->inter.mv[1][0];
+      mv_previous.y = ref_cu->inter.mv[1][1];
     }
     // Apply mv scaling if neighbor poc is available
     if (info->state->frame->ref_LX_size[ref_list] > 0) {
@@ -1284,8 +1285,13 @@ static void search_pu_inter_ref(inter_search_info_t *info,
           [col_list]
           [ref_cu->inter.mv_ref[col_list]]
         ],
-        &mv
+        &mv_previous
       );
+    }
+
+    // Check if the mv is valid after scaling
+    if (fracmv_within_tile(info, mv_previous.x, mv_previous.y)) {
+      mv = mv_previous;
     }
   }
 
