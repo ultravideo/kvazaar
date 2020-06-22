@@ -52,7 +52,7 @@ static INLINE __m256i swap_lanes(__m256i v)
   return _mm256_permute4x64_epi64(v, _MM_SHUFFLE(1, 0, 3, 2));
 }
 
-static INLINE __m256i truncate(__m256i v, __m256i debias, int32_t shift)
+static INLINE __m256i truncate_avx2(__m256i v, __m256i debias, int32_t shift)
 {
   __m256i truncable = _mm256_add_epi32 (v,         debias);
   return              _mm256_srai_epi32(truncable, shift);
@@ -85,8 +85,8 @@ static __m256i mul_clip_matrix_4x4_avx2(const __m256i left, const __m256i right,
   __m256i rows_up = _mm256_add_epi32(prod1, prod2);
   __m256i rows_dn = _mm256_add_epi32(prod3, prod4);
 
-  __m256i rows_up_tr = truncate(rows_up, debias, shift);
-  __m256i rows_dn_tr = truncate(rows_dn, debias, shift);
+  __m256i rows_up_tr = truncate_avx2(rows_up, debias, shift);
+  __m256i rows_dn_tr = truncate_avx2(rows_dn, debias, shift);
 
   __m256i result = _mm256_packs_epi32(rows_up_tr, rows_dn_tr);
   return result;
@@ -223,8 +223,8 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
     __m256i lo   = _mm256_add_epi32(lo_1,  lo_2);
     __m256i hi   = _mm256_add_epi32(hi_1,  hi_2);
 
-    __m256i lo_tr = truncate(lo, debias, shift);
-    __m256i hi_tr = truncate(hi, debias, shift);
+    __m256i lo_tr = truncate_avx2(lo, debias, shift);
+    __m256i hi_tr = truncate_avx2(hi, debias, shift);
 
     __m256i final_dr = _mm256_packs_epi32(lo_tr, hi_tr);
 
@@ -282,8 +282,8 @@ static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
     __m256i hsum2c_0    = _mm256_hadd_epi32(hsum0,    hsum1);
     __m256i hsum2c_1    = _mm256_hadd_epi32(hsum2,    hsum3);
 
-    __m256i hsum2c_0_tr = truncate(hsum2c_0, debias, shift);
-    __m256i hsum2c_1_tr = truncate(hsum2c_1, debias, shift);
+    __m256i hsum2c_0_tr = truncate_avx2(hsum2c_0, debias, shift);
+    __m256i hsum2c_1_tr = truncate_avx2(hsum2c_1, debias, shift);
 
     __m256i tmp_dc      = _mm256_packs_epi32(hsum2c_0_tr, hsum2c_1_tr);
 
@@ -337,8 +337,8 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
     __m256i hsum2c_0    = _mm256_hadd_epi32(hsum0,    hsum1);
     __m256i hsum2c_1    = _mm256_hadd_epi32(hsum2,    hsum3);
 
-    __m256i hsum2c_0_tr = truncate(hsum2c_0, debias, shift);
-    __m256i hsum2c_1_tr = truncate(hsum2c_1, debias, shift);
+    __m256i hsum2c_0_tr = truncate_avx2(hsum2c_0, debias, shift);
+    __m256i hsum2c_1_tr = truncate_avx2(hsum2c_1, debias, shift);
 
     __m256i tmp_dr      = _mm256_packs_epi32(hsum2c_0_tr, hsum2c_1_tr);
 
@@ -456,7 +456,7 @@ static void matmul_16x16_a_bt(const __m256i *a,
       __m256i s9  = _mm256_add_epi32(s6, s7);
 
       __m256i res = _mm256_hadd_epi32(s8, s9);
-      results_32[fco] = truncate(res, debias, shift);
+      results_32[fco] = truncate_avx2(res, debias, shift);
     }
     output[y] = _mm256_packs_epi32(results_32[0], results_32[1]);
   }
@@ -862,10 +862,10 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
     size_t acc_base = i << 2;
     size_t dst_base = i << 1;
 
-    __m256i q0  = truncate(accu[acc_base + 0], debias, shift);
-    __m256i q1  = truncate(accu[acc_base + 1], debias, shift);
-    __m256i q2  = truncate(accu[acc_base + 2], debias, shift);
-    __m256i q3  = truncate(accu[acc_base + 3], debias, shift);
+    __m256i q0  = truncate_avx2(accu[acc_base + 0], debias, shift);
+    __m256i q1  = truncate_avx2(accu[acc_base + 1], debias, shift);
+    __m256i q2  = truncate_avx2(accu[acc_base + 2], debias, shift);
+    __m256i q3  = truncate_avx2(accu[acc_base + 3], debias, shift);
 
     __m256i h01 = _mm256_packs_epi32(q0, q1);
     __m256i h23 = _mm256_packs_epi32(q2, q3);
