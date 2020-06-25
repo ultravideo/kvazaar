@@ -27,7 +27,8 @@
 #include "pthread.h"
 
 
-static const int SMOOTHING_WINDOW = 40;
+static const int MIN_SMOOTHING_WINDOW = 40;
+static int smoothing_window = 40;
 static const double MIN_LAMBDA    = 0.1;
 static const double MAX_LAMBDA    = 10000;
 #define BETA1 1.2517
@@ -147,21 +148,31 @@ static double gop_allocate_bits(encoder_state_t * const state)
   // At this point, total_bits_coded of the current state contains the
   // number of bits written encoder->owf frames before the current frame.
   uint64_t bits_coded = state->frame->total_bits_coded;
-  int pictures_coded = MAX(0, state->frame->num - encoder->cfg.owf);
-
-  int gop_offset = (state->frame->gop_offset - encoder->cfg.owf) % MAX(1, encoder->cfg.gop_len);
-  
-  if (encoder->cfg.gop_len > 0 && gop_offset != encoder->cfg.gop_len - 1 && encoder->cfg.gop_lp_definition.d == 0) {
+  int pictures_coded = 0;
+  if(encoder->cfg.gop_len) {
+    pictures_coded = MAX(0, state->frame->num - CEILDIV(encoder->cfg.owf, encoder->cfg.gop_len)*encoder->cfg.gop_len);
+  }
+  else {
+    pictures_coded = MAX(0, state->frame->num - encoder->cfg.owf);
+  }
+    
+  if (encoder->cfg.gop_len > 0 && encoder->cfg.owf > 0) {
     // Subtract number of bits in the partially coded GOP.
     bits_coded -= state->frame->cur_gop_bits_coded;
-    // Subtract number of pictures in the partially coded GOP.
-    pictures_coded -= gop_offset + 1;
   }
 
-  // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
-  double gop_target_bits =
-    (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
-    * MAX(1, encoder->cfg.gop_len) / SMOOTHING_WINDOW;
+  smoothing_window = MAX(MIN_SMOOTHING_WINDOW, smoothing_window - encoder->cfg.gop_len / 2);
+  double gop_target_bits = -1;
+
+  while( gop_target_bits < 0 && smoothing_window < 150) {
+    // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
+    gop_target_bits =
+      (encoder->target_avg_bppic * (pictures_coded + smoothing_window) - bits_coded)
+      * MAX(1, encoder->cfg.gop_len) / smoothing_window;
+    if(gop_target_bits < 0) {
+      smoothing_window += 10;
+    }
+  }
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
