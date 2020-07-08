@@ -35,6 +35,10 @@ static const double MAX_LAMBDA    = 10000;
 
 static kvz_rc_data *data;
 
+static FILE *ctu_mse = NULL;
+
+static FILE *bits = NULL;
+
 /**
  * \brief Clip lambda value to a valid range.
  */
@@ -87,6 +91,8 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
 
   data->intra_alpha = 6.7542000000000000;
   data->intra_beta = 1.7860000000000000;
+
+  bits = fopen("bits.txt", "w");
   return data;
 }
 
@@ -173,6 +179,8 @@ static double gop_allocate_bits(encoder_state_t * const state)
       smoothing_window += 10;
     }
   }
+
+  fprintf(bits, "gop_alloc;%d;%f;%d\n", state->frame->num, gop_target_bits, smoothing_window);
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
@@ -855,10 +863,13 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
 
 
 void kvz_update_after_picture(encoder_state_t * const state) {
+  if (ctu_mse == NULL) ctu_mse = fopen("ctu_mse.txt", "w");
   double total_distortion = 0;
   double lambda = 0;
   int32_t pixels = (state->encoder_control->in.width * state->encoder_control->in.height);
   double pic_bpp = (double)state->frame->cur_frame_bits_coded / pixels;
+
+  fprintf(bits, "frame_spent;%d;%lu\n", state->frame->num, state->frame->cur_frame_bits_coded);
 
   const encoder_control_t * const encoder = state->encoder_control;
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
@@ -875,6 +886,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
     pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
 
+  fprintf(ctu_mse, "%d;%d;%d\n", state->frame->num, state->encoder_control->in.width_in_lcu, state->encoder_control->in.height_in_lcu);
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
       int ctu_distortion = 0;
@@ -886,11 +898,19 @@ void kvz_update_after_picture(encoder_state_t * const state) {
           ctu_distortion += temp * temp;
         }        
       }
+      fprintf(ctu_mse, "%f\t", (double)ctu_distortion / ctu->pixels);
+      fprintf(bits, "%d\t", ctu->bits);
       ctu->distortion = (double)ctu_distortion / ctu->pixels;
       total_distortion += (double)ctu_distortion / ctu->pixels;
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
-    }    
+    }
+    fprintf(bits, "\n");
+    fprintf(ctu_mse, "\n");
   }
+  fprintf(ctu_mse, "\n");
+  fprintf(bits, "\n");
+
+  if (state->encoder_control->cfg.rc_algorithm != KVZ_OBA) return;
 
   total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
   if (state->frame->is_irap) {
@@ -959,7 +979,9 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     const double pic_target_bits = pic_allocate_bits(state);
     const double target_bpp = pic_target_bits / ctrl->in.pixels_per_pic;
     double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
+    fprintf(bits, "frame_alloc;%d;%f;%f\n", state->frame->num, pic_target_bits, lambda);
     lambda = clip_lambda(lambda);
+
 
     state->frame->lambda              = lambda;
     state->frame->QP                  = lambda_to_qp(lambda);

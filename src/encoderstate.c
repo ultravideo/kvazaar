@@ -40,6 +40,8 @@
 #include "strategies/strategies-picture.h"
 
 
+static FILE * video_characteristics = NULL;
+
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
@@ -1241,9 +1243,38 @@ static bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
 }
 
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
+  if (video_characteristics == NULL) video_characteristics = fopen("video_stats.txt", "w");
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
   const kvz_config * const cfg = &state->encoder_control->cfg;
+
+  fprintf(video_characteristics, "%d;%d;%d\n",state->frame->num, state->encoder_control->in.width_in_lcu, state->encoder_control->in.height_in_lcu);
+  for (int y = 0; y < state->encoder_control->in.height_in_lcu; y++) {
+    for (int x = 0; x < state->encoder_control->in.width_in_lcu; x++) {
+
+      double sum = 0;
+      double sq_sum = 0;
+
+      int total = 0;
+
+      int width_limit = MIN((x + 1) * 64, state->encoder_control->in.width);
+      int height_limit = MIN((y + 1) * 64, state->encoder_control->in.height);
+
+      for(int pix_y = y * 64; pix_y < height_limit; pix_y++) {
+        for (int pix_x = x * 64; pix_x < width_limit; pix_x++) {
+          double temp = frame->fulldata[pix_x + pix_y * frame->width];
+          sum += temp;
+          sq_sum += temp * temp;
+          total += 1;
+        }        
+      }
+      double mean = sum / total;
+      fprintf(video_characteristics, "%f;%f\t", mean, sq_sum / total - mean * mean);
+
+    }
+    fprintf(video_characteristics, "\n");
+  }
+  fprintf(video_characteristics, "\n");
 
   encoder_set_source_picture(state, frame);
 
