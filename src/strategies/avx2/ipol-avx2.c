@@ -1267,6 +1267,90 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   }
 }
 
+static void kvz_ipol_8tap_ver_im_hi_avx2(uint8_t *filter,
+int width,
+int height,
+int16_t *src,
+int16_t src_stride,
+int16_t *dst,
+int16_t dst_stride)
+{
+  const int shift2 = 6;
+
+  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
+  __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
+  __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
+  __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
+  __m256i all_w45 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(2, 2, 2, 2));
+  __m256i all_w67 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(3, 3, 3, 3));
+
+  for (int x = 0; x + 3 < width; x += 4) {
+
+    int16_t *strip_ptr = src + 0 * src_stride + x;
+
+    // Initial values
+    // Broadcasted rows in both lanes
+    // __m256i r0; // Unused
+    // __m256i r1; // Unused
+    __m256i r2 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 0 * src_stride));
+    __m256i r3 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 1 * src_stride));
+    __m256i r4 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 2 * src_stride));
+    __m256i r5 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 3 * src_stride));
+    __m256i r6 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 4 * src_stride));
+    __m256i r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 5 * src_stride));
+    __m256i r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 6 * src_stride));
+
+    // Consecutive rows in low and high lanes
+    // __m256i r0_r1; // Unused
+    // __m256i r1_r2; // Unused
+    __m256i r2_r3 = _mm256_blend_epi32(r2, r3, 0xF0);
+    __m256i r3_r4 = _mm256_blend_epi32(r3, r4, 0xF0);
+    __m256i r4_r5 = _mm256_blend_epi32(r4, r5, 0xF0);
+    __m256i r5_r6 = _mm256_blend_epi32(r5, r6, 0xF0);
+    __m256i r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+    __m256i r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+    // Paired samples of consecutive rows
+    __m256i r01_r12;
+    __m256i r23_r34 = _mm256_unpacklo_epi16(r2_r3, r3_r4);
+    __m256i r45_r56 = _mm256_unpacklo_epi16(r4_r5, r5_r6);
+    __m256i r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+    for (int y = 0; y < height; y += 2) {
+
+      strip_ptr = src + y * src_stride + x;
+
+      // Slide window
+      r01_r12 = r23_r34;
+      r23_r34 = r45_r56;
+      r45_r56 = r67_r78;
+      r6 = r8;
+      r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 7 * src_stride));
+      r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 8 * src_stride));
+      r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+      r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+      r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+      __m256i dot01 = _mm256_madd_epi16(r01_r12, all_w01);
+      __m256i dot23 = _mm256_madd_epi16(r23_r34, all_w23);
+      __m256i dot45 = _mm256_madd_epi16(r45_r56, all_w45);
+      __m256i dot67 = _mm256_madd_epi16(r67_r78, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
+      __m256i sum = _mm256_add_epi32(sum0123, sum4567);
+      sum = _mm256_srai_epi32(sum, shift2);
+      sum = _mm256_packs_epi32(sum, sum);
+
+      int16_t *dst_addr0 = &dst[(y + 0) * dst_stride + x];
+      int16_t *dst_addr1 = &dst[(y + 1) * dst_stride + x];
+      _mm_storel_epi64((__m128i *)dst_addr0, _mm256_castsi256_si128(sum));
+      _mm_storel_epi64((__m128i *)dst_addr1, _mm256_extracti128_si256(sum, 1));
+    }
+  }
+}
+
 static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * const encoder,
   kvz_pixel *src, 
   int16_t src_stride, 
@@ -1289,8 +1373,8 @@ static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * cons
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
 
-  int16_t hor_stride = LCU_WIDTH;
-  int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
+  int16_t hor_stride = width;
+  ALIGNED(64) int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
 
   // HORIZONTAL STEP
   __m256i shuf_01_23, shuf_45_67;
@@ -1311,14 +1395,7 @@ static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * cons
   }
 
   // VERTICAL STEP
-  __m256i taps[4];
-  kvz_init_ver_filter_taps(ver_fir, taps);
-
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_no_round_avx2(taps, &hor_intermediate[y * hor_stride + x], hor_stride, &dst[y * dst_stride + x], dst_stride);
-    }
-  }
+  kvz_ipol_8tap_ver_im_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
 }
 
 
