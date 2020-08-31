@@ -882,7 +882,7 @@ static void features_init_array(features_s* arr_features, int16_t _size, int _qp
 * \param _width     Width of the matrix.
 * \return average value of the block, -1 if error.
 */
-static INLINE double vect_average_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, size_t _width)
+static INLINE double vect_average_blck_int8(const kvz_pixel* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, size_t _width)
 {
 	if (_mat_src == NULL)
 	{
@@ -916,7 +916,7 @@ static INLINE double vect_average_blck_int8(const uint8_t* _mat_src, size_t _x, 
 * \param _width     Width of the matrix.
 * \return average value of the block, -1 if error.
 */
-static INLINE double vect_variance_blck_int8(const uint8_t* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, double _avg_blck, size_t _width)
+static INLINE double vect_variance_blck_int8(const kvz_pixel* _mat_src, size_t _x, size_t _x_end, size_t _y, size_t _y_end, double _avg_blck, size_t _width)
 {
 	if (_mat_src == NULL)
 	{
@@ -952,7 +952,7 @@ static INLINE double vect_variance_blck_int8(const uint8_t* _mat_src, size_t _x,
 * \param p_variance  Pointer to be filled with the variance;
 * \return None.
 */
-static INLINE void features_var_avg_blck(uint8_t* arr_luma_px, uint32_t i_xLcu, uint32_t i_yLcu,
+static INLINE void features_var_avg_blck(kvz_pixel* arr_luma_px, uint32_t i_xLcu, uint32_t i_yLcu,
 	uint32_t i_xBlck, uint32_t i_yBlck, uint8_t i_blockSize,
 	int32_t i_width, int32_t i_height,
 	double* p_average, double* p_variance)
@@ -1222,7 +1222,7 @@ static void features_var_of_sub_var(features_s* arr_features, uint8_t i_depth)
 * \param p_features64	    Pointer to the features of depth 0.
 * \return None.
 */
-static void features_compute_all(features_s* arr_features[5], uint8_t* luma_px)
+static void features_compute_all(features_s* arr_features[5], kvz_pixel* luma_px)
 {
 
 	uint32_t x_px = 0; /*!< Top left X of the lcu */
@@ -1475,7 +1475,7 @@ static void ml_os_qt_gen(uint8_t* arr_depthMap, features_s* arr_features_cur, fe
 
 
 
-static void os_luma_qt_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, int8_t qp, uint8_t* arr_CDM)
+static void os_luma_qt_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, kvz_pixel* luma_px, int8_t qp, uint8_t* arr_CDM)
 {
 	// Features array per depth
 	features_s arr_features_4[256];
@@ -1731,7 +1731,7 @@ static void generate_interval_from_os_pred(ml_intra_ctu_pred_t* ml_intra_depth_c
 /**
 *	Generate the interval of depth predictions based on the luma samples
 */
-void kvz_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, int8_t qp) {
+void kvz_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, kvz_pixel* luma_px, int8_t qp) {
 
 	// Compute the one-shot (OS) Quad-tree prediction (_mat_OS_pred)
 	os_luma_qt_pred(ml_intra_depth_ctu, luma_px, qp, ml_intra_depth_ctu->_mat_upper_depth);

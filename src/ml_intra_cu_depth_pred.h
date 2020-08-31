@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
 
 
@@ -85,6 +86,6 @@ typedef int (*tree_predict)(features_s*, double*, double*);
 ml_intra_ctu_pred_t* kvz_init_ml_intra_depth_const(void);
 void kvz_end_ml_intra_depth_const(ml_intra_ctu_pred_t * ml_intra_depth_ctu);
 
-void kvz_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uint8_t* luma_px, int8_t qp);
+void kvz_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, kvz_pixel* luma_px, int8_t qp);
 
 #endif
