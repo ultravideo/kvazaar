@@ -58,3 +58,8 @@ test-distcheck:
     - ./autogen.sh
     - ./configure --enable-werror || (cat config.log && false)
     - make --jobs=8 VERBOSE=1 distcheck
+
+test-10bit:
+  <<: *test-template
+  variables:
+    CFLAGS: '-DKVZ_BIT_DEPTH=10'
