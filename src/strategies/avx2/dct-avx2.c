@@ -25,6 +25,8 @@
 #include "strategies/avx2/dct-avx2.h"
 
 #if COMPILE_INTEL_AVX2
+#include "kvazaar.h"
+#if KVZ_BIT_DEPTH == 8
 #include <immintrin.h>
 
 #include "strategyselector.h"
@@ -924,12 +926,14 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
 TRANSFORM(dct, 32);
 ITRANSFORM(dct, 32);
 
+#endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+#if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
@@ -945,6 +949,7 @@ int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
     success &= kvz_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
   }
+#endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }

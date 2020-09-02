@@ -22,17 +22,20 @@
 #define REG_SAD_POW2_WIDTHS_SSE41_H_
 
 #include "kvazaar.h"
+
+#if KVZ_BIT_DEPTH == 8
+
 #include "strategies/missing-intel-intrinsics.h"
 #include <immintrin.h>
 
-static INLINE uint32_t reg_sad_w0(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w0(const uint8_t * const data1, const uint8_t * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
   return 0;
 }
 
-static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w4(const uint8_t * const data1, const uint8_t * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
@@ -71,7 +74,7 @@ static INLINE uint32_t reg_sad_w4(const kvz_pixel * const data1, const kvz_pixel
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w8(const uint8_t * const data1, const uint8_t * const data2,
                            const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
@@ -122,7 +125,7 @@ static INLINE uint32_t reg_sad_w8(const kvz_pixel * const data1, const kvz_pixel
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w12(const uint8_t * const data1, const uint8_t * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -141,7 +144,7 @@ static INLINE uint32_t reg_sad_w12(const kvz_pixel * const data1, const kvz_pixe
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w16(const uint8_t * const data1, const uint8_t * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -186,7 +189,7 @@ static INLINE uint32_t reg_sad_w16(const kvz_pixel * const data1, const kvz_pixe
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w24(const uint8_t * const data1, const uint8_t * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -238,7 +241,7 @@ static INLINE uint32_t reg_sad_w24(const kvz_pixel * const data1, const kvz_pixe
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_arbitrary(const uint8_t * const data1, const uint8_t * const data2,
                                   const int32_t width, const int32_t height, const uint32_t stride1,
                                   const uint32_t stride2)
 {
@@ -334,7 +337,7 @@ static INLINE uint32_t reg_sad_arbitrary(const kvz_pixel * const data1, const kv
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t ver_sad_w4(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_w4(const uint8_t *pic_data, const uint8_t *ref_data,
                            int32_t height, uint32_t stride)
 {
   __m128i ref_row = _mm_set1_epi32(*(const uint32_t *)ref_data);
@@ -371,7 +374,7 @@ static uint32_t ver_sad_w4(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t ver_sad_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_w8(const uint8_t *pic_data, const uint8_t *ref_data,
                            int32_t height, uint32_t stride)
 {
   const __m128i ref_row = _mm_set1_epi64x(*(const uint64_t *)ref_data);
@@ -415,7 +418,7 @@ static uint32_t ver_sad_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t ver_sad_w12(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_w12(const uint8_t *pic_data, const uint8_t *ref_data,
                             int32_t height, uint32_t stride)
 {
   const __m128i ref_row = _mm_loadu_si128((__m128i *)ref_data);
@@ -434,7 +437,7 @@ static uint32_t ver_sad_w12(const kvz_pixel *pic_data, const kvz_pixel *ref_data
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t ver_sad_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_w16(const uint8_t *pic_data, const uint8_t *ref_data,
                             int32_t height, uint32_t stride)
 {
   const __m128i ref_row = _mm_loadu_si128((__m128i *)ref_data);
@@ -474,7 +477,7 @@ static uint32_t ver_sad_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t ver_sad_arbitrary(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_arbitrary(const uint8_t *pic_data, const uint8_t *ref_data,
                                   int32_t width, int32_t height, uint32_t stride)
 {
   int32_t y, x;
@@ -561,7 +564,7 @@ static uint32_t ver_sad_arbitrary(const kvz_pixel *pic_data, const kvz_pixel *re
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t hor_sad_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_sse41_w4(const uint8_t *pic_data, const uint8_t *ref_data,
                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                  uint32_t left, uint32_t right)
 {
@@ -625,7 +628,7 @@ static uint32_t hor_sad_sse41_w4(const kvz_pixel *pic_data, const kvz_pixel *ref
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_sse41_w8(const uint8_t *pic_data, const uint8_t *ref_data,
                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                  uint32_t left, uint32_t right)
 {
@@ -738,7 +741,7 @@ static uint32_t hor_sad_sse41_w8(const kvz_pixel *pic_data, const kvz_pixel *ref
  * border pixel, and use a suitable mask to fill all the other pixels with
  * that value.
  */
-static uint32_t hor_sad_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_sse41_w16(const uint8_t *pic_data, const uint8_t *ref_data,
                                   int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                   const uint32_t left, const uint32_t right)
 {
@@ -821,7 +824,7 @@ static uint32_t hor_sad_sse41_w16(const kvz_pixel *pic_data, const kvz_pixel *re
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static INLINE uint32_t hor_sad_sse41_arbitrary(const uint8_t *pic_data, const uint8_t *ref_data,
                                                int32_t width, int32_t height, uint32_t pic_stride,
                                                uint32_t ref_stride, uint32_t left, uint32_t right)
 {
@@ -1023,5 +1026,7 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const kvz_pixel *pic_data, const 
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
   return _mm_cvtsi128_si32(sad);
 }
+
+#endif // KVZ_BIT_DEPTH == 8
 
 #endif

@@ -21,10 +21,12 @@
 #include "strategies/avx2/intra-avx2.h"
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
+#include "kvazaar.h"
+#if KVZ_BIT_DEPTH == 8
+
 #include <immintrin.h>
 #include <stdlib.h>
 
-#include "kvazaar.h"
 #include "strategyselector.h"
 #include "strategies/missing-intel-intrinsics.h"
 
@@ -35,7 +37,7 @@
  * \param delta_pos     Fractional pixel precise position of sample displacement
  * \param x             Sample offset in direction x in ref_main array
  */
-static INLINE __m128i filter_4x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+static INLINE __m128i filter_4x1_avx2(const uint8_t *ref_main, int16_t delta_pos, int x){
 
   int8_t delta_int = delta_pos >> 5;
   int8_t delta_fract = delta_pos & (32-1);
@@ -58,7 +60,7 @@ static INLINE __m128i filter_4x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-static void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_4x4_avx2(uint8_t *dst, const uint8_t *ref_main, int sample_disp, bool vertical_mode){
 
   __m128i row0 = filter_4x1_avx2(ref_main, 1 * sample_disp, 0);
   __m128i row1 = filter_4x1_avx2(ref_main, 2 * sample_disp, 0);
@@ -86,7 +88,7 @@ static void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sampl
  * \param delta_pos     Fractional pixel precise position of sample displacement
  * \param x             Sample offset in direction x in ref_main array
  */
-static INLINE __m128i filter_8x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+static INLINE __m128i filter_8x1_avx2(const uint8_t *ref_main, int16_t delta_pos, int x){
 
   int8_t delta_int = delta_pos >> 5;
   int8_t delta_fract = delta_pos & (32-1);
@@ -110,7 +112,7 @@ static INLINE __m128i filter_8x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-static void filter_8x8_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_8x8_avx2(uint8_t *dst, const uint8_t *ref_main, int sample_disp, bool vertical_mode){
   __m128i row0 = filter_8x1_avx2(ref_main, 1 * sample_disp, 0);
   __m128i row1 = filter_8x1_avx2(ref_main, 2 * sample_disp, 0);
   __m128i row2 = filter_8x1_avx2(ref_main, 3 * sample_disp, 0);
@@ -163,7 +165,7 @@ static void filter_8x8_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sampl
  * \param delta_pos     Fractional pixel precise position of sample displacement
  * \param x             Sample offset in direction x in ref_main array
  */
-static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+static INLINE __m256i filter_16x1_avx2(const uint8_t *ref_main, int16_t delta_pos, int x){
 
   int8_t delta_int = delta_pos >> 5;
   int8_t delta_fract = delta_pos & (32-1);
@@ -189,7 +191,7 @@ static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-static void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_16x16_avx2(uint8_t *dst, const uint8_t *ref_main, int sample_disp, bool vertical_mode){
   for (int y = 0; y < 16; y += 8) {
     __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, 0);
     __m256i row1 = filter_16x1_avx2(ref_main, (y + 2) * sample_disp, 0);
@@ -281,7 +283,7 @@ static void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sam
  * \param vertical_mode Mode direction, true if vertical
  * \param width         Block width
  */
-static void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
+static void filter_NxN_avx2(uint8_t *dst, const uint8_t *ref_main, int sample_disp, bool vertical_mode, int width){
   for (int y = 0; y < width; y += 8) {
     for (int x = 0; x < width; x += 16) {
       __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, x);
@@ -376,9 +378,9 @@ static void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sampl
 static void kvz_angular_pred_avx2(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
-  const kvz_pixel *const in_ref_above,
-  const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst)
+  const uint8_t *const in_ref_above,
+  const uint8_t *const in_ref_left,
+  uint8_t *const dst)
 {
   assert(log2_width >= 2 && log2_width <= 5);
   assert(intra_mode >= 2 && intra_mode <= 34);
@@ -388,7 +390,7 @@ static void kvz_angular_pred_avx2(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  kvz_pixel tmp_ref[2 * 32];
+  uint8_t tmp_ref[2 * 32];
   const int_fast8_t width = 1 << log2_width;
 
   // Whether to swap references to always project on the left reference row.
@@ -399,9 +401,9 @@ static void kvz_angular_pred_avx2(
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
 
   // Pointer for the reference we are interpolating from.
-  const kvz_pixel *ref_main;
+  const uint8_t *ref_main;
   // Pointer for the other reference.
-  const kvz_pixel *ref_side;
+  const uint8_t *ref_side;
 
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
@@ -463,15 +465,15 @@ static void kvz_angular_pred_avx2(
  */
 static void kvz_intra_pred_planar_avx2(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const dst)
+  const uint8_t *const ref_top,
+  const uint8_t *const ref_left,
+  uint8_t *const dst)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
   const int_fast8_t width = 1 << log2_width;
-  const kvz_pixel top_right = ref_top[width + 1];
-  const kvz_pixel bottom_left = ref_left[width + 1];
+  const uint8_t top_right = ref_top[width + 1];
+  const uint8_t bottom_left = ref_left[width + 1];
 
   if (log2_width > 2) {
     
@@ -888,12 +890,11 @@ static void pred_filtered_dc_32x32(const uint8_t *ref_top,
 */
 static void kvz_intra_pred_filtered_dc_avx2(
   const int_fast8_t log2_width,
-  const kvz_pixel *ref_top,
-  const kvz_pixel *ref_left,
-        kvz_pixel *out_block)
+  const uint8_t *ref_top,
+  const uint8_t *ref_left,
+        uint8_t *out_block)
 {
   assert(log2_width >= 2 && log2_width <= 5);
-  assert(sizeof(kvz_pixel) == sizeof(uint8_t));
 
   if (log2_width == 2) {
     pred_filtered_dc_4x4(ref_top, ref_left, out_block);
@@ -906,17 +907,20 @@ static void kvz_intra_pred_filtered_dc_avx2(
   }
 }
 
+#endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2 && defined X86_64
+#if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
     success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
     success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &kvz_intra_pred_filtered_dc_avx2);
   }
+#endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }

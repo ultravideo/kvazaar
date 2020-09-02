@@ -21,16 +21,17 @@
 #include "strategies/x86_asm/picture-x86-asm.h"
 
 #if defined(KVZ_COMPILE_ASM)
+#include "kvazaar.h"
+#if KVZ_BIT_DEPTH == 8
 #include <stdlib.h>
 
-#include "kvazaar.h"
 #include "strategies/x86_asm/picture-x86-asm-sad.h"
 #include "strategies/x86_asm/picture-x86-asm-satd.h"
 #include "strategies/sse41/picture-sse41.h"
 #include "strategyselector.h"
 
 
-static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2)
+static unsigned kvz_sad_32x32_avx(const uint8_t *data1, const uint8_t *data2)
 {
   unsigned sad = 0;
   sad += kvz_sad_16x16_avx(data1, data2);
@@ -40,7 +41,7 @@ static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2
   return sad;
 }
 
-static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2)
+static unsigned kvz_sad_64x64_avx(const uint8_t *data1, const uint8_t *data2)
 {
   unsigned sad = 0;
   sad += kvz_sad_32x32_avx(data1, data2);
@@ -50,7 +51,7 @@ static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2
   return sad;
 }
 
-static unsigned kvz_sad_other_avx(const kvz_pixel *data1, const kvz_pixel *data2,
+static unsigned kvz_sad_other_avx(const uint8_t *data1, const uint8_t *data2,
                                   int width, int height,
                                   unsigned stride)
 {
@@ -65,7 +66,7 @@ static unsigned kvz_sad_other_avx(const kvz_pixel *data1, const kvz_pixel *data2
   return sad;
 }
 
-static unsigned reg_sad_x86_asm(const kvz_pixel *data1, const kvz_pixel * data2,
+static unsigned reg_sad_x86_asm(const uint8_t *data1, const uint8_t * data2,
                                 const int width, const int height,
                                 const unsigned stride1, const unsigned stride2)
 {
@@ -90,12 +91,14 @@ static unsigned reg_sad_x86_asm(const kvz_pixel *data1, const kvz_pixel * data2,
   }
 }
 
+#endif // KVZ_BIT_DEPTH == 8
 #endif //defined(KVZ_COMPILE_ASM)
 
 int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if defined(KVZ_COMPILE_ASM)
+#if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= kvz_strategyselector_register(opaque, "reg_sad", "x86_asm_avx", 30, &reg_sad_x86_asm);
 
@@ -111,6 +114,7 @@ int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_32x32", "x86_asm_avx", 30, &kvz_satd_32x32_avx);
     success &= kvz_strategyselector_register(opaque, "satd_64x64", "x86_asm_avx", 30, &kvz_satd_64x64_avx);
   }
+#endif // KVZ_BIT_DEPTH == 8
 #endif //!defined(KVZ_COMPILE_ASM)
   return success;
 }

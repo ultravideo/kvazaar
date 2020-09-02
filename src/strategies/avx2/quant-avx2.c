@@ -506,35 +506,37 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
 #undef LOG2_SCAN_SET_SIZE
 }
 
-static INLINE __m128i get_residual_4x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+#if KVZ_BIT_DEPTH == 8
+
+static INLINE __m128i get_residual_4x1_avx2(const uint8_t *a_in, const uint8_t *b_in){
   __m128i a = _mm_cvtsi32_si128(*(int32_t*)a_in);
   __m128i b = _mm_cvtsi32_si128(*(int32_t*)b_in);
   __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
   return diff;
 }
 
-static INLINE __m128i get_residual_8x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+static INLINE __m128i get_residual_8x1_avx2(const uint8_t *a_in, const uint8_t *b_in){
   __m128i a = _mm_cvtsi64_si128(*(int64_t*)a_in);
   __m128i b = _mm_cvtsi64_si128(*(int64_t*)b_in);
   __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
   return diff;
 }
 
-static INLINE int32_t get_quantized_recon_4x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+static INLINE int32_t get_quantized_recon_4x1_avx2(int16_t *residual, const uint8_t *pred_in){
   __m128i res = _mm_loadl_epi64((__m128i*)residual);
   __m128i pred = _mm_cvtsi32_si128(*(int32_t*)pred_in);
   __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
   return _mm_cvtsi128_si32(_mm_packus_epi16(rec, rec));
 }
 
-static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const uint8_t *pred_in){
   __m128i res = _mm_loadu_si128((__m128i*)residual);
   __m128i pred = _mm_cvtsi64_si128(*(int64_t*)pred_in);
   __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
   return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
 }
 
-static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in, int16_t *residual, int width, int in_stride){
+static void get_residual_avx2(const uint8_t *ref_in, const uint8_t *pred_in, int16_t *residual, int width, int in_stride){
 
   __m128i diff = _mm_setzero_si128();
   switch (width) {
@@ -579,7 +581,7 @@ static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in,
   }
 }
 
-static void get_quantized_recon_avx2(int16_t *residual, const kvz_pixel *pred_in, int in_stride, kvz_pixel *rec_out, int out_stride, int width){
+static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width){
 
   switch (width) {
     case 4:
@@ -629,8 +631,8 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   const cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
-  const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
-  kvz_pixel *rec_out, coeff_t *coeff_out,
+  const uint8_t *const ref_in, const uint8_t *const pred_in,
+  uint8_t *rec_out, coeff_t *coeff_out,
   bool early_skip)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
@@ -766,6 +768,8 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   }
 }
 
+#endif // KVZ_BIT_DEPTH == 8
+
 static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
 {
   assert(length % 8 == 0);
@@ -870,11 +874,13 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
   bool success = true;
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
-  success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
+#if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
     success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
   }
+#endif // KVZ_BIT_DEPTH == 8
+  success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
   success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

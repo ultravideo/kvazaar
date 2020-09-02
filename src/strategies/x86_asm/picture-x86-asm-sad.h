@@ -27,17 +27,18 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
+#if KVZ_BIT_DEPTH == 8
+unsigned kvz_sad_4x4_avx(const uint8_t*, const uint8_t*);
+unsigned kvz_sad_8x8_avx(const uint8_t*, const uint8_t*);
+unsigned kvz_sad_16x16_avx(const uint8_t*, const uint8_t*);
 
-unsigned kvz_sad_4x4_avx(const kvz_pixel*, const kvz_pixel*);
-unsigned kvz_sad_8x8_avx(const kvz_pixel*, const kvz_pixel*);
-unsigned kvz_sad_16x16_avx(const kvz_pixel*, const kvz_pixel*);
-
-unsigned kvz_sad_4x4_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
-unsigned kvz_sad_8x8_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
-unsigned kvz_sad_16x16_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
-unsigned kvz_sad_32x32_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
-unsigned kvz_sad_64x64_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride);
-
+unsigned kvz_sad_4x4_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
+unsigned kvz_sad_8x8_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
+unsigned kvz_sad_16x16_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
+unsigned kvz_sad_32x32_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
+unsigned kvz_sad_64x64_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
+#endif // KVZ_BIT_DEPTH == 8
 
 #endif

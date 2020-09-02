@@ -25,6 +25,8 @@
 #include "global.h"
 
 #if COMPILE_INTEL_AVX2
+#include "kvazaar.h"
+#if KVZ_BIT_DEPTH == 8
 #include "strategies/avx2/picture-avx2.h"
 #include "strategies/avx2/reg_sad_pow2_widths-avx2.h"
 
@@ -33,7 +35,6 @@
 #include <mmintrin.h>
 #include <xmmintrin.h>
 #include <string.h>
-#include "kvazaar.h"
 #include "strategies/strategies-picture.h"
 #include "strategyselector.h"
 #include "strategies/generic/picture-generic.h"
@@ -52,7 +53,7 @@
  *
  * \returns Sum of Absolute Differences
  */
-uint32_t kvz_reg_sad_avx2(const kvz_pixel * const data1, const kvz_pixel * const data2,
+uint32_t kvz_reg_sad_avx2(const uint8_t * const data1, const uint8_t * const data2,
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   if (width == 0)
@@ -123,7 +124,7 @@ static INLINE uint32_t m256i_horizontal_sum(const __m256i sum)
 }
 
 
-static unsigned sad_8bit_8x8_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
+static unsigned sad_8bit_8x8_avx2(const uint8_t *buf1, const uint8_t *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -133,7 +134,7 @@ static unsigned sad_8bit_8x8_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 }
 
 
-static unsigned sad_8bit_16x16_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
+static unsigned sad_8bit_16x16_avx2(const uint8_t *buf1, const uint8_t *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -143,7 +144,7 @@ static unsigned sad_8bit_16x16_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2
 }
 
 
-static unsigned sad_8bit_32x32_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
+static unsigned sad_8bit_32x32_avx2(const uint8_t *buf1, const uint8_t *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -163,7 +164,7 @@ static unsigned sad_8bit_32x32_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2
 }
 
 
-static unsigned sad_8bit_64x64_avx2(const kvz_pixel * buf1, const kvz_pixel * buf2)
+static unsigned sad_8bit_64x64_avx2(const uint8_t * buf1, const uint8_t * buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -182,7 +183,7 @@ static unsigned sad_8bit_64x64_avx2(const kvz_pixel * buf1, const kvz_pixel * bu
   return m256i_horizontal_sum(sum0);
 }
 
-static unsigned satd_4x4_8bit_avx2(const kvz_pixel *org, const kvz_pixel *cur)
+static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
 {
 
   __m128i original = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)org));
@@ -228,7 +229,7 @@ static unsigned satd_4x4_8bit_avx2(const kvz_pixel *org, const kvz_pixel *cur)
 
 
 static void satd_8bit_4x4_dual_avx2(
-  const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *satds_out) 
+  const pred_buffer preds, const uint8_t * const orig, unsigned num_modes, unsigned *satds_out) 
 {
 
   __m256i original = _mm256_broadcastsi128_si256(_mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)orig)));
@@ -423,14 +424,14 @@ INLINE static void sum_block_dual_avx2(__m256i *ver_row, unsigned *sum0, unsigne
   *sum1 = _mm_cvtsi128_si32(_mm256_extracti128_si256(sad, 1));
 }
 
-INLINE static __m128i diff_row_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
+INLINE static __m128i diff_row_avx2(const uint8_t *buf1, const uint8_t *buf2)
 {
   __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)buf1));
   __m128i buf2_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)buf2));
   return _mm_sub_epi16(buf1_row, buf2_row);
 }
 
-INLINE static __m256i diff_row_dual_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2, const kvz_pixel *orig)
+INLINE static __m256i diff_row_dual_avx2(const uint8_t *buf1, const uint8_t *buf2, const uint8_t *orig)
 {
   __m128i temp1 = _mm_loadl_epi64((__m128i*)buf1);
   __m128i temp2 = _mm_loadl_epi64((__m128i*)buf2);
@@ -442,8 +443,8 @@ INLINE static __m256i diff_row_dual_avx2(const kvz_pixel *buf1, const kvz_pixel 
 }
 
 INLINE static void diff_blocks_avx2(__m128i (*row_diff)[8],
-                                                           const kvz_pixel * buf1, unsigned stride1,
-                                                           const kvz_pixel * orig, unsigned stride_orig)
+                                                           const uint8_t * buf1, unsigned stride1,
+                                                           const uint8_t * orig, unsigned stride_orig)
 {
   (*row_diff)[0] = diff_row_avx2(buf1 + 0 * stride1, orig + 0 * stride_orig);
   (*row_diff)[1] = diff_row_avx2(buf1 + 1 * stride1, orig + 1 * stride_orig);
@@ -457,9 +458,9 @@ INLINE static void diff_blocks_avx2(__m128i (*row_diff)[8],
 }
 
 INLINE static void diff_blocks_dual_avx2(__m256i (*row_diff)[8],
-                                                           const kvz_pixel * buf1, unsigned stride1,
-                                                           const kvz_pixel * buf2, unsigned stride2,
-                                                           const kvz_pixel * orig, unsigned stride_orig)
+                                                           const uint8_t * buf1, unsigned stride1,
+                                                           const uint8_t * buf2, unsigned stride2,
+                                                           const uint8_t * orig, unsigned stride_orig)
 {
   (*row_diff)[0] = diff_row_dual_avx2(buf1 + 0 * stride1, buf2 + 0 * stride2, orig + 0 * stride_orig);
   (*row_diff)[1] = diff_row_dual_avx2(buf1 + 1 * stride1, buf2 + 1 * stride2, orig + 1 * stride_orig);
@@ -496,9 +497,9 @@ INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
   hor_transform_row_dual_avx2((*row_diff) + 7);
 }
 
-static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned stride1,
-                                                const kvz_pixel * buf2, unsigned stride2,
-                                                const kvz_pixel * orig, unsigned stride_orig,
+static void kvz_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned stride1,
+                                                const uint8_t * buf2, unsigned stride2,
+                                                const uint8_t * orig, unsigned stride_orig,
                                                 unsigned *sum0, unsigned *sum1)
 {
   __m256i temp[8];
@@ -516,18 +517,18 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned
 /**
 * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
 */
-static unsigned kvz_satd_4x4_subblock_8bit_avx2(const kvz_pixel * buf1,
+static unsigned kvz_satd_4x4_subblock_8bit_avx2(const uint8_t * buf1,
                                                 const int32_t     stride1,
-                                                const kvz_pixel * buf2,
+                                                const uint8_t * buf2,
                                                 const int32_t     stride2)
 {
   // TODO: AVX2 implementation
   return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
 }
 
-static void kvz_satd_4x4_subblock_quad_avx2(const kvz_pixel *preds[4],
+static void kvz_satd_4x4_subblock_quad_avx2(const uint8_t *preds[4],
                                        const int stride,
-                                       const kvz_pixel *orig,
+                                       const uint8_t *orig,
                                        const int orig_stride,
                                        unsigned costs[4])
 {
@@ -535,7 +536,7 @@ static void kvz_satd_4x4_subblock_quad_avx2(const kvz_pixel *preds[4],
   kvz_satd_4x4_subblock_quad_generic(preds, stride, orig, orig_stride, costs);
 }
 
-static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
+static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned stride1, const uint8_t * buf2, unsigned stride2)
 {
   __m128i temp[8];
 
@@ -549,9 +550,9 @@ static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned str
   return result;
 }
 
-static void satd_8x8_subblock_quad_avx2(const kvz_pixel **preds,
+static void satd_8x8_subblock_quad_avx2(const uint8_t **preds,
   const int stride,
-  const kvz_pixel *orig,
+  const uint8_t *orig,
   const int orig_stride,
   unsigned *costs)
 {
@@ -570,7 +571,7 @@ SATD_ANY_SIZE(8bit_avx2)
 // multiples of 8x8 with the 8x8 hadamard function.
 #define SATD_NXN_DUAL_AVX2(n) \
 static void satd_8bit_ ## n ## x ## n ## _dual_avx2( \
-  const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *satds_out)  \
+  const pred_buffer preds, const uint8_t * const orig, unsigned num_modes, unsigned *satds_out)  \
 { \
   unsigned x, y; \
   satds_out[0] = 0; \
@@ -590,7 +591,7 @@ static void satd_8bit_ ## n ## x ## n ## _dual_avx2( \
 }
 
 static void satd_8bit_8x8_dual_avx2(
-  const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *satds_out) 
+  const pred_buffer preds, const uint8_t * const orig, unsigned num_modes, unsigned *satds_out) 
 { 
   unsigned x, y; 
   satds_out[0] = 0;
@@ -618,17 +619,17 @@ SATD_NXN_DUAL_AVX2(64)
   static cost_pixel_any_size_multi_func satd_any_size_## suffix; \
   static void satd_any_size_ ## suffix ( \
       int width, int height, \
-      const kvz_pixel **preds, \
+      const uint8_t **preds, \
       const int stride, \
-      const kvz_pixel *orig, \
+      const uint8_t *orig, \
       const int orig_stride, \
       unsigned num_modes, \
       unsigned *costs_out, \
       int8_t *valid) \
   { \
     unsigned sums[num_parallel_blocks] = { 0 }; \
-    const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
-    const kvz_pixel *orig_ptr = orig; \
+    const uint8_t *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
+    const uint8_t *orig_ptr = orig; \
     costs_out[0] = 0; costs_out[1] = 0; costs_out[2] = 0; costs_out[3] = 0; \
     if (width % 8 != 0) { \
       /* Process the first column using 4x4 blocks. */ \
@@ -681,7 +682,7 @@ SATD_NXN_DUAL_AVX2(64)
 SATD_ANY_SIZE_MULTI_AVX2(quad_avx2, 4)
 
 
-static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel *const rec,
+static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -767,9 +768,9 @@ static void inter_recon_bipred_avx2(const int hi_prec_luma_rec0,
  const hi_prec_buf_t*high_precision_rec0,
  const hi_prec_buf_t*high_precision_rec1,
  lcu_t* lcu,
- kvz_pixel* temp_lcu_y,
- kvz_pixel* temp_lcu_u,
- kvz_pixel* temp_lcu_v,
+ uint8_t* temp_lcu_y,
+ uint8_t* temp_lcu_u,
+ uint8_t* temp_lcu_v,
 bool predict_luma,
 bool predict_chroma)
 {
@@ -799,7 +800,7 @@ bool predict_chroma)
             int sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
             int sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
 
-            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
           }
         }
 
@@ -834,7 +835,7 @@ bool predict_chroma)
             int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
             int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
 
-            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
           }
 
         }
@@ -877,11 +878,11 @@ bool predict_chroma)
           int temp_x_in_lcu = (((xpos >> 1) + temp_i) & (LCU_WIDTH_C - 1));
           int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (temp_lcu_u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
           int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-          lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
+          lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
 
           int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (temp_lcu_v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
           int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-          lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
+          lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
         }
       }
 
@@ -940,11 +941,11 @@ bool predict_chroma)
             int temp_x_in_lcu = (((xpos >> 1) + temp_i) & (LCU_WIDTH_C - 1));
             int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (temp_lcu_u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
             int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-            lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
+            lcu->rec.u[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
 
             int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (temp_lcu_v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
             int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-            lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
+            lcu->rec.v[y_in_lcu * LCU_WIDTH_C + temp_x_in_lcu] = (uint8_t)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
           }
         } else {
           // Load 8 pixels to vector
@@ -1013,7 +1014,7 @@ static optimized_sad_func_ptr_t get_optimized_sad_avx2(int32_t width)
     return NULL;
 }
 
-static uint32_t ver_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_avx2(const uint8_t *pic_data, const uint8_t *ref_data,
                              int32_t width, int32_t height, uint32_t stride)
 {
   if (width == 0)
@@ -1030,7 +1031,7 @@ static uint32_t ver_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
     return ver_sad_arbitrary(pic_data, ref_data, width, height, stride);
 }
 
-static uint32_t hor_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_avx2(const uint8_t *pic_data, const uint8_t *ref_data,
                              int32_t width, int32_t height, uint32_t pic_stride,
                              uint32_t ref_stride, uint32_t left, uint32_t right)
 {
@@ -1051,7 +1052,7 @@ static uint32_t hor_sad_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
                                    pic_stride, ref_stride, left, right);
 }
 
-static double pixel_var_avx2_largebuf(const kvz_pixel *buf, const uint32_t len)
+static double pixel_var_avx2_largebuf(const uint8_t *buf, const uint32_t len)
 {
   const float len_f  = (float)len;
   const __m256i zero = _mm256_setzero_si256();
@@ -1154,7 +1155,7 @@ static __m256i hsum_epi32_to_epi64(const __m256i v)
   return        sums_64;
 }
 
-static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
+static double pixel_var_avx2(const uint8_t *buf, const uint32_t len)
 {
   assert(sizeof(*buf) == 1);
   assert((len & 31) == 0);
@@ -1223,19 +1224,21 @@ static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
 
 #else // INACCURATE_VARIANCE_CALCULATION
 
-static double pixel_var_avx2(const kvz_pixel *buf, const uint32_t len)
+static double pixel_var_avx2(const uint8_t *buf, const uint32_t len)
 {
   return pixel_var_avx2_largebuf(buf, len);
 }
 
 #endif // !INACCURATE_VARIANCE_CALCULATION
 
+#endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+#if KVZ_BIT_DEPTH == 8
   // We don't actually use SAD for intra right now, other than 4x4 for
   // transform skip, but we might again one day and this is some of the
   // simplest code to look at for anyone interested in doing more
@@ -1271,6 +1274,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
 
   }
+#endif // KVZ_BIT_DEPTH == 8
 #endif
   return success;
 }

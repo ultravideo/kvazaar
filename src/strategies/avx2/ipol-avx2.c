@@ -25,23 +25,25 @@
 #include "strategies/avx2/ipol-avx2.h"
 
 #if COMPILE_INTEL_AVX2
+#include "kvazaar.h"
+
 #include <immintrin.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "encoder.h"
-#include "kvazaar.h"
 #include "search_inter.h"
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"
 #include "strategyselector.h"
 #include "strategies/generic/ipol-generic.h"
 
+#if KVZ_BIT_DEPTH == 8
 
 extern int8_t kvz_g_luma_filter[4][8];
 extern int8_t kvz_g_chroma_filter[8][4];
 
-static int32_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
+static int32_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, uint8_t *data)
 {
   __m128i fir = _mm_loadl_epi64((__m128i*)filter);
   __m128i row = _mm_loadl_epi64((__m128i*)data);
@@ -100,7 +102,7 @@ static void kvz_init_ver_filter_taps(int8_t *filter, __m256i *filters) {
   filters[3] = _mm256_inserti128_si256(filters[3], _mm256_castsi256_si128(filters[2]), 1); // Pairs 67 45
 }
 
-static void kvz_eight_tap_filter_hor_8x1_avx2(kvz_pixel *data, int16_t * out,
+static void kvz_eight_tap_filter_hor_8x1_avx2(uint8_t *data, int16_t * out,
   __m256i *shuf_01_23, __m256i *shuf_45_67,
   __m256i *taps_01_23, __m256i *taps_45_67) {
 
@@ -117,7 +119,7 @@ static void kvz_eight_tap_filter_hor_8x1_avx2(kvz_pixel *data, int16_t * out,
   _mm_storeu_si128((__m128i*)out, filtered);
 }
 
-static void kvz_four_tap_filter_hor_4x4_avx2(kvz_pixel *data, int stride, int16_t * out, int out_stride,
+static void kvz_four_tap_filter_hor_4x4_avx2(uint8_t *data, int stride, int16_t * out, int out_stride,
   __m256i *shuf_01, __m256i *shuf_23,
   __m256i *taps_01, __m256i *taps_23) {
 
@@ -143,7 +145,7 @@ static void kvz_four_tap_filter_hor_4x4_avx2(kvz_pixel *data, int stride, int16_
   _mm_storeh_pd((double*)(out + 3 * out_stride), _mm_castsi128_pd(upper));
 }
 
-static void kvz_four_tap_filter_hor_4xN_avx2(kvz_pixel *data, int stride, int16_t * out, int out_stride,
+static void kvz_four_tap_filter_hor_4xN_avx2(uint8_t *data, int stride, int16_t * out, int out_stride,
   __m256i *shuf_01_23, __m256i *taps_01_23,
   int rows) {
 
@@ -177,7 +179,7 @@ static int32_t kvz_eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data
   return filtered;
 }
 
-static void kvz_eight_tap_filter_ver_16bit_1x8_avx2(int8_t *filter, int16_t *data, int16_t stride, kvz_pixel *out)
+static void kvz_eight_tap_filter_ver_16bit_1x8_avx2(int8_t *filter, int16_t *data, int16_t stride, uint8_t *out)
 {
   // Interpolation filter shifts
   int32_t shift2 = 6;
@@ -243,7 +245,7 @@ static void kvz_eight_tap_filter_ver_16bit_1x8_avx2(int8_t *filter, int16_t *dat
   _mm_storel_epi64((__m128i*)out, filtered);
 }
 
-static void kvz_four_tap_filter_ver_16bit_4x4_avx2(int8_t *filter, int16_t *data, int16_t stride, kvz_pixel *out, int16_t out_stride)
+static void kvz_four_tap_filter_ver_16bit_4x4_avx2(int8_t *filter, int16_t *data, int16_t stride, uint8_t *out, int16_t out_stride)
 {
   // Interpolation filter shifts
   int32_t shift2 = 6;
@@ -366,7 +368,7 @@ static void kvz_four_tap_filter_ver_16bit_4x4_no_round_avx2(int8_t *filter, int1
   _mm_storeh_pi((__m64*)&out[3 * out_stride], _mm_castsi128_ps(filtered23));
 }
 
-INLINE static void filter_row_ver_16b_8x1_avx2(int16_t *data, int64_t stride, __m256i* taps, kvz_pixel * out, int64_t out_stride)
+INLINE static void filter_row_ver_16b_8x1_avx2(int16_t *data, int64_t stride, __m256i* taps, uint8_t * out, int64_t out_stride)
 {
   // Interpolation filter shifts
   int32_t shift2 = 6;
@@ -589,7 +591,7 @@ INLINE static void filter_row_ver_16b_8x1_no_round_avx2(int16_t *data, int64_t s
   _mm_storeu_si128((__m128i*)(out + 6 * out_stride), filtered6);
 }
 
-INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_avx2(__m256i *filters, int16_t *data, int16_t stride, kvz_pixel *out, int out_stride)
+INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_avx2(__m256i *filters, int16_t *data, int16_t stride, uint8_t *out, int out_stride)
 {
   // Filter even rows
   filter_row_ver_16b_8x1_avx2(data, stride, filters, out, out_stride); // 0 2 4 6
@@ -610,11 +612,11 @@ INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_no_round_avx2(__m256i *fil
 }
 
 static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * encoder,
-  kvz_pixel *src,
+  uint8_t *src,
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
+  uint8_t filtered[4][LCU_WIDTH * LCU_WIDTH],
   int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
@@ -695,10 +697,10 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   }
 
   // VERTICAL STEP
-  kvz_pixel *out_l = filtered[0];
-  kvz_pixel *out_r = filtered[1];
-  kvz_pixel *out_t = filtered[2];
-  kvz_pixel *out_b = filtered[3];
+  uint8_t *out_l = filtered[0];
+  uint8_t *out_r = filtered[1];
+  uint8_t *out_t = filtered[2];
+  uint8_t *out_b = filtered[3];
 
   __m256i taps[4];
   kvz_init_ver_filter_taps(fir0, taps);
@@ -746,11 +748,11 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 }
 
 static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * encoder,
-  kvz_pixel *src,
+  uint8_t *src,
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
+  uint8_t filtered[4][LCU_WIDTH * LCU_WIDTH],
   int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
@@ -774,10 +776,10 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int16_t *col_pos2 = hor_first_cols[2];
 
   // VERTICAL STEP
-  kvz_pixel *out_tl = filtered[0];
-  kvz_pixel *out_tr = filtered[1];
-  kvz_pixel *out_bl = filtered[2];
-  kvz_pixel *out_br = filtered[3];
+  uint8_t *out_tl = filtered[0];
+  uint8_t *out_tr = filtered[1];
+  uint8_t *out_bl = filtered[2];
+  uint8_t *out_br = filtered[3];
 
  __m256i taps[4];
   kvz_init_ver_filter_taps(fir2, taps);
@@ -829,11 +831,11 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 }
 
 static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * encoder,
-  kvz_pixel *src,
+  uint8_t *src,
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
+  uint8_t filtered[4][LCU_WIDTH * LCU_WIDTH],
   int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
@@ -928,10 +930,10 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   }
 
   // VERTICAL STEP
-  kvz_pixel *out_l = filtered[0];
-  kvz_pixel *out_r = filtered[1];
-  kvz_pixel *out_t = filtered[2];
-  kvz_pixel *out_b = filtered[3];
+  uint8_t *out_l = filtered[0];
+  uint8_t *out_r = filtered[1];
+  uint8_t *out_t = filtered[2];
+  uint8_t *out_b = filtered[3];
 
   int8_t *ver_fir_l = hpel_off_y != 0 ? fir2 : fir0;
   int8_t *ver_fir_r = hpel_off_y != 0 ? fir2 : fir0;
@@ -1056,11 +1058,11 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 }
 
 static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * encoder,
-  kvz_pixel *src,
+  uint8_t *src,
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
+  uint8_t filtered[4][LCU_WIDTH * LCU_WIDTH],
   int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
@@ -1088,10 +1090,10 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int16_t hor_stride = LCU_WIDTH;
 
   // VERTICAL STEP
-  kvz_pixel *out_tl = filtered[0];
-  kvz_pixel *out_tr = filtered[1];
-  kvz_pixel *out_bl = filtered[2];
-  kvz_pixel *out_br = filtered[3];
+  uint8_t *out_tl = filtered[0];
+  uint8_t *out_tr = filtered[1];
+  uint8_t *out_bl = filtered[2];
+  uint8_t *out_br = filtered[3];
 
   int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
   int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
@@ -1214,11 +1216,11 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 }
 
 static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const encoder,
-  kvz_pixel *src, 
+  uint8_t *src, 
   int16_t src_stride, 
   int width, 
   int height, 
-  kvz_pixel *dst, 
+  uint8_t *dst, 
   int16_t dst_stride, 
   int8_t hor_flag, 
   int8_t ver_flag, 
@@ -1268,7 +1270,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
 }
 
 static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * const encoder,
-  kvz_pixel *src, 
+  uint8_t *src, 
   int16_t src_stride, 
   int width, 
   int height, 
@@ -1323,11 +1325,11 @@ static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * cons
 
 
 static void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encoder,
-  kvz_pixel *src,
+  uint8_t *src,
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel *dst,
+  uint8_t *dst,
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
@@ -1385,7 +1387,7 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encode
 }
 
 static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t * const encoder,
-  kvz_pixel *src, 
+  uint8_t *src, 
   int16_t src_stride, 
   int width, 
   int height, 
@@ -1446,6 +1448,8 @@ static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t * const 
     }
   }
 }
+
+#endif //KVZ_BIT_DEPTH == 8
 
 void kvz_get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
   int filter_size, int width, int height, kvz_extended_block *out) {
@@ -1510,6 +1514,8 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+#if KVZ_BIT_DEPTH == 8
+
   if (bitdepth == 8){
     success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_hor_ver_luma", "avx2", 40, &kvz_filter_hpel_blocks_hor_ver_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_diag_luma", "avx2", 40, &kvz_filter_hpel_blocks_diag_luma_avx2);
@@ -1520,7 +1526,10 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "sample_14bit_quarterpel_luma", "avx2", 40, &kvz_sample_14bit_quarterpel_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_14bit_octpel_chroma", "avx2", 40, &kvz_sample_14bit_octpel_chroma_avx2);
   }
+#endif //KVZ_BIT_DEPTH == 8
+
   success &= kvz_strategyselector_register(opaque, "get_extended_block", "avx2", 40, &kvz_get_extended_block_avx2);
+
 #endif //COMPILE_INTEL_AVX2
   return success;
 }

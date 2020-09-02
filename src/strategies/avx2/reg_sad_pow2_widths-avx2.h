@@ -21,10 +21,13 @@
 #ifndef REG_SAD_POW2_WIDTHS_AVX2_H_
 #define REG_SAD_POW2_WIDTHS_AVX2_H_
 
-#include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
 #include "kvazaar.h"
 
-static INLINE uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixel * const data2,
+#if KVZ_BIT_DEPTH == 8
+
+#include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
+
+static INLINE uint32_t reg_sad_w32(const uint8_t * const data1, const uint8_t * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -74,7 +77,7 @@ static INLINE uint32_t reg_sad_w32(const kvz_pixel * const data1, const kvz_pixe
   return _mm_cvtsi128_si32(sad);
 }
 
-static INLINE uint32_t reg_sad_w64(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_w64(const uint8_t * const data1, const uint8_t * const data2,
                             const int32_t height, const uint32_t stride1,
                             const uint32_t stride2)
 {
@@ -129,7 +132,7 @@ static INLINE uint32_t reg_sad_w64(const kvz_pixel * const data1, const kvz_pixe
   return _mm_cvtsi128_si32(sad);
 }
 
-static uint32_t hor_sad_avx2_w32(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_avx2_w32(const uint8_t *pic_data, const uint8_t *ref_data,
                                  int32_t height, uint32_t pic_stride, uint32_t ref_stride,
                                  const uint32_t left, const uint32_t right)
 {
@@ -205,5 +208,7 @@ static uint32_t hor_sad_avx2_w32(const kvz_pixel *pic_data, const kvz_pixel *ref
 
   return _mm_cvtsi128_si32(sad);
 }
+
+#endif // KVZ_BIT_DEPTH == 8
 
 #endif

@@ -21,6 +21,8 @@
 #include "strategies/avx2/sao-avx2.h"
 
 #if COMPILE_INTEL_AVX2
+#include "kvazaar.h"
+#if KVZ_BIT_DEPTH == 8
 #include <immintrin.h>
 #include <nmmintrin.h>
 
@@ -31,7 +33,6 @@
 #include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
-#include "kvazaar.h"
 #include "sao.h"
 #include "strategyselector.h"
 
@@ -271,12 +272,12 @@ static INLINE __m256i FIX_W32 do_one_edge_ymm(const __m256i a,
   return calc_diff_off_delta(diff_lo, diff_hi, offset, orig);
 }
 
-static int32_t sao_edge_ddistortion_avx2(const kvz_pixel *orig_data,
-                                         const kvz_pixel *rec_data,
-                                               int32_t    block_width,
-                                               int32_t    block_height,
-                                               int32_t    eo_class,
-                                         const int32_t    offsets[NUM_SAO_EDGE_CATEGORIES])
+static int32_t sao_edge_ddistortion_avx2(const uint8_t *orig_data,
+                                         const uint8_t *rec_data,
+                                               int32_t  block_width,
+                                               int32_t  block_height,
+                                               int32_t  eo_class,
+                                         const int32_t  offsets[NUM_SAO_EDGE_CATEGORIES])
 {
   int32_t y, x;
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
@@ -407,12 +408,12 @@ static void FIX_W32 calc_edge_dir_one_ymm(const __m256i  a,
   }
 }
 
-static void calc_sao_edge_dir_avx2(const kvz_pixel *orig_data,
-                                   const kvz_pixel *rec_data,
-                                         int32_t    eo_class,
-                                         int32_t    block_width,
-                                         int32_t    block_height,
-                                         int32_t    cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
+static void calc_sao_edge_dir_avx2(const uint8_t *orig_data,
+                                   const uint8_t *rec_data,
+                                         int32_t  eo_class,
+                                         int32_t  block_width,
+                                         int32_t  block_height,
+                                         int32_t  cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
 {
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
@@ -608,8 +609,8 @@ static __m256i lookup_color_band_ymm(const __m256i  curr_row,
 }
 
 static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
-                                          const kvz_pixel         *rec_data,
-                                                kvz_pixel         *new_rec_data,
+                                          const uint8_t           *rec_data,
+                                                uint8_t           *new_rec_data,
                                           const sao_info_t        *sao,
                                                 int32_t            stride,
                                                 int32_t            new_stride,
@@ -695,8 +696,8 @@ static __m256i FIX_W32 do_one_nonband_ymm(const __m256i a,
 }
 
 static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
-                                           const kvz_pixel         *rec_data,
-                                                 kvz_pixel         *new_rec_data,
+                                           const uint8_t           *rec_data,
+                                                 uint8_t           *new_rec_data,
                                            const sao_info_t        *sao,
                                                  int32_t            stride,
                                                  int32_t            new_stride,
@@ -784,8 +785,8 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
 }
 
 static void sao_reconstruct_color_avx2(const encoder_control_t *encoder,
-                                       const kvz_pixel         *rec_data,
-                                             kvz_pixel         *new_rec_data,
+                                       const uint8_t           *rec_data,
+                                             uint8_t           *new_rec_data,
                                        const sao_info_t        *sao,
                                              int32_t            stride,
                                              int32_t            new_stride,
@@ -884,18 +885,21 @@ use_generic:
       block_height, band_pos, sao_bands);
 }
 
+#endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 int kvz_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+#if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
     success &= kvz_strategyselector_register(opaque, "calc_sao_edge_dir", "avx2", 40, &calc_sao_edge_dir_avx2);
     success &= kvz_strategyselector_register(opaque, "sao_reconstruct_color", "avx2", 40, &sao_reconstruct_color_avx2);
     success &= kvz_strategyselector_register(opaque, "sao_band_ddistortion", "avx2", 40, &sao_band_ddistortion_avx2);
   }
+#endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
   return success;
 }
