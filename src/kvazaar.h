@@ -74,7 +74,10 @@ extern "C" {
  */
 #define KVZ_DATA_CHUNK_SIZE 4096
 
+#ifndef KVZ_BIT_DEPTH
 #define KVZ_BIT_DEPTH 8
+#endif
+
 #if KVZ_BIT_DEPTH == 8
 typedef uint8_t kvz_pixel;
 #else
