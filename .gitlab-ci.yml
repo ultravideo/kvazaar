@@ -63,3 +63,5 @@ test-10bit:
   <<: *test-template
   variables:
     CFLAGS: '-DKVZ_BIT_DEPTH=10'
+    # VAQ is not currently supported on the 10-bit build, so xfail it
+    XFAIL_TESTS: test_tools.sh
