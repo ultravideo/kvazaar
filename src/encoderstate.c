@@ -1736,7 +1736,7 @@ void kvz_scalability_prepare(encoder_state_t *state)
     
     //if (encoder->cfg.threads > 0) {
     scaled_pic = prepare_deferred_block_step_scaling(ilr_rec, &encoder->layer.upscaling, state, 1);
-    scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, 0); //TODO: Force separate cuas for SNR here because get_temporal_merge_candidate seems to access the cua even when tmvp is disabled, causing data races. 
+    scaled_cu = prepare_deferred_cua_lcu_upsampling(state, mv_scale, pos_scale, state->encoder_control->cfg.tmvp_enable); //TODO: Force separate cuas for SNR here because get_temporal_merge_candidate seems to access the cua even when tmvp is disabled, causing data races. 
     //}
     //else {
     //  scaled_pic = kvz_image_scaling(ilr_rec, &encoder->layer.upscaling, 1);
