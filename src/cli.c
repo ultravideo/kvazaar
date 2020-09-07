@@ -47,7 +47,7 @@ static const struct option long_options[] = {
   { "input-fps",          required_argument, NULL, 0 },
   { "deblock",            required_argument, NULL, 0 },
   { "no-deblock",               no_argument, NULL, 0 },
-  { "sao",                optional_argument, NULL, 0 },
+  { "sao",                required_argument, NULL, 0 },
   { "no-sao",                   no_argument, NULL, 0 },
   { "rdoq",                     no_argument, NULL, 0 },
   { "no-rdoq",                  no_argument, NULL, 0 },
