@@ -196,7 +196,7 @@ static int detect_file_format(const char *file_name) {
 
   // Find the last delimiter char ( / or \ ). Hope the other kind is not used in the name.
   // If delim is not found, set pointer to the beginning.
-  unsigned char* sub_str = (unsigned char*)strrchr(file_name, '.');
+  char* sub_str = (char*)strrchr(file_name, '.');
   if (!sub_str) return 0;
 
   // KVZ_FILE_FORMAT
