@@ -78,6 +78,9 @@ Input:
       --input-format <string> : P420 or P400 [P420]
       --input-bitdepth <int> : 8-16 [8]
       --loop-input           : Re-read input file forever.
+      --input-file-format <string> : Input file format if other than RAW [auto]
+                                    - auto: Check the file ending for format
+                                    - y4m
 
 Options:
       --help                 : Print this help message and exit.
