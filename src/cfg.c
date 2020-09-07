@@ -163,6 +163,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->intra_bit_allocation = false;
   cfg->clip_neighbour = true;
 
+  cfg->file_format = KVZ_FORMAT_AUTO;
+
   return 1;
 }
 
@@ -448,8 +450,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
   static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
-  static const char * const preset_values[11][25*2] = {
 
+  static const char * const file_format_names[] = {"y4m", NULL};
+
+  static const char * const preset_values[11][25*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -1358,6 +1362,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("clip-neighbour") {
     cfg->clip_neighbour = atobool(value);
+  }
+  else if OPT("input-file-format") {
+    int8_t file_format = 0;
+    if (!parse_enum(value, file_format_names, &file_format)) {
+      fprintf(stderr, "Invalid input file format %s. Valid values include %s\n", value,
+        file_format_names[0]);
+      return 0;
+    }
+    cfg->file_format = file_format;
   }
   else {
     return 0;

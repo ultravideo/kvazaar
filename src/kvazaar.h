@@ -227,6 +227,14 @@ enum kvz_rc_algorithm
   KVZ_LAMBDA = 1,
   KVZ_OBA = 2,
 };
+
+enum kvz_file_format
+{
+  KVZ_FORMAT_AUTO = 0,
+  KVZ_FORMAT_Y4M = 1
+};
+
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -437,6 +445,8 @@ typedef struct kvz_config
   uint8_t intra_bit_allocation;
 
   uint8_t clip_neighbour;
+
+  enum kvz_file_format file_format;
 } kvz_config;
 
 /**

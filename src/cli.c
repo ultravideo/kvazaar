@@ -149,6 +149,7 @@ static const struct option long_options[] = {
   { "no-intra-bits",            no_argument, NULL, 0 },
   { "clip-neighbour",           no_argument, NULL, 0 },
   { "no-clip-neighbour",        no_argument, NULL, 0 },
+  { "input-file-format",  required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -182,6 +183,26 @@ static int select_input_res_auto(const char *file_name, int32_t *out_width, int3
   } while (*sub_str != 0 && !success);
 
   return success;
+}
+
+/**
+* \brief Try to detect file format from file name automatically
+*
+* \param file_name    file name to get format from
+* \return      0 (auto) if no format is detected, or id of the format
+*/
+static int detect_file_format(const char *file_name) {
+  if (!file_name) return 0;
+
+  // Find the last delimiter char ( / or \ ). Hope the other kind is not used in the name.
+  // If delim is not found, set pointer to the beginning.
+  unsigned char* sub_str = (unsigned char*)strrchr(file_name, '.');
+  if (!sub_str) return 0;
+
+  // KVZ_FILE_FORMAT
+  if (strcmp(sub_str, ".y4m") == 0) return 1;
+
+  return 0;
 }
 
 /**
@@ -289,8 +310,13 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     goto done;
   }
 
+  // Check the file name for format
+  if (opts->config->file_format == KVZ_FORMAT_AUTO) {
+    opts->config->file_format = detect_file_format(opts->input);
+  }
+
   // Set resolution automatically if necessary
-  if (opts->config->width == 0 && opts->config->height == 0) {
+  if (opts->config->file_format == KVZ_FORMAT_AUTO && opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }
@@ -370,6 +396,9 @@ void print_help(void)
     "      --input-format <string> : P420 or P400 [P420]\n"
     "      --input-bitdepth <int> : 8-16 [8]\n"
     "      --loop-input           : Re-read input file forever.\n"
+    "      --input-file-format <string> : Input file format if other than RAW [auto]\n"
+    "                                    - auto: Check the file ending for format\n"
+    "                                    - y4m\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Options:\n"

@@ -311,6 +311,92 @@ static double calc_avg_qp(uint64_t qp_sum, uint32_t frames_done)
 }
 
 /**
+* \brief Reads the information in y4m header
+*
+* \param input  Pointer to the input file
+* \param config Pointer to the config struct
+*/
+static bool read_header(FILE* input, kvz_config* config) {
+  char buffer[256];
+  bool end_of_header = false;
+
+  while(!end_of_header) {
+    for (int i = 0; i < 256; i++) {
+      buffer[i] = getc(input);
+      // Start code of frame data
+      if (buffer[i] == 0x0A) {
+        for (; i > 0; i--) {
+          ungetc(buffer[i], input);
+        }
+        end_of_header = true;
+        break;
+      }
+      // Header sections are separated by space (ascii 0x20)
+      if (buffer[i] == 0x20) {
+        // Header start sequence does not hold any addition information, so it can be skipped
+        if ((i == 9) && strncmp(buffer, "YUV4MPEG2 ", 10) == 0) {
+          break;
+        }
+        switch (buffer[0]) {
+        // Width
+        case 'W':
+          // Exclude starting 'W' and the space at the end with substr
+          config->width = atoi(&buffer[1]);
+          break;
+        // Height
+        case 'H':
+          // Exclude starting 'H' and the space at the end with substr
+          config->height = atoi(&buffer[1]);
+          break;
+        // Framerate (or start code of frame)
+        case 'F':
+          // The header has no ending signature other than the start code of a frame
+          if (i > 5 && strncmp(buffer, "FRAME", 5) == 0) {
+            for (; i > 0; i--) {
+              ungetc(buffer[i], input);
+            }
+            end_of_header = true;
+            break;
+          }
+          else {
+            config->framerate_num = atoi(&buffer[1]);
+            for (int j = 0; j < i; j++) {
+              if (buffer[j] == ':') {
+                config->framerate_denom = atoi(&buffer[j + 1]);
+              }
+            }
+            break;
+          }
+        // Interlacing
+        case 'I':
+          break;
+        // Aspect ratio
+        case 'A':
+          break;
+        // Colour space
+        case 'C':
+          break;
+        // Comment
+        case 'X':
+          break;
+        default:
+          fprintf(stderr, "Unknown header argument starting with '%i'\n", buffer[0]);
+          break;
+        }
+        break;
+      }
+    }
+  }
+
+  if (config->width == 0 || config->height == 0 || config->framerate_num == 0 || config->framerate_denom == 0) {
+    fprintf(stderr, "Failed to read necessary info from y4m headers. Width, height and frame rate must be present in the headers.\n");
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * \brief Program main function.
  * \param argc Argument count from commandline
  * \param argv Argument list
@@ -405,6 +491,13 @@ int main(int argc, char *argv[])
     recout = open_output_file(opts->debug);
     if (recout == NULL) {
       fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug);
+      goto exit_failure;
+    }
+  }
+
+  // Parse headers if input data is in y4m container
+  if (opts->config->file_format == KVZ_FORMAT_Y4M) {
+    if (!read_header(input, opts->config)) {
       goto exit_failure;
     }
   }
