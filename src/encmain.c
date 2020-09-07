@@ -200,7 +200,7 @@ static void* input_read_thread(void* in_args)
                                     args->opts->config->height,
                                     args->encoder->cfg.input_bitdepth,
                                     args->encoder->bitdepth,
-                                    frame_in);
+                                    frame_in, args->opts->config->file_format);
     if (!read_success) {
       // reading failed
       if (feof(args->input)) {
@@ -219,7 +219,7 @@ static void* input_read_thread(void* in_args)
                                           args->opts->config->height,
                                           args->encoder->cfg.input_bitdepth,
                                           args->encoder->bitdepth,
-                                          frame_in);
+                                          frame_in, args->opts->config->file_format);
           if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
             retval = RETVAL_FAILURE;
@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
-  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height)) {
+  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height, opts->config->file_format)) {
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }

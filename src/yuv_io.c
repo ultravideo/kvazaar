@@ -188,6 +188,25 @@ static int yuv_io_read_plane(
 }
 
 
+static int read_frame_header(FILE* input) {
+  char buffer[256];
+  bool frame_start = false;
+
+  while (!frame_start) {
+    for (int i = 0; i < 256; i++) {
+      buffer[i] = getc(input);
+      if (buffer[i] == EOF) return 0;
+      // ToDo: frame headers can have some information structured same as start headers
+      // This info is just skipped for now, since it's not clear what it could be.
+      if (buffer[i] == 0x0A) {
+        frame_start = true;
+        break;
+      }
+    }
+  }
+  return 1;
+}
+
 /**
  * \brief Read a single frame from a file.
  *
@@ -204,12 +223,19 @@ static int yuv_io_read_plane(
 int yuv_io_read(FILE* file,
                 unsigned in_width, unsigned out_width,
                 unsigned in_bitdepth, unsigned out_bitdepth,
-                kvz_picture *img_out)
+                kvz_picture *img_out, unsigned file_format)
 {
   assert(in_width % 2 == 0);
   assert(out_width % 2 == 0);
 
   int ok;
+
+  if (file_format == KVZ_FORMAT_Y4M) {
+    ok = read_frame_header(file);
+    if (!ok) return 0;
+  }
+
+  
 
   ok = yuv_io_read_plane(
       file, 
@@ -254,9 +280,19 @@ int yuv_io_read(FILE* file,
  * \return              1 on success, 0 on failure
  */
 int yuv_io_seek(FILE* file, unsigned frames,
-                unsigned input_width, unsigned input_height)
+                unsigned input_width, unsigned input_height,
+                unsigned file_format)
 {
     const size_t frame_bytes = input_width * input_height * 3 / 2;
+
+    if (file_format == KVZ_FORMAT_Y4M) {
+      for (unsigned i = 0; i < frames; i++) {
+        if (!read_frame_header(file)) return 0;
+        if (fseek(file, frame_bytes, SEEK_CUR)) return 0;
+      }
+      return 1;
+    }
+
     const int64_t skip_bytes = (int64_t)(frames * frame_bytes);
 
     // Attempt to seek normally.
