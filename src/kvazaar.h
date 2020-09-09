@@ -231,7 +231,8 @@ enum kvz_rc_algorithm
 enum kvz_file_format
 {
   KVZ_FORMAT_AUTO = 0,
-  KVZ_FORMAT_Y4M = 1
+  KVZ_FORMAT_Y4M = 1,
+  KVZ_FORMAT_YUV = 2
 };
 
 

@@ -194,13 +194,18 @@ static int select_input_res_auto(const char *file_name, int32_t *out_width, int3
 static int detect_file_format(const char *file_name) {
   if (!file_name) return 0;
 
-  // Find the last delimiter char ( / or \ ). Hope the other kind is not used in the name.
-  // If delim is not found, set pointer to the beginning.
+  // Find the last dot in the file name.
+  // If delim is not found, return 0
   char* sub_str = (char*)strrchr(file_name, '.');
   if (!sub_str) return 0;
+  char ending_lower_case[4];
+  for(int i = 0; i < 4; i++){
+    ending_lower_case[i] = tolower(sub_str[i]);
+  }
 
   // KVZ_FILE_FORMAT
-  if (strcmp(sub_str, ".y4m") == 0) return 1;
+  if (strcmp(ending_lower_case, ".y4m") == 0) return 1;
+  else if (strcmp(ending_lower_case, ".yuv") == 0) return 2;
 
   return 0;
 }
@@ -316,7 +321,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   }
 
   // Set resolution automatically if necessary
-  if (opts->config->file_format == KVZ_FORMAT_AUTO && opts->config->width == 0 && opts->config->height == 0) {
+  if ((opts->config->file_format == KVZ_FORMAT_AUTO || opts->config->file_format == KVZ_FORMAT_YUV)
+      && opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }
@@ -396,9 +402,10 @@ void print_help(void)
     "      --input-format <string> : P420 or P400 [P420]\n"
     "      --input-bitdepth <int> : 8-16 [8]\n"
     "      --loop-input           : Re-read input file forever.\n"
-    "      --input-file-format <string> : Input file format if other than RAW [auto]\n"
+    "      --input-file-format <string> : Input file format [auto]\n"
     "                                    - auto: Check the file ending for format\n"
-    "                                    - y4m\n"
+    "                                    - y4m (skips frame headers)\n"
+    "                                    - yuv\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Options:\n"
