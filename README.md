@@ -78,9 +78,10 @@ Input:
       --input-format <string> : P420 or P400 [P420]
       --input-bitdepth <int> : 8-16 [8]
       --loop-input           : Re-read input file forever.
-      --input-file-format <string> : Input file format if other than RAW [auto]
+      --input-file-format <string> : Input file format [auto]
                                     - auto: Check the file ending for format
-                                    - y4m
+                                    - y4m (skips frame headers)
+                                    - yuv
 
 Options:
       --help                 : Print this help message and exit.
@@ -138,11 +139,11 @@ Video structure:
                                    - N: Target N bits per second.
       --rc-algorithm <string>: Select used rc-algorithm. [lambda]
                                    - lambda: rate control from:
-                                     DOI: 10.1109/TIP.2014.2336550 
+                                     DOI: 10.1109/TIP.2014.2336550
                                    - oba: DOI: 10.1109/TCSVT.2016.2589878
       --(no-)intra-bits      : Use Hadamard cost based allocation for intra
                                frames. Default on for gop 8 and off for lp-gop
-      --(no-)clip-neighbour  : On oba based rate control whether to clip 
+      --(no-)clip-neighbour  : On oba based rate control whether to clip
                                lambda values to same frame's ctus or previous'.
                                Default on for RA GOPS and disabled for LP.
       --(no-)lossless        : Use lossless coding. [disabled]
@@ -326,7 +327,7 @@ The LP-GOP syntax is "lp-g(num)d(num)t(num)", where
 ```
 QP
 +4  o o o o  
-+3   o   o    o o o o 
++3   o   o    o o o o
 +2     o       o o o    ooooooo
 +1 o       o o       o o       o ooooooooo
    g8d4t1    g8d3t1    g8d2t1    g8d1t1

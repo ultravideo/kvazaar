@@ -21,6 +21,7 @@
 #include "cfg.h"
 #include "gop.h"
 
+#include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -451,7 +452,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
 
-  static const char * const file_format_names[] = {"y4m", NULL};
+  static const char * const file_format_names[] = {"auto", "y4m", "yuv", NULL};
 
   static const char * const preset_values[11][25*2] = {
       {
@@ -1365,12 +1366,20 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("input-file-format") {
     int8_t file_format = 0;
-    if (!parse_enum(value, file_format_names, &file_format)) {
-      fprintf(stderr, "Invalid input file format %s. Valid values include %s\n", value,
-        file_format_names[0]);
+    char value_lower_case[255];
+    for (int i = 0; i < 255; i++) {
+      value_lower_case[i] = tolower(value[i]);
+    }
+    fprintf(stderr, "value: %s ", value_lower_case);
+    if (!parse_enum(value_lower_case, file_format_names, &file_format)) {
+      fprintf(stderr, "Invalid input file format %s. Valid values include %s, %s, and %s\n", value,
+        file_format_names[0],
+        file_format_names[1], 
+        file_format_names[2]);
       return 0;
     }
     cfg->file_format = file_format;
+    fprintf(stderr, "%i\n", cfg->file_format);
   }
   else {
     return 0;
