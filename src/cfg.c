@@ -163,6 +163,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->intra_bit_allocation = false;
   cfg->clip_neighbour = true;
 
+  cfg->stats_file_prefix = NULL;
   return 1;
 }
 
@@ -1358,6 +1359,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("clip-neighbour") {
     cfg->clip_neighbour = atobool(value);
+  }
+  else if OPT("stats-file-prefix") {
+    cfg->stats_file_prefix = strdup(value);
   }
   else {
     return 0;

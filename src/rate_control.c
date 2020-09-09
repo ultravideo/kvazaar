@@ -35,6 +35,11 @@ static const double MAX_LAMBDA    = 10000;
 
 static kvz_rc_data *data;
 
+static FILE *dist_file;
+static FILE *bits_file;
+static FILE *qp_file;
+static FILE *lambda_file;
+
 /**
  * \brief Clip lambda value to a valid range.
  */
@@ -87,6 +92,17 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
 
   data->intra_alpha = 6.7542000000000000;
   data->intra_beta = 1.7860000000000000;
+  if(encoder->cfg.stats_file_prefix) {
+    char buff[128];
+    sprintf(buff, "%sbits.txt", encoder->cfg.stats_file_prefix);
+    bits_file = fopen(buff, "w");
+    sprintf(buff, "%sdist.txt", encoder->cfg.stats_file_prefix);
+    dist_file = fopen(buff, "w");
+    sprintf(buff, "%sqp.txt", encoder->cfg.stats_file_prefix);
+    qp_file = fopen(buff, "w");
+    sprintf(buff, "%slambda.txt", encoder->cfg.stats_file_prefix);
+    lambda_file = fopen(buff, "w");
+  }
   return data;
 }
 
@@ -875,6 +891,13 @@ void kvz_update_after_picture(encoder_state_t * const state) {
     pthread_mutex_unlock(&state->frame->new_ratecontrol->intra_lock);
   }
 
+  if (encoder->cfg.stats_file_prefix) {
+    fprintf(dist_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(bits_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(qp_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(lambda_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+  }
+
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
       int ctu_distortion = 0;
@@ -889,8 +912,22 @@ void kvz_update_after_picture(encoder_state_t * const state) {
       ctu->distortion = (double)ctu_distortion / ctu->pixels;
       total_distortion += (double)ctu_distortion / ctu->pixels;
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
-    }    
+      if(encoder->cfg.stats_file_prefix) {
+        fprintf(dist_file, "%f ", ctu->distortion);
+        fprintf(bits_file, "%d ", ctu->bits);
+        fprintf(qp_file, "%d ", ctu->qp);
+        fprintf(lambda_file, "%f ", ctu->lambda);
+      }
+    }
+    if (encoder->cfg.stats_file_prefix) {
+      fprintf(dist_file, "\n");
+      fprintf(bits_file, "\n");
+      fprintf(qp_file, "\n");
+      fprintf(lambda_file, "\n");
+    }
   }
+
+  if(encoder->cfg.stats_file_prefix && encoder->cfg.rc_algorithm != KVZ_OBA) return;
 
   total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
   if (state->frame->is_irap) {
@@ -1014,6 +1051,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
                                vector2d_t pos)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
+  lcu_stats_t *lcu = kvz_get_lcu_stats(state, pos.x, pos.y);
 
   if (ctrl->cfg.roi.dqps != NULL) {
     vector2d_t lcu = {
@@ -1032,7 +1070,6 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 
   }
   else if (ctrl->cfg.target_bitrate > 0) {
-    lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
 
@@ -1065,7 +1102,6 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
                   lambda);
     lambda = clip_lambda(lambda);
 
-    lcu->lambda        = lambda;
     state->lambda      = lambda;
     state->lambda_sqrt = sqrt(lambda);
     state->qp          = lambda_to_qp(lambda);
@@ -1092,4 +1128,6 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
   }
+  lcu->lambda = state->lambda;
+  lcu->qp = state->qp;
 }

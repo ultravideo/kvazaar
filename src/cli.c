@@ -149,6 +149,7 @@ static const struct option long_options[] = {
   { "no-intra-bits",            no_argument, NULL, 0 },
   { "clip-neighbour",           no_argument, NULL, 0 },
   { "no-clip-neighbour",        no_argument, NULL, 0 },
+  { "stats-file-prefix",   required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -396,6 +397,10 @@ void print_help(void)
     "                                   - intra_pred_modes: Intra prediction modes.\n"
     "      --key <string>         : Encryption key [16,213,27,56,255,127,242,112,\n"
     "                                               97,126,197,204,25,59,38,30]\n"
+    "      --stats-file-prefix    : A prefix used for stats files that include\n"
+    "                               bits, lambda, distortion, and qp for each ctu.\n"
+    "                               These are meant for debugging and are not\n"
+    "                               written unless the prefix is defined."
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video structure:\n"

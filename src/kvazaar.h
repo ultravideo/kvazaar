@@ -437,6 +437,8 @@ typedef struct kvz_config
   uint8_t intra_bit_allocation;
 
   uint8_t clip_neighbour;
+
+  char *stats_file_prefix;
 } kvz_config;
 
 /**
