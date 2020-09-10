@@ -198,14 +198,15 @@ static int detect_file_format(const char *file_name) {
   // If delim is not found, return 0
   char* sub_str = (char*)strrchr(file_name, '.');
   if (!sub_str) return 0;
+  if (strlen(sub_str) != 4) return 0;
   char ending_lower_case[4];
   for(int i = 0; i < 4; i++){
     ending_lower_case[i] = tolower(sub_str[i]);
   }
 
   // KVZ_FILE_FORMAT
-  if (strcmp(ending_lower_case, ".y4m") == 0) return 1;
-  else if (strcmp(ending_lower_case, ".yuv") == 0) return 2;
+  if (strncmp(ending_lower_case, ".y4m", 4) == 0) return 1;
+  else if (strncmp(ending_lower_case, ".yuv", 4) == 0) return 2;
 
   return 0;
 }
