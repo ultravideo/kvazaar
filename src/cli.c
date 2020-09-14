@@ -149,7 +149,7 @@ static const struct option long_options[] = {
   { "no-intra-bits",            no_argument, NULL, 0 },
   { "clip-neighbour",           no_argument, NULL, 0 },
   { "no-clip-neighbour",        no_argument, NULL, 0 },
-  { "stats-file-prefix",   required_argument, NULL, 0 },
+  { "stats-file-prefix",  required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -400,7 +400,7 @@ void print_help(void)
     "      --stats-file-prefix    : A prefix used for stats files that include\n"
     "                               bits, lambda, distortion, and qp for each ctu.\n"
     "                               These are meant for debugging and are not\n"
-    "                               written unless the prefix is defined."
+    "                               written unless the prefix is defined.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video structure:\n"

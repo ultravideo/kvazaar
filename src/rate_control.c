@@ -807,6 +807,8 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
 
+    ctu->adjust_lambda = state->lambda;
+    ctu->adjust_qp = state->qp;
     //ctu->qp = state->qp;
     //ctu->lambda = state->lambda;
   }
@@ -870,6 +872,22 @@ static void update_ck(encoder_state_t * const state, int ctu_index, int layer)
 }
 
 
+static int calc_poc(encoder_state_t * const state) {
+  const encoder_control_t * const encoder = state->encoder_control;
+  if((encoder->cfg.open_gop && !encoder->cfg.gop_lowdelay) || !encoder->cfg.intra_period) {
+    return state->frame->poc;
+  }
+  if(!encoder->cfg.gop_len || encoder->cfg.open_gop || encoder->cfg.intra_period == 1 || encoder->cfg.gop_lowdelay) {
+    return state->frame->poc + state->frame->num / encoder->cfg.intra_period * encoder->cfg.intra_period;
+  }
+  if (!encoder->cfg.gop_lowdelay && !encoder->cfg.open_gop) {
+    return state->frame->poc + state->frame->num / (encoder->cfg.intra_period + 1) * (encoder->cfg.intra_period + 1);
+  }
+  assert(0);
+  return -1;
+}
+
+
 void kvz_update_after_picture(encoder_state_t * const state) {
   double total_distortion = 0;
   double lambda = 0;
@@ -892,10 +910,11 @@ void kvz_update_after_picture(encoder_state_t * const state) {
   }
 
   if (encoder->cfg.stats_file_prefix) {
-    fprintf(dist_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(bits_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(qp_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(lambda_file, "%d %d %d\n", state->frame->poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    int poc = calc_poc(state);
+    fprintf(dist_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(bits_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(qp_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(lambda_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
   }
 
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
@@ -915,8 +934,8 @@ void kvz_update_after_picture(encoder_state_t * const state) {
       if(encoder->cfg.stats_file_prefix) {
         fprintf(dist_file, "%f ", ctu->distortion);
         fprintf(bits_file, "%d ", ctu->bits);
-        fprintf(qp_file, "%d ", ctu->qp);
-        fprintf(lambda_file, "%f ", ctu->lambda);
+        fprintf(qp_file, "%d ", ctu->adjust_qp ? ctu->adjust_qp : ctu->qp);
+        fprintf(lambda_file, "%f ", ctu->adjust_lambda ? ctu->adjust_lambda : ctu->lambda);
       }
     }
     if (encoder->cfg.stats_file_prefix) {
@@ -1112,13 +1131,16 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->lambda_sqrt = sqrt(state->frame->lambda);
   }
 
+  lcu->lambda = state->lambda;
+  lcu->qp = state->qp;
+
   // Apply variance adaptive quantization
   if (ctrl->cfg.vaq) {
-    vector2d_t lcu = {
+    vector2d_t lcu_pos = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
     };
-    int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+    int id = lcu_pos.x + lcu_pos.y * state->tile->frame->width_in_lcu;
     int aq_offset = round(state->frame->aq_offsets[id]);
     state->qp += aq_offset;    
     // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
@@ -1127,7 +1149,8 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
+
+    lcu->adjust_lambda = state->lambda;
+    lcu->adjust_qp = state->qp;
   }
-  lcu->lambda = state->lambda;
-  lcu->qp = state->qp;
 }
