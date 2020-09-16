@@ -64,6 +64,8 @@ typedef struct lcu_stats_t {
   //! \brief Lambda value which was used for this LCU
   double lambda;
 
+  double adjust_lambda;
+
   //! \brief Rate control alpha parameter
   double rc_alpha;
 
@@ -73,6 +75,7 @@ typedef struct lcu_stats_t {
   int i_cost;
 
   int8_t qp;
+  int8_t adjust_qp;
   uint8_t skipped;
 } lcu_stats_t;
 

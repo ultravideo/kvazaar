@@ -448,6 +448,8 @@ typedef struct kvz_config
   uint8_t clip_neighbour;
 
   enum kvz_file_format file_format;
+
+  char *stats_file_prefix;
 } kvz_config;
 
 /**

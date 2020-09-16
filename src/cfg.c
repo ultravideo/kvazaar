@@ -165,6 +165,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->file_format = KVZ_FORMAT_AUTO;
 
+  cfg->stats_file_prefix = NULL;
   return 1;
 }
 
@@ -1373,6 +1374,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
     cfg->file_format = file_format;
+  }
+  else if OPT("stats-file-prefix") {
+    cfg->stats_file_prefix = strdup(value);
   }
   else {
     return 0;

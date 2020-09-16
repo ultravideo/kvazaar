@@ -100,7 +100,12 @@ a list of features separated with a '+'. [off]
 \fB\-\-key <string>        
 Encryption key [16,213,27,56,255,127,242,112,
                 97,126,197,204,25,59,38,30]
-
+.TP
+\fB\-\-stats\-file\-prefix   
+A prefix used for stats files that include
+bits, lambda, distortion, and qp for each ctu.
+These are meant for debugging and are not
+written unless the prefix is defined.
 .SS "Video structure:"
 .TP
 \fB\-q\fR, \fB\-\-qp <integer>        

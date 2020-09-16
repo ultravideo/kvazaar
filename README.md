@@ -107,7 +107,10 @@ Options:
                                    - intra_pred_modes: Intra prediction modes.
       --key <string>         : Encryption key [16,213,27,56,255,127,242,112,
                                                97,126,197,204,25,59,38,30]
-
+      --stats-file-prefix    : A prefix used for stats files that include
+                               bits, lambda, distortion, and qp for each ctu.
+                               These are meant for debugging and are not
+                               written unless the prefix is defined.
 Video structure:
   -q, --qp <integer>         : Quantization parameter [22]
   -p, --period <integer>     : Period of intra pictures [64]
