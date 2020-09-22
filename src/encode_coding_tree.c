@@ -270,10 +270,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
       const int qp_pred      = kvz_get_cu_ref_qp(state, x_cu, y_cu, state->last_qp);
       const int qp_delta     = cur_cu->qp - qp_pred;
       // Possible deltaQP range depends on bit depth as stated in HEVC specification.
-      if (KVZ_BIT_DEPTH == 8)
-        assert(qp_delta >= -26 && qp_delta <= 25 && "QP delta not in valid range [-26, 25]."); // This range applies only to 8-bit encoding
-      if (KVZ_BIT_DEPTH == 10)
-        assert(qp_delta >= -32 && qp_delta <= 31 && "QP delta not in valid range [-32, 31]."); // This range applies only to 10-bit encoding
+      int qp_bd_offset = 3 * (KVZ_BIT_DEPTH - 8);
+      int qp_delta_min = -(26 + qp_bd_offset);
+      int qp_delta_max = 25 + qp_bd_offset;
+      assert(qp_delta >= qp_delta_min && qp_delta <= qp_delta_max && "QP delta not in valid range.");
 
       const int qp_delta_abs = ABS(qp_delta);
       cabac_data_t* cabac    = &state->cabac;
