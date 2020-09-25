@@ -40,6 +40,7 @@
 #include "strategyselector.h"
 #include "tables.h"
 #include "transform.h"
+#include "fast_coeff_cost.h"
 
 static INLINE int32_t hsum32_8x32i(__m256i src)
 {
@@ -792,12 +793,8 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t qp)
+static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
 {
-  assert(qp >= MIN_FAST_COEFF_COST_QP && qp <= MAX_FAST_COEFF_COST_QP);
-
-  const uint64_t *curr_wts = fast_coeff_cost_wts + qp - MIN_FAST_COEFF_COST_QP;
-
   const __m256i zero           = _mm256_setzero_si256();
   const __m256i threes         = _mm256_set1_epi16(3);
   const __m256i negate_hibytes = _mm256_set1_epi16(0xff00);
@@ -807,7 +804,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   __m256i lo_sum     = _mm256_setzero_si256();
   __m256i hi_sum     = _mm256_setzero_si256();
 
-  __m128i wts_128    = _mm_loadl_epi64 ((const __m128i *)curr_wts);
+  __m128i wts_128    = _mm_loadl_epi64 ((const __m128i *)&weights);
   __m128i wts_lo_128 = _mm_shuffle_epi8(wts_128, wt_extract_los);
   __m128i wts_hi_128 = _mm_shuffle_epi8(wts_128, wt_extract_his);
 

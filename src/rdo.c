@@ -210,9 +210,10 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int8_t scan_mode)
 {
   if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
-      state->qp >= MIN_FAST_COEFF_COST_QP &&
-      state->qp <= MAX_FAST_COEFF_COST_QP) {
-    return kvz_fast_coeff_cost(coeff, width, state->qp);
+      state->qp < MAX_FAST_COEFF_COST_QP) {
+
+    uint64_t weights = kvz_fast_coeff_get_weights(state);
+    return kvz_fast_coeff_cost(coeff, width, weights);
   } else {
     return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
   }

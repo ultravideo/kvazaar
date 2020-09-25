@@ -450,6 +450,7 @@ typedef struct kvz_config
   enum kvz_file_format file_format;
 
   char *stats_file_prefix;
+  char *fast_coeff_table_fn;   /*!< \brief Pointer to fast coeff table filename */
 } kvz_config;
 
 /**

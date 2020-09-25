@@ -855,6 +855,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->cqmfile = cqmfile;
     cfg->scaling_list = KVZ_SCALING_LIST_CUSTOM;
   }
+  else if OPT("fast-coeff-table") {
+    char* fast_coeff_table_fn = strdup(value);
+    if (!fast_coeff_table_fn) {
+      fprintf(stderr, "Failed to allocate memory for fast coeff table file name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->fast_coeff_table_fn);
+    cfg->fast_coeff_table_fn = fast_coeff_table_fn;
+  }
   else if OPT("scaling-list") {    
     int8_t scaling_list = KVZ_SCALING_LIST_OFF;
     int result = parse_enum(value, scaling_list_names, &scaling_list);

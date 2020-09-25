@@ -71,6 +71,8 @@ libkvazaar_la_SOURCES = \
 	encoder_state-geometry.h \
 	encode_coding_tree.c \
 	encode_coding_tree.h \
+	fast_coeff_cost.c \
+	fast_coeff_cost.h \
 	filter.c \
 	filter.h \
 	global.h \
