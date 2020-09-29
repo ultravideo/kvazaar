@@ -349,4 +349,8 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 #  define COMPILE_ARM 0
 #endif
 
+// Min & max delta QP limits based on bit depth
+#define KVZ_QP_DELTA_MIN -(26 + 3 * (KVZ_BIT_DEPTH - 8))
+#define KVZ_QP_DELTA_MAX 25 + 3 * (KVZ_BIT_DEPTH - 8)
+
 #endif
