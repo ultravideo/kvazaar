@@ -243,6 +243,9 @@ Compression tools:
                                    - sensitive: Terminate even earlier.
       --fast-residual-cost <int> : Skip CABAC cost for residual coefficients
                                    when QP is below the limit. [0]
+      --fast-coeff-table <string> : Read custom weights for residual
+                                    coefficients from a file instead of using
+                                    defaults [default]
       --(no-)intra-rdo-et    : Check intra modes in rdo stage only until
                                a zero coefficient CU is found. [disabled]
       --(no-)early-skip      : Try to find skip cu from merge candidates.
