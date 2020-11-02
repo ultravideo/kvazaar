@@ -73,6 +73,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
+  cfg->fast_coeff_table_fn = NULL;
   cfg->ref_frames      = 1;
   cfg->gop_len         = 4;
   cfg->gop_lowdelay    = true;
@@ -173,6 +174,7 @@ int kvz_config_destroy(kvz_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
+    FREE_POINTER(cfg->fast_coeff_table_fn);
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
