@@ -195,6 +195,11 @@ static INLINE uint32_t get_coeff_cabac_cost(
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
+/*
+ * TODO TODO TODO TODO TODO TODO TODO: the mutexes only protect when one but
+ * not both of these fuckers are used. Also we need some way to actually
+ * access the outfile, kvz_get_coeff_cost gets the encoder struct as a const..
+ */
 static INLINE void save_ccc(const coeff_t *coeff, int32_t size, uint32_t ccc)
 {
   const uint64_t flush_count = 4096;
@@ -205,9 +210,30 @@ static INLINE void save_ccc(const coeff_t *coeff, int32_t size, uint32_t ccc)
 
   assert(sizeof(coeff_t) == sizeof(int16_t));
 
+  /*
+  fwrite(&size,  sizeof(size),     1,    encoder->fastrd_learning_outfile);
+  fwrite(&ccc,   sizeof(ccc),      1,    encoder->fastrd_learning_outfile);
+  fwrite( coeff, sizeof(coeff_t),  size, encoder->fastrd_learning_outfile);
+  */
   fwrite(&size,  sizeof(size),     1,    stdout);
   fwrite(&ccc,   sizeof(ccc),      1,    stdout);
   fwrite( coeff, sizeof(coeff_t),  size, stdout);
+
+  if (((++count) % flush_count) == 0)
+    fflush(stdout);
+
+  pthread_mutex_unlock(&mtx);
+}
+
+static INLINE void save_accuracy(uint32_t ccc, uint32_t fast_cost)
+{
+  const uint64_t flush_count = 4096;
+
+  static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+  static uint64_t count = 0;
+  pthread_mutex_lock(&mtx);
+
+  fprintf(stdout, "%u %u\n", fast_cost, ccc);
 
   if (((++count) % flush_count) == 0)
     fflush(stdout);
@@ -230,14 +256,24 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
-  int save_cccs = 1; // TODO!
+  uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
+  uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
+
   if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
       state->qp < MAX_FAST_COEFF_COST_QP) {
+    // TODO: do we need to assert(0) out of the fast-estimation branch if we
+    // are to save block costs, or should we just warn about it somewhere
+    // earlier (configuration validation I guess)?
     if (save_cccs) {
-      assert(0 && "Plz no fast-residual-cost");
+      assert(0 && "Fast RD sampling does not work with fast-residual-cost");
     } else {
       uint64_t weights = kvz_fast_coeff_get_weights(state);
-      return kvz_fast_coeff_cost(coeff, width, weights);
+      uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
+      if (check_accuracy) {
+        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+        save_accuracy(ccc, fast_cost);
+      }
+      return fast_cost;
     }
   } else {
     uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);

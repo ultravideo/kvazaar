@@ -152,6 +152,9 @@ static const struct option long_options[] = {
   { "input-file-format",  required_argument, NULL, 0 },
   { "stats-file-prefix",  required_argument, NULL, 0 },
   { "fast-coeff-table",   required_argument, NULL, 0 },
+  { "fastrd-sampling",          no_argument, NULL, 0 },
+  { "fastrd-accuracy-check",    no_argument, NULL, 0 },
+  { "fastrd-outfile",     required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

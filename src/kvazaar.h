@@ -27,6 +27,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 
 
 #ifdef __cplusplus
@@ -451,6 +452,19 @@ typedef struct kvz_config
 
   char *stats_file_prefix;
   char *fast_coeff_table_fn;   /*!< \brief Pointer to fast coeff table filename */
+
+  /** \brief whether we're sampling TBs and their costs for fast cost
+   *         estimation training */
+  uint8_t rdo_cost_sampling_mode_on;
+
+  /** \brief whether we're running in normal mode, sampling TBs and their cost
+   *         for fast estimation training, or comparing estimator accuracy to
+   *         CABAC */
+  uint8_t fastrd_sampling_on;
+  uint8_t fastrd_accuracy_check_on;
+
+  char *fastrd_learning_output_fn;
+
 } kvz_config;
 
 /**

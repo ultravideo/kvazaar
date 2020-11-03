@@ -167,6 +167,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->file_format = KVZ_FORMAT_AUTO;
 
   cfg->stats_file_prefix = NULL;
+
+  cfg->fastrd_sampling_on = 0;
+  cfg->fastrd_accuracy_check_on = 0;
+  cfg->fastrd_learning_output_fn = NULL;
   return 1;
 }
 
@@ -180,6 +184,7 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
+    FREE_POINTER(cfg->fastrd_learning_output_fn);
   }
   free(cfg);
 
@@ -865,6 +870,21 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     FREE_POINTER(cfg->fast_coeff_table_fn);
     cfg->fast_coeff_table_fn = fast_coeff_table_fn;
+  }
+  else if OPT("fastrd-sampling") {
+    cfg->fastrd_sampling_on = 1;
+  }
+  else if OPT("fastrd-accuracy-check") {
+    cfg->fastrd_accuracy_check_on = 1;
+  }
+  else if OPT("fastrd-outfile") {
+    char *fastrd_learning_output_fn = strdup(value);
+    if (!fastrd_learning_output_fn) {
+      fprintf(stderr, "Failed to allocate memory for fast RD learning outfile name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->fastrd_learning_output_fn);
+    cfg->fastrd_learning_output_fn = fastrd_learning_output_fn;
   }
   else if OPT("scaling-list") {    
     int8_t scaling_list = KVZ_SCALING_LIST_OFF;
