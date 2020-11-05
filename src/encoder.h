@@ -136,7 +136,6 @@ typedef struct encoder_control_t
   int32_t poc_lsb_bits;
 
   fast_coeff_table_t fast_coeff_table;
-  FILE *fastrd_learning_outfile;
 
 } encoder_control_t;
 

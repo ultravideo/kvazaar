@@ -20,6 +20,7 @@
 
 #include "rdo.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -42,6 +43,11 @@
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
+
+#define RD_SAMPLING_MAX_LAST_QP     50
+
+static FILE *fastrd_learning_outfile[RD_SAMPLING_MAX_LAST_QP + 1] = {NULL};
+static pthread_mutex_t outfile_mutex[RD_SAMPLING_MAX_LAST_QP + 1] = {PTHREAD_MUTEX_INITIALIZER};
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
@@ -143,6 +149,48 @@ struct sh_rates_t {
   int32_t quant_delta[32 * 32];
 };
 
+int kvz_init_rdcost_outfiles(const char *dir_path)
+{
+#define RD_SAMPLING_MAX_FN_LENGTH 4095
+  static const char *basename_tmpl = "/%02i.txt";
+  char fn_template[RD_SAMPLING_MAX_FN_LENGTH + 1];
+  char fn[RD_SAMPLING_MAX_FN_LENGTH + 1];
+  int rv = 0, qp;
+
+  // As long as QP is a two-digit number, template and produced string should
+  // be equal in length ("%i" -> "22")
+  assert(RD_SAMPLING_MAX_LAST_QP <= 99);
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
+
+  strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
+  strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+
+  for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
+    FILE *curr;
+
+    snprintf(fn, RD_SAMPLING_MAX_FN_LENGTH, fn_template, qp);
+    fn[RD_SAMPLING_MAX_FN_LENGTH] = 0;
+    curr = fopen(fn, "w");
+    if (curr == NULL) {
+      fprintf(stderr, "Failed to open %s: %s\n", fn, strerror(errno));
+      rv = -1;
+      qp--;
+      goto out_close_files;
+    }
+    fastrd_learning_outfile[qp] = curr;
+  }
+  goto out;
+
+out_close_files:
+  for (; qp >= 0; qp--) {
+    fclose(fastrd_learning_outfile[qp]);
+    fastrd_learning_outfile[qp] = NULL;
+  }
+out:
+  return rv;
+#undef RD_SAMPLING_MAX_FN_LENGTH
+}
+
 
 /**
  * \brief Calculate actual (or really close to actual) bitcost for coding
@@ -195,50 +243,31 @@ static INLINE uint32_t get_coeff_cabac_cost(
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
-/*
- * TODO TODO TODO TODO TODO TODO TODO: the mutexes only protect when one but
- * not both of these fuckers are used. Also we need some way to actually
- * access the outfile, kvz_get_coeff_cost gets the encoder struct as a const..
- */
-static INLINE void save_ccc(const coeff_t *coeff, int32_t size, uint32_t ccc)
+static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
 {
-  const uint64_t flush_count = 4096;
-
-  static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-  static uint64_t count = 0;
-  pthread_mutex_lock(&mtx);
+  pthread_mutex_t *mtx = outfile_mutex + qp;
 
   assert(sizeof(coeff_t) == sizeof(int16_t));
+  assert(qp <= RD_SAMPLING_MAX_LAST_QP);
 
-  /*
-  fwrite(&size,  sizeof(size),     1,    encoder->fastrd_learning_outfile);
-  fwrite(&ccc,   sizeof(ccc),      1,    encoder->fastrd_learning_outfile);
-  fwrite( coeff, sizeof(coeff_t),  size, encoder->fastrd_learning_outfile);
-  */
-  fwrite(&size,  sizeof(size),     1,    stdout);
-  fwrite(&ccc,   sizeof(ccc),      1,    stdout);
-  fwrite( coeff, sizeof(coeff_t),  size, stdout);
+  pthread_mutex_lock(mtx);
 
-  if (((++count) % flush_count) == 0)
-    fflush(stdout);
+  fwrite(&size,  sizeof(size),     1,    fastrd_learning_outfile[qp]);
+  fwrite(&ccc,   sizeof(ccc),      1,    fastrd_learning_outfile[qp]);
+  fwrite( coeff, sizeof(coeff_t),  size, fastrd_learning_outfile[qp]);
 
-  pthread_mutex_unlock(&mtx);
+  pthread_mutex_unlock(mtx);
 }
 
-static INLINE void save_accuracy(uint32_t ccc, uint32_t fast_cost)
+static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
 {
-  const uint64_t flush_count = 4096;
+  pthread_mutex_t *mtx = outfile_mutex + qp;
 
-  static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-  static uint64_t count = 0;
-  pthread_mutex_lock(&mtx);
+  assert(qp <= RD_SAMPLING_MAX_LAST_QP);
 
-  fprintf(stdout, "%u %u\n", fast_cost, ccc);
-
-  if (((++count) % flush_count) == 0)
-    fflush(stdout);
-
-  pthread_mutex_unlock(&mtx);
+  pthread_mutex_lock(mtx);
+  fprintf(fastrd_learning_outfile[qp], "%u %u\n", fast_cost, ccc);
+  pthread_mutex_unlock(mtx);
 }
 
 /**
@@ -271,14 +300,14 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
       uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
         uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
-        save_accuracy(ccc, fast_cost);
+        save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
     uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
     if (save_cccs) {
-      save_ccc(coeff, width * width, ccc);
+      save_ccc(state->qp, coeff, width * width, ccc);
     }
     return ccc;
   }
@@ -1114,4 +1143,16 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
 
   // Store bitcost before restoring cabac
   return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
+}
+
+void kvz_close_rdcost_outfiles(void)
+{
+  int i;
+
+  for (i = 0; i < RD_SAMPLING_MAX_LAST_QP; i++) {
+    FILE *curr = fastrd_learning_outfile[i];
+    if (curr != NULL) {
+      fclose(curr);
+    }
+  }
 }

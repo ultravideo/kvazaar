@@ -463,7 +463,7 @@ typedef struct kvz_config
   uint8_t fastrd_sampling_on;
   uint8_t fastrd_accuracy_check_on;
 
-  char *fastrd_learning_output_fn;
+  char *fastrd_learning_outdir_fn;
 
 } kvz_config;
 

@@ -22,13 +22,13 @@
 
 // This define is required for M_PI on Windows.
 #define _USE_MATH_DEFINES
-#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "cfg.h"
 #include "gop.h"
+#include "rdo.h"
 #include "strategyselector.h"
 #include "kvz_math.h"
 #include "fast_coeff_cost.h"
@@ -356,19 +356,13 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   }
 
   if (cfg->fastrd_sampling_on || cfg->fastrd_accuracy_check_on) {
-    FILE *fastrd_learning_outfile;
-
-    if (cfg->fastrd_learning_output_fn == NULL) {
+    if (cfg->fastrd_learning_outdir_fn == NULL) {
       fprintf(stderr, "No output file defined for Fast RD sampling or accuracy check.\n");
       goto init_failed;
     }
-    fastrd_learning_outfile = fopen(cfg->fastrd_learning_output_fn, "w");
-    if (fastrd_learning_outfile == NULL) {
-      fprintf(stderr, "Failed to open output file for Fast RD: %s\n",
-          strerror(errno));
+    if (kvz_init_rdcost_outfiles(cfg->fastrd_learning_outdir_fn) != 0) {
       goto init_failed;
     }
-    encoder->fastrd_learning_outfile = fastrd_learning_outfile;
   }
 
   kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
@@ -725,9 +719,7 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
   kvz_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
 
-  if (encoder->fastrd_learning_outfile != NULL) {
-    fclose(encoder->fastrd_learning_outfile);
-  }
+  kvz_close_rdcost_outfiles();
 
   free(encoder);
 }

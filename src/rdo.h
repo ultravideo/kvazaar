@@ -36,6 +36,9 @@
 extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 
+int kvz_init_rdcost_outfiles(const char *fn_template);
+void kvz_close_rdcost_outfiles(void);
+
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
