@@ -13,13 +13,13 @@ ofdir  = os.path.join("/tmp", "rdcost", "data")
 # Note that n_kvazaars * len(dest_qps) has to be less than the max number of
 # fd's that a process can have (check it out: ulimit -a, likely 1024)
 smt_threads   = 8 # Kinda lazy, but just match this to your cpu
-n_kvz_threads = 4 # How many threads each kvz instance is running?
+n_kvz_threads = 1 # How many threads each kvz instance is running?
 n_kvazaars    = smt_threads // n_kvz_threads
 kvz_srcdir    = lambda path: os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
 dest_qps      = tuple(range(51))
-base_qps      = tuple(range(12, 43))
-sequences     = ("/opt/test_seqs/hevc-B/*.yuv", "/opt/test_seqs/custom_seqs/*/*.yuv")
+base_qps      = tuple(range(22, 28))
+sequences     = ("/opt/test_seqs/hevc-D/*.yuv",)# "/opt/test_seqs/custom_seqs/*/*.yuv")
 
 kvzargs       = [kvz_srcdir("kvazaar"), "--threads", str(n_kvz_threads), "--preset=ultrafast", "--fastrd-sampling", "--fast-residual-cost=0"]
 kvzenv        = {"LD_LIBRARY_PATH": kvz_srcdir(".libs/")}
@@ -94,12 +94,14 @@ def do_gzip(in_fn, out_fn):
             block = inf.read(BLOCK_SZ)
             num_read += len(block)
             if (num_read >= print_next_thres):
-                print("    read %8i MB from %s" % (num_read / (1024 * 1024), in_fn))
+                print("    read     %8i MB from %s" % (num_read / (1024 * 1024), in_fn))
                 print_next_thres += BLOCK_SZ * PRINT_MULT
 
             if (len(block) == 0):
                 break
             outf.write(block)
+
+        print("    finished %8i MB from %s" % (num_read / (1024 * 1024), in_fn))
 
 def run_job(job):
     ifpath, qp = job

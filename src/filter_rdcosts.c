@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -59,11 +60,17 @@ void update_matrix(const uint64_t *buckets, uint64_t *mat)
   }
 }
 
-void process_rdcosts(FILE *in, FILE *out)
+static inline int is_power_of_two(uint32_t u)
+{
+  return (u & (u - 1)) == 0;
+}
+
+int process_rdcosts(FILE *in, FILE *out)
 {
   void *buf = malloc(BUFSZ);
   uint32_t *u32buf = (uint32_t *)buf;
   int16_t  *i16buf = (int16_t  *)buf;
+  int rv = 0;
 
   float weights[NUM_TOTAL_BUCKETS] = {0.0f};
 
@@ -74,14 +81,35 @@ void process_rdcosts(FILE *in, FILE *out)
     uint64_t cg_buckets[NUM_TOTAL_BUCKETS] = {0};
     uint64_t cg_num_signs = 0;
     uint16_t excess = 0;
+    size_t   n_read;
 
-    fread(buf, sizeof(uint32_t), 2, in);
+    n_read = fread(buf, sizeof(uint32_t), 2, in);
     size = u32buf[0];
     ccc  = u32buf[1];
 
-    size_sqrt = 1 << (ilog2(size) >> 1);
+    // Can't rely on feof() alone when reading from a pipe that might only get
+    // closed long after the last data has been poured in
+    if (n_read == 0) {
+      break;
+    }
+    if (feof(in) || n_read < sizeof(uint32_t) * 2) {
+      fprintf(stderr, "Unexpected EOF when reading header, managed still to read %u bytes\n", n_read);
+      rv = 1;
+      goto out;
+    }
+    if (!is_power_of_two(size)) {
+      fprintf(stderr, "Errorneous block size %u\n", size);
+      rv = 1;
+      goto out;
+    }
 
-    fread(buf, sizeof(int16_t), size, in);
+    size_sqrt = 1 << (ilog2(size) >> 1);
+    n_read = fread(buf, sizeof(int16_t), size, in);
+    if (n_read != size * sizeof(int16_t)) {
+      fprintf(stderr, "Unexpected EOF when reading block, managed still to read %u bytes\n", n_read);
+      rv = 1;
+      goto out;
+    }
 
     count_coeffs(i16buf, size, cg_buckets, &cg_num_signs, &excess);
     update_matrix(cg_buckets, mat);
@@ -94,11 +122,12 @@ void process_rdcosts(FILE *in, FILE *out)
     printf("\n");
   }
 
-
+out:
   free(buf);
+  return rv;
 }
 
 int main(int ar, char **av)
 {
-  process_rdcosts(stdin, stdout);
+  return process_rdcosts(stdin, stdout);
 }
