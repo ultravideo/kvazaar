@@ -10,19 +10,19 @@ import time
 logdir = os.path.join("/tmp", "rdcost", "logs")
 ofdir  = os.path.join("/tmp", "rdcost", "data")
 
-n_threads   = 8
-home_rel    = lambda path: os.path.join(os.environ["HOME"], path)
+# Note that n_kvazaars * len(dest_qps) has to be less than the max number of
+# fd's that a process can have (check it out: ulimit -a, likely 1024)
+smt_threads   = 8 # Kinda lazy, but just match this to your cpu
+n_kvz_threads = 4 # How many threads each kvz instance is running?
+n_kvazaars    = smt_threads // n_kvz_threads
+kvz_srcdir    = lambda path: os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
-dest_qps    = tuple(range(51))
-base_qps    = tuple(range(12, 43))
-#base_qps    = tuple(range(12, 15))
-sequences   = ("/opt/test_seqs/hevc-B/*.yuv", "/opt/test_seqs/custom_seqs/*/*.yuv")
-#sequences   = ("/opt/test_seqs/custom_seqs/*/*.yuv",)
+dest_qps      = tuple(range(51))
+base_qps      = tuple(range(12, 43))
+sequences     = ("/opt/test_seqs/hevc-B/*.yuv", "/opt/test_seqs/custom_seqs/*/*.yuv")
 
-kvzargs     = [home_rel("kvazaar/src/kvazaar"), "--threads", "1", "--preset=ultrafast", "--fastrd-sampling", "--fast-residual-cost=0"]
-kvzenv      = {"LD_LIBRARY_PATH": home_rel("kvazaar/src/.libs/")}
-
-gzargs      = ["gzip"]
+kvzargs       = [kvz_srcdir("kvazaar"), "--threads", str(n_kvz_threads), "--preset=ultrafast", "--fastrd-sampling", "--fast-residual-cost=0"]
+kvzenv        = {"LD_LIBRARY_PATH": kvz_srcdir(".libs/")}
 
 class MultiPipeGZOutManager:
     pipe_fn_template  = "%02i.txt"
@@ -123,14 +123,7 @@ def run_job(job):
         with MultiPipeGZOutManager(odpath, dest_qps) as pipes_and_outputs:
             gzips = []
             gzip_threads = []
-            #for pipe_fn, out_f in pipes_and_outputs.items():
             for pipe_fn, out_fn in pipes_and_outputs.items():
-                #my_gzargs = gzargs + ["-c", pipe_fn]
-                #gzip = subprocess.Popen(my_gzargs, stdout=out_f)
-                #gzips.append(gzip)
-                #print("  launched gzip %s" % " ".join(my_gzargs))
-
-
                 gzip_thread = threading.Thread(target=do_gzip, args=(pipe_fn, out_fn))
                 gzip_thread.start()
                 gzip_threads.append(gzip_thread)
@@ -149,7 +142,7 @@ def main():
     jobs = combinations(chain(map(glob.glob, sequences)), base_qps)
     joblist = MTSafeIterable(jobs)
 
-    threads = [threading.Thread(target=threadfunc, args=(joblist,)) for _ in range(n_threads)]
+    threads = [threading.Thread(target=threadfunc, args=(joblist,)) for _ in range(n_kvazaars)]
     for thread in threads:
         thread.start()
 
