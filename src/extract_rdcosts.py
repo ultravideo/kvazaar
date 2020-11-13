@@ -123,7 +123,6 @@ def run_job(job):
 
     with open(logpath, "w") as lf:
         with MultiPipeGZOutManager(odpath, dest_qps) as pipes_and_outputs:
-            gzips = []
             gzip_threads = []
             for pipe_fn, out_fn in pipes_and_outputs.items():
                 gzip_thread = threading.Thread(target=do_gzip, args=(pipe_fn, out_fn))
@@ -131,10 +130,7 @@ def run_job(job):
                 gzip_threads.append(gzip_thread)
 
             kvz = subprocess.Popen(my_kvzargs, env=kvzenv, stderr=lf)
-
-            kvz.communicate()
-            for gzip in gzips:
-                gzip.communicate()
+            kvz.wait()
 
 def threadfunc(joblist):
     for job in joblist:

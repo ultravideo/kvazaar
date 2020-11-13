@@ -121,6 +121,7 @@ int process_rdcosts(FILE *in, FILE *out)
     }
     printf("\n");
   }
+  fflush(stdout);
 
 out:
   free(buf);
