@@ -12,14 +12,11 @@ import time
 
 n_threads   = 8
 datadirs    = "/tmp/rdcost/data/"
-#datadirs    = "/tmp/rdcost/data/RaceHorses_416x240_30.yuv-qp23/"
 gzargs      = ["gzip", "-d"]
 filtargs    = ["./frcosts_matrix"]
 octargs     = ["octave-cli", "invert_matrix.m"]
 filt2args   = ["./ols_2ndpart"]
 resultdir   = os.path.join("/tmp", "rdcost", "coeff_buckets")
-
-gz_glob     = "[0-9][0-9].txt.gz"
 
 class MultiPipeManager:
     pipe_fn_template  = "%02i.txt"
