@@ -58,11 +58,17 @@ void count_coeffs(const int16_t *buf, uint32_t size, uint64_t *buckets, uint64_t
   }
 }
 
-void process_rdcosts(FILE *in, FILE *out, const double *mat)
+static inline int is_power_of_two(uint32_t u)
+{
+  return (u & (u - 1)) == 0;
+}
+
+int process_rdcosts(FILE *in, FILE *out, const double *mat)
 {
   void *buf = malloc(BUFSZ);
   uint32_t *u32buf = (uint32_t *)buf;
   int16_t  *i16buf = (int16_t  *)buf;
+  int rv = 0;
 
   double res[NUM_TOTAL_BUCKETS] = {0.0};
 
@@ -70,14 +76,36 @@ void process_rdcosts(FILE *in, FILE *out, const double *mat)
     uint32_t size, ccc, size_sqrt;
     uint64_t cg_buckets[NUM_TOTAL_BUCKETS] = {0};
     uint64_t cg_num_signs = 0;
+    size_t   n_read;
 
-    fread(buf, sizeof(uint32_t), 2, in);
+    n_read = fread(buf, sizeof(uint32_t), 2, in);
     size = u32buf[0];
     ccc  = u32buf[1];
 
+    // Can't rely on feof() alone when reading from a pipe that might only get
+    // closed long after the last data has been poured in
+    if (n_read == 0) {
+      break;
+    }
+    if (feof(in) || n_read < sizeof(uint32_t) * 2) {
+      fprintf(stderr, "Unexpected EOF when reading header, managed still to read %u bytes\n", n_read);
+      rv = 1;
+      goto out;
+    }
+    if (!is_power_of_two(size)) {
+      fprintf(stderr, "Errorneous block size %u\n", size);
+      rv = 1;
+      goto out;
+    }
+
     size_sqrt = 1 << (ilog2(size) >> 1);
 
-    fread(buf, sizeof(int16_t), size, in);
+    n_read = fread(buf, sizeof(int16_t), size, in);
+    if (n_read != size * sizeof(int16_t)) {
+      fprintf(stderr, "Unexpected EOF when reading block, managed still to read %u bytes\n", n_read);
+      rv = 1;
+      goto out;
+    }
 
     count_coeffs(i16buf, size, cg_buckets, &cg_num_signs);
     update_result(cg_buckets, ccc, mat, res);
@@ -86,7 +114,9 @@ void process_rdcosts(FILE *in, FILE *out, const double *mat)
   for (int y = 0; y < NUM_TOTAL_BUCKETS; y++)
     fprintf(out, "%g\n", (float)(res[y]));
 
+out:
   free(buf);
+  return rv;
 }
 
 int main(int ar, char **av)
@@ -97,6 +127,6 @@ int main(int ar, char **av)
     return 1;
   }
   read_matrix(av[1], mat);
-  process_rdcosts(stdin, stdout, mat);
+  return process_rdcosts(stdin, stdout, mat);
 }
 
