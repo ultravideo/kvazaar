@@ -92,8 +92,8 @@ int process_rdcosts(FILE *in, FILE *out)
     if (n_read == 0) {
       break;
     }
-    if (feof(in) || n_read < sizeof(uint32_t) * 2) {
-      fprintf(stderr, "Unexpected EOF when reading header, managed still to read %u bytes\n", n_read);
+    if (feof(in) || n_read < 2) {
+      fprintf(stderr, "Unexpected EOF when reading header, managed still to read %u u32's\n", n_read);
       rv = 1;
       goto out;
     }
@@ -105,8 +105,8 @@ int process_rdcosts(FILE *in, FILE *out)
 
     size_sqrt = 1 << (ilog2(size) >> 1);
     n_read = fread(buf, sizeof(int16_t), size, in);
-    if (n_read != size * sizeof(int16_t)) {
-      fprintf(stderr, "Unexpected EOF when reading block, managed still to read %u bytes\n", n_read);
+    if (n_read != size) {
+      fprintf(stderr, "Unexpected EOF when reading block, managed still to read %u i16's\n", n_read);
       rv = 1;
       goto out;
     }
