@@ -15,11 +15,17 @@ ofdir  = os.path.join("/tmp", "rdcost", "data")
 smt_threads   = 8 # Kinda lazy, but just match this to your cpu
 n_kvz_threads = 1 # How many threads each kvz instance is running?
 n_kvazaars    = smt_threads // n_kvz_threads
-kvz_srcdir    = lambda path: os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+kvz_srcdir    = lambda path: os.path.join(
+                                 os.path.dirname(
+                                     os.path.dirname(
+                                         os.path.realpath(__file__)
+                                     )
+                                 ), "src", path)
+
 
 dest_qps      = tuple(range(51))
-base_qps      = tuple(range(22, 28))
-sequences     = ("/opt/test_seqs/hevc-D/*.yuv",)# "/opt/test_seqs/custom_seqs/*/*.yuv")
+base_qps      = tuple(range(12, 43))
+sequences     = ("/opt/test_seqs/custom_seqs/*/*.yuv",)
 
 kvzargs       = [kvz_srcdir("kvazaar"), "--threads", str(n_kvz_threads), "--preset=ultrafast", "--fastrd-sampling", "--fast-residual-cost=0"]
 kvzenv        = {"LD_LIBRARY_PATH": kvz_srcdir(".libs/")}
@@ -137,6 +143,7 @@ def threadfunc(joblist):
         run_job(job)
 
 def main():
+    assert(isinstance(sequences, tuple))
     jobs = combinations(chain(map(glob.glob, sequences)), base_qps)
     joblist = MTSafeIterable(jobs)
 

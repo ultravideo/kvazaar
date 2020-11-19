@@ -1,4 +1,4 @@
 #!/bin/sh
 
-gcc -O2 filter_rdcosts.c -o ../src/frcosts_matrix
-gcc -O2 ols_2ndpart.c -o ../src/ols_2ndpart
+gcc -O2 filter_rdcosts.c -o frcosts_matrix
+gcc -O2 ols_2ndpart.c -o ols_2ndpart
