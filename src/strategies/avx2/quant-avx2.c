@@ -40,6 +40,7 @@
 #include "strategyselector.h"
 #include "tables.h"
 #include "transform.h"
+#include "fast_coeff_cost.h"
 
 static INLINE int32_t hsum32_8x32i(__m256i src)
 {
@@ -792,80 +793,62 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-#define TO_Q88(f) ((int16_t)((f) * 256.0f))
-
-static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t qp)
+static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
 {
-#define NUM_BUCKETS 5
-  static const int16_t wt_m[NUM_BUCKETS] = {
-    TO_Q88(-0.004916),
-    TO_Q88( 0.010806),
-    TO_Q88( 0.055562),
-    TO_Q88( 0.033436),
-    TO_Q88(-0.007690),
-  };
-  static const int16_t wt_c[NUM_BUCKETS] = {
-    TO_Q88( 0.172024),
-    TO_Q88( 3.421462),
-    TO_Q88( 2.879506),
-    TO_Q88( 5.585471),
-    TO_Q88( 0.256772),
-  };
+  const __m256i zero           = _mm256_setzero_si256();
+  const __m256i threes         = _mm256_set1_epi16(3);
+  const __m256i negate_hibytes = _mm256_set1_epi16(0xff00);
+  const __m128i wt_extract_los = _mm_cvtsi32_si128(0x06040200);
+  const __m128i wt_extract_his = _mm_cvtsi32_si128(0x07050301);
 
-  const __m256i zero   = _mm256_setzero_si256();
-  const __m256i threes = _mm256_set1_epi16(3);
-  const __m256i ones   = _mm256_srli_epi16(threes, 1);
-  const __m256i twos   = _mm256_slli_epi16(ones,   1);
+  __m256i lo_sum     = _mm256_setzero_si256();
+  __m256i hi_sum     = _mm256_setzero_si256();
 
-  __m256i wt[NUM_BUCKETS - 1];
-  for (int32_t i = 0; i < NUM_BUCKETS - 1; i++)
-    wt[i] = _mm256_set1_epi16(wt_m[i] * qp + wt_c[i]);
+  __m128i wts_128    = _mm_loadl_epi64 ((const __m128i *)&weights);
+  __m128i wts_lo_128 = _mm_shuffle_epi8(wts_128, wt_extract_los);
+  __m128i wts_hi_128 = _mm_shuffle_epi8(wts_128, wt_extract_his);
 
-  uint32_t wid_wt = width * (wt_m[NUM_BUCKETS - 1] * qp + wt_c[NUM_BUCKETS - 1]);
-  __m256i avx_inc = _mm256_setzero_si256();
+  __m256i wts_lo     = _mm256_broadcastsi128_si256(wts_lo_128);
+  __m256i wts_hi     = _mm256_broadcastsi128_si256(wts_hi_128);
 
-  for (int32_t i = 0; i < width * width; i += 16) {
-    __m256i curr      = _mm256_loadu_si256((__m256i *)(coeff + i));
-    __m256i curr_abs  = _mm256_abs_epi16  (curr);
-    __m256i curr_max3 = _mm256_min_epi16  (curr_abs, threes);
+  for (int i = 0; i < width * width; i += 32) {
+    __m256i curr_lo      = _mm256_loadu_si256 ((const __m256i *)(coeff + i));
+    __m256i curr_abs_lo  = _mm256_abs_epi16   (curr_lo);
+    __m256i curr_max3_lo = _mm256_min_epu16   (curr_abs_lo, threes);
 
-    __m256i curr_eq_0 = _mm256_cmpeq_epi16(curr_max3, zero);
-    __m256i curr_eq_1 = _mm256_cmpeq_epi16(curr_max3, ones);
-    __m256i curr_eq_2 = _mm256_cmpeq_epi16(curr_max3, twos);
-    __m256i curr_eq_3 = _mm256_cmpeq_epi16(curr_max3, threes);
+    // 4x4 blocks only have 16 coeffs, so handle them separately
+    __m256i curr_max3_hi;
+    if (width >= 8) {
+      __m256i curr_hi      = _mm256_loadu_si256 ((const __m256i *)(coeff + i + 16));
+      __m256i curr_abs_hi  = _mm256_abs_epi16   (curr_hi);
+              curr_max3_hi = _mm256_min_epu16   (curr_abs_hi, threes);
+              curr_max3_hi = _mm256_slli_epi16  (curr_max3_hi, 8);
+    } else {
+      // Set MSBs for high bytes if they're meaningless, so shuffles will
+      // return zeros for them
+      curr_max3_hi = negate_hibytes;
+    }
+    __m256i curr_max3    = _mm256_or_si256    (curr_max3_lo, curr_max3_hi);
+    __m256i curr_wts_lo  = _mm256_shuffle_epi8(wts_lo, curr_max3);
+    __m256i curr_wts_hi  = _mm256_shuffle_epi8(wts_hi, curr_max3);
 
-    __m256i curr_0_wt = _mm256_and_si256  (curr_eq_0, wt[0]);
-    __m256i curr_1_wt = _mm256_and_si256  (curr_eq_1, wt[1]);
-    __m256i curr_2_wt = _mm256_and_si256  (curr_eq_2, wt[2]);
-    __m256i curr_3_wt = _mm256_and_si256  (curr_eq_3, wt[3]);
+    __m256i curr_sum_lo  = _mm256_sad_epu8    (curr_wts_lo, zero);
+    __m256i curr_sum_hi  = _mm256_sad_epu8    (curr_wts_hi, zero);
 
-    // Use madd to horizontally sum 16-bit weights into 32-bit atoms
-    __m256i wt_0_32b  = _mm256_madd_epi16(curr_0_wt, ones);
-    __m256i wt_1_32b  = _mm256_madd_epi16(curr_1_wt, ones);
-    __m256i wt_2_32b  = _mm256_madd_epi16(curr_2_wt, ones);
-    __m256i wt_3_32b  = _mm256_madd_epi16(curr_3_wt, ones);
-
-    __m256i wt_01     = _mm256_add_epi32(wt_0_32b, wt_1_32b);
-    __m256i wt_23     = _mm256_add_epi32(wt_2_32b, wt_3_32b);
-    __m256i curr_wts  = _mm256_add_epi32(wt_01,    wt_23);
-    avx_inc           = _mm256_add_epi32(avx_inc,  curr_wts);
+            lo_sum       = _mm256_add_epi64   (lo_sum, curr_sum_lo);
+            hi_sum       = _mm256_add_epi64   (hi_sum, curr_sum_hi);
   }
-  __m128i inchi = _mm256_extracti128_si256(avx_inc, 1);
-  __m128i inclo = _mm256_castsi256_si128  (avx_inc);
+          hi_sum = _mm256_slli_epi64(hi_sum, 8);
+  __m256i sum0   = _mm256_add_epi64(lo_sum, hi_sum);
 
-  __m128i sum_1 = _mm_add_epi32    (inclo, inchi);
-  __m128i sum_2 = _mm_shuffle_epi32(sum_1, _MM_SHUFFLE(1, 0, 3, 2));
-  __m128i sum_3 = _mm_add_epi32    (sum_1, sum_2);
-  __m128i sum_4 = _mm_shuffle_epi32(sum_3, _MM_SHUFFLE(2, 3, 0, 1));
-  __m128i sum   = _mm_add_epi32    (sum_3, sum_4);
+  __m256i sum1   = _mm256_permute4x64_epi64(sum0, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i sum2   = _mm256_add_epi64        (sum0, sum1);
+  __m256i sum3   = _mm256_shuffle_epi32    (sum2, _MM_SHUFFLE(1, 0, 3, 2));
+  __m256i sum4   = _mm256_add_epi64        (sum2, sum3);
 
-  uint32_t sum_u32 = _mm_cvtsi128_si32(sum);
-  uint32_t sum_total = sum_u32 + wid_wt;
-  return sum_total >> 8;
-#undef NUM_BUCKETS
+  __m128i sum128 = _mm256_castsi256_si128  (sum4);
+  return (_mm_cvtsi128_si32(sum128) + (1 << 7)) >> 8;
 }
-
-#undef TO_Q88
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 

@@ -155,6 +155,7 @@
     <ClCompile Include="..\..\src\encoder_state-geometry.c" />
     <ClCompile Include="..\..\src\encode_coding_tree.c" />
     <ClCompile Include="..\..\src\extras\getopt.c" />
+    <ClCompile Include="..\..\src\fast_coeff_cost.c" />
     <ClCompile Include="..\..\src\filter.c" />
     <ClCompile Include="..\..\src\image.c" />
     <ClCompile Include="..\..\src\imagelist.c" />
@@ -290,6 +291,7 @@
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\encoderstate.h" />
     <ClInclude Include="..\..\src\extras\getopt.h" />
+    <ClInclude Include="..\..\src\fast_coeff_cost.h" />
     <ClInclude Include="..\..\src\filter.h" />
     <ClInclude Include="..\..\src\global.h" />
     <ClInclude Include="..\..\src\inter.h" />

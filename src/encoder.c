@@ -30,7 +30,7 @@
 #include "gop.h"
 #include "strategyselector.h"
 #include "kvz_math.h"
-
+#include "fast_coeff_cost.h"
 
 /**
  * \brief Strength of QP adjustments when using adaptive QP for 360 video.
@@ -232,6 +232,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   encoder->cfg.tiles_width_split = NULL;
   encoder->cfg.tiles_height_split = NULL;
   encoder->cfg.slice_addresses_in_ts = NULL;
+  encoder->cfg.fast_coeff_table_fn = NULL;
 
   if (encoder->cfg.gop_len > 0) {
     if (encoder->cfg.gop_lowdelay) {
@@ -336,6 +337,21 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     // Enable scaling lists if default lists are used
     encoder->scaling_list.enable = 1;
     encoder->scaling_list.use_default_list = 1;
+  }
+
+  if (cfg->fast_coeff_table_fn) {
+    FILE *fast_coeff_table_f = fopen(cfg->fast_coeff_table_fn, "rb");
+    if (fast_coeff_table_f == NULL) {
+      fprintf(stderr, "Could not open fast coeff table file.\n");
+      goto init_failed;
+    }
+    if (kvz_fast_coeff_table_parse(&encoder->fast_coeff_table, fast_coeff_table_f) != 0) {
+      fprintf(stderr, "Failed to parse fast coeff table, using default\n");
+      kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
+    }
+    fclose(fast_coeff_table_f);
+  } else {
+    kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
   }
 
   kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
