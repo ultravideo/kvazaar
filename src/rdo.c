@@ -47,7 +47,7 @@
 #define RD_SAMPLING_MAX_LAST_QP     50
 
 static FILE *fastrd_learning_outfile[RD_SAMPLING_MAX_LAST_QP + 1] = {NULL};
-static pthread_mutex_t outfile_mutex[RD_SAMPLING_MAX_LAST_QP + 1] = {PTHREAD_MUTEX_INITIALIZER};
+static pthread_mutex_t outfile_mutex[RD_SAMPLING_MAX_LAST_QP + 1];
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
@@ -166,6 +166,17 @@ int kvz_init_rdcost_outfiles(const char *dir_path)
   strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
 
   for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
+    pthread_mutex_t *curr = outfile_mutex + qp;
+
+    if (pthread_mutex_init(curr, NULL) != 0) {
+      fprintf(stderr, "Failed to create mutex\n");
+      rv = -1;
+      qp--;
+      goto out_destroy_mutexes;
+    }
+  }
+
+  for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
     FILE *curr;
 
     snprintf(fn, RD_SAMPLING_MAX_FN_LENGTH, fn_template, qp);
@@ -186,6 +197,14 @@ out_close_files:
     fclose(fastrd_learning_outfile[qp]);
     fastrd_learning_outfile[qp] = NULL;
   }
+  goto out;
+
+out_destroy_mutexes:
+  for (; qp >= 0; qp--) {
+    pthread_mutex_destroy(outfile_mutex + qp);
+  }
+  goto out;
+
 out:
   return rv;
 #undef RD_SAMPLING_MAX_FN_LENGTH
@@ -1151,8 +1170,12 @@ void kvz_close_rdcost_outfiles(void)
 
   for (i = 0; i < RD_SAMPLING_MAX_LAST_QP; i++) {
     FILE *curr = fastrd_learning_outfile[i];
+    pthread_mutex_t *curr_mtx = outfile_mutex + i;
     if (curr != NULL) {
       fclose(curr);
+    }
+    if (curr_mtx != NULL) {
+      pthread_mutex_destroy(curr_mtx);
     }
   }
 }
