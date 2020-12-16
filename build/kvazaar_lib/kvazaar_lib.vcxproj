@@ -165,6 +165,7 @@
     <ClCompile Include="..\..\src\nal.c" />
     <ClCompile Include="..\..\src\rate_control.c" />
     <ClCompile Include="..\..\src\rdo.c" />
+    <ClCompile Include="..\..\src\fast_coeff_cost.c" />
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
@@ -300,6 +301,7 @@
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\rate_control.h" />
     <ClInclude Include="..\..\src\rdo.h" />
+    <ClInclude Include="..\..\src\fast_coeff_cost.h" />
     <ClInclude Include="..\..\src\sao.h" />
     <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
