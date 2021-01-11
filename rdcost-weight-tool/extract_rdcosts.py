@@ -7,14 +7,20 @@ import subprocess
 import threading
 import time
 
-logdir = os.path.join("/tmp", "rdcost", "logs")
-ofdir  = os.path.join("/tmp", "rdcost", "data")
+# Where logs and sampled data will wind up, and where the sequences are read.
+# Do note that the sequences variable is supposed to be a tuple, because you
+# could have multiple sets of sequences.
+logdir    =  "/tmp/rdcost/logs"
+ofdir     =  "/tmp/rdcost/data"
+sequences = ("/opt/test_seqs/custom_seqs/*/*.yuv",)
 
 # Note that n_kvazaars * len(dest_qps) has to be less than the max number of
 # fd's that a process can have (check it out: ulimit -a, likely 1024)
 smt_threads   = 8 # Kinda lazy, but just match this to your cpu
 n_kvz_threads = 1 # How many threads each kvz instance is running?
 n_kvazaars    = smt_threads // n_kvz_threads
+
+# You likely will not need to change anything below this line
 kvz_srcdir    = lambda path: os.path.join(
                                  os.path.dirname(
                                      os.path.dirname(
@@ -25,7 +31,6 @@ kvz_srcdir    = lambda path: os.path.join(
 
 dest_qps      = tuple(range(51))
 base_qps      = tuple(range(12, 43))
-sequences     = ("/opt/test_seqs/custom_seqs/*/*.yuv",)
 
 kvzargs       = [kvz_srcdir("kvazaar"), "--threads", str(n_kvz_threads), "--preset=ultrafast", "--fastrd-sampling", "--fast-residual-cost=0"]
 kvzenv        = {"LD_LIBRARY_PATH": kvz_srcdir(".libs/")}
@@ -144,6 +149,9 @@ def threadfunc(joblist):
 
 def main():
     assert(isinstance(sequences, tuple))
+    for d in (logdir, ofdir):
+        os.makedirs(d, exist_ok=True)
+
     jobs = combinations(chain(map(glob.glob, sequences)), base_qps)
     joblist = MTSafeIterable(jobs)
 

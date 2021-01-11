@@ -10,13 +10,15 @@ import tempfile
 import threading
 import time
 
+# You should change these to your liking
 n_threads   = 8
 datadirs    = "/tmp/rdcost/data/"
+resultdir   = "/tmp/rdcost/coeff_buckets"
+
 gzargs      = ["gzip", "-d"]
 filtargs    = ["./frcosts_matrix"]
 octargs     = ["octave-cli", "invert_matrix.m"]
 filt2args   = ["./ols_2ndpart"]
-resultdir   = os.path.join("/tmp", "rdcost", "coeff_buckets")
 
 class MultiPipeManager:
     pipe_fn_template  = "%02i.txt"
@@ -135,6 +137,9 @@ def scan_datadirs(path):
             yield job_name, glob.glob(os.path.join(seq_glob, qp_fn))
 
 def main():
+    for d in (datadirs, resultdir):
+        os.makedirs(d, exist_ok=True)
+
     jobs = scan_datadirs(datadirs)
     joblist = MTSafeIterable(iter(jobs))
 
