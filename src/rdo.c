@@ -314,6 +314,7 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
     // earlier (configuration validation I guess)?
     if (save_cccs) {
       assert(0 && "Fast RD sampling does not work with fast-residual-cost");
+      return UINT32_MAX; // Hush little compiler don't you cry, not really gonna return anything after assert(0)
     } else {
       uint64_t weights = kvz_fast_coeff_get_weights(state);
       uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
