@@ -266,7 +266,11 @@ done:
   // Do some cleaning up.
   args->api->picture_free(frame_in);
 
+  // This thread exit call causes problems with media auto-build suite
+  // The environment compiles with MINGW using a different pthreads lib
+  #ifndef __MINGW32__
   pthread_exit(NULL);
+  #endif
   return NULL;
 }
 
