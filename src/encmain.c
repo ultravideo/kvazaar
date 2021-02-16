@@ -268,7 +268,7 @@ done:
 
   // This thread exit call causes problems with media auto-build suite
   // The environment compiles with MINGW using a different pthreads lib
-  #if !defined(__MINGW32__) || !defined(__MINGW64__)
+  #if !defined(__MINGW32__) && !defined(__MINGW64__)
   pthread_exit(NULL);
   #endif
   return NULL;
