@@ -32,7 +32,7 @@ test-tsan:
   variables:
     CFLAGS: '-fsanitize=thread'
     # Temporarily suppress known errors or false positives.
-    TSAN_OPTIONS: 'suppressions=/builds/TIE/ultravideo/kvazaar/tests/tsan_suppressions.txt'
+    TSAN_OPTIONS: 'suppressions=/builds/cs/ultravideo/kvazaar/tests/tsan_suppressions.txt'
 
 test-ubsan:
   <<: *test-template
