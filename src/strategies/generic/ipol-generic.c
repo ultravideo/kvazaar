@@ -728,59 +728,46 @@ void kvz_sample_14bit_octpel_chroma_generic(const encoder_control_t * const enco
 }
 
 
-void kvz_get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filter_size, int width, int height, kvz_extended_block *out) {
+void kvz_get_extended_block_generic(kvz_epol_args args) {
 
-  int half_filter_size = filter_size >> 1;
+  int min_y = args.blk_y - args.pad_t;
+  int max_y = args.blk_y + args.blk_h + args.pad_b - 1;
+  bool out_of_bounds_y = (min_y < 0) || (max_y >= args.src_h);
 
-  out->buffer = ref + (ypos - half_filter_size + off_y + mv_y) * ref_width + (xpos - half_filter_size + off_x + mv_x);
-  out->stride = ref_width;
-  out->orig_topleft = out->buffer + out->stride * half_filter_size + half_filter_size;
-  out->malloc_used = 0;
+  int min_x = args.blk_x - args.pad_l;
+  int max_x = args.blk_x + args.blk_w + args.pad_r - 1;
+  bool out_of_bounds_x = (min_x < 0) || (max_x >= args.src_w);
 
-  int min_y = ypos - half_filter_size + off_y + mv_y;
-  int max_y = min_y + height + filter_size;
-  int out_of_bounds_y = (min_y < 0) || (max_y >= ref_height);
+  if (out_of_bounds_y || out_of_bounds_x) {
 
-  int min_x = xpos - half_filter_size + off_x + mv_x;
-  int max_x = min_x + width + filter_size;
-  int out_of_bounds_x = (min_x < 0) || (max_x >= ref_width);
+    *args.ext = args.buf;
+    *args.ext_s = args.pad_l + args.blk_w + args.pad_r;
+    *args.ext_origin = args.buf + args.pad_t * (*args.ext_s) + args.pad_l;
 
-  int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
+    int cnt_l = CLIP(0, *args.ext_s, -min_x);
+    int cnt_r = CLIP(0, *args.ext_s, max_x - (args.src_w - 1));
+    int cnt_m = CLIP(0, *args.ext_s, *args.ext_s - cnt_l - cnt_r);
 
-  if (sample_out_of_bounds){
-    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (height + filter_size));
-    if (!out->buffer){
-      fprintf(stderr, "Memory allocation failed!\n");
-      assert(0);
+    // For each row including padding
+    for (int y = -args.pad_t; y < args.blk_h + args.pad_b; ++y) {
+
+      int clipped_y = CLIP(0, args.src_h - 1, args.blk_y + y);
+      kvz_pixel sample_l = *(args.src + clipped_y * args.src_s);
+      kvz_pixel sample_r = *(args.src + clipped_y * args.src_s + args.src_w - 1);
+      kvz_pixel *src_m = args.src + clipped_y * args.src_s + MAX(min_x, 0);
+      kvz_pixel *dst_l = args.buf + (y + args.pad_t) * (*args.ext_s);
+      kvz_pixel *dst_m = dst_l + cnt_l;
+      kvz_pixel *dst_r = dst_m + cnt_m;
+      for (int i = 0; i < cnt_l; ++i) *(dst_l + i) = sample_l;
+      for (int i = 0; i < cnt_m; ++i) *(dst_m + i) = *(src_m + i);
+      for (int i = 0; i < cnt_r; ++i) *(dst_r + i) = sample_r;
     }
-    out->stride = width + filter_size;
-    out->orig_topleft = out->buffer + out->stride * half_filter_size + half_filter_size;
-    out->malloc_used = 1;
+  } else {
 
-    int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
-
-    for (dst_y = 0, y = ypos - half_filter_size; y < ((ypos + height)) + half_filter_size; dst_y++, y++) {
-
-      // calculate y-pixel offset
-      coord_y = y + off_y + mv_y;
-      coord_y = CLIP(0, (ref_height)-1, coord_y);
-      coord_y *= ref_width;
-
-      if (!out_of_bounds_x){
-        memcpy(&out->buffer[dst_y * out->stride + 0], &ref[coord_y + min_x], out->stride * sizeof(kvz_pixel));
-      } else {
-        for (dst_x = 0, x = (xpos)-half_filter_size; x < ((xpos + width)) + half_filter_size; dst_x++, x++) {
-
-          coord_x = x + off_x + mv_x;
-          coord_x = CLIP(0, (ref_width)-1, coord_x);
-
-          // Store source block data (with extended borders)
-          out->buffer[dst_y * out->stride + dst_x] = ref[coord_y + coord_x];
-        }
-      }
-    }
-  } 
+    *args.ext = args.src + (args.blk_y - args.pad_t) * args.src_s + (args.blk_x - args.pad_l);
+    *args.ext_origin = args.src + args.blk_y * args.src_s + args.blk_x;
+    *args.ext_s = args.src_s;
+  }
 }
 
 int kvz_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)

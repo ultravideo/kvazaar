@@ -38,8 +38,34 @@ typedef void(ipol_blocks_func)(const encoder_control_t * encoder, kvz_pixel *src
   kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH], int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH], int8_t fme_level, int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1], 
   int8_t sample_off_x, int8_t sample_off_y);
 
-typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filter_size, int width, int height, kvz_extended_block *out);
+typedef struct {
+  // Source samples
+  kvz_pixel *src; // Top-left sample
+  int src_w; // Width
+  int src_h; // Height
+  int src_s; // Stride
+
+  // Requested sampling position, base dimensions, and padding
+  int blk_x;
+  int blk_y;
+  int blk_w; // Width
+  int blk_h; // Height
+  int pad_l; // Left
+  int pad_r; // Right
+  int pad_t; // Top
+  int pad_b; // Bottom
+
+  // Buffer for possible extrapolation. Free memory provided by the caller.
+  kvz_pixel *buf;
+
+  // Extended block data. These are set by the function.
+  kvz_pixel **ext; // Top-left sample with padding
+  kvz_pixel **ext_origin; // Top-left sample without padding
+  int *ext_s; // Stride
+} kvz_epol_args;
+
+typedef unsigned(epol_func)(kvz_epol_args *args);
+
 
 typedef void(kvz_sample_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
 typedef void(kvz_sample_octpel_chroma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
