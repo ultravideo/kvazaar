@@ -1414,26 +1414,12 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
 
+  // Buffer for intermediate values with one extra row 
+  // because the loop writes two rows each iteration.
+  ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
   int16_t hor_stride = LCU_WIDTH;
-  int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
 
-  // HORIZONTAL STEP
-  __m256i shuf_01_23, shuf_45_67;
-  __m256i taps_01_23, taps_45_67;
-
-  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
-  kvz_init_filter_taps(hor_fir, &taps_01_23, &taps_45_67);
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_intermediate[y * hor_stride + x],
-        &shuf_01_23, &shuf_45_67,
-        &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
+  kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
 
   // VERTICAL STEP
   __m256i taps[4];
