@@ -609,7 +609,7 @@ INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_no_round_avx2(__m256i *fil
 
 }
 
-static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
+static void kvz_ipol_8tap_hor_px_im_avx2(int8_t *filter,
   int width,
   int height,
   kvz_pixel *src,
@@ -704,7 +704,7 @@ static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
   }
 }
 
-static void kvz_ipol_8tap_ver_im_px_avx2(uint8_t *filter,
+static void kvz_ipol_8tap_ver_im_px_avx2(int8_t *filter,
   int width,
   int height,
   int16_t *src,
@@ -796,7 +796,7 @@ static void kvz_ipol_8tap_ver_im_px_avx2(uint8_t *filter,
   }
 }
 
-static void kvz_ipol_8tap_ver_im_hi_avx2(uint8_t *filter,
+static void kvz_ipol_8tap_ver_im_hi_avx2(int8_t *filter,
 int width,
 int height,
 int16_t *src,
