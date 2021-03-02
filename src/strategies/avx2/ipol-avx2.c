@@ -609,6 +609,277 @@ INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_no_round_avx2(__m256i *fil
 
 }
 
+static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
+  int width,
+  int height,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int16_t *dst,
+  int16_t dst_stride) {
+  __m256i shuf01 = _mm256_setr_epi8(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8,
+                                    0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8);
+  __m256i shuf23 = _mm256_setr_epi8(2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10,
+                                    2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10);
+  __m256i shuf45 = _mm256_setr_epi8(4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12,
+                                    4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12);
+  __m256i shuf67 = _mm256_setr_epi8(6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14,
+                                    6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14);
+
+  __m256i all_w01 = _mm256_set1_epi16(*(uint16_t *)(filter + 0));
+  __m256i all_w23 = _mm256_set1_epi16(*(uint16_t *)(filter + 2));
+  __m256i all_w45 = _mm256_set1_epi16(*(uint16_t *)(filter + 4));
+  __m256i all_w67 = _mm256_set1_epi16(*(uint16_t *)(filter + 6));
+
+  int y_offset = -KVZ_LUMA_FILTER_OFFSET;
+  int x_offset = -KVZ_LUMA_FILTER_OFFSET;
+
+  kvz_pixel *top_left = src + src_stride * y_offset + x_offset;
+
+  int y = 0;
+  int x = 0;
+
+  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
+
+    for (x = 0; x + 7 < width; x += 8) {
+
+      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
+      __m128i r0 = _mm_loadu_si128((__m128i*)(chunk_ptr + 0 * src_stride));
+      __m128i r1 = _mm_loadu_si128((__m128i*)(chunk_ptr + 1 * src_stride));
+      __m256i r0_r1 = _mm256_castsi128_si256(r0);
+      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
+
+      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
+      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
+      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
+      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
+
+      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
+      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
+      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
+      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
+      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
+
+      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
+      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
+      __m128i sum_r0 = _mm256_castsi256_si128(sum);
+      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
+      _mm_storeu_si128(dst_r0, sum_r0);
+      _mm_storeu_si128(dst_r1, sum_r1);
+    }
+  }
+
+  if (x < width) {
+    for (int y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
+
+      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
+      __m128i r0 = _mm_loadu_si128((__m128i *)(chunk_ptr + 0 * src_stride));
+      __m128i r1 = _mm_loadu_si128((__m128i *)(chunk_ptr + 1 * src_stride));
+      __m256i r0_r1 = _mm256_castsi128_si256(r0);
+      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
+
+      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
+      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
+      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
+      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
+
+      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
+      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
+      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
+      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
+      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
+
+      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
+      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
+      __m128i sum_r0 = _mm256_castsi256_si128(sum);
+      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
+      _mm_storel_epi64(dst_r0, sum_r0);
+      _mm_storel_epi64(dst_r1, sum_r1);
+    }
+  }
+}
+
+static void kvz_ipol_8tap_ver_im_px_avx2(uint8_t *filter,
+  int width,
+  int height,
+  int16_t *src,
+  int16_t src_stride,
+  kvz_pixel *dst,
+  int16_t dst_stride)
+{
+  // Interpolation filter shifts
+  int32_t shift2 = 6;
+
+  // Weighted prediction offset and shift
+  int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
+  int32_t wp_offset1 = 1 << (wp_shift1 - 1);
+
+  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
+  __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
+  __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
+  __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
+  __m256i all_w45 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(2, 2, 2, 2));
+  __m256i all_w67 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(3, 3, 3, 3));
+
+  for (int x = 0; x + 3 < width; x += 4) {
+
+    int16_t *strip_ptr = src + 0 * src_stride + x;
+
+    // Initial values
+    // Broadcasted rows in both lanes
+    // __m256i r0; // Unused
+    // __m256i r1; // Unused
+    __m256i r2 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 0 * src_stride));
+    __m256i r3 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 1 * src_stride));
+    __m256i r4 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 2 * src_stride));
+    __m256i r5 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 3 * src_stride));
+    __m256i r6 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 4 * src_stride));
+    __m256i r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 5 * src_stride));
+    __m256i r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 6 * src_stride));
+
+    // Consecutive rows in low and high lanes
+    // __m256i r0_r1; // Unused
+    // __m256i r1_r2; // Unused
+    __m256i r2_r3 = _mm256_blend_epi32(r2, r3, 0xF0);
+    __m256i r3_r4 = _mm256_blend_epi32(r3, r4, 0xF0);
+    __m256i r4_r5 = _mm256_blend_epi32(r4, r5, 0xF0);
+    __m256i r5_r6 = _mm256_blend_epi32(r5, r6, 0xF0);
+    __m256i r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+    __m256i r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+    // Paired samples of consecutive rows
+    __m256i r01_r12;
+    __m256i r23_r34 = _mm256_unpacklo_epi16(r2_r3, r3_r4);
+    __m256i r45_r56 = _mm256_unpacklo_epi16(r4_r5, r5_r6);
+    __m256i r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+    for (int y = 0; y < height; y += 2) {
+
+      strip_ptr = src + y * src_stride + x;
+
+      // Slide window
+      r01_r12 = r23_r34;
+      r23_r34 = r45_r56;
+      r45_r56 = r67_r78;
+      r6 = r8;
+      r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 7 * src_stride));
+      r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 8 * src_stride));
+      r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+      r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+      r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+      __m256i dot01 = _mm256_madd_epi16(r01_r12, all_w01);
+      __m256i dot23 = _mm256_madd_epi16(r23_r34, all_w23);
+      __m256i dot45 = _mm256_madd_epi16(r45_r56, all_w45);
+      __m256i dot67 = _mm256_madd_epi16(r67_r78, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
+      __m256i sum = _mm256_add_epi32(sum0123, sum4567);
+      sum = _mm256_srai_epi32(sum, shift2);
+      sum = _mm256_add_epi32(sum, _mm256_set1_epi32(wp_offset1));
+      sum = _mm256_srai_epi32(sum, wp_shift1);
+      sum = _mm256_packs_epi32(sum, sum);
+      sum = _mm256_packus_epi16(sum, sum);
+
+      kvz_pixel *dst_addr0 = &dst[(y + 0) * dst_stride + x];
+      kvz_pixel *dst_addr1 = &dst[(y + 1) * dst_stride + x];
+      *(uint32_t*)dst_addr0 = _mm_cvtsi128_si32(_mm256_castsi256_si128(sum));
+      *(uint32_t*)dst_addr1 = _mm_cvtsi128_si32(_mm256_extracti128_si256(sum, 1));
+    }
+  }
+}
+
+static void kvz_ipol_8tap_ver_im_hi_avx2(uint8_t *filter,
+int width,
+int height,
+int16_t *src,
+int16_t src_stride,
+int16_t *dst,
+int16_t dst_stride)
+{
+  const int shift2 = 6;
+
+  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
+  __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
+  __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
+  __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
+  __m256i all_w45 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(2, 2, 2, 2));
+  __m256i all_w67 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(3, 3, 3, 3));
+
+  for (int x = 0; x + 3 < width; x += 4) {
+
+    int16_t *strip_ptr = src + 0 * src_stride + x;
+
+    // Initial values
+    // Broadcasted rows in both lanes
+    // __m256i r0; // Unused
+    // __m256i r1; // Unused
+    __m256i r2 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 0 * src_stride));
+    __m256i r3 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 1 * src_stride));
+    __m256i r4 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 2 * src_stride));
+    __m256i r5 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 3 * src_stride));
+    __m256i r6 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 4 * src_stride));
+    __m256i r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 5 * src_stride));
+    __m256i r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 6 * src_stride));
+
+    // Consecutive rows in low and high lanes
+    // __m256i r0_r1; // Unused
+    // __m256i r1_r2; // Unused
+    __m256i r2_r3 = _mm256_blend_epi32(r2, r3, 0xF0);
+    __m256i r3_r4 = _mm256_blend_epi32(r3, r4, 0xF0);
+    __m256i r4_r5 = _mm256_blend_epi32(r4, r5, 0xF0);
+    __m256i r5_r6 = _mm256_blend_epi32(r5, r6, 0xF0);
+    __m256i r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+    __m256i r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+    // Paired samples of consecutive rows
+    __m256i r01_r12;
+    __m256i r23_r34 = _mm256_unpacklo_epi16(r2_r3, r3_r4);
+    __m256i r45_r56 = _mm256_unpacklo_epi16(r4_r5, r5_r6);
+    __m256i r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+    for (int y = 0; y < height; y += 2) {
+
+      strip_ptr = src + y * src_stride + x;
+
+      // Slide window
+      r01_r12 = r23_r34;
+      r23_r34 = r45_r56;
+      r45_r56 = r67_r78;
+      r6 = r8;
+      r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 7 * src_stride));
+      r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 8 * src_stride));
+      r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
+      r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
+
+      r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
+
+      __m256i dot01 = _mm256_madd_epi16(r01_r12, all_w01);
+      __m256i dot23 = _mm256_madd_epi16(r23_r34, all_w23);
+      __m256i dot45 = _mm256_madd_epi16(r45_r56, all_w45);
+      __m256i dot67 = _mm256_madd_epi16(r67_r78, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
+      __m256i sum = _mm256_add_epi32(sum0123, sum4567);
+      sum = _mm256_srai_epi32(sum, shift2);
+      sum = _mm256_packs_epi32(sum, sum);
+
+      int16_t *dst_addr0 = &dst[(y + 0) * dst_stride + x];
+      int16_t *dst_addr1 = &dst[(y + 1) * dst_stride + x];
+      _mm_storel_epi64((__m128i *)dst_addr0, _mm256_castsi256_si128(sum));
+      _mm_storel_epi64((__m128i *)dst_addr1, _mm256_extracti128_si256(sum, 1));
+    }
+  }
+}
+
 static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * encoder,
   kvz_pixel *src,
   int16_t src_stride,
@@ -675,16 +946,7 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
   kvz_init_filter_taps(fir2, &taps_01_23, &taps_45_67);
 
-  for (y = first_y; y < height + KVZ_EXT_PADDING_LUMA + 1; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET + 1;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_pos2[y * hor_stride + x],
-                                            &shuf_01_23, &shuf_45_67,
-                                            &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
+  kvz_ipol_8tap_hor_px_im_avx2(fir2, width, height + 1, src + 1, src_stride, hor_pos2, hor_stride);
 
   // Write the first column in contiguous memory
   x = 0;
@@ -704,12 +966,9 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   kvz_init_ver_filter_taps(fir0, taps);
 
   // Right
-  for (y = 0; y + 7 < height; y+=8) {
-
-    for (x = 0; x + 7 < width ; x+=8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos2[(y + 1) * hor_stride + x], hor_stride, &out_r[y * dst_stride + x], dst_stride);
-    }
-  }
+  int16_t *im = &hor_pos2[hor_stride];
+  kvz_pixel *dst = out_r;
+  kvz_ipol_8tap_ver_im_px_avx2(fir0, width, height, im, hor_stride, dst, dst_stride);
 
   // Left
   // Copy from the right filtered block and filter the extra column
@@ -725,11 +984,9 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   kvz_init_ver_filter_taps(fir2, taps);
   // Top
-  for (y = 0; y + 7 < height; y+=8) {
-    for (x = 0; x + 7 < width; x+=8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos0[y * hor_stride + x], hor_stride, &out_t[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = hor_pos0;
+  dst = out_t;
+  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride);
 
   // Bottom
   // Copy what can be copied from the top filtered values.
@@ -782,11 +1039,9 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
  __m256i taps[4];
   kvz_init_ver_filter_taps(fir2, taps);
   // Top-Right
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos2[y * hor_stride + x], hor_stride, &out_tr[y * dst_stride + x], dst_stride);
-    }
-  }
+  int16_t *im = hor_pos2;
+  kvz_pixel *dst = out_tr;
+  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride);
 
   // Top-left
   // Copy from the top-right filtered block and filter the extra column
@@ -885,17 +1140,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   kvz_init_filter_taps(hor_fir_l, &taps_01_23, &taps_45_67);
   
   int sample_off_y = hpel_off_y < 0 ? 0 : 1;
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA + 1; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET + 1;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_pos_l[y * hor_stride + x],
-        &shuf_01_23, &shuf_45_67,
-        &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
+  kvz_ipol_8tap_hor_px_im_avx2(hor_fir_l, width, height + 1, src + 1, src_stride, hor_pos_l, hor_stride);
 
   // Write the first column in contiguous memory
   x = 0;
@@ -907,17 +1152,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   // Right QPEL
   kvz_init_filter_taps(hor_fir_r, &taps_01_23, &taps_45_67);
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA + 1; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET + 1;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_pos_r[y * hor_stride + x],
-        &shuf_01_23, &shuf_45_67,
-        &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
+  kvz_ipol_8tap_hor_px_im_avx2(hor_fir_r, width, height + 1, src + 1, src_stride, hor_pos_r, hor_stride);
 
   // Write the first column in contiguous memory
   x = 0;
@@ -944,12 +1179,9 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Filter block and then filter column and align if neccessary
   kvz_init_ver_filter_taps(ver_fir_l, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + sample_off_y;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_l[ypos * hor_stride + x], hor_stride, &out_l[y * dst_stride + x], dst_stride);
-    }
-  }
+  int16_t *im = &hor_pos_l[sample_off_y * hor_stride];
+  kvz_pixel *dst = out_l;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_l, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -972,12 +1204,9 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Filter block and then filter column and align if neccessary
   kvz_init_ver_filter_taps(ver_fir_r, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + sample_off_y;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_r[ypos * hor_stride + x], hor_stride, &out_r[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_pos_r[sample_off_y * hor_stride];
+  dst = out_r;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_r, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -1002,12 +1231,9 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int sample_off_x = (hpel_off_x > -1 ? 1 : 0);
   kvz_init_ver_filter_taps(ver_fir_t, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_t;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_hpel_pos[ypos * hor_stride + x], hor_stride, &out_t[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_hpel_pos[off_y_fir_t * hor_stride];
+  dst = out_t;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
 
   if (!sample_off_x) {
     for (y = 0; y < height; ++y) {
@@ -1030,12 +1256,9 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Filter block and then filter column and align if neccessary
   kvz_init_ver_filter_taps(ver_fir_b, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_b;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_hpel_pos[ypos * hor_stride + x], hor_stride, &out_b[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_hpel_pos[off_y_fir_b * hor_stride];
+  dst = out_b;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
 
   if (!sample_off_x) {
     for (y = 0; y < height; ++y) {
@@ -1107,12 +1330,9 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Filter block and then filter column and align if neccessary
   kvz_init_ver_filter_taps(ver_fir_t, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_t;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_l[ypos * hor_stride + x], hor_stride, &out_tl[y * dst_stride + x], dst_stride);
-    }
-  }
+  int16_t *im = &hor_pos_l[off_y_fir_t * hor_stride];
+  kvz_pixel *dst = out_tl;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -1134,12 +1354,9 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Top-right QPEL
   // Filter block and then filter column and align if neccessary
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_t;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_r[ypos * hor_stride + x], hor_stride, &out_tr[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_pos_r[off_y_fir_t * hor_stride];
+  dst = out_tr;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -1162,12 +1379,9 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Filter block and then filter column and align if neccessary
   kvz_init_ver_filter_taps(ver_fir_b, taps);
 
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_b;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_l[ypos * hor_stride + x], hor_stride, &out_bl[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_pos_l[off_y_fir_b * hor_stride];
+  dst = out_bl;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -1188,12 +1402,9 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 
   // Bottom-right QPEL
   // Filter block and then filter column and align if neccessary
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y + off_y_fir_b;
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_pos_r[ypos * hor_stride + x], hor_stride, &out_br[y * dst_stride + x], dst_stride);
-    }
-  }
+  im = &hor_pos_r[off_y_fir_b * hor_stride];
+  dst = out_br;
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -1209,185 +1420,6 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
       uint64_t rest = *(uint64_t*)&out_br[y * dst_stride + x];
       uint64_t chunk = (rest << 8) | first;
       *(uint64_t*)&out_br[y * dst_stride + x] = chunk;
-    }
-  }
-}
-
-static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
-  int width,
-  int height,
-  kvz_pixel *src,
-  int16_t src_stride,
-  int16_t *dst,
-  int16_t dst_stride) {
-  __m256i shuf01 = _mm256_setr_epi8(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8,
-                                    0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8);
-  __m256i shuf23 = _mm256_setr_epi8(2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10,
-                                    2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10);
-  __m256i shuf45 = _mm256_setr_epi8(4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12,
-                                    4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12);
-  __m256i shuf67 = _mm256_setr_epi8(6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14,
-                                    6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14);
-
-  __m256i all_w01 = _mm256_set1_epi16(*(uint16_t *)(filter + 0));
-  __m256i all_w23 = _mm256_set1_epi16(*(uint16_t *)(filter + 2));
-  __m256i all_w45 = _mm256_set1_epi16(*(uint16_t *)(filter + 4));
-  __m256i all_w67 = _mm256_set1_epi16(*(uint16_t *)(filter + 6));
-
-  int y_offset = -KVZ_LUMA_FILTER_OFFSET;
-  int x_offset = -KVZ_LUMA_FILTER_OFFSET;
-
-  kvz_pixel *top_left = src + src_stride * y_offset + x_offset;
-
-  int y = 0;
-  int x = 0;
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-
-      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
-      __m128i r0 = _mm_loadu_si128((__m128i*)(chunk_ptr + 0 * src_stride));
-      __m128i r1 = _mm_loadu_si128((__m128i*)(chunk_ptr + 1 * src_stride));
-      __m256i r0_r1 = _mm256_castsi128_si256(r0);
-      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
-
-      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
-      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
-      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
-      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
-
-      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
-      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
-      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
-      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
-
-      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
-      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
-      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
-
-      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
-      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
-      __m128i sum_r0 = _mm256_castsi256_si128(sum);
-      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
-      _mm_storeu_si128(dst_r0, sum_r0);
-      _mm_storeu_si128(dst_r1, sum_r1);
-    }
-  }
-
-  if (x < width) {
-    for (int y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
-
-      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
-      __m128i r0 = _mm_loadu_si128((__m128i *)(chunk_ptr + 0 * src_stride));
-      __m128i r1 = _mm_loadu_si128((__m128i *)(chunk_ptr + 1 * src_stride));
-      __m256i r0_r1 = _mm256_castsi128_si256(r0);
-      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
-
-      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
-      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
-      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
-      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
-
-      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
-      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
-      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
-      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
-
-      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
-      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
-      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
-
-      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
-      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
-      __m128i sum_r0 = _mm256_castsi256_si128(sum);
-      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
-      _mm_storel_epi64(dst_r0, sum_r0);
-      _mm_storel_epi64(dst_r1, sum_r1);
-    }
-  }
-}
-
-static void kvz_ipol_8tap_ver_im_hi_avx2(uint8_t *filter,
-int width,
-int height,
-int16_t *src,
-int16_t src_stride,
-int16_t *dst,
-int16_t dst_stride)
-{
-  const int shift2 = 6;
-
-  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
-  __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
-  __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
-  __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
-  __m256i all_w45 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(2, 2, 2, 2));
-  __m256i all_w67 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(3, 3, 3, 3));
-
-  for (int x = 0; x + 3 < width; x += 4) {
-
-    int16_t *strip_ptr = src + 0 * src_stride + x;
-
-    // Initial values
-    // Broadcasted rows in both lanes
-    // __m256i r0; // Unused
-    // __m256i r1; // Unused
-    __m256i r2 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 0 * src_stride));
-    __m256i r3 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 1 * src_stride));
-    __m256i r4 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 2 * src_stride));
-    __m256i r5 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 3 * src_stride));
-    __m256i r6 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 4 * src_stride));
-    __m256i r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 5 * src_stride));
-    __m256i r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 6 * src_stride));
-
-    // Consecutive rows in low and high lanes
-    // __m256i r0_r1; // Unused
-    // __m256i r1_r2; // Unused
-    __m256i r2_r3 = _mm256_blend_epi32(r2, r3, 0xF0);
-    __m256i r3_r4 = _mm256_blend_epi32(r3, r4, 0xF0);
-    __m256i r4_r5 = _mm256_blend_epi32(r4, r5, 0xF0);
-    __m256i r5_r6 = _mm256_blend_epi32(r5, r6, 0xF0);
-    __m256i r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
-    __m256i r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
-
-    // Paired samples of consecutive rows
-    __m256i r01_r12;
-    __m256i r23_r34 = _mm256_unpacklo_epi16(r2_r3, r3_r4);
-    __m256i r45_r56 = _mm256_unpacklo_epi16(r4_r5, r5_r6);
-    __m256i r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
-
-    for (int y = 0; y < height; y += 2) {
-
-      strip_ptr = src + y * src_stride + x;
-
-      // Slide window
-      r01_r12 = r23_r34;
-      r23_r34 = r45_r56;
-      r45_r56 = r67_r78;
-      r6 = r8;
-      r7 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 7 * src_stride));
-      r8 = _mm256_set1_epi64x(*(uint64_t *)(strip_ptr + 8 * src_stride));
-      r6_r7 = _mm256_blend_epi32(r6, r7, 0xF0);
-      r7_r8 = _mm256_blend_epi32(r7, r8, 0xF0);
-
-      r67_r78 = _mm256_unpacklo_epi16(r6_r7, r7_r8);
-
-      __m256i dot01 = _mm256_madd_epi16(r01_r12, all_w01);
-      __m256i dot23 = _mm256_madd_epi16(r23_r34, all_w23);
-      __m256i dot45 = _mm256_madd_epi16(r45_r56, all_w45);
-      __m256i dot67 = _mm256_madd_epi16(r67_r78, all_w67);
-
-      __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
-      __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
-      __m256i sum = _mm256_add_epi32(sum0123, sum4567);
-      sum = _mm256_srai_epi32(sum, shift2);
-      sum = _mm256_packs_epi32(sum, sum);
-
-      int16_t *dst_addr0 = &dst[(y + 0) * dst_stride + x];
-      int16_t *dst_addr1 = &dst[(y + 1) * dst_stride + x];
-      _mm_storel_epi64((__m128i *)dst_addr0, _mm256_castsi256_si128(sum));
-      _mm_storel_epi64((__m128i *)dst_addr1, _mm256_extracti128_si256(sum, 1));
     }
   }
 }
@@ -1420,16 +1452,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   int16_t hor_stride = LCU_WIDTH;
 
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
-
-  // VERTICAL STEP
-  __m256i taps[4];
-  kvz_init_ver_filter_taps(ver_fir, taps);
-
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_intermediate[y * hor_stride + x], hor_stride, &dst[y * dst_stride + x], dst_stride);
-    }
-  }
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
 }
 
 
