@@ -1267,6 +1267,101 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   }
 }
 
+static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
+  int width,
+  int height,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int16_t *dst,
+  int16_t dst_stride) {
+  __m256i shuf01 = _mm256_setr_epi8(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8,
+                                    0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8);
+  __m256i shuf23 = _mm256_setr_epi8(2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10,
+                                    2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10);
+  __m256i shuf45 = _mm256_setr_epi8(4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12,
+                                    4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12);
+  __m256i shuf67 = _mm256_setr_epi8(6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14,
+                                    6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14);
+
+  __m256i all_w01 = _mm256_set1_epi16(*(uint16_t *)(filter + 0));
+  __m256i all_w23 = _mm256_set1_epi16(*(uint16_t *)(filter + 2));
+  __m256i all_w45 = _mm256_set1_epi16(*(uint16_t *)(filter + 4));
+  __m256i all_w67 = _mm256_set1_epi16(*(uint16_t *)(filter + 6));
+
+  int y_offset = -KVZ_LUMA_FILTER_OFFSET;
+  int x_offset = -KVZ_LUMA_FILTER_OFFSET;
+
+  kvz_pixel *top_left = src + src_stride * y_offset + x_offset;
+
+  int y = 0;
+  int x = 0;
+
+  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
+
+    for (x = 0; x + 7 < width; x += 8) {
+
+      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
+      __m128i r0 = _mm_loadu_si128((__m128i*)(chunk_ptr + 0 * src_stride));
+      __m128i r1 = _mm_loadu_si128((__m128i*)(chunk_ptr + 1 * src_stride));
+      __m256i r0_r1 = _mm256_castsi128_si256(r0);
+      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
+
+      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
+      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
+      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
+      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
+
+      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
+      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
+      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
+      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
+      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
+
+      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
+      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
+      __m128i sum_r0 = _mm256_castsi256_si128(sum);
+      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
+      _mm_storeu_si128(dst_r0, sum_r0);
+      _mm_storeu_si128(dst_r1, sum_r1);
+    }
+  }
+
+  if (x < width) {
+    for (int y = 0; y < height + KVZ_EXT_PADDING_LUMA; y += 2) {
+
+      kvz_pixel *chunk_ptr = top_left + src_stride * y + x;
+      __m128i r0 = _mm_loadu_si128((__m128i *)(chunk_ptr + 0 * src_stride));
+      __m128i r1 = _mm_loadu_si128((__m128i *)(chunk_ptr + 1 * src_stride));
+      __m256i r0_r1 = _mm256_castsi128_si256(r0);
+      r0_r1 = _mm256_inserti128_si256(r0_r1, r1, 1);
+
+      __m256i r0_r1_01 = _mm256_shuffle_epi8(r0_r1, shuf01);
+      __m256i r0_r1_23 = _mm256_shuffle_epi8(r0_r1, shuf23);
+      __m256i r0_r1_45 = _mm256_shuffle_epi8(r0_r1, shuf45);
+      __m256i r0_r1_67 = _mm256_shuffle_epi8(r0_r1, shuf67);
+
+      __m256i dot01 = _mm256_maddubs_epi16(r0_r1_01, all_w01);
+      __m256i dot23 = _mm256_maddubs_epi16(r0_r1_23, all_w23);
+      __m256i dot45 = _mm256_maddubs_epi16(r0_r1_45, all_w45);
+      __m256i dot67 = _mm256_maddubs_epi16(r0_r1_67, all_w67);
+
+      __m256i sum0123 = _mm256_add_epi16(dot01, dot23);
+      __m256i sum4567 = _mm256_add_epi16(dot45, dot67);
+      __m256i sum = _mm256_add_epi16(sum0123, sum4567);
+
+      __m128i *dst_r0 = (__m128i*)(dst + (y + 0) * dst_stride + x);
+      __m128i *dst_r1 = (__m128i*)(dst + (y + 1) * dst_stride + x);
+      __m128i sum_r0 = _mm256_castsi256_si128(sum);
+      __m128i sum_r1 = _mm256_extracti128_si256(sum, 1);
+      _mm_storel_epi64(dst_r0, sum_r0);
+      _mm_storel_epi64(dst_r1, sum_r1);
+    }
+  }
+}
+
 static void kvz_ipol_8tap_ver_im_hi_avx2(uint8_t *filter,
 int width,
 int height,
@@ -1362,40 +1457,19 @@ static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * cons
   int8_t ver_flag, 
   const int16_t mv[2])
 {
-  // TODO: Optimize SMP and AMP
-  if (width != height) {
-    kvz_sample_14bit_quarterpel_luma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
-    return;
-  }
   // TODO: horizontal and vertical only filtering
   int x, y;
 
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
+  
+  // Buffer for intermediate values with one extra row 
+  // because the loop writes two rows each iteration.
+  ALIGNED(64) int16_t hor_filtered[(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
+  int16_t hor_stride = LCU_WIDTH;
 
-  int16_t hor_stride = width;
-  ALIGNED(64) int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
-
-  // HORIZONTAL STEP
-  __m256i shuf_01_23, shuf_45_67;
-  __m256i taps_01_23, taps_45_67;
-
-  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
-  kvz_init_filter_taps(hor_fir, &taps_01_23, &taps_45_67);
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_intermediate[y * hor_stride + x],
-        &shuf_01_23, &shuf_45_67,
-        &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
-
-  // VERTICAL STEP
-  kvz_ipol_8tap_ver_im_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_filtered, hor_stride);
+  kvz_ipol_8tap_ver_im_hi_avx2(ver_fir, width, height, hor_filtered, hor_stride, dst, dst_stride);
 }
 
 
