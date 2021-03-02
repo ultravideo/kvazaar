@@ -1213,60 +1213,6 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   }
 }
 
-static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const encoder,
-  kvz_pixel *src, 
-  int16_t src_stride, 
-  int width, 
-  int height, 
-  kvz_pixel *dst, 
-  int16_t dst_stride, 
-  int8_t hor_flag, 
-  int8_t ver_flag, 
-  const int16_t mv[2])
-{
-  // TODO: Optimize SMP and AMP
-  if (width != height) {
-    kvz_sample_quarterpel_luma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
-    return;
-  }
-
-  int x, y;
-
-  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
-  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
-
-  int16_t hor_stride = LCU_WIDTH;
-  int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
-
-  // HORIZONTAL STEP
-  __m256i shuf_01_23, shuf_45_67;
-  __m256i taps_01_23, taps_45_67;
-
-  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
-  kvz_init_filter_taps(hor_fir, &taps_01_23, &taps_45_67);
-
-  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; ++y) {
-
-    for (x = 0; x + 7 < width; x += 8) {
-      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
-      int xpos = x - KVZ_LUMA_FILTER_OFFSET;
-      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_intermediate[y * hor_stride + x],
-        &shuf_01_23, &shuf_45_67,
-        &taps_01_23, &taps_45_67); //TODO: >> shift1
-    }
-  }
-
-  // VERTICAL STEP
-  __m256i taps[4];
-  kvz_init_ver_filter_taps(ver_fir, taps);
-
-  for (y = 0; y + 7 < height; y += 8) {
-    for (x = 0; x + 7 < width; x += 8) {
-      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_intermediate[y * hor_stride + x], hor_stride, &dst[y * dst_stride + x], dst_stride);
-    }
-  }
-}
-
 static void kvz_ipol_8tap_hor_px_im_avx2(uint8_t *filter,
   int width,
   int height,
@@ -1445,6 +1391,61 @@ int16_t dst_stride)
     }
   }
 }
+
+static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const encoder,
+  kvz_pixel *src, 
+  int16_t src_stride, 
+  int width, 
+  int height, 
+  kvz_pixel *dst, 
+  int16_t dst_stride, 
+  int8_t hor_flag, 
+  int8_t ver_flag, 
+  const int16_t mv[2])
+{
+  // TODO: Optimize SMP and AMP
+  if (width != height) {
+    kvz_sample_quarterpel_luma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
+    return;
+  }
+
+  int x, y;
+
+  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
+  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
+
+  int16_t hor_stride = LCU_WIDTH;
+  int16_t hor_intermediate[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
+
+  // HORIZONTAL STEP
+  __m256i shuf_01_23, shuf_45_67;
+  __m256i taps_01_23, taps_45_67;
+
+  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
+  kvz_init_filter_taps(hor_fir, &taps_01_23, &taps_45_67);
+
+  for (y = 0; y < height + KVZ_EXT_PADDING_LUMA; ++y) {
+
+    for (x = 0; x + 7 < width; x += 8) {
+      int ypos = y - KVZ_LUMA_FILTER_OFFSET;
+      int xpos = x - KVZ_LUMA_FILTER_OFFSET;
+      kvz_eight_tap_filter_hor_8x1_avx2(&src[src_stride*ypos + xpos], &hor_intermediate[y * hor_stride + x],
+        &shuf_01_23, &shuf_45_67,
+        &taps_01_23, &taps_45_67); //TODO: >> shift1
+    }
+  }
+
+  // VERTICAL STEP
+  __m256i taps[4];
+  kvz_init_ver_filter_taps(ver_fir, taps);
+
+  for (y = 0; y + 7 < height; y += 8) {
+    for (x = 0; x + 7 < width; x += 8) {
+      kvz_eight_tap_filter_ver_16bit_8x8_avx2(taps, &hor_intermediate[y * hor_stride + x], hor_stride, &dst[y * dst_stride + x], dst_stride);
+    }
+  }
+}
+
 
 static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * const encoder,
   kvz_pixel *src, 
