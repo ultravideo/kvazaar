@@ -246,7 +246,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   } 
   
   if( encoder->cfg.intra_qp_offset_auto ) {
-      encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? -kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1 : 0;
+    // Limit offset to -3 since HM/VTM seems to use it even for 32 frame gop
+    encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? MAX(-(int8_t)kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1, -3) : 0;
   }
 
   // Disable GOP and QP offset for all-intra coding
