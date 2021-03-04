@@ -1,8 +1,3 @@
-# Only the whitelisted branches get built, regardless of build config
-branches:
-  only:
-    - master
-
 # Email the author if their commit either failed to build or fixed a failed build
 # good -> bad, bad -> bad, bad -> good  but not  good -> good
 notifications:
@@ -37,13 +32,16 @@ configuration:
   - Release
 
 # Build with multiple compilers / build suites
-image: Visual Studio 2015
 environment:
   matrix:
-    - platform: Win32
-    - platform: x64
-    - MSYSTEM: MINGW32
-    - MSYSTEM: MINGW64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      platform: Win32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      platform: x64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      MSYSTEM: MINGW32
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      MSYSTEM: MINGW64
 
 for:
 -
