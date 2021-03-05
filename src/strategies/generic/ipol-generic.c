@@ -728,34 +728,34 @@ void kvz_sample_14bit_octpel_chroma_generic(const encoder_control_t * const enco
 }
 
 
-void kvz_get_extended_block_generic(kvz_epol_args args) {
+void kvz_get_extended_block_generic(kvz_epol_args *args) {
 
-  int min_y = args.blk_y - args.pad_t;
-  int max_y = args.blk_y + args.blk_h + args.pad_b - 1;
-  bool out_of_bounds_y = (min_y < 0) || (max_y >= args.src_h);
+  int min_y = args->blk_y - args->pad_t;
+  int max_y = args->blk_y + args->blk_h + args->pad_b - 1;
+  bool out_of_bounds_y = (min_y < 0) || (max_y >= args->src_h);
 
-  int min_x = args.blk_x - args.pad_l;
-  int max_x = args.blk_x + args.blk_w + args.pad_r - 1;
-  bool out_of_bounds_x = (min_x < 0) || (max_x >= args.src_w);
+  int min_x = args->blk_x - args->pad_l;
+  int max_x = args->blk_x + args->blk_w + args->pad_r - 1;
+  bool out_of_bounds_x = (min_x < 0) || (max_x >= args->src_w);
 
   if (out_of_bounds_y || out_of_bounds_x) {
 
-    *args.ext = args.buf;
-    *args.ext_s = args.pad_l + args.blk_w + args.pad_r;
-    *args.ext_origin = args.buf + args.pad_t * (*args.ext_s) + args.pad_l;
+    *args->ext = args->buf;
+    *args->ext_s = args->pad_l + args->blk_w + args->pad_r;
+    *args->ext_origin = args->buf + args->pad_t * (*args->ext_s) + args->pad_l;
 
-    int cnt_l = CLIP(0, *args.ext_s, -min_x);
-    int cnt_r = CLIP(0, *args.ext_s, max_x - (args.src_w - 1));
-    int cnt_m = CLIP(0, *args.ext_s, *args.ext_s - cnt_l - cnt_r);
+    int cnt_l = CLIP(0, *args->ext_s, -min_x);
+    int cnt_r = CLIP(0, *args->ext_s, max_x - (args->src_w - 1));
+    int cnt_m = CLIP(0, *args->ext_s, *args->ext_s - cnt_l - cnt_r);
 
     // For each row including padding
-    for (int y = -args.pad_t; y < args.blk_h + args.pad_b; ++y) {
+    for (int y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
 
-      int clipped_y = CLIP(0, args.src_h - 1, args.blk_y + y);
-      kvz_pixel sample_l = *(args.src + clipped_y * args.src_s);
-      kvz_pixel sample_r = *(args.src + clipped_y * args.src_s + args.src_w - 1);
-      kvz_pixel *src_m = args.src + clipped_y * args.src_s + MAX(min_x, 0);
-      kvz_pixel *dst_l = args.buf + (y + args.pad_t) * (*args.ext_s);
+      int clipped_y = CLIP(0, args->src_h - 1, args->blk_y + y);
+      kvz_pixel sample_l = *(args->src + clipped_y * args->src_s);
+      kvz_pixel sample_r = *(args->src + clipped_y * args->src_s + args->src_w - 1);
+      kvz_pixel *src_m = args->src + clipped_y * args->src_s + MAX(min_x, 0);
+      kvz_pixel *dst_l = args->buf + (y + args->pad_t) * (*args->ext_s);
       kvz_pixel *dst_m = dst_l + cnt_l;
       kvz_pixel *dst_r = dst_m + cnt_m;
       for (int i = 0; i < cnt_l; ++i) *(dst_l + i) = sample_l;
@@ -764,9 +764,9 @@ void kvz_get_extended_block_generic(kvz_epol_args args) {
     }
   } else {
 
-    *args.ext = args.src + (args.blk_y - args.pad_t) * args.src_s + (args.blk_x - args.pad_l);
-    *args.ext_origin = args.src + args.blk_y * args.src_s + args.blk_x;
-    *args.ext_s = args.src_s;
+    *args->ext = args->src + (args->blk_y - args->pad_t) * args->src_s + (args->blk_x - args->pad_l);
+    *args->ext_origin = args->src + args->blk_y * args->src_s + args->blk_x;
+    *args->ext_s = args->src_s;
   }
 }
 

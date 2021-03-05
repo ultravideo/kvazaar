@@ -64,7 +64,7 @@ typedef struct {
   int *ext_s; // Stride
 } kvz_epol_args;
 
-typedef unsigned(epol_func)(kvz_epol_args *args);
+typedef void(epol_func)(kvz_epol_args *args);
 
 
 typedef void(kvz_sample_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
