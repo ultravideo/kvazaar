@@ -56,111 +56,6 @@ static int32_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
   return filtered;
 }
 
-static void kvz_init_shuffle_masks(__m256i *shuf_01_23, __m256i *shuf_45_67) {
-  // Shuffle pairs
-  *shuf_01_23 = _mm256_setr_epi8(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8,
-                                 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10);
-  *shuf_45_67 = _mm256_setr_epi8(4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12,
-                                 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14);
-}
-
-static void kvz_init_shuffle_masks_chroma(__m256i *shuf_01, __m256i *shuf_23) {
-  // Shuffle pairs
-  *shuf_01 = _mm256_setr_epi8(0, 1, 1, 2, 2, 3, 3, 4, 8, 9, 9, 10, 10, 11, 11, 12,
-                              0, 1, 1, 2, 2, 3, 3, 4, 8, 9, 9, 10, 10, 11, 11, 12);
-  *shuf_23 = _mm256_setr_epi8(2, 3, 3, 4, 4, 5, 5, 6, 10, 11, 11, 12, 12, 13, 13, 14,
-                              2, 3, 3, 4, 4, 5, 5, 6, 10, 11, 11, 12, 12, 13, 13, 14);
-}
-
-static void kvz_init_filter_taps(int8_t *filter,
-  __m256i *taps_01_23, __m256i *taps_45_67) {
-  // Filter weights
-  __m256i all_taps = _mm256_castsi128_si256(_mm_loadl_epi64((__m128i*)filter));
-  __m256i perm_01 = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
-  __m256i perm_23 = _mm256_setr_epi32(2, 2, 2, 2, 3, 3, 3, 3);
-  all_taps = _mm256_unpacklo_epi16(all_taps, all_taps);
-  *taps_01_23 = _mm256_permutevar8x32_epi32(all_taps, perm_01);
-  *taps_45_67 = _mm256_permutevar8x32_epi32(all_taps, perm_23);
-}
-
-static void kvz_init_filter_taps_chroma(int8_t *filter,
-  __m256i *taps_01, __m256i *taps_23) {
-  // Filter weights
-  __m256i all_taps = _mm256_set1_epi32(*(int32_t*)filter);
-  all_taps = _mm256_unpacklo_epi16(all_taps, all_taps);
-  *taps_01 = _mm256_shuffle_epi32(all_taps, _MM_SHUFFLE(0, 0, 0, 0));
-  *taps_23 = _mm256_shuffle_epi32(all_taps, _MM_SHUFFLE(1, 1, 1, 1));
-}
-
-static void kvz_init_ver_filter_taps(int8_t *filter, __m256i *filters) {
-  for (int i = 0; i < 4; ++i) filters[i] = _mm256_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&filter[2 * i]));
-  filters[0] = _mm256_inserti128_si256(filters[0], _mm256_castsi256_si128(filters[3]), 1); // Pairs 01 67
-  filters[1] = _mm256_inserti128_si256(filters[1], _mm256_castsi256_si128(filters[0]), 1); // Pairs 23 01
-  filters[2] = _mm256_inserti128_si256(filters[2], _mm256_castsi256_si128(filters[1]), 1); // Pairs 45 23
-  filters[3] = _mm256_inserti128_si256(filters[3], _mm256_castsi256_si128(filters[2]), 1); // Pairs 67 45
-}
-
-static void kvz_eight_tap_filter_hor_8x1_avx2(kvz_pixel *data, int16_t * out,
-  __m256i *shuf_01_23, __m256i *shuf_45_67,
-  __m256i *taps_01_23, __m256i *taps_45_67) {
-
-  __m256i row = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)data));
-
-  __m256i pairs_01_23 = _mm256_shuffle_epi8(row, *shuf_01_23);
-  __m256i pairs_45_67 = _mm256_shuffle_epi8(row, *shuf_45_67);
-  
-  __m256i temp0 = _mm256_maddubs_epi16(pairs_01_23, *taps_01_23);
-  __m256i temp1 = _mm256_maddubs_epi16(pairs_45_67, *taps_45_67);
-
-  __m256i sum = _mm256_add_epi16(temp0, temp1);
-  __m128i filtered = _mm_add_epi16(_mm256_castsi256_si128(sum), _mm256_extracti128_si256(sum, 1));
-  _mm_storeu_si128((__m128i*)out, filtered);
-}
-
-static void kvz_four_tap_filter_hor_4x4_avx2(kvz_pixel *data, int stride, int16_t * out, int out_stride,
-  __m256i *shuf_01, __m256i *shuf_23,
-  __m256i *taps_01, __m256i *taps_23) {
-
-  __m256i four_rows = _mm256_setr_epi64x(
-    *(int64_t*)&data[0 * stride],
-    *(int64_t*)&data[1 * stride],
-    *(int64_t*)&data[2 * stride],
-    *(int64_t*)&data[3 * stride]);
-
-  __m256i pairs_l = _mm256_shuffle_epi8(four_rows, *shuf_01);
-  __m256i pairs_r = _mm256_shuffle_epi8(four_rows, *shuf_23);
-
-  __m256i temp_l = _mm256_maddubs_epi16(pairs_l, *taps_01);
-  __m256i temp_r = _mm256_maddubs_epi16(pairs_r, *taps_23);
-
-  __m256i sum = _mm256_add_epi16(temp_l, temp_r);
-
-  __m128i lower = _mm256_castsi256_si128(sum);
-  __m128i upper = _mm256_extracti128_si256(sum, 1);
-  _mm_storel_epi64((__m128i*)(out + 0 * out_stride), lower);
-  _mm_storeh_pd((double*)(out + 1 * out_stride), _mm_castsi128_pd(lower));
-  _mm_storel_epi64((__m128i*)(out + 2 * out_stride), upper);
-  _mm_storeh_pd((double*)(out + 3 * out_stride), _mm_castsi128_pd(upper));
-}
-
-static void kvz_four_tap_filter_hor_4xN_avx2(kvz_pixel *data, int stride, int16_t * out, int out_stride,
-  __m256i *shuf_01_23, __m256i *taps_01_23,
-  int rows) {
-
-  for (int i = 0; i < rows; ++i) {
-    __m256i row = _mm256_set1_epi64x(*(int64_t*)&data[i * stride]);
-
-    __m256i pairs_l_r = _mm256_shuffle_epi8(row, *shuf_01_23);
-    __m256i temp_l_r = _mm256_maddubs_epi16(pairs_l_r, *taps_01_23);
-
-    __m128i temp_l = _mm256_castsi256_si128(temp_l_r);
-    __m128i temp_r = _mm256_extracti128_si256(temp_l_r, 1);
-    __m128i sum = _mm_add_epi16(temp_l, temp_r);
-
-    _mm_storel_epi64((__m128i*)(out + i * out_stride), sum);
-  }
-}
-
 static int32_t kvz_eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
 {
   __m128i fir = _mm_loadl_epi64((__m128i*)filter);
@@ -241,372 +136,6 @@ static void kvz_eight_tap_filter_ver_16bit_1x8_avx2(int8_t *filter, int16_t *dat
 
 
   _mm_storel_epi64((__m128i*)out, filtered);
-}
-
-static void kvz_four_tap_filter_ver_16bit_4x4_avx2(int8_t *filter, int16_t *data, int16_t stride, kvz_pixel *out, int16_t out_stride)
-{
-  // Interpolation filter shifts
-  int32_t shift2 = 6;
-
-  // Weighted prediction offset and shift
-  int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
-  int32_t wp_offset1 = 1 << (wp_shift1 - 1);
-
-  // Filter weights
-  __m128i all_taps = _mm_cvtepi8_epi16(_mm_cvtsi32_si128(*(int32_t*)filter));
-  __m128i taps_01 = _mm_shuffle_epi32(all_taps, _MM_SHUFFLE(0, 0, 0, 0));
-  __m128i taps_23 = _mm_shuffle_epi32(all_taps, _MM_SHUFFLE(1, 1, 1, 1));
-
-  __m128i row0 = _mm_loadl_epi64((__m128i*)&data[0 * stride]);
-  __m128i row1 = _mm_loadl_epi64((__m128i*)&data[1 * stride]);
-  __m128i row2 = _mm_loadl_epi64((__m128i*)&data[2 * stride]);
-  __m128i row3 = _mm_loadl_epi64((__m128i*)&data[3 * stride]);
-  __m128i row4 = _mm_loadl_epi64((__m128i*)&data[4 * stride]);
-  __m128i row5 = _mm_loadl_epi64((__m128i*)&data[5 * stride]);
-  __m128i row6 = _mm_loadl_epi64((__m128i*)&data[6 * stride]);
-
-  __m128i pairs01 = _mm_unpacklo_epi16(row0, row1);
-  __m128i pairs23 = _mm_unpacklo_epi16(row2, row3);
-  __m128i temp01 = _mm_madd_epi16(pairs01, taps_01);
-  __m128i temp23 = _mm_madd_epi16(pairs23, taps_23);
-  __m128i sum0123 = _mm_add_epi32(temp01, temp23);
-
-  __m128i pairs12 = _mm_unpacklo_epi16(row1, row2);
-  __m128i pairs34 = _mm_unpacklo_epi16(row3, row4);
-  __m128i temp12 = _mm_madd_epi16(pairs12, taps_01);
-  __m128i temp34 = _mm_madd_epi16(pairs34, taps_23);
-  __m128i sum1234 = _mm_add_epi32(temp12, temp34);
-
-  __m128i pairs45 = _mm_unpacklo_epi16(row4, row5);
-  __m128i temp23_2 = _mm_madd_epi16(pairs23, taps_01);
-  __m128i temp45 = _mm_madd_epi16(pairs45, taps_23);
-  __m128i sum2345 = _mm_add_epi32(temp23_2, temp45);
-
-  __m128i pairs56 = _mm_unpacklo_epi16(row5, row6);
-  __m128i temp34_2 = _mm_madd_epi16(pairs34, taps_01);
-  __m128i temp56 = _mm_madd_epi16(pairs56, taps_23);
-  __m128i sum3456 = _mm_add_epi32(temp34_2, temp56);
-
-  sum0123 = _mm_srai_epi32(sum0123, shift2);
-  sum1234 = _mm_srai_epi32(sum1234, shift2);
-  sum2345 = _mm_srai_epi32(sum2345, shift2);
-  sum3456 = _mm_srai_epi32(sum3456, shift2);
-
-  __m128i offset = _mm_set1_epi32(wp_offset1);
-  sum0123 = _mm_add_epi32(sum0123, offset);
-  sum1234 = _mm_add_epi32(sum1234, offset);
-  sum2345 = _mm_add_epi32(sum2345, offset);
-  sum3456 = _mm_add_epi32(sum3456, offset);
-
-  sum0123 = _mm_srai_epi32(sum0123, wp_shift1);
-  sum1234 = _mm_srai_epi32(sum1234, wp_shift1);
-  sum2345 = _mm_srai_epi32(sum2345, wp_shift1);
-  sum3456 = _mm_srai_epi32(sum3456, wp_shift1);
-
-  __m128i filtered01 = _mm_packs_epi32(sum0123, sum1234);
-  __m128i filtered23 = _mm_packs_epi32(sum2345, sum3456);
-  __m128i filtered = _mm_packus_epi16(filtered01, filtered23);
-
-  *(int32_t*)&out[0 * out_stride] = _mm_cvtsi128_si32(filtered);
-  *(int32_t*)&out[1 * out_stride] = _mm_extract_epi32(filtered, 1);
-  *(int32_t*)&out[2 * out_stride] = _mm_extract_epi32(filtered, 2);
-  *(int32_t*)&out[3 * out_stride] = _mm_extract_epi32(filtered, 3);
-}
-
-static void kvz_four_tap_filter_ver_16bit_4x4_no_round_avx2(int8_t *filter, int16_t *data, int16_t stride, int16_t *out, int16_t out_stride)
-{
-  int32_t shift2 = 6;
-
-  // Filter weights
-  __m128i all_taps = _mm_cvtepi8_epi16(_mm_cvtsi32_si128(*(int32_t*)filter));
-  __m128i taps_01 = _mm_shuffle_epi32(all_taps, _MM_SHUFFLE(0, 0, 0, 0));
-  __m128i taps_23 = _mm_shuffle_epi32(all_taps, _MM_SHUFFLE(1, 1, 1, 1));
-
-  __m128i row0 = _mm_loadl_epi64((__m128i*)&data[0 * stride]);
-  __m128i row1 = _mm_loadl_epi64((__m128i*)&data[1 * stride]);
-  __m128i row2 = _mm_loadl_epi64((__m128i*)&data[2 * stride]);
-  __m128i row3 = _mm_loadl_epi64((__m128i*)&data[3 * stride]);
-  __m128i row4 = _mm_loadl_epi64((__m128i*)&data[4 * stride]);
-  __m128i row5 = _mm_loadl_epi64((__m128i*)&data[5 * stride]);
-  __m128i row6 = _mm_loadl_epi64((__m128i*)&data[6 * stride]);
-
-  __m128i pairs01 = _mm_unpacklo_epi16(row0, row1);
-  __m128i pairs23 = _mm_unpacklo_epi16(row2, row3);
-  __m128i temp01 = _mm_madd_epi16(pairs01, taps_01);
-  __m128i temp23 = _mm_madd_epi16(pairs23, taps_23);
-  __m128i sum0123 = _mm_add_epi32(temp01, temp23);
-
-  __m128i pairs12 = _mm_unpacklo_epi16(row1, row2);
-  __m128i pairs34 = _mm_unpacklo_epi16(row3, row4);
-  __m128i temp12 = _mm_madd_epi16(pairs12, taps_01);
-  __m128i temp34 = _mm_madd_epi16(pairs34, taps_23);
-  __m128i sum1234 = _mm_add_epi32(temp12, temp34);
-
-  __m128i pairs45 = _mm_unpacklo_epi16(row4, row5);
-  __m128i temp23_2 = _mm_madd_epi16(pairs23, taps_01);
-  __m128i temp45 = _mm_madd_epi16(pairs45, taps_23);
-  __m128i sum2345 = _mm_add_epi32(temp23_2, temp45);
-
-  __m128i pairs56 = _mm_unpacklo_epi16(row5, row6);
-  __m128i temp34_2 = _mm_madd_epi16(pairs34, taps_01);
-  __m128i temp56 = _mm_madd_epi16(pairs56, taps_23);
-  __m128i sum3456 = _mm_add_epi32(temp34_2, temp56);
-
-  sum0123 = _mm_srai_epi32(sum0123, shift2);
-  sum1234 = _mm_srai_epi32(sum1234, shift2);
-  sum2345 = _mm_srai_epi32(sum2345, shift2);
-  sum3456 = _mm_srai_epi32(sum3456, shift2);
-
-  __m128i filtered01 = _mm_packs_epi32(sum0123, sum1234);
-  __m128i filtered23 = _mm_packs_epi32(sum2345, sum3456);
-
-  _mm_storel_pi((__m64*)&out[0 * out_stride], _mm_castsi128_ps(filtered01));
-  _mm_storeh_pi((__m64*)&out[1 * out_stride], _mm_castsi128_ps(filtered01));
-  _mm_storel_pi((__m64*)&out[2 * out_stride], _mm_castsi128_ps(filtered23));
-  _mm_storeh_pi((__m64*)&out[3 * out_stride], _mm_castsi128_ps(filtered23));
-}
-
-INLINE static void filter_row_ver_16b_8x1_avx2(int16_t *data, int64_t stride, __m256i* taps, kvz_pixel * out, int64_t out_stride)
-{
-  // Interpolation filter shifts
-  int32_t shift2 = 6;
-
-  // Weighted prediction offset and shift
-  int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
-  int32_t wp_offset1 = 1 << (wp_shift1 - 1);
-
-  __m256i pairs_lo, pairs_hi;
-
-  // Filter 01 later with 67
-  __m256i br0 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 0 * stride)));
-  __m256i br1 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 1 * stride)));
-
-  __m256i br2 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 2 * stride)));
-  __m256i br3 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 3 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br2, br3);
-  pairs_hi = _mm256_unpackhi_epi16(br2, br3);
-  __m256i rows02_23_01_lo = _mm256_madd_epi16(pairs_lo, taps[1]); // Firs 23 01
-  __m256i rows02_23_01_hi = _mm256_madd_epi16(pairs_hi, taps[1]); // Firs 23 01
-
-  __m256i br4 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 4 * stride)));
-  __m256i br5 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 5 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br4, br5);
-  pairs_hi = _mm256_unpackhi_epi16(br4, br5);
-  __m256i rows02_45_23_lo = _mm256_madd_epi16(pairs_lo, taps[2]); // Firs 45 23
-  __m256i rows02_45_23_hi = _mm256_madd_epi16(pairs_hi, taps[2]); // Firs 45 23
-
-  __m256i br6 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 6 * stride)));
-  __m256i br7 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 7 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br6, br7);
-  pairs_hi = _mm256_unpackhi_epi16(br6, br7);
-  __m256i rows02_67_45_lo = _mm256_madd_epi16(pairs_lo, taps[3]); // Firs 67 45
-  __m256i rows02_67_45_hi = _mm256_madd_epi16(pairs_hi, taps[3]); // Firs 67 45
-  __m256i rows46_23_01_lo = _mm256_madd_epi16(pairs_lo, taps[1]); // Firs 23 01
-  __m256i rows46_23_01_hi = _mm256_madd_epi16(pairs_hi, taps[1]); // Firs 23 01
-
-  __m256i br8 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 8 * stride)));
-  __m256i br9 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 9 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br8, br9);
-  pairs_hi = _mm256_unpackhi_epi16(br8, br9);
-  // Filter rows02 later
-  __m256i rows46_45_23_lo = _mm256_madd_epi16(pairs_lo, taps[2]); // Firs 45 23
-  __m256i rows46_45_23_hi = _mm256_madd_epi16(pairs_hi, taps[2]); // Firs 45 23
-
-  __m256i br10 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 10 * stride)));
-  __m256i br11 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 11 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br10, br11);
-  pairs_hi = _mm256_unpackhi_epi16(br10, br11);
-  __m256i rows46_67_45_lo = _mm256_madd_epi16(pairs_lo, taps[3]); // Firs 67 45
-  __m256i rows46_67_45_hi = _mm256_madd_epi16(pairs_hi, taps[3]); // Firs 67 45
-
-  // Deferred
-  __m256i r08 = _mm256_permute2x128_si256(br0, br8, _MM_SHUFFLE(0, 2, 0, 0));
-  __m256i r19 = _mm256_permute2x128_si256(br1, br9, _MM_SHUFFLE(0, 2, 0, 0));
-  pairs_lo = _mm256_unpacklo_epi16(r08, r19);
-  pairs_hi = _mm256_unpackhi_epi16(r08, r19);
-  __m256i rows02_01_67_lo = _mm256_madd_epi16(pairs_lo, taps[0]); // Firs 01 67
-  __m256i rows02_01_67_hi = _mm256_madd_epi16(pairs_hi, taps[0]); // Firs 01 67
-
-  __m256i br12 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 12 * stride)));
-  __m256i br13 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 13 * stride)));
-
-  __m256i r412 = _mm256_permute2x128_si256(br4, br12, _MM_SHUFFLE(0, 2, 0, 0));
-  __m256i r513 = _mm256_permute2x128_si256(br5, br13, _MM_SHUFFLE(0, 2, 0, 0));
-  pairs_lo = _mm256_unpacklo_epi16(r412, r513);
-  pairs_hi = _mm256_unpackhi_epi16(r412, r513);
-  __m256i rows46_01_67_lo = _mm256_madd_epi16(pairs_lo, taps[0]); // Firs 01 67
-  __m256i rows46_01_67_hi = _mm256_madd_epi16(pairs_hi, taps[0]); // Firs 01 67
-
-  __m256i accu02_lo, accu02_hi;
-  __m256i accu46_lo, accu46_hi;
-
-  accu02_lo = _mm256_add_epi32(rows02_23_01_lo, rows02_45_23_lo);
-  accu02_lo = _mm256_add_epi32(accu02_lo, rows02_67_45_lo);
-  accu02_lo = _mm256_add_epi32(accu02_lo, rows02_01_67_lo);
-
-  accu02_hi = _mm256_add_epi32(rows02_23_01_hi, rows02_45_23_hi);
-  accu02_hi = _mm256_add_epi32(accu02_hi, rows02_67_45_hi);
-  accu02_hi = _mm256_add_epi32(accu02_hi, rows02_01_67_hi);
-
-  accu46_lo = _mm256_add_epi32(rows46_23_01_lo, rows46_45_23_lo);
-  accu46_lo = _mm256_add_epi32(accu46_lo, rows46_67_45_lo);
-  accu46_lo = _mm256_add_epi32(accu46_lo, rows46_01_67_lo);
-
-  accu46_hi = _mm256_add_epi32(rows46_23_01_hi, rows46_45_23_hi);
-  accu46_hi = _mm256_add_epi32(accu46_hi, rows46_67_45_hi);
-  accu46_hi = _mm256_add_epi32(accu46_hi, rows46_01_67_hi);
-
-  accu02_lo = _mm256_srai_epi32(accu02_lo, shift2);
-  accu02_hi = _mm256_srai_epi32(accu02_hi, shift2);
-  accu46_lo = _mm256_srai_epi32(accu46_lo, shift2);
-  accu46_hi = _mm256_srai_epi32(accu46_hi, shift2);
-
-  __m256i offset = _mm256_set1_epi32(wp_offset1);
-  accu02_lo = _mm256_add_epi32(accu02_lo, offset);
-  accu02_hi = _mm256_add_epi32(accu02_hi, offset);
-  accu46_lo = _mm256_add_epi32(accu46_lo, offset);
-  accu46_hi = _mm256_add_epi32(accu46_hi, offset);
-
-  accu02_lo = _mm256_srai_epi32(accu02_lo, wp_shift1);
-  accu02_hi = _mm256_srai_epi32(accu02_hi, wp_shift1);
-  accu46_lo = _mm256_srai_epi32(accu46_lo, wp_shift1);
-  accu46_hi = _mm256_srai_epi32(accu46_hi, wp_shift1);
-
-  __m256i rows02 = _mm256_packs_epi32(accu02_lo, accu02_hi);
-  __m256i rows46 = _mm256_packs_epi32(accu46_lo, accu46_hi);
-
-  __m256i filtered04_26 = _mm256_packus_epi16(rows02, rows46);
-  __m128i filtered04 = _mm256_castsi256_si128(filtered04_26);
-  __m128i filtered26 = _mm256_extracti128_si256(filtered04_26, 1);
-
-  _mm_storel_pi((__m64*)&out[0 * out_stride], _mm_castsi128_ps(filtered04));
-  _mm_storel_pi((__m64*)&out[2 * out_stride], _mm_castsi128_ps(filtered26));
-  _mm_storeh_pi((__m64*)&out[4 * out_stride], _mm_castsi128_ps(filtered04));
-  _mm_storeh_pi((__m64*)&out[6 * out_stride], _mm_castsi128_ps(filtered26));
-}
-
-INLINE static void filter_row_ver_16b_8x1_no_round_avx2(int16_t *data, int64_t stride, __m256i *taps, int16_t *out, int64_t out_stride) {
-
-  int32_t shift2 = 6;
-
-  __m256i pairs_lo, pairs_hi;
-
-  // Filter 01 later with 67
-  __m256i br0 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 0 * stride)));
-  __m256i br1 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 1 * stride)));
-
-  __m256i br2 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 2 * stride)));
-  __m256i br3 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 3 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br2, br3);
-  pairs_hi = _mm256_unpackhi_epi16(br2, br3);
-  __m256i rows02_23_01_lo = _mm256_madd_epi16(pairs_lo, taps[1]); // Firs 23 01
-  __m256i rows02_23_01_hi = _mm256_madd_epi16(pairs_hi, taps[1]); // Firs 23 01
-
-  __m256i br4 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 4 * stride)));
-  __m256i br5 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 5 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br4, br5);
-  pairs_hi = _mm256_unpackhi_epi16(br4, br5);
-  __m256i rows02_45_23_lo = _mm256_madd_epi16(pairs_lo, taps[2]); // Firs 45 23
-  __m256i rows02_45_23_hi = _mm256_madd_epi16(pairs_hi, taps[2]); // Firs 45 23
-
-  __m256i br6 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 6 * stride)));
-  __m256i br7 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 7 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br6, br7);
-  pairs_hi = _mm256_unpackhi_epi16(br6, br7);
-  __m256i rows02_67_45_lo = _mm256_madd_epi16(pairs_lo, taps[3]); // Firs 67 45
-  __m256i rows02_67_45_hi = _mm256_madd_epi16(pairs_hi, taps[3]); // Firs 67 45
-  __m256i rows46_23_01_lo = _mm256_madd_epi16(pairs_lo, taps[1]); // Firs 23 01
-  __m256i rows46_23_01_hi = _mm256_madd_epi16(pairs_hi, taps[1]); // Firs 23 01
-
-  __m256i br8 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 8 * stride)));
-  __m256i br9 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 9 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br8, br9);
-  pairs_hi = _mm256_unpackhi_epi16(br8, br9);
-  // Filter rows02 later
-  __m256i rows46_45_23_lo = _mm256_madd_epi16(pairs_lo, taps[2]); // Firs 45 23
-  __m256i rows46_45_23_hi = _mm256_madd_epi16(pairs_hi, taps[2]); // Firs 45 23
-
-  __m256i br10 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 10 * stride)));
-  __m256i br11 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 11 * stride)));
-  pairs_lo = _mm256_unpacklo_epi16(br10, br11);
-  pairs_hi = _mm256_unpackhi_epi16(br10, br11);
-  __m256i rows46_67_45_lo = _mm256_madd_epi16(pairs_lo, taps[3]); // Firs 67 45
-  __m256i rows46_67_45_hi = _mm256_madd_epi16(pairs_hi, taps[3]); // Firs 67 45
-
-                                                                  // Deferred
-  __m256i r08 = _mm256_permute2x128_si256(br0, br8, _MM_SHUFFLE(0, 2, 0, 0));
-  __m256i r19 = _mm256_permute2x128_si256(br1, br9, _MM_SHUFFLE(0, 2, 0, 0));
-  pairs_lo = _mm256_unpacklo_epi16(r08, r19);
-  pairs_hi = _mm256_unpackhi_epi16(r08, r19);
-  __m256i rows02_01_67_lo = _mm256_madd_epi16(pairs_lo, taps[0]); // Firs 01 67
-  __m256i rows02_01_67_hi = _mm256_madd_epi16(pairs_hi, taps[0]); // Firs 01 67
-
-  __m256i br12 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 12 * stride)));
-  __m256i br13 = _mm256_broadcastsi128_si256(_mm_loadu_si128((__m128i*)(data + 13 * stride)));
-
-  __m256i r412 = _mm256_permute2x128_si256(br4, br12, _MM_SHUFFLE(0, 2, 0, 0));
-  __m256i r513 = _mm256_permute2x128_si256(br5, br13, _MM_SHUFFLE(0, 2, 0, 0));
-  pairs_lo = _mm256_unpacklo_epi16(r412, r513);
-  pairs_hi = _mm256_unpackhi_epi16(r412, r513);
-  __m256i rows46_01_67_lo = _mm256_madd_epi16(pairs_lo, taps[0]); // Firs 01 67
-  __m256i rows46_01_67_hi = _mm256_madd_epi16(pairs_hi, taps[0]); // Firs 01 67
-
-  __m256i accu02_lo, accu02_hi;
-  __m256i accu46_lo, accu46_hi;
-
-  accu02_lo = _mm256_add_epi32(rows02_23_01_lo, rows02_45_23_lo);
-  accu02_lo = _mm256_add_epi32(accu02_lo, rows02_67_45_lo);
-  accu02_lo = _mm256_add_epi32(accu02_lo, rows02_01_67_lo);
-
-  accu02_hi = _mm256_add_epi32(rows02_23_01_hi, rows02_45_23_hi);
-  accu02_hi = _mm256_add_epi32(accu02_hi, rows02_67_45_hi);
-  accu02_hi = _mm256_add_epi32(accu02_hi, rows02_01_67_hi);
-
-  accu46_lo = _mm256_add_epi32(rows46_23_01_lo, rows46_45_23_lo);
-  accu46_lo = _mm256_add_epi32(accu46_lo, rows46_67_45_lo);
-  accu46_lo = _mm256_add_epi32(accu46_lo, rows46_01_67_lo);
-
-  accu46_hi = _mm256_add_epi32(rows46_23_01_hi, rows46_45_23_hi);
-  accu46_hi = _mm256_add_epi32(accu46_hi, rows46_67_45_hi);
-  accu46_hi = _mm256_add_epi32(accu46_hi, rows46_01_67_hi);
-
-  accu02_lo = _mm256_srai_epi32(accu02_lo, shift2);
-  accu02_hi = _mm256_srai_epi32(accu02_hi, shift2);
-  accu46_lo = _mm256_srai_epi32(accu46_lo, shift2);
-  accu46_hi = _mm256_srai_epi32(accu46_hi, shift2);
-
-  __m256i rows02 = _mm256_packs_epi32(accu02_lo, accu02_hi);
-  __m256i rows46 = _mm256_packs_epi32(accu46_lo, accu46_hi);
-
-  __m128i filtered0 = _mm256_castsi256_si128(rows02);
-  __m128i filtered2 = _mm256_extracti128_si256(rows02, 1);
-  __m128i filtered4 = _mm256_castsi256_si128(rows46);
-  __m128i filtered6 = _mm256_extracti128_si256(rows46, 1);
-
-  _mm_storeu_si128((__m128i*)(out + 0 * out_stride), filtered0);
-  _mm_storeu_si128((__m128i*)(out + 2 * out_stride), filtered2);
-  _mm_storeu_si128((__m128i*)(out + 4 * out_stride), filtered4);
-  _mm_storeu_si128((__m128i*)(out + 6 * out_stride), filtered6);
-}
-
-INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_avx2(__m256i *filters, int16_t *data, int16_t stride, kvz_pixel *out, int out_stride)
-{
-  // Filter even rows
-  filter_row_ver_16b_8x1_avx2(data, stride, filters, out, out_stride); // 0 2 4 6
-
-  // Filter odd rows
-  filter_row_ver_16b_8x1_avx2(data + stride, stride, filters, out + out_stride, out_stride); // 1 3 5 7
- 
-}
-
-INLINE static void kvz_eight_tap_filter_ver_16bit_8x8_no_round_avx2(__m256i *filters, int16_t *data, int16_t stride, int16_t *out, int out_stride)
-{
-  // Filter even rows
-  filter_row_ver_16b_8x1_no_round_avx2(data, stride, filters, out, out_stride); // 0 2 4 6
-
-  // Filter odd rows
-  filter_row_ver_16b_8x1_no_round_avx2(data + stride, stride, filters, out + out_stride, out_stride); // 1 3 5 7
-
 }
 
 static void kvz_ipol_8tap_hor_px_im_avx2(int8_t *filter,
@@ -1122,9 +651,6 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   // HORIZONTAL STEP
   // Integer pixels
-  __m256i shuf_01_23, shuf_45_67;
-  __m256i taps_01_23, taps_45_67;
-
   for (y = 0; y < height + KVZ_EXT_PADDING_LUMA + 1; ++y) {
     
     for (x = 0; x + 7 < width; x += 8) {
@@ -1147,9 +673,6 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   }
 
   // Half pixels
-  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
-  kvz_init_filter_taps(fir2, &taps_01_23, &taps_45_67);
-
   kvz_ipol_8tap_hor_px_im_avx2(fir2, width, height + 1, src + 1, src_stride, hor_pos2, hor_stride);
 
   // Write the first column in contiguous memory
@@ -1165,9 +688,6 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   kvz_pixel *out_r = filtered[1];
   kvz_pixel *out_t = filtered[2];
   kvz_pixel *out_b = filtered[3];
-
-  __m256i taps[4];
-  kvz_init_ver_filter_taps(fir0, taps);
 
   // Right
   int16_t *im = &hor_pos2[hor_stride];
@@ -1186,7 +706,6 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
     out_l[y * dst_stride + x] = sample;
   }
 
-  kvz_init_ver_filter_taps(fir2, taps);
   // Top
   im = hor_pos0;
   dst = out_t;
@@ -1240,8 +759,6 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   kvz_pixel *out_bl = filtered[2];
   kvz_pixel *out_br = filtered[3];
 
- __m256i taps[4];
-  kvz_init_ver_filter_taps(fir2, taps);
   // Top-Right
   int16_t *im = hor_pos2;
   kvz_pixel *dst = out_tr;
@@ -1336,13 +853,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
 
   // HORIZONTAL STEP
-  __m256i shuf_01_23, shuf_45_67;
-  __m256i taps_01_23, taps_45_67;
-
   // Left QPEL
-  kvz_init_shuffle_masks(&shuf_01_23, &shuf_45_67);
-  kvz_init_filter_taps(hor_fir_l, &taps_01_23, &taps_45_67);
-  
   int sample_off_y = hpel_off_y < 0 ? 0 : 1;
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir_l, width, height + 1, src + 1, src_stride, hor_pos_l, hor_stride);
 
@@ -1355,7 +866,6 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   }
 
   // Right QPEL
-  kvz_init_filter_taps(hor_fir_r, &taps_01_23, &taps_45_67);
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir_r, width, height + 1, src + 1, src_stride, hor_pos_r, hor_stride);
 
   // Write the first column in contiguous memory
@@ -1377,12 +887,8 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
   int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
 
-  __m256i taps[4];
-
   // Left QPEL (1/4 or 3/4 x positions) 
   // Filter block and then filter column and align if neccessary
-  kvz_init_ver_filter_taps(ver_fir_l, taps);
-
   int16_t *im = &hor_pos_l[sample_off_y * hor_stride];
   kvz_pixel *dst = out_l;
   kvz_ipol_8tap_ver_im_px_avx2(ver_fir_l, width, height, im, hor_stride, dst, dst_stride);
@@ -1406,8 +912,6 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   // Right QPEL (3/4 or 1/4 x positions)
   // Filter block and then filter column and align if neccessary
-  kvz_init_ver_filter_taps(ver_fir_r, taps);
-
   im = &hor_pos_r[sample_off_y * hor_stride];
   dst = out_r;
   kvz_ipol_8tap_ver_im_px_avx2(ver_fir_r, width, height, im, hor_stride, dst, dst_stride);
@@ -1433,7 +937,6 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Top QPEL (1/4 or 3/4 y positions)
   // Filter block and then filter column and align if neccessary
   int sample_off_x = (hpel_off_x > -1 ? 1 : 0);
-  kvz_init_ver_filter_taps(ver_fir_t, taps);
 
   im = &hor_hpel_pos[off_y_fir_t * hor_stride];
   dst = out_t;
@@ -1458,7 +961,6 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   // Bottom QPEL (3/4 or 1/4 y positions)
   // Filter block and then filter column and align if neccessary
-  kvz_init_ver_filter_taps(ver_fir_b, taps);
 
   im = &hor_hpel_pos[off_y_fir_b * hor_stride];
   dst = out_b;
@@ -1529,11 +1031,8 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int off_y_fir_t = hpel_off_y < 1 ? 0 : 1;
   int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
 
-  __m256i taps[4];
   // Top-left QPEL
   // Filter block and then filter column and align if neccessary
-  kvz_init_ver_filter_taps(ver_fir_t, taps);
-
   int16_t *im = &hor_pos_l[off_y_fir_t * hor_stride];
   kvz_pixel *dst = out_tl;
   kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
@@ -1581,8 +1080,6 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 
   // Bottom-left QPEL
   // Filter block and then filter column and align if neccessary
-  kvz_init_ver_filter_taps(ver_fir_b, taps);
-
   im = &hor_pos_l[off_y_fir_b * hor_stride];
   dst = out_bl;
   kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
