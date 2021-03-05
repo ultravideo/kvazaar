@@ -72,11 +72,14 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
-    .buf = ext_buffer,
-    .ext = &ext,
-    .ext_origin = &ext_origin,
-    .ext_s = &ext_s
   };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
   kvz_sample_quarterpel_luma(state->encoder_control,
@@ -123,11 +126,14 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t *const state,
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
-    .buf = ext_buffer,
-    .ext = &ext,
-    .ext_origin = &ext_origin,
-    .ext_s = &ext_s
   };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
   kvz_sample_14bit_quarterpel_luma(state->encoder_control,
@@ -177,11 +183,14 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET + 3, // Three rows for AVX2
-    .buf = ext_buffer,
-    .ext = &ext,
-    .ext_origin = &ext_origin,
-    .ext_s = &ext_s
   };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
   kvz_sample_octpel_chroma(state->encoder_control,
@@ -245,11 +254,14 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t *const state,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET + 3, // Three rows for AVX2
-    .buf = ext_buffer,
-    .ext = &ext,
-    .ext_origin = &ext_origin,
-    .ext_s = &ext_s
   };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
   kvz_sample_14bit_octpel_chroma(state->encoder_control,

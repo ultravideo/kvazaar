@@ -1032,11 +1032,14 @@ static void search_frac(inter_search_info_t *info)
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
-    .buf = ext_buffer,
-    .ext = &ext,
-    .ext_origin = &ext_origin,
-    .ext_s = &ext_s
   };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
 

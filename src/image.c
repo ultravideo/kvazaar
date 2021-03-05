@@ -497,11 +497,14 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
       .pad_r = 0,
       .pad_t = 0,
       .pad_b = 0,
-      .buf = ext_buffer,
-      .ext = &ext,
-      .ext_origin = &ext_origin,
-      .ext_s = &ext_s
     };
+
+    // Initialize separately. Gets rid of warning
+    // about using nonstandard extension.
+    epol_args.buf = ext_buffer;
+    epol_args.ext = &ext;
+    epol_args.ext_origin = &ext_origin;
+    epol_args.ext_s = &ext_s;
 
     kvz_get_extended_block(&epol_args);
 
