@@ -992,11 +992,11 @@ static void search_frac(inter_search_info_t *info)
 
   unsigned costs[4] = { 0 };
 
-  ALIGNED(64) kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH];
+  ALIGNED(64) kvz_pixel filtered[4][LCU_LUMA_SIZE];
 
   // Storage buffers for intermediate horizontally filtered results.
   // Have the first columns in contiguous memory for vectorization.
-  ALIGNED(64) int16_t intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
+  ALIGNED(64) int16_t intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1];
 
   const kvz_picture *ref = info->ref;
@@ -1013,9 +1013,9 @@ static void search_frac(inter_search_info_t *info)
   int8_t sample_off_y = 0;
 
   // Space for (possibly) extrapolated pixels and the part from the picture
-  // One extra column for ME and two extra columns for ME and AVX2
+  // One extra row and column compared to normal interpolation and some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[(KVZ_EXT_BLOCK_W_LUMA + 1) * (KVZ_EXT_BLOCK_W_LUMA + 2)];
+  kvz_pixel ext_buffer[KVZ_FME_MAX_INPUT_SIZE_SIMD];
   kvz_pixel *ext = NULL;
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;
@@ -1031,7 +1031,7 @@ static void search_frac(inter_search_info_t *info)
     .pad_l = KVZ_LUMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
   };
 
   // Initialize separately. Gets rid of warning

@@ -618,8 +618,8 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
-  int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
   int8_t hpel_off_x, int8_t hpel_off_y)
@@ -730,8 +730,8 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
-  int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
   int8_t hpel_off_x, int8_t hpel_off_y)
@@ -809,8 +809,8 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
-  int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
   int8_t hpel_off_x, int8_t hpel_off_y)
@@ -989,8 +989,8 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int16_t src_stride,
   int width,
   int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH],
-  int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH],
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
   int8_t fme_level,
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
   int8_t hpel_off_x, int8_t hpel_off_y)
@@ -1147,7 +1147,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
 
   // Buffer for intermediate values with one extra row 
   // because the loop writes two rows each iteration.
-  ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
+  ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
   int16_t hor_stride = LCU_WIDTH;
 
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
@@ -1172,7 +1172,7 @@ static void kvz_sample_quarterpel_luma_hi_avx2(const encoder_control_t * const e
   
   // Buffer for intermediate values with one extra row 
   // because the loop writes two rows each iteration.
-  ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
+  ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
   int16_t hor_stride = LCU_WIDTH;
 
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
@@ -1201,7 +1201,7 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t *const encoder
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
-  ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C];
+  ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD];
   int16_t hor_stride = LCU_WIDTH_C;
 
   kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
@@ -1229,7 +1229,7 @@ static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
-  ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C];
+  ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD];
   int16_t hor_stride = LCU_WIDTH_C;
 
   kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);

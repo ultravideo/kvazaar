@@ -53,9 +53,9 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
   int mv_frac_y = (mv_param[1] & 3);
 
   // Space for extrapolated pixels and the part from the picture.
-  // One extra row for AVX2.
+  // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_EXT_BLOCK_W_LUMA * (KVZ_EXT_BLOCK_W_LUMA + 1)];
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
   kvz_pixel *ext = NULL;
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;
@@ -107,9 +107,9 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   int mv_frac_y = (mv_param[1] & 3);
 
   // Space for extrapolated pixels and the part from the picture.
-  // One extra row for AVX2.
+  // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_EXT_BLOCK_W_LUMA * (KVZ_EXT_BLOCK_W_LUMA + 1)];
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
   kvz_pixel *ext = NULL;
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;
@@ -161,9 +161,9 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   int mv_frac_y = (mv_param[1] & 7);
 
   // Space for extrapolated pixels and the part from the picture.
-  // Three extra rows for AVX2.
+  // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_EXT_BLOCK_W_CHROMA * (KVZ_EXT_BLOCK_W_CHROMA + 3)];
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
   kvz_pixel *ext = NULL;
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;
@@ -232,9 +232,9 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   int mv_frac_y = (mv_param[1] & 7);
 
   // Space for extrapolated pixels and the part from the picture.
-  // Three extra rows for AVX2.
+  // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_EXT_BLOCK_W_CHROMA * (KVZ_EXT_BLOCK_W_CHROMA + 3)];
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
   kvz_pixel *ext = NULL;
   kvz_pixel *ext_origin = NULL;
   int ext_s = 0;

@@ -31,11 +31,26 @@
 #include "kvazaar.h"
 #include "search_inter.h"
 
+// AVX2 implementation of horizontal filter reads and
+// writes two rows for luma and four for chroma at a time.
+// Extra vertical padding is added to prevent segfaults.
+// Horizontal padding is not needed even if one extra byte
+// is read because kvz_image_alloc adds enough padding.
+#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * KVZ_EXT_BLOCK_W_LUMA)
+#define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA)
+#define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH)
+#define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
+
+// On top of basic interpolation, FME needs one extra
+// column and row for ME (left and up). Adding the
+// extra row happens to satisfy AVX2 requirements for
+// row count. No other extra rows are needed.
+#define KVZ_FME_MAX_INPUT_SIZE_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * (KVZ_EXT_BLOCK_W_LUMA + 1))
 
 typedef struct { kvz_pixel *buffer; kvz_pixel *orig_topleft; unsigned stride; unsigned malloc_used; } kvz_extended_block;
 
 typedef void(ipol_blocks_func)(const encoder_control_t * encoder, kvz_pixel *src, int16_t src_stride, int width, int height,
-  kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH], int16_t hor_intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH], int8_t fme_level, int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1], 
+  kvz_pixel filtered[4][LCU_LUMA_SIZE], int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD], int8_t fme_level, int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
   int8_t sample_off_x, int8_t sample_off_y);
 
 typedef struct {
