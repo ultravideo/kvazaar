@@ -94,7 +94,7 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
     mv_param);
 }
 
-static void inter_recon_14bit_frac_luma(const encoder_state_t *const state,
+static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   const kvz_picture *const ref,
   int32_t xpos,
   int32_t ypos,
@@ -136,7 +136,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t *const state,
   epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
-  kvz_sample_14bit_quarterpel_luma(state->encoder_control,
+  kvz_sample_quarterpel_luma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     block_width,
@@ -219,7 +219,7 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     mv_param);
 }
 
-static void inter_recon_14bit_frac_chroma(const encoder_state_t *const state,
+static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   const kvz_picture *const ref,
   int32_t xpos,
   int32_t ypos,
@@ -264,7 +264,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t *const state,
   epol_args.ext_s = &ext_s;
 
   kvz_get_extended_block(&epol_args);
-  kvz_sample_14bit_octpel_chroma(state->encoder_control,
+  kvz_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     block_width / 2,
@@ -278,7 +278,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t *const state,
   // Chroma V
   epol_args.src = ref->v;
   kvz_get_extended_block(&epol_args);
-  kvz_sample_14bit_octpel_chroma(state->encoder_control,
+  kvz_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     block_width / 2,
@@ -378,7 +378,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
     if (fractional_luma) {
       // With a fractional MV, do interpolation.
       if (state->encoder_control->cfg.bipred && hi_prec_out) {
-        inter_recon_14bit_frac_luma(state, ref,
+        inter_recon_frac_luma_hi(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
           mv_param, hi_prec_out);
@@ -418,7 +418,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.
     if (state->encoder_control->cfg.bipred && hi_prec_out) {
-      inter_recon_14bit_frac_chroma(state, ref,
+      inter_recon_frac_chroma_hi(state, ref,
                                     pu_in_tile.x, pu_in_tile.y,
                                     width, height,
                                     mv_param, hi_prec_out);

@@ -156,7 +156,7 @@ void kvz_sample_quarterpel_luma_generic(const encoder_control_t * const encoder,
   }
 }
 
-void kvz_sample_14bit_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void kvz_sample_quarterpel_luma_hi_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -694,7 +694,7 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder, k
   }
 }
 
-void kvz_sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -780,8 +780,8 @@ int kvz_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_diag_luma", "generic", 0, &kvz_filter_qpel_blocks_diag_luma_generic);
   success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "generic", 0, &kvz_sample_quarterpel_luma_generic);
   success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "generic", 0, &kvz_sample_octpel_chroma_generic);
-  success &= kvz_strategyselector_register(opaque, "sample_14bit_quarterpel_luma", "generic", 0, &kvz_sample_14bit_quarterpel_luma_generic);
-  success &= kvz_strategyselector_register(opaque, "sample_14bit_octpel_chroma", "generic", 0, &kvz_sample_14bit_octpel_chroma_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "generic", 0, &kvz_sample_quarterpel_luma_hi_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "generic", 0, &kvz_sample_octpel_chroma_hi_generic);
   success &= kvz_strategyselector_register(opaque, "get_extended_block", "generic", 0, &kvz_get_extended_block_generic);
 
   return success;

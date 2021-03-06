@@ -409,7 +409,7 @@ int16_t dst_stride)
   }
 }
 
-static void kvz_ipol_4tap_hor_px_hi_avx2(int8_t *filter,
+static void kvz_ipol_4tap_hor_px_im_avx2(int8_t *filter,
   int width,
   int height,
   kvz_pixel *src,
@@ -473,7 +473,7 @@ static void kvz_ipol_4tap_hor_px_hi_avx2(int8_t *filter,
   }
 }
 
-static void kvz_ipol_4tap_ver_hi_px_avx2(int8_t *filter,
+static void kvz_ipol_4tap_ver_im_px_avx2(int8_t *filter,
   int width,
   int height,
   int16_t *src,
@@ -547,7 +547,7 @@ static void kvz_ipol_4tap_ver_hi_px_avx2(int8_t *filter,
   }
 }
 
-static void kvz_ipol_4tap_ver_hi_hi_avx2(int8_t *filter,
+static void kvz_ipol_4tap_ver_im_hi_avx2(int8_t *filter,
   int width,
   int height,
   int16_t *src,
@@ -1155,7 +1155,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
 }
 
 
-static void kvz_sample_14bit_quarterpel_luma_avx2(const encoder_control_t * const encoder,
+static void kvz_sample_quarterpel_luma_hi_avx2(const encoder_control_t * const encoder,
   kvz_pixel *src, 
   int16_t src_stride, 
   int width, 
@@ -1204,11 +1204,11 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t *const encoder
   ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH_C;
 
-  kvz_ipol_4tap_hor_px_hi_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
-  kvz_ipol_4tap_ver_hi_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
+  kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
+  kvz_ipol_4tap_ver_im_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
 }
 
-static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t *const encoder,
+static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const encoder,
   kvz_pixel *src,
   int16_t src_stride,
   int width,
@@ -1221,7 +1221,7 @@ static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t *const e
 {
   // TODO: Optimizations for rest of the blocks (for example 2x8).
   if (width % 4 != 0) {
-    kvz_sample_14bit_octpel_chroma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
+    kvz_sample_octpel_chroma_hi_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
     return;
   }
   int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
@@ -1232,8 +1232,8 @@ static void kvz_sample_14bit_octpel_chroma_avx2(const encoder_control_t *const e
   ALIGNED(64) int16_t hor_intermediate[(KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH_C;
 
-  kvz_ipol_4tap_hor_px_hi_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
-  kvz_ipol_4tap_ver_hi_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
+  kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
+  kvz_ipol_4tap_ver_im_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
 }
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
@@ -1249,8 +1249,8 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_diag_luma", "avx2", 40, &kvz_filter_qpel_blocks_diag_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "avx2", 40, &kvz_sample_quarterpel_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "avx2", 40, &kvz_sample_octpel_chroma_avx2);
-    success &= kvz_strategyselector_register(opaque, "sample_14bit_quarterpel_luma", "avx2", 40, &kvz_sample_14bit_quarterpel_luma_avx2);
-    success &= kvz_strategyselector_register(opaque, "sample_14bit_octpel_chroma", "avx2", 40, &kvz_sample_14bit_octpel_chroma_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "avx2", 40, &kvz_sample_quarterpel_luma_hi_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "avx2", 40, &kvz_sample_octpel_chroma_hi_avx2);
   }
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
