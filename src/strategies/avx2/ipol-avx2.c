@@ -1136,12 +1136,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   int8_t ver_flag, 
   const int16_t mv[2])
 {
-  // TODO: Optimize SMP and AMP
-  if (width != height) {
-    kvz_sample_quarterpel_luma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
-    return;
-  }
-
+  // TODO: horizontal and vertical only filtering
   int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
   int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
 
