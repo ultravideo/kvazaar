@@ -398,7 +398,7 @@ int16_t dst_stride)
       __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
       __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
       __m256i sum = _mm256_add_epi32(sum0123, sum4567);
-      sum = _mm256_srai_epi32(sum, shift2);
+      sum = _mm256_srai_epi32(sum, shift2); // TODO: -8192 offsetting for extreme values
       sum = _mm256_packs_epi32(sum, sum);
 
       int16_t *dst_addr0 = &dst[(y + 0) * dst_stride + x];
