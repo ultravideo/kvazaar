@@ -755,15 +755,15 @@ void kvz_get_extended_block_generic(kvz_epol_args *args) {
     for (y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
 
       int clipped_y = CLIP(0, args->src_h - 1, args->blk_y + y);
-      kvz_pixel sample_l = *(args->src + clipped_y * args->src_s);
-      kvz_pixel sample_r = *(args->src + clipped_y * args->src_s + args->src_w - 1);
+      kvz_pixel *sample_l = args->src + clipped_y * args->src_s;
+      kvz_pixel *sample_r = args->src + clipped_y * args->src_s + args->src_w - 1;
       kvz_pixel *src_m = args->src + clipped_y * args->src_s + MAX(min_x, 0);
       kvz_pixel *dst_l = args->buf + (y + args->pad_t) * (*args->ext_s);
       kvz_pixel *dst_m = dst_l + cnt_l;
       kvz_pixel *dst_r = dst_m + cnt_m;
-      for (int i = 0; i < cnt_l; ++i) *(dst_l + i) = sample_l;
+      for (int i = 0; i < cnt_l; ++i) *(dst_l + i) = *sample_l;
       for (int i = 0; i < cnt_m; ++i) *(dst_m + i) = *(src_m + i);
-      for (int i = 0; i < cnt_r; ++i) *(dst_r + i) = sample_r;
+      for (int i = 0; i < cnt_r; ++i) *(dst_r + i) = *sample_r;
     }
 
     for (int y_simd = 0; y_simd < args->pad_b_simd; ++y_simd) {
