@@ -1,3 +1,4 @@
-race:kvz_eight_tap_filter_hor_8x1_avx2
+# AVX2 interpolation reads some extra pixels
+race:kvz_ipol_8tap_hor_px_im_avx2
 race:kvz_filter_hpel_blocks_hor_ver_luma_avx2
 race:kvz_eight_tap_filter_hor_avx2

@@ -992,12 +992,11 @@ static void search_frac(inter_search_info_t *info)
 
   unsigned costs[4] = { 0 };
 
-  kvz_extended_block src = { 0, 0, 0, 0 };
-  ALIGNED(64) kvz_pixel filtered[4][LCU_WIDTH * LCU_WIDTH];
+  ALIGNED(64) kvz_pixel filtered[4][LCU_LUMA_SIZE];
 
   // Storage buffers for intermediate horizontally filtered results.
   // Have the first columns in contiguous memory for vectorization.
-  ALIGNED(64) int16_t intermediate[5][(KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH];
+  ALIGNED(64) int16_t intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1];
 
   const kvz_picture *ref = info->ref;
@@ -1013,20 +1012,45 @@ static void search_frac(inter_search_info_t *info)
   int8_t sample_off_x = 0;
   int8_t sample_off_y = 0;
 
-  kvz_get_extended_block(orig.x, orig.y, mv.x - 1, mv.y - 1,
-                state->tile->offset_x,
-                state->tile->offset_y,
-                ref->y, ref->width, ref->height, KVZ_LUMA_FILTER_TAPS,
-                internal_width+1, internal_height+1,
-                &src);
+  // Space for (possibly) extrapolated pixels and the part from the picture
+  // One extra row and column compared to normal interpolation and some extra for AVX2.
+  // The extrapolation function will set the pointers and stride.
+  kvz_pixel ext_buffer[KVZ_FME_MAX_INPUT_SIZE_SIMD];
+  kvz_pixel *ext = NULL;
+  kvz_pixel *ext_origin = NULL;
+  int ext_s = 0;
+  kvz_epol_args epol_args = {
+    .src = ref->y,
+    .src_w = ref->width,
+    .src_h = ref->height,
+    .src_s = ref->stride,
+    .blk_x = state->tile->offset_x + orig.x + mv.x - 1,
+    .blk_y = state->tile->offset_y + orig.y + mv.y - 1,
+    .blk_w = internal_width + 1,  // TODO: real width
+    .blk_h = internal_height + 1, // TODO: real height
+    .pad_l = KVZ_LUMA_FILTER_OFFSET,
+    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_t = KVZ_LUMA_FILTER_OFFSET,
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 0 // AVX2 padding unnecessary because of blk_h
+  };
+
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
+
+  kvz_get_extended_block(&epol_args);
 
   kvz_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
   int tmp_stride = pic->stride;
                   
   // Search integer position
   costs[0] = kvz_satd_any_size(width, height,
-                            tmp_pic, tmp_stride,
-                            src.orig_topleft + src.stride + 1, src.stride);
+    tmp_pic, tmp_stride,
+    ext_origin + ext_s + 1, ext_s);
 
   costs[0] += info->mvd_cost_func(state,
                                   mv.x, mv.y, 2,
@@ -1056,8 +1080,8 @@ static void search_frac(inter_search_info_t *info)
     const int mv_shift = (step < 2) ? 1 : 0;
 
     filter_steps[step](state->encoder_control,
-      src.orig_topleft,
-      src.stride,
+      ext_origin,
+      ext_s,
       internal_width,
       internal_height,
       filtered,
@@ -1131,8 +1155,6 @@ static void search_frac(inter_search_info_t *info)
   info->best_mv = mv;
   info->best_cost = best_cost;
   info->best_bitcost = best_bitcost;
-
-  if (src.malloc_used) free(src.buffer);
 }
 
 /**

@@ -40,224 +40,258 @@ typedef struct {
 } merge_candidates_t;
 
 
-static void inter_recon_frac_luma(const encoder_state_t * const state,
-                                  const kvz_picture * const ref,
-                                  int32_t xpos,
-                                  int32_t ypos,
-                                  int32_t block_width,
-                                  int32_t block_height,
-                                  const int16_t mv_param[2],
-                                  lcu_t *lcu)
+static void inter_recon_frac_luma(const encoder_state_t *const state,
+  const kvz_picture *const ref,
+  int32_t xpos,
+  int32_t ypos,
+  int32_t block_width,
+  int32_t block_height,
+  const int16_t mv_param[2],
+  lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
 
-  // Fractional luma 1/4-pel
-  kvz_extended_block src = {0, 0, 0, 0};
+  // Space for extrapolated pixels and the part from the picture.
+  // Some extra for AVX2.
+  // The extrapolation function will set the pointers and stride.
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
+  kvz_pixel *ext = NULL;
+  kvz_pixel *ext_origin = NULL;
+  int ext_s = 0;
+  kvz_epol_args epol_args = {
+    .src = ref->y,
+    .src_w = ref->width,
+    .src_h = ref->height,
+    .src_s = ref->stride,
+    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> 2),
+    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> 2),
+    .blk_w = block_width,
+    .blk_h = block_height,
+    .pad_l = KVZ_LUMA_FILTER_OFFSET,
+    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_t = KVZ_LUMA_FILTER_OFFSET,
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 1 // One row for AVX2
+  };
 
-  // Fractional luma
-  kvz_get_extended_block(xpos,
-                         ypos,
-                         mv_param[0] >> 2,
-                         mv_param[1] >> 2,
-                         state->tile->offset_x,
-                         state->tile->offset_y,
-                         ref->y,
-                         ref->width,
-                         ref->height,
-                         KVZ_LUMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src);
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
+
+  kvz_get_extended_block(&epol_args);
   kvz_sample_quarterpel_luma(state->encoder_control,
-                                     src.orig_topleft,
-                                     src.stride,
-                                     block_width,
-                                     block_height,
-                                     lcu->rec.y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
-                                     LCU_WIDTH,
-                                     mv_frac_x,
-                                     mv_frac_y,
-                                     mv_param);
-
-  if (src.malloc_used) free(src.buffer);
+    ext_origin,
+    ext_s,
+    block_width,
+    block_height,
+    lcu->rec.y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
+    LCU_WIDTH,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 }
 
-static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
-                                        const kvz_picture * const ref,
-                                        int32_t xpos,
-                                        int32_t ypos,
-                                        int32_t block_width,
-                                        int32_t block_height,
-                                        const int16_t mv_param[2],
-                                        hi_prec_buf_t *hi_prec_out)
+static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
+  const kvz_picture *const ref,
+  int32_t xpos,
+  int32_t ypos,
+  int32_t block_width,
+  int32_t block_height,
+  const int16_t mv_param[2],
+  hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
 
-  // Fractional luma 1/4-pel
-  kvz_extended_block src = { 0, 0, 0, 0 };
+  // Space for extrapolated pixels and the part from the picture.
+  // Some extra for AVX2.
+  // The extrapolation function will set the pointers and stride.
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
+  kvz_pixel *ext = NULL;
+  kvz_pixel *ext_origin = NULL;
+  int ext_s = 0;
+  kvz_epol_args epol_args = {
+    .src = ref->y,
+    .src_w = ref->width,
+    .src_h = ref->height,
+    .src_s = ref->stride,
+    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> 2),
+    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> 2),
+    .blk_w = block_width,
+    .blk_h = block_height,
+    .pad_l = KVZ_LUMA_FILTER_OFFSET,
+    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_t = KVZ_LUMA_FILTER_OFFSET,
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 1 // One row for AVX2
+  };
 
-  // Fractional luma
-  kvz_get_extended_block(xpos,
-                         ypos,
-                         mv_param[0] >> 2,
-                         mv_param[1] >> 2,
-                         state->tile->offset_x,
-                         state->tile->offset_y,
-                         ref->y,
-                         ref->width,
-                         ref->height,
-                         KVZ_LUMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src);
-  kvz_sample_14bit_quarterpel_luma(state->encoder_control,
-                                           src.orig_topleft,
-                                           src.stride,
-                                           block_width,
-                                           block_height,
-                                           hi_prec_out->y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
-                                           LCU_WIDTH,
-                                           mv_frac_x,
-                                           mv_frac_y,
-                                           mv_param);
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
-  if (src.malloc_used) free(src.buffer);
+  kvz_get_extended_block(&epol_args);
+  kvz_sample_quarterpel_luma_hi(state->encoder_control,
+    ext_origin,
+    ext_s,
+    block_width,
+    block_height,
+    hi_prec_out->y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
+    LCU_WIDTH,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 }
 
-static void inter_recon_frac_chroma(const encoder_state_t * const state,
-                                    const kvz_picture * const ref,
-                                    int32_t xpos,
-                                    int32_t ypos,
-                                    int32_t block_width,
-                                    int32_t block_height,
-                                    const int16_t mv_param[2],
-                                    lcu_t *lcu)
+static void inter_recon_frac_chroma(const encoder_state_t *const state,
+  const kvz_picture *const ref,
+  int32_t xpos,
+  int32_t ypos,
+  int32_t block_width,
+  int32_t block_height,
+  const int16_t mv_param[2],
+  lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
 
-  // Translate to chroma
-  xpos >>= 1;
-  ypos >>= 1;
-  block_width >>= 1;
-  block_height >>= 1;
+  // Space for extrapolated pixels and the part from the picture.
+  // Some extra for AVX2.
+  // The extrapolation function will set the pointers and stride.
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
+  kvz_pixel *ext = NULL;
+  kvz_pixel *ext_origin = NULL;
+  int ext_s = 0;
 
-  // Fractional chroma 1/8-pel
-  kvz_extended_block src_u = { 0, 0, 0, 0 };
-  kvz_extended_block src_v = { 0, 0, 0, 0 };
+  // Chroma U
+  // Divisions by 2 due to 4:2:0 chroma subsampling
+  kvz_epol_args epol_args = {
+    .src = ref->u,
+    .src_w = ref->width / 2,
+    .src_h = ref->height / 2,
+    .src_s = ref->stride / 2,
+    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> 3),
+    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> 3),
+    .blk_w = block_width / 2,
+    .blk_h = block_height / 2,
+    .pad_l = KVZ_CHROMA_FILTER_OFFSET,
+    .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_t = KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b_simd = 3 // Three rows for AVX2
+  };
 
-  //Fractional chroma U
-  kvz_get_extended_block(xpos, ypos,
-                         (mv_param[0] >> 2) >> 1,
-                         (mv_param[1] >> 2) >> 1,
-                         state->tile->offset_x >> 1,
-                         state->tile->offset_y >> 1,
-                         ref->u,
-                         ref->width >> 1,
-                         ref->height >> 1,
-                         KVZ_CHROMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src_u);
-  kvz_sample_octpel_chroma(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
-    block_height, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
-  //Fractional chroma V
-  kvz_get_extended_block(xpos, ypos,
-                         (mv_param[0] >> 2) >> 1,
-                         (mv_param[1] >> 2) >> 1,
-                         state->tile->offset_x >> 1,
-                         state->tile->offset_y >> 1,
-                         ref->v,
-                         ref->width >> 1,
-                         ref->height >> 1,
-                         KVZ_CHROMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src_v);
-  kvz_sample_octpel_chroma(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
-    block_height, lcu->rec.v + (ypos  % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+  kvz_get_extended_block(&epol_args);
+  kvz_sample_octpel_chroma(state->encoder_control,
+    ext_origin,
+    ext_s,
+    block_width / 2,
+    block_height / 2,
+    lcu->rec.u + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
+    LCU_WIDTH_C,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 
-  if (src_u.malloc_used) free(src_u.buffer);
-  if (src_v.malloc_used) free(src_v.buffer);
+  // Chroma V
+  epol_args.src = ref->v;
+  kvz_get_extended_block(&epol_args);
+  kvz_sample_octpel_chroma(state->encoder_control,
+    ext_origin,
+    ext_s,
+    block_width / 2,
+    block_height / 2,
+    lcu->rec.v + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
+    LCU_WIDTH_C,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 }
 
-static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
-                                          const kvz_picture * const ref,
-                                          int32_t xpos,
-                                          int32_t ypos,
-                                          int32_t block_width,
-                                          int32_t block_height,
-                                          const int16_t mv_param[2],
-                                          hi_prec_buf_t *hi_prec_out)
+static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
+  const kvz_picture *const ref,
+  int32_t xpos,
+  int32_t ypos,
+  int32_t block_width,
+  int32_t block_height,
+  const int16_t mv_param[2],
+  hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
 
-  // Translate to chroma
-  xpos >>= 1;
-  ypos >>= 1;
-  block_width >>= 1;
-  block_height >>= 1;
+  // Space for extrapolated pixels and the part from the picture.
+  // Some extra for AVX2.
+  // The extrapolation function will set the pointers and stride.
+  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
+  kvz_pixel *ext = NULL;
+  kvz_pixel *ext_origin = NULL;
+  int ext_s = 0;
 
-  // Fractional chroma 1/8-pel
-  kvz_extended_block src_u = { 0, 0, 0, 0 };
-  kvz_extended_block src_v = { 0, 0, 0, 0 };
+  // Chroma U
+  // Divisions by 2 due to 4:2:0 chroma subsampling
+  kvz_epol_args epol_args = {
+    .src = ref->u,
+    .src_w = ref->width / 2,
+    .src_h = ref->height / 2,
+    .src_s = ref->stride / 2,
+    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> 3),
+    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> 3),
+    .blk_w = block_width / 2,
+    .blk_h = block_height / 2,
+    .pad_l = KVZ_CHROMA_FILTER_OFFSET,
+    .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_t = KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b_simd = 3 // Three rows for AVX2
+  };
 
-  //Fractional chroma U
-  kvz_get_extended_block(xpos,
-                         ypos,
-                         (mv_param[0] >> 2) >> 1,
-                         (mv_param[1] >> 2) >> 1,
-                         state->tile->offset_x >> 1,
-                         state->tile->offset_y >> 1,
-                         ref->u,
-                         ref->width >> 1,
-                         ref->height >> 1,
-                         KVZ_CHROMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src_u);
-  kvz_sample_14bit_octpel_chroma(state->encoder_control,
-                                         src_u.orig_topleft,
-                                         src_u.stride,
-                                         block_width,
-                                         block_height,
-                                         hi_prec_out->u + (ypos % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
-                                         LCU_WIDTH_C,
-                                         mv_frac_x,
-                                         mv_frac_y,
-                                         mv_param);
+  // Initialize separately. Gets rid of warning
+  // about using nonstandard extension.
+  epol_args.buf = ext_buffer;
+  epol_args.ext = &ext;
+  epol_args.ext_origin = &ext_origin;
+  epol_args.ext_s = &ext_s;
 
-  //Fractional chroma V
-  kvz_get_extended_block(xpos,
-                         ypos,
-                         (mv_param[0] >> 2) >> 1,
-                         (mv_param[1] >> 2) >> 1,
-                         state->tile->offset_x >> 1,
-                         state->tile->offset_y >> 1,
-                         ref->v,
-                         ref->width >> 1,
-                         ref->height >> 1,
-                         KVZ_CHROMA_FILTER_TAPS,
-                         block_width,
-                         block_height,
-                         &src_v);
-  kvz_sample_14bit_octpel_chroma(state->encoder_control,
-                                         src_v.orig_topleft,
-                                         src_v.stride,
-                                         block_width,
-                                         block_height,
-                                         hi_prec_out->v + (ypos  % LCU_WIDTH_C) * LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
-                                         LCU_WIDTH_C,
-                                         mv_frac_x,
-                                         mv_frac_y,
-                                         mv_param);
+  kvz_get_extended_block(&epol_args);
+  kvz_sample_octpel_chroma_hi(state->encoder_control,
+    ext_origin,
+    ext_s,
+    block_width / 2,
+    block_height / 2,
+    hi_prec_out->u + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
+    LCU_WIDTH_C,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 
-  if (src_u.malloc_used) free(src_u.buffer);
-  if (src_v.malloc_used) free(src_v.buffer);
+  // Chroma V
+  epol_args.src = ref->v;
+  kvz_get_extended_block(&epol_args);
+  kvz_sample_octpel_chroma_hi(state->encoder_control,
+    ext_origin,
+    ext_s,
+    block_width / 2,
+    block_height / 2,
+    hi_prec_out->v + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
+    LCU_WIDTH_C,
+    mv_frac_x,
+    mv_frac_y,
+    mv_param);
 }
 
 
@@ -348,7 +382,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
     if (fractional_luma) {
       // With a fractional MV, do interpolation.
       if (state->encoder_control->cfg.bipred && hi_prec_out) {
-        inter_recon_14bit_frac_luma(state, ref,
+        inter_recon_frac_luma_hi(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
           mv_param, hi_prec_out);
@@ -388,7 +422,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.
     if (state->encoder_control->cfg.bipred && hi_prec_out) {
-      inter_recon_14bit_frac_chroma(state, ref,
+      inter_recon_frac_chroma_hi(state, ref,
                                     pu_in_tile.x, pu_in_tile.y,
                                     width, height,
                                     mv_param, hi_prec_out);

@@ -477,33 +477,46 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
                              ref->stride) >> (KVZ_BIT_DEPTH - 8);
   } else {
     // Extrapolate pixels from outside the frame.
-    kvz_extended_block block;
-    kvz_get_extended_block(pic_x,
-                           pic_y,
-                           ref_x - pic_x,
-                           ref_y - pic_y,
-                           0,
-                           0,
-                           ref->y,
-                           ref->width,
-                           ref->height,
-                           0,
-                           block_width,
-                           block_height,
-                           &block);
+
+    // Space for extrapolated pixels and the part from the picture
+    // The extrapolation function will set the pointers and stride.
+    kvz_pixel ext_buffer[LCU_LUMA_SIZE];
+    kvz_pixel *ext = NULL;
+    kvz_pixel *ext_origin = NULL;
+    int ext_s = 0;
+    kvz_epol_args epol_args = {
+      .src = ref->y,
+      .src_w = ref->width,
+      .src_h = ref->height,
+      .src_s = ref->stride,
+      .blk_x = ref_x,
+      .blk_y = ref_y,
+      .blk_w = block_width,
+      .blk_h = block_height,
+      .pad_l = 0,
+      .pad_r = 0,
+      .pad_t = 0,
+      .pad_b = 0,
+      .pad_b_simd = 0,
+    };
+
+    // Initialize separately. Gets rid of warning
+    // about using nonstandard extension.
+    epol_args.buf = ext_buffer;
+    epol_args.ext = &ext;
+    epol_args.ext_origin = &ext_origin;
+    epol_args.ext_s = &ext_s;
+
+    kvz_get_extended_block(&epol_args);
 
     const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
 
     unsigned satd = kvz_satd_any_size(block_width,
-                                      block_height,
-                                      pic_data,
-                                      pic->stride,
-                                      block.buffer,
-                                      block.stride) >> (KVZ_BIT_DEPTH - 8);
-
-    if (block.malloc_used) {
-      FREE_POINTER(block.buffer);
-    }
+      block_height,
+      pic_data,
+      pic->stride,
+      ext_origin,
+      ext_s) >> (KVZ_BIT_DEPTH - 8);
 
     return satd;
   }
