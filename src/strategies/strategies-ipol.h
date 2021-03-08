@@ -69,6 +69,7 @@ typedef struct {
   int pad_r; // Right
   int pad_t; // Top
   int pad_b; // Bottom
+  int pad_b_simd; // "Don't care" rows in the end. Zeroed out.
 
   // Buffer for possible extrapolation. Free memory provided by the caller.
   kvz_pixel *buf;

@@ -71,7 +71,8 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
     .pad_l = KVZ_LUMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 1 // One row for AVX2
   };
 
   // Initialize separately. Gets rid of warning
@@ -125,7 +126,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
     .pad_l = KVZ_LUMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET + 1, // One row for AVX2
+    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 1 // One row for AVX2
   };
 
   // Initialize separately. Gets rid of warning
@@ -182,7 +184,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET + 3, // Three rows for AVX2
+    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b_simd = 3 // Three rows for AVX2
   };
 
   // Initialize separately. Gets rid of warning
@@ -253,7 +256,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET + 3, // Three rows for AVX2
+    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_b_simd = 3 // Three rows for AVX2
   };
 
   // Initialize separately. Gets rid of warning

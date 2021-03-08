@@ -497,6 +497,7 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
       .pad_r = 0,
       .pad_t = 0,
       .pad_b = 0,
+      .pad_b_simd = 0,
     };
 
     // Initialize separately. Gets rid of warning

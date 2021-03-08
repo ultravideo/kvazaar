@@ -1032,6 +1032,7 @@ static void search_frac(inter_search_info_t *info)
     .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
     .pad_t = KVZ_LUMA_FILTER_OFFSET,
     .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_b_simd = 0 // AVX2 padding unnecessary because of blk_h
   };
 
   // Initialize separately. Gets rid of warning

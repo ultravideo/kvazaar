@@ -731,7 +731,7 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
 void kvz_get_extended_block_generic(kvz_epol_args *args) {
 
   int min_y = args->blk_y - args->pad_t;
-  int max_y = args->blk_y + args->blk_h + args->pad_b - 1;
+  int max_y = args->blk_y + args->blk_h + args->pad_b + args->pad_b_simd - 1;
   bool out_of_bounds_y = (min_y < 0) || (max_y >= args->src_h);
 
   int min_x = args->blk_x - args->pad_l;
@@ -744,12 +744,15 @@ void kvz_get_extended_block_generic(kvz_epol_args *args) {
     *args->ext_s = args->pad_l + args->blk_w + args->pad_r;
     *args->ext_origin = args->buf + args->pad_t * (*args->ext_s) + args->pad_l;
 
+    // Note that stride equals width here.
     int cnt_l = CLIP(0, *args->ext_s, -min_x);
     int cnt_r = CLIP(0, *args->ext_s, max_x - (args->src_w - 1));
     int cnt_m = CLIP(0, *args->ext_s, *args->ext_s - cnt_l - cnt_r);
 
-    // For each row including padding
-    for (int y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
+    // For each row including real padding.
+    // Don't read "don't care" values (SIMD padding). Zero them out.
+    int y;
+    for (y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
 
       int clipped_y = CLIP(0, args->src_h - 1, args->blk_y + y);
       kvz_pixel sample_l = *(args->src + clipped_y * args->src_s);
@@ -762,6 +765,12 @@ void kvz_get_extended_block_generic(kvz_epol_args *args) {
       for (int i = 0; i < cnt_m; ++i) *(dst_m + i) = *(src_m + i);
       for (int i = 0; i < cnt_r; ++i) *(dst_r + i) = sample_r;
     }
+
+    for (int y_simd = 0; y_simd < args->pad_b_simd; ++y_simd) {
+      kvz_pixel *dst = args->buf + (y + args->pad_t + y_simd) * (*args->ext_s);
+      FILL_ARRAY(dst, 0, *args->ext_s);
+    }
+
   } else {
 
     *args->ext = args->src + (args->blk_y - args->pad_t) * args->src_s + (args->blk_x - args->pad_l);
