@@ -3,13 +3,7 @@
 
 #include <stdio.h>
 #include "kvazaar.h"
-// #include "encoderstate.h"
-
-#define MAX_FAST_COEFF_COST_QP 50
-
-typedef struct {
-  uint64_t wts_by_qp[MAX_FAST_COEFF_COST_QP];
-} fast_coeff_table_t;
+#include "encoderstate.h"
 
 // Weights for 4 buckets (coeff 0, coeff 1, coeff 2, coeff >= 3), for QPs from
 // 0 to MAX_FAST_COEFF_COST_QP
@@ -68,8 +62,6 @@ static const float default_fast_coeff_cost_wts[][4] = {
   {0.000000, 0.000000, 0.000000, 0.000000},
   {0.000019, 5.811260, 4.399110, 7.336310},
 };
-
-typedef struct encoder_state_t encoder_state_t;
 
 int kvz_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_coeff_table_f);
 void kvz_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table);

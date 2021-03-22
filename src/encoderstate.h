@@ -238,11 +238,13 @@ typedef struct encoder_state_config_wfrow_t {
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow_t;
 
+typedef struct encoder_state_t encoder_state_t;
+
 typedef struct lcu_order_element {
   //This it used for leaf of the encoding tree. All is relative to the tile.
   int id;
   int index;
-  struct encoder_state_t *encoder_state;
+  encoder_state_t *encoder_state;
   vector2d_t position;
   vector2d_t position_px; //Top-left
   vector2d_t size;
@@ -257,7 +259,7 @@ typedef struct lcu_order_element {
   struct lcu_order_element *right;
 } lcu_order_element_t;
 
-typedef struct encoder_state_t {
+struct encoder_state_t {
   const encoder_control_t *encoder_control;
   encoder_state_type type;
 
@@ -324,8 +326,7 @@ typedef struct encoder_state_t {
   //Constraint structure  
   void * constraint;
 
-
-} encoder_state_t;
+} ;
 
 void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
 

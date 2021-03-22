@@ -30,7 +30,11 @@
 #include "kvazaar.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
-#include "fast_coeff_cost.h"
+
+#define MAX_FAST_COEFF_COST_QP 50
+typedef struct {
+  uint64_t wts_by_qp[MAX_FAST_COEFF_COST_QP];
+} fast_coeff_table_t;
 
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
