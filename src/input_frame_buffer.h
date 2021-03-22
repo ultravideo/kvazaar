@@ -28,10 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
-
-
-// Forward declaration.
-struct encoder_state_t;
+#include "encoderstate.h"
 
 typedef struct input_frame_buffer_t {
   /** \brief An array for stroring the input frames. */

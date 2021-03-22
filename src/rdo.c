@@ -37,6 +37,7 @@
 #include "transform.h"
 
 #include "strategies/strategies-quant.h"
+#include "fast_coeff_cost.h"
 
 
 #define QUANT_SHIFT          14

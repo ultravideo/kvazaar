@@ -1,6 +1,5 @@
 #include "fast_coeff_cost.h"
 #include "kvazaar.h"
-#include "encoderstate.h"
 
 // Note: Assumes that costs are non-negative, for pretty obvious reasons
 static uint16_t to_q88(float f)
