@@ -2,11 +2,11 @@ Kvazaar
 =======
 An open-source HEVC encoder licensed under LGPLv2.1
 
-Join channel #kvazaar_hevc in Freenode IRC network to contact us.
+Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us.
 
 Kvazaar is still under development. Speed and RD-quality will continue to improve.
 
-http://ultravideo.cs.tut.fi/#encoder for more information.
+http://ultravideo.fi/#encoder for more information.
 
 - Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 - Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
