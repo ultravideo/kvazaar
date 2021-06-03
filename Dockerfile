@@ -27,7 +27,6 @@ COPY . kvazaar
 # data in the image.
 RUN apt-get update \
     && apt-get install -y $REQUIRED_PACKAGES \
-    && apt-get clean \
     && cd kvazaar \
     && ./autogen.sh \
     && ./configure --disable-shared \
@@ -35,7 +34,6 @@ RUN apt-get update \
     && make install \
     && AUTOINSTALLED_PACKAGES=`apt-mark showauto` \
     && apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES \
-    && apt-get clean autoclean \
     && apt-get autoremove -y \
     && rm -rf /var/lib/{apt,dpkg,cache,log}/
 
