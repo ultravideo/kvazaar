@@ -1,0 +1,117 @@
+name: Kvazaar_pr_tests
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  basic-test:
+    runs-on: self-hosted
+
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j VERBOSE=1
+      
+  basic-test:
+    runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j VERBOSE=1
+      
+  test-ubsan:
+    runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment
+      
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-asan:
+    runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=address
+      ASAN_OPTIONS: detect_leaks=0
+      # AddressSanitizer adds some extra symbols so we expect a failure from
+      # the external symbols test.
+      XFAIL_TESTS: test_external_symbols.sh
+      
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-tsan:
+    runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=thread
+      
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-valgrind:
+    runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    
+    env:
+      KVAZAAR_OVERRIDE_angular_pred: generic
+      
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.event.pull_request.head.ref}}
+        repository: ${{github.event.pull_request.head.repo.full_name}}
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && KVZ_TEST_VALGRIND=1 make check -j4 VERBOSE=1

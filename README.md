@@ -8,7 +8,7 @@ Kvazaar is still under development. Speed and RD-quality will continue to improv
 
 http://ultravideo.fi/#encoder for more information.
 
-- Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
+- Linux [![Kvazaar_tests](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml/badge.svg)](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml)
 - Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
 ## Table of Contents

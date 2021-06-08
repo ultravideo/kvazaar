@@ -1,0 +1,83 @@
+name: Kvazaar_tests
+
+on:
+  push:
+  pull_request:
+    types: [closed]
+
+jobs:
+  basic-test:
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j VERBOSE=1
+      
+  test-ubsan:
+    runs-on: self-hosted
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment
+      
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-asan:
+    runs-on: self-hosted
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=address
+      ASAN_OPTIONS: detect_leaks=0
+      # AddressSanitizer adds some extra symbols so we expect a failure from
+      # the external symbols test.
+      XFAIL_TESTS: test_external_symbols.sh
+      
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-tsan:
+    runs-on: self-hosted
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=thread
+      
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      
+  test-valgrind:
+    runs-on: self-hosted
+    
+    env:
+      KVAZAAR_OVERRIDE_angular_pred: generic
+      
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: make
+      run: make -j
+    - name: Run tests
+      run: export PATH="/home/docker/bin:${PATH}" && KVZ_TEST_VALGRIND=1 make check -j4 VERBOSE=1
