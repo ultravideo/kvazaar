@@ -226,7 +226,7 @@ endif #HAVE_PPC
 if HAVE_X86
 
 if HAVE_AVX2_GCC
-libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mbmi2
+libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2
 endif
 if HAVE_AVX2_CLANG
 libavx2_la_CFLAGS = -mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2
