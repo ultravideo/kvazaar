@@ -5,21 +5,6 @@ on:
     types: [labeled]
 
 jobs:
-  basic-test:
-    runs-on: self-hosted
-
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
-    - name: make
-      run: make -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && make check -j VERBOSE=1
       
   basic-test:
     runs-on: self-hosted
