@@ -4,7 +4,7 @@ SUBDIRS = src tests
 
 dist_man1_MANS = doc/kvazaar.1
 
-dist_doc_DATA = COPYING CREDITS README.md
+dist_doc_DATA = LICENSE CREDITS README.md
 
 EXTRA_DIST = \
 	build \

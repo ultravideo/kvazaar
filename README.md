@@ -1,6 +1,6 @@
 Kvazaar
 =======
-An open-source HEVC encoder licensed under LGPLv2.1
+An open-source HEVC encoder licensed under 3-clause BSD
 
 Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us.
 

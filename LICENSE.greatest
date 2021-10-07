@@ -1,0 +1,3 @@
+Kvazaar uses "Greatest" C unit testing library, licensed under ISC license.
+A fork of the library is included in the git project as a submodule. The
+original can be found at https://github.com/silentbicycle/greatest .

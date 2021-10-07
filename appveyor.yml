@@ -15,7 +15,7 @@ skip_commits:
     - .gitlab-ci.yml
     - .travis-install.bash
     - .travis.yml
-    - COPYING
+    - LICENSE
     - CREDITS
     - README.md
     - docs.doxy
