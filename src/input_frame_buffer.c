@@ -183,7 +183,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
       dts_out = buf->pts_buffer[dts_idx % gop_buf_size] + buf->delay;
     } else {
       int dts_idx = buf->num_out - (cfg->gop_len - 1);
-      dts_out = buf->pts_buffer[dts_idx % gop_buf_size];
+      dts_out = buf->pts_buffer[dts_idx % gop_buf_size] - 1;
     }
   }
   else {
