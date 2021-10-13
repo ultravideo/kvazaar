@@ -100,6 +100,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 #ifdef KVZ_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
+  const encoder_control_t* encoder = state->encoder_control;
 
   WRITE_U(stream, 0, 4, "vps_video_parameter_set_id");
   WRITE_U(stream, 3, 2, "vps_reserved_three_2bits" );
@@ -112,12 +113,18 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
-  //for each layer
-  for (int i = 0; i < 1; i++) {
-  WRITE_UE(stream, 1, "vps_max_dec_pic_buffering");
-  WRITE_UE(stream, 0, "vps_num_reorder_pics");
-  WRITE_UE(stream, 0, "vps_max_latency_increase");
+  if (encoder->cfg.gop_lowdelay) {
+    const int dpb = encoder->cfg.ref_frames;
+    WRITE_UE(stream, dpb - 1, "vps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, 0, "vps_max_num_reorder_pics");
   }
+  else {
+    // Clip to non-negative values to prevent problems with GOP=0
+    const int dpb = MIN(16, encoder->cfg.gop_len);
+    WRITE_UE(stream, MAX(dpb - 1, 0), "vps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, MAX(encoder->cfg.gop_len - 1, 0), "vps_max_num_reorder_pics");
+  }
+  WRITE_UE(stream, 0, "vps_max_latency_increase");
 
   WRITE_U(stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
   WRITE_UE(stream, 0, "vps_max_op_sets_minus1");
