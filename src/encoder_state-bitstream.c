@@ -146,6 +146,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   int max_buffer  = max_required_dpb_size(encoder);
   int max_reorder = max_num_reorder_pics(encoder);
+  if (max_buffer - 1 < max_reorder) max_buffer = max_reorder + 1;
   WRITE_UE(stream, max_buffer - 1, "vps_max_dec_pic_buffering_minus1");
   WRITE_UE(stream, max_reorder, "vps_max_num_reorder_pics");
 
@@ -417,6 +418,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //for each layer
   int max_buffer  = max_required_dpb_size(encoder);
   int max_reorder = max_num_reorder_pics(encoder);
+  if (max_buffer - 1 < max_reorder) max_buffer = max_reorder + 1;
   WRITE_UE(stream, max_buffer - 1, "sps_max_dec_pic_buffering_minus1");
   WRITE_UE(stream, max_reorder, "sps_max_num_reorder_pics");
 
