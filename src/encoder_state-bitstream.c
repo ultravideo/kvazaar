@@ -9,15 +9,15 @@
  * 
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice, this
  *   list of conditions and the following disclaimer in the documentation and/or
  *   other materials provided with the distribution.
- * 
+ *
  * * Neither the name of the Tampere University or ITU/ISO/IEC nor the names of its
  *   contributors may be used to endorse or promote products derived from
  *   this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -54,37 +54,37 @@
 #include "rate_control.h"
 
 
-static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
+static void encoder_state_write_bitstream_aud(encoder_state_t *const state)
 {
-  bitstream_t * const stream = &state->stream;
+  bitstream_t *const stream = &state->stream;
   kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
 
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
-                   : state->frame->slicetype == KVZ_SLICE_P ? 1
-                   :                                       2;
+    : state->frame->slicetype == KVZ_SLICE_P ? 1
+    : 2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
-                                              encoder_state_t * const state)
+  encoder_state_t *const state)
 {
   // PTL
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, (state->encoder_control->bitdepth == 8)?1:2, 5, "general_profile_idc");
+  WRITE_U(stream, (state->encoder_control->bitdepth == 8) ? 1 : 2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
    *  compatibility_flag[2] should be set too.
    */
-  WRITE_U(stream, 3<<29, 32, "general_profile_compatibility_flag[]");
+  WRITE_U(stream, 3 << 29, 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
-  WRITE_U(stream, state->encoder_control->in.source_scan_type!= 0, 1, "general_interlaced_source_flag");
+  WRITE_U(stream, state->encoder_control->in.source_scan_type != 0, 1, "general_interlaced_source_flag");
   WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
 
@@ -106,6 +106,25 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end PTL
 }
 
+static uint8_t max_required_dpb_size(const encoder_control_t * const encoder)
+{
+  int max_buffer = 1;
+  for (int g = 0; g < encoder->cfg.gop_len; ++g) {
+    int neg_refs = encoder->cfg.gop[g].ref_neg_count;
+    int pos_refs = encoder->cfg.gop[g].ref_pos_count;
+    if (neg_refs + pos_refs + 1 > max_buffer) max_buffer = neg_refs + pos_refs + 1;
+  }
+
+  if (encoder->cfg.gop_len == 0) max_buffer = encoder->cfg.ref_frames + 1;
+
+  return max_buffer;
+}
+
+static uint8_t max_num_reorder_pics(const encoder_control_t * const encoder)
+{
+  return encoder->cfg.gop_lowdelay ? 0 : MAX(encoder->cfg.gop_len - 1, 0);
+}
+
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -125,17 +144,12 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
-  if (encoder->cfg.gop_lowdelay) {
-    const int dpb = encoder->cfg.ref_frames;
-    WRITE_UE(stream, dpb - 1, "vps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, 0, "vps_max_num_reorder_pics");
-  }
-  else {
-    // Clip to non-negative values to prevent problems with GOP=0
-    const int dpb = MIN(16, encoder->cfg.gop_len);
-    WRITE_UE(stream, MAX(dpb - 1, 0), "vps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, MAX(encoder->cfg.gop_len - 1, 0), "vps_max_num_reorder_pics");
-  }
+  int max_buffer  = max_required_dpb_size(encoder);
+  int max_reorder = max_num_reorder_pics(encoder);
+  if (max_buffer - 1 < max_reorder) max_buffer = max_reorder + 1;
+  WRITE_UE(stream, max_buffer - 1, "vps_max_dec_pic_buffering_minus1");
+  WRITE_UE(stream, max_reorder, "vps_max_num_reorder_pics");
+
   WRITE_UE(stream, 0, "vps_max_latency_increase");
 
   WRITE_U(stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
@@ -402,16 +416,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  if (encoder->cfg.gop_lowdelay) {
-    const int dpb = encoder->cfg.ref_frames;
-    WRITE_UE(stream, dpb - 1, "sps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
-  } else {
-    // Clip to non-negative values to prevent problems with GOP=0
-    const int dpb = MIN(16, encoder->cfg.gop_len);
-    WRITE_UE(stream, MAX(dpb - 1, 0), "sps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, MAX(encoder->cfg.gop_len - 1, 0), "sps_max_num_reorder_pics");
-  }
+  int max_buffer  = max_required_dpb_size(encoder);
+  int max_reorder = max_num_reorder_pics(encoder);
+  if (max_buffer - 1 < max_reorder) max_buffer = max_reorder + 1;
+  WRITE_UE(stream, max_buffer - 1, "sps_max_dec_pic_buffering_minus1");
+  WRITE_UE(stream, max_reorder, "sps_max_num_reorder_pics");
+
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
