@@ -818,14 +818,18 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
   unsigned dst_stride)
 {
   bool has_pow2_width = _mm_popcnt_u32(pu_w) == 1;
-  if (has_pow2_width) {
+  bool area_mod_32 = (pu_w * pu_h) % 32;
+  assert(!(pu_w == 4 && pu_h == 4) && "Branch for 4x4 not yet implemented.");
+  assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
+
+  if (has_pow2_width && area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 32) {
 
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_L0 = _mm256_loadu_si256((__m256i *) & px_L0[i]);
-      __m256i sample_L1 = _mm256_loadu_si256((__m256i *) & px_L1[i]);
+      __m256i sample_L0 = _mm256_loadu_si256((__m256i*)&px_L0[i]);
+      __m256i sample_L1 = _mm256_loadu_si256((__m256i*)&px_L1[i]);
       __m256i avg = _mm256_avg_epu8(sample_L0, sample_L1);
 
       switch (pu_w) {
@@ -839,7 +843,7 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
         break;
       }
     }
-  } else {
+  } else if (area_mod_32 == 0){
     for (int i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
@@ -847,18 +851,58 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
 
       // Last 64 bits of the 256 are not used to simplify the loop
       __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
-      __m256i sample_L0 = _mm256_maskload_epi64((uint64_t*)&px_L0[i], mask);
-      __m256i sample_L1 = _mm256_maskload_epi64((uint64_t*)&px_L1[i], mask);
+      __m256i sample_L0 = _mm256_maskload_epi64((const long long*)&px_L0[i], mask);
+      __m256i sample_L1 = _mm256_maskload_epi64((const long long*)&px_L1[i], mask);
       __m256i avg = _mm256_avg_epu8(sample_L0, sample_L1);
 
       switch (pu_w) {
       case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
       case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((uint64_t*)&dst[y * dst_stride + x], mask, avg); break;
+      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
       default:
         assert(0 && "Unexpected block width");
         break;
       }
+    }
+  } else {
+    // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
+    switch (pu_w) {
+      __m128i sample_L0, sample_L1, avg;
+    case 8: // 8x2, 8x6
+      for (int i = 0; i < pu_w * pu_h; i += 16) {
+
+        int y = i / pu_w;
+
+        sample_L0 = _mm_loadu_si128((__m128i*)&px_L0[i]);
+        sample_L1 = _mm_loadu_si128((__m128i*)&px_L1[i]);
+        avg = _mm_avg_epu8(sample_L0, sample_L1);
+        _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
+        _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
+      }
+      break;
+    case 6: // 6x8
+      for (int i = 0; i < pu_w * pu_h; i += 12) {
+
+        int y = i / pu_w;
+
+        __m128i mask = _mm_setr_epi32(-1, -1, -1, 0);
+        __m128i sample_L0 = _mm_maskload_epi32((const int*)(&px_L0[i]), mask);
+        __m128i sample_L1 = _mm_maskload_epi32((const int*)(&px_L1[i]), mask);
+        __m128i avg = _mm_avg_epu8(sample_L0, sample_L1);
+
+        uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
+        uint16_t elements_45 = _mm_extract_epi16(avg, 2);
+        uint16_t elements_67 = _mm_extract_epi16(avg, 3);
+        uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
+        *(uint32_t*)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+        *(uint16_t*)&dst[(y + 0) * dst_stride + 4] = elements_45;
+        *(uint16_t*)&dst[(y + 1) * dst_stride + 0] = elements_67;
+        *(uint32_t*)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+      }
+      break;
+    default:
+      assert(0 && "Unexpected block width");
+      break;
     }
   }
 }
@@ -870,10 +914,8 @@ static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  unsigned size = pu_w * pu_h;
-  bool multiple_of_32 = !(size % 32);
-
-  if (MIN(pu_w, pu_h) >= 4) { // TODO: REMOVE
+  // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
+  if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
     case  4: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  4, pu_h, dst_stride); break;
     case  8: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  8, pu_h, dst_stride); break;
@@ -881,13 +923,26 @@ static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
     case 32: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 32, pu_h, dst_stride); break;
     case 64: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 64, pu_h, dst_stride); break;
     
+    case  6: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  6, pu_h, dst_stride); break;
     case 12: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 12, pu_h, dst_stride); break;
     case 24: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 24, pu_h, dst_stride); break;
     case 48: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 48, pu_h, dst_stride); break;
     default:
-      printf("W: %d\n", pu_w);
       assert(0 && "Unexpected block width.");
       break;
+    }
+  } else {
+    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t offset = 1 << (shift - 1);
+
+    for (int i = 0; i < pu_w * pu_h; ++i)
+    {
+      int y = i / pu_w;
+      int x = i % pu_w;
+      int16_t sample_L0 = px_L0[i] << (14 - KVZ_BIT_DEPTH);
+      int16_t sample_L1 = px_L1[i] << (14 - KVZ_BIT_DEPTH);
+      int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
+      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
@@ -904,7 +959,11 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
   __m256i offset = _mm256_set1_epi32(scalar_offset);
 
   bool has_pow2_width = _mm_popcnt_u32(pu_w) == 1;
-  if (has_pow2_width) {
+  bool area_mod_32 = (pu_w * pu_h) % 32;
+  assert(!(pu_w == 4 && pu_h == 4) && "Branch for 4x4 not yet implemented.");
+  assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
+
+  if (has_pow2_width && area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 32) {
       int y = i / pu_w;
       int x = i % pu_w;
@@ -951,7 +1010,7 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
         break;
       }
     }
-  } else {
+  } else if (area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
@@ -993,11 +1052,85 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       switch (pu_w) {
       case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
       case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((uint64_t *)&dst[y * dst_stride + x], mask, avg); break;
+      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
       default:
         assert(0 && "Unexpected block width");
         break;
       }
+    }
+  } else {
+    // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
+    switch (pu_w) {
+      case 8: // 8x2, 8x6
+        for (int i = 0; i < pu_w * pu_h; i += 16) {
+
+          int y = i / pu_w;
+
+          __m256i sample_L0_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
+          __m256i sample_L1_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
+
+          __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
+          __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
+          
+          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i avg_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
+          __m256i avg_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
+
+          avg_lo = _mm256_add_epi32(avg_lo, offset);
+          avg_hi = _mm256_add_epi32(avg_hi, offset);
+
+          avg_lo = _mm256_srai_epi32(avg_lo, shift);
+          avg_hi = _mm256_srai_epi32(avg_hi, shift);
+
+          __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
+          avg256 = _mm256_packus_epi16(avg256, avg256);
+          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg = _mm256_castsi256_si128(avg256);
+
+          _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
+          _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
+        }
+        break;
+      case 6: // 6x8
+        for (int i = 0; i < pu_w * pu_h; i += 12) {
+
+          int y = i / pu_w;
+
+          __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
+          __m256i sample_L0_16bit = _mm256_maskload_epi64((const long long*)(&ip_L0[i]), mask);
+          __m256i sample_L1_16bit = _mm256_maskload_epi64((const long long*)(&ip_L1[i]), mask);
+
+          __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
+          __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
+
+          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
+          __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
+
+          avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
+          avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
+
+          avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
+          avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
+
+          __m256i avg256 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+          avg256 = _mm256_packus_epi16(avg256, avg256);
+          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg = _mm256_castsi256_si128(avg256);
+
+          uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
+          uint16_t elements_45 = _mm_extract_epi16(avg, 2);
+          uint16_t elements_67 = _mm_extract_epi16(avg, 3);
+          uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
+          *(uint32_t *)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+          *(uint16_t *)&dst[(y + 0) * dst_stride + 4] = elements_45;
+          *(uint16_t *)&dst[(y + 1) * dst_stride + 0] = elements_67;
+          *(uint32_t *)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+        }
+        break;
+      default:
+        assert(0 && "Unexpected block width");
+        break;
     }
   }
 }
@@ -1009,10 +1142,8 @@ static void bipred_average_ip_ip_avx2(kvz_pixel *dst,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  unsigned size = pu_w * pu_h;
-  bool multiple_of_32 = !(size % 32);
-
-  if (MIN(pu_w, pu_h) >= 4) { // TODO: REMOVE
+  // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
+  if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
     case  4: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 4, pu_h, dst_stride); break;
     case  8: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 8, pu_h, dst_stride); break;
@@ -1020,12 +1151,27 @@ static void bipred_average_ip_ip_avx2(kvz_pixel *dst,
     case 32: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 32, pu_h, dst_stride); break;
     case 64: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 64, pu_h, dst_stride); break;
 
+    case  6: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1,  6, pu_h, dst_stride); break;
     case 12: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 12, pu_h, dst_stride); break;
     case 24: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 24, pu_h, dst_stride); break;
     case 48: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 48, pu_h, dst_stride); break;
     default:
+      printf("%dx%d\n", pu_w, pu_h);
       assert(0 && "Unexpected block width.");
       break;
+    }
+  } else {
+    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t offset = 1 << (shift - 1);
+
+    for (int i = 0; i < pu_w * pu_h; ++i)
+    {
+      int y = i / pu_w;
+      int x = i % pu_w;
+      int16_t sample_L0 = ip_L0[i];
+      int16_t sample_L1 = ip_L1[i];
+      int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
+      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
@@ -1042,7 +1188,11 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
   __m256i offset = _mm256_set1_epi32(scalar_offset);
 
   bool has_pow2_width = _mm_popcnt_u32(pu_w) == 1;
-  if (has_pow2_width) {
+  bool area_mod_32 = (pu_w * pu_h) % 32;
+  assert(!(pu_w == 4 && pu_h == 4) && "Branch for 4x4 not yet implemented.");
+  assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
+
+  if (has_pow2_width && area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 32) {
 
       int y = i / pu_w;
@@ -1092,7 +1242,7 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
         break;
       }
     }
-  } else {
+  } else if (area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
@@ -1138,11 +1288,90 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       switch (pu_w) {
       case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
       case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((uint64_t *)&dst[y * dst_stride + x], mask, avg); break;
+      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
       default:
         assert(0 && "Unexpected block width");
         break;
       }
+    }
+  } else {
+    // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
+    switch (pu_w) {
+      case 8: // 8x2, 8x6
+        for (int i = 0; i < pu_w * pu_h; i += 16) {
+
+          int y = i / pu_w;
+
+          __m128i sample_px_8bit = _mm_loadu_si128((__m128i*)&px[i]);
+          __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
+          sample_px_16bit = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          __m256i sample_ip_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
+
+          __m256i sample_px_ip_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_ip_16bit);
+          __m256i sample_px_ip_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_ip_16bit);
+
+          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i avg_lo = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
+          __m256i avg_hi = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
+
+          avg_lo = _mm256_add_epi32(avg_lo, offset);
+          avg_hi = _mm256_add_epi32(avg_hi, offset);
+
+          avg_lo = _mm256_srai_epi32(avg_lo, shift);
+          avg_hi = _mm256_srai_epi32(avg_hi, shift);
+
+          __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
+          avg256 = _mm256_packus_epi16(avg256, avg256);
+          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg = _mm256_castsi256_si128(avg256);
+
+          _mm_storel_epi64((__m128i*) & dst[y * dst_stride], avg);
+          _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
+        }
+        break;
+      case 6: // 6x8
+        for (int i = 0; i < pu_w * pu_h; i += 12) {
+
+          int y = i / pu_w;
+
+          __m128i mask128 = _mm_setr_epi32(-1, -1, -1, 0);
+          __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
+          __m128i sample_px_8bit = _mm_maskload_epi32((const int*)(&px[i]), mask128);
+          __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
+          sample_px_16bit = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          __m256i sample_ip_16bit = _mm256_maskload_epi64((const long long*)(&ip[i]), mask);
+
+          __m256i sample_px_ip_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_ip_16bit);
+          __m256i sample_px_ip_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_ip_16bit);
+
+          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i avg_lo = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
+          __m256i avg_hi = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
+
+          avg_lo = _mm256_add_epi32(avg_lo, offset);
+          avg_hi = _mm256_add_epi32(avg_hi, offset);
+
+          avg_lo = _mm256_srai_epi32(avg_lo, shift);
+          avg_hi = _mm256_srai_epi32(avg_hi, shift);
+
+          __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
+          avg256 = _mm256_packus_epi16(avg256, avg256);
+          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg = _mm256_castsi256_si128(avg256);
+
+          uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
+          uint16_t elements_45 = _mm_extract_epi16(avg, 2);
+          uint16_t elements_67 = _mm_extract_epi16(avg, 3);
+          uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
+          *(uint32_t *)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+          *(uint16_t *)&dst[(y + 0) * dst_stride + 4] = elements_45;
+          *(uint16_t *)&dst[(y + 1) * dst_stride + 0] = elements_67;
+          *(uint32_t *)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+        }
+        break;
+      default:
+        assert(0 && "Unexpected block width");
+        break;
     }
   }
 }
@@ -1154,10 +1383,8 @@ static void bipred_average_px_ip_avx2(kvz_pixel *dst,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  unsigned size = pu_w * pu_h;
-  bool multiple_of_32 = !(size % 32);
-
-  if (MIN(pu_w, pu_h) >= 4) { // TODO: REMOVE
+  // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
+  if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
     case  4: bipred_average_px_ip_template_avx2(dst, px, ip, 4, pu_h, dst_stride); break;
     case  8: bipred_average_px_ip_template_avx2(dst, px, ip, 8, pu_h, dst_stride); break;
@@ -1165,12 +1392,26 @@ static void bipred_average_px_ip_avx2(kvz_pixel *dst,
     case 32: bipred_average_px_ip_template_avx2(dst, px, ip, 32, pu_h, dst_stride); break;
     case 64: bipred_average_px_ip_template_avx2(dst, px, ip, 64, pu_h, dst_stride); break;
 
+    case  6: bipred_average_px_ip_template_avx2(dst, px, ip,  6, pu_h, dst_stride); break;
     case 12: bipred_average_px_ip_template_avx2(dst, px, ip, 12, pu_h, dst_stride); break;
     case 24: bipred_average_px_ip_template_avx2(dst, px, ip, 24, pu_h, dst_stride); break;
     case 48: bipred_average_px_ip_template_avx2(dst, px, ip, 48, pu_h, dst_stride); break;
     default:
       assert(0 && "Unexpected block width.");
       break;
+    }
+  } else {
+    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t offset = 1 << (shift - 1);
+
+    for (int i = 0; i < pu_w * pu_h; ++i)
+    {
+      int y = i / pu_w;
+      int x = i % pu_w;
+      int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
+      int16_t sample_ip = ip[i];
+      int32_t rounded = (sample_px + sample_ip + offset) >> shift;
+      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
