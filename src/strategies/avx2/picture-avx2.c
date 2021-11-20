@@ -814,7 +814,7 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
   kvz_pixel *px_L0,
   kvz_pixel *px_L1,
   unsigned pu_w,
-  unsigned pu_h, 
+  unsigned pu_h,
   unsigned dst_stride)
 {
   bool has_pow2_width = _mm_popcnt_u32(pu_w) == 1;
@@ -830,79 +830,79 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
 
       __m256i sample_L0 = _mm256_loadu_si256((__m256i*)&px_L0[i]);
       __m256i sample_L1 = _mm256_loadu_si256((__m256i*)&px_L1[i]);
-      __m256i avg = _mm256_avg_epu8(sample_L0, sample_L1);
+      __m256i avg       = _mm256_avg_epu8(sample_L0, sample_L1);
 
       switch (pu_w) {
-      case  4: scatter_ymm_4x8_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case  8: scatter_ymm_8x4_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 32: // Same as case 64
-      case 64: _mm256_storeu_si256((__m256i *) & dst[y * dst_stride + x], avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case  4: scatter_ymm_4x8_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case  8: scatter_ymm_8x4_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 32: // Same as case 64
+        case 64: _mm256_storeu_si256((__m256i *)&dst[y * dst_stride + x], avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
-  } else if (area_mod_32 == 0){
+  } else if (area_mod_32 == 0) {
     for (int i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
       int x = i % pu_w;
 
       // Last 64 bits of the 256 are not used to simplify the loop
-      __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
+      __m256i mask      = _mm256_setr_epi64x(-1, -1, -1, 0);
       __m256i sample_L0 = _mm256_maskload_epi64((const long long*)&px_L0[i], mask);
       __m256i sample_L1 = _mm256_maskload_epi64((const long long*)&px_L1[i], mask);
-      __m256i avg = _mm256_avg_epu8(sample_L0, sample_L1);
+      __m256i avg       = _mm256_avg_epu8(sample_L0, sample_L1);
 
       switch (pu_w) {
-      case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 24: // Same as case 48
+        case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
   } else {
     // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
     switch (pu_w) {
       __m128i sample_L0, sample_L1, avg;
-    case 8: // 8x2, 8x6
-      for (int i = 0; i < pu_w * pu_h; i += 16) {
+      case 8: // 8x2, 8x6
+        for (int i = 0; i < pu_w * pu_h; i += 16) {
 
-        int y = i / pu_w;
+          int y = i / pu_w;
 
-        sample_L0 = _mm_loadu_si128((__m128i*)&px_L0[i]);
-        sample_L1 = _mm_loadu_si128((__m128i*)&px_L1[i]);
-        avg = _mm_avg_epu8(sample_L0, sample_L1);
-        _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
-        _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
-      }
-      break;
-    case 6: // 6x8
-      for (int i = 0; i < pu_w * pu_h; i += 12) {
+          sample_L0 = _mm_loadu_si128((__m128i*)&px_L0[i]);
+          sample_L1 = _mm_loadu_si128((__m128i*)&px_L1[i]);
+          avg       = _mm_avg_epu8(sample_L0, sample_L1);
+          _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
+          _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
+        }
+        break;
+      case 6: // 6x8
+        for (int i = 0; i < pu_w * pu_h; i += 12) {
 
-        int y = i / pu_w;
+          int y = i / pu_w;
 
-        __m128i mask = _mm_setr_epi32(-1, -1, -1, 0);
-        __m128i sample_L0 = _mm_maskload_epi32((const int*)(&px_L0[i]), mask);
-        __m128i sample_L1 = _mm_maskload_epi32((const int*)(&px_L1[i]), mask);
-        __m128i avg = _mm_avg_epu8(sample_L0, sample_L1);
+          __m128i mask      = _mm_setr_epi32(-1, -1, -1, 0);
+          __m128i sample_L0 = _mm_maskload_epi32((const int*)(&px_L0[i]), mask);
+          __m128i sample_L1 = _mm_maskload_epi32((const int*)(&px_L1[i]), mask);
+          __m128i avg       = _mm_avg_epu8(sample_L0, sample_L1);
 
-        uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
-        uint16_t elements_45 = _mm_extract_epi16(avg, 2);
-        uint16_t elements_67 = _mm_extract_epi16(avg, 3);
-        uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
-        *(uint32_t*)&dst[(y + 0) * dst_stride + 0] = elements_0123;
-        *(uint16_t*)&dst[(y + 0) * dst_stride + 4] = elements_45;
-        *(uint16_t*)&dst[(y + 1) * dst_stride + 0] = elements_67;
-        *(uint32_t*)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
-      }
-      break;
-    default:
-      assert(0 && "Unexpected block width");
-      break;
+          uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
+          uint16_t elements_45   = _mm_extract_epi16(avg, 2);
+          uint16_t elements_67   = _mm_extract_epi16(avg, 3);
+          uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
+          *(uint32_t*)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+          *(uint16_t*)&dst[(y + 0) * dst_stride + 4] = elements_45;
+          *(uint16_t*)&dst[(y + 1) * dst_stride + 0] = elements_67;
+          *(uint32_t*)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+        }
+        break;
+      default:
+        assert(0 && "Unexpected block width.");
+        break;
     }
   }
 }
@@ -917,19 +917,19 @@ static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
   // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
   if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
-    case  4: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  4, pu_h, dst_stride); break;
-    case  8: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  8, pu_h, dst_stride); break;
-    case 16: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 16, pu_h, dst_stride); break;
-    case 32: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 32, pu_h, dst_stride); break;
-    case 64: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 64, pu_h, dst_stride); break;
-    
-    case  6: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  6, pu_h, dst_stride); break;
-    case 12: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 12, pu_h, dst_stride); break;
-    case 24: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 24, pu_h, dst_stride); break;
-    case 48: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 48, pu_h, dst_stride); break;
-    default:
-      assert(0 && "Unexpected block width.");
-      break;
+      case  4: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  4, pu_h, dst_stride); break;
+      case  8: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  8, pu_h, dst_stride); break;
+      case 16: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 16, pu_h, dst_stride); break;
+      case 32: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 32, pu_h, dst_stride); break;
+      case 64: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 64, pu_h, dst_stride); break;
+
+      case  6: bipred_average_px_px_template_avx2(dst, px_L0, px_L1,  6, pu_h, dst_stride); break;
+      case 12: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 12, pu_h, dst_stride); break;
+      case 24: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 24, pu_h, dst_stride); break;
+      case 48: bipred_average_px_px_template_avx2(dst, px_L0, px_L1, 48, pu_h, dst_stride); break;
+      default:
+        assert(0 && "Unexpected block width.");
+        break;
     }
   } else {
     int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
@@ -968,17 +968,17 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i *) & ip_L0[i]);
-      __m256i sample_L0_23_16bit = _mm256_loadu_si256((__m256i *) & ip_L0[i + 16]);
-      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i *) & ip_L1[i]);
-      __m256i sample_L1_23_16bit = _mm256_loadu_si256((__m256i *) & ip_L1[i + 16]);
+      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
+      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
+      __m256i sample_L0_23_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i + 16]);
+      __m256i sample_L1_23_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i + 16]);
 
       __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
       __m256i sample_L0_L1_01_hi = _mm256_unpackhi_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
       __m256i sample_L0_L1_23_lo = _mm256_unpacklo_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
       __m256i sample_L0_L1_23_hi = _mm256_unpackhi_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
 
-      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i all_ones  = _mm256_set1_epi16(1);
       __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_01_lo, all_ones);
       __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_01_hi, all_ones);
       __m256i avg_23_lo = _mm256_madd_epi16(sample_L0_L1_23_lo, all_ones);
@@ -994,20 +994,20 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
       avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
 
-      __m256i avg_01 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23 = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
-      __m256i avg = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
+      __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
       switch (pu_w) {
-      case  4: scatter_ymm_4x8_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case  8: scatter_ymm_8x4_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 32: // Same as case 64
-      case 64: _mm256_storeu_si256((__m256i *) & dst[y * dst_stride + x], avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case  4: scatter_ymm_4x8_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case  8: scatter_ymm_8x4_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 32: // Same as case 64
+        case 64: _mm256_storeu_si256((__m256i*)&dst[y * dst_stride + x], avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
   } else if (area_mod_32 == 0) {
@@ -1017,10 +1017,10 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       int x = i % pu_w;
 
       // Last 64 bits of the 256 are not used to simplify the loop
-      __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
+      __m256i mask               = _mm256_setr_epi64x(-1, -1, -1, 0);
       __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
-      __m256i sample_L0_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip_L0[i + 16]));
       __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
+      __m256i sample_L0_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip_L0[i + 16]));
       __m256i sample_L1_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip_L1[i + 16]));
 
       __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
@@ -1028,7 +1028,7 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       __m256i sample_L0_L1_23_lo = _mm256_unpacklo_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
       __m256i sample_L0_L1_23_hi = _mm256_unpackhi_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
 
-      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i all_ones  = _mm256_set1_epi16(1);
       __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_01_lo, all_ones);
       __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_01_hi, all_ones);
       __m256i avg_23_lo = _mm256_madd_epi16(sample_L0_L1_23_lo, all_ones);
@@ -1044,18 +1044,18 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
       avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
       avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
 
-      __m256i avg_01 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23 = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
-      __m256i avg = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
+      __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
       switch (pu_w) {
-      case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 24: // Same as case 48
+        case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
   } else {
@@ -1071,10 +1071,10 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
 
           __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
           __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
-          
+
           __m256i all_ones = _mm256_set1_epi16(1);
-          __m256i avg_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
-          __m256i avg_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
+          __m256i avg_lo   = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
+          __m256i avg_hi   = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
 
           avg_lo = _mm256_add_epi32(avg_lo, offset);
           avg_hi = _mm256_add_epi32(avg_hi, offset);
@@ -1083,9 +1083,9 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
           avg_hi = _mm256_srai_epi32(avg_hi, shift);
 
           __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
-          avg256 = _mm256_packus_epi16(avg256, avg256);
-          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
-          __m128i avg = _mm256_castsi256_si128(avg256);
+          avg256         = _mm256_packus_epi16(avg256, avg256);
+          avg256         = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg    = _mm256_castsi256_si128(avg256);
 
           _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
           _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
@@ -1103,7 +1103,7 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
           __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
           __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
 
-          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i all_ones  = _mm256_set1_epi16(1);
           __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
           __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
 
@@ -1114,22 +1114,22 @@ static INLINE void bipred_average_ip_ip_template_avx2(kvz_pixel *dst,
           avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
 
           __m256i avg256 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-          avg256 = _mm256_packus_epi16(avg256, avg256);
-          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
-          __m128i avg = _mm256_castsi256_si128(avg256);
+          avg256         = _mm256_packus_epi16(avg256, avg256);
+          avg256         = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg    = _mm256_castsi256_si128(avg256);
 
           uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
-          uint16_t elements_45 = _mm_extract_epi16(avg, 2);
-          uint16_t elements_67 = _mm_extract_epi16(avg, 3);
+          uint16_t elements_45   = _mm_extract_epi16(avg, 2);
+          uint16_t elements_67   = _mm_extract_epi16(avg, 3);
           uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
-          *(uint32_t *)&dst[(y + 0) * dst_stride + 0] = elements_0123;
-          *(uint16_t *)&dst[(y + 0) * dst_stride + 4] = elements_45;
-          *(uint16_t *)&dst[(y + 1) * dst_stride + 0] = elements_67;
-          *(uint32_t *)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+          *(uint32_t*)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+          *(uint16_t*)&dst[(y + 0) * dst_stride + 4] = elements_45;
+          *(uint16_t*)&dst[(y + 1) * dst_stride + 0] = elements_67;
+          *(uint32_t*)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
         }
         break;
       default:
-        assert(0 && "Unexpected block width");
+        assert(0 && "Unexpected block width.");
         break;
     }
   }
@@ -1145,20 +1145,19 @@ static void bipred_average_ip_ip_avx2(kvz_pixel *dst,
   // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
   if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
-    case  4: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 4, pu_h, dst_stride); break;
-    case  8: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 8, pu_h, dst_stride); break;
-    case 16: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 16, pu_h, dst_stride); break;
-    case 32: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 32, pu_h, dst_stride); break;
-    case 64: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 64, pu_h, dst_stride); break;
+      case  4: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1,  4, pu_h, dst_stride); break;
+      case  8: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1,  8, pu_h, dst_stride); break;
+      case 16: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 16, pu_h, dst_stride); break;
+      case 32: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 32, pu_h, dst_stride); break;
+      case 64: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 64, pu_h, dst_stride); break;
 
-    case  6: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1,  6, pu_h, dst_stride); break;
-    case 12: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 12, pu_h, dst_stride); break;
-    case 24: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 24, pu_h, dst_stride); break;
-    case 48: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 48, pu_h, dst_stride); break;
-    default:
-      printf("%dx%d\n", pu_w, pu_h);
-      assert(0 && "Unexpected block width.");
-      break;
+      case  6: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1,  6, pu_h, dst_stride); break;
+      case 12: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 12, pu_h, dst_stride); break;
+      case 24: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 24, pu_h, dst_stride); break;
+      case 48: bipred_average_ip_ip_template_avx2(dst, ip_L0, ip_L1, 48, pu_h, dst_stride); break;
+      default:
+        assert(0 && "Unexpected block width.");
+        break;
     }
   } else {
     int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
@@ -1198,19 +1197,19 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_px_01_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *) & px[i]));
-      __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *) & px[i + 16]));
-      sample_px_01_16bit = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_23_16bit = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
-      __m256i sample_ip_01_16bit = _mm256_loadu_si256((__m256i *) & ip[i]);
-      __m256i sample_ip_23_16bit = _mm256_loadu_si256((__m256i *) & ip[i + 16]);
+      __m256i sample_px_01_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i]));
+      __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i + 16]));
+      sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
+      __m256i sample_ip_01_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
+      __m256i sample_ip_23_16bit = _mm256_loadu_si256((__m256i*)&ip[i + 16]);
 
       __m256i sample_px_ip_01_lo = _mm256_unpacklo_epi16(sample_px_01_16bit, sample_ip_01_16bit);
       __m256i sample_px_ip_01_hi = _mm256_unpackhi_epi16(sample_px_01_16bit, sample_ip_01_16bit);
       __m256i sample_px_ip_23_lo = _mm256_unpacklo_epi16(sample_px_23_16bit, sample_ip_23_16bit);
       __m256i sample_px_ip_23_hi = _mm256_unpackhi_epi16(sample_px_23_16bit, sample_ip_23_16bit);
 
-      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i all_ones  = _mm256_set1_epi16(1);
       __m256i avg_01_lo = _mm256_madd_epi16(sample_px_ip_01_lo, all_ones);
       __m256i avg_01_hi = _mm256_madd_epi16(sample_px_ip_01_hi, all_ones);
       __m256i avg_23_lo = _mm256_madd_epi16(sample_px_ip_23_lo, all_ones);
@@ -1226,20 +1225,20 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
       avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
 
-      __m256i avg_01 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23 = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
-      __m256i avg = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
+      __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
       switch (pu_w) {
-      case  4: scatter_ymm_4x8_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case  8: scatter_ymm_8x4_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 32: // Same as case 64
-      case 64: _mm256_storeu_si256((__m256i *) & dst[y * dst_stride + x], avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case  4: scatter_ymm_4x8_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case  8: scatter_ymm_8x4_8bit( &dst[y * dst_stride + x], avg, dst_stride); break;
+        case 16: scatter_ymm_16x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 32: // Same as case 64
+        case 64: _mm256_storeu_si256((__m256i*)&dst[y * dst_stride + x], avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
   } else if (area_mod_32 == 0) {
@@ -1249,13 +1248,13 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       int x = i % pu_w;
 
       // Last 64 bits of the 256 / 32 bits of the 128 are not used to simplify the loop
-      __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
-      __m128i sample_px_01_8bit = _mm_loadu_si128((__m128i*)&px[i]);
-      __m128i sample_px_23_8bit = _mm_loadl_epi64((__m128i*)&px[i + 16]);
+      __m256i mask               = _mm256_setr_epi64x(-1, -1, -1, 0);
+      __m128i sample_px_01_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
+      __m128i sample_px_23_8bit  = _mm_loadl_epi64((__m128i*)&px[i + 16]);
       __m256i sample_px_01_16bit = _mm256_cvtepu8_epi16(sample_px_01_8bit);
       __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(sample_px_23_8bit);
-      sample_px_01_16bit = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_23_16bit = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
       __m256i sample_ip_01_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
       __m256i sample_ip_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip[i + 16]));
 
@@ -1264,7 +1263,7 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       __m256i sample_px_ip_23_lo = _mm256_unpacklo_epi16(sample_px_23_16bit, sample_ip_23_16bit);
       __m256i sample_px_ip_23_hi = _mm256_unpackhi_epi16(sample_px_23_16bit, sample_ip_23_16bit);
 
-      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i all_ones  = _mm256_set1_epi16(1);
       __m256i avg_01_lo = _mm256_madd_epi16(sample_px_ip_01_lo, all_ones);
       __m256i avg_01_hi = _mm256_madd_epi16(sample_px_ip_01_hi, all_ones);
       __m256i avg_23_lo = _mm256_madd_epi16(sample_px_ip_23_lo, all_ones);
@@ -1280,18 +1279,18 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
       avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
       avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
 
-      __m256i avg_01 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23 = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
-      __m256i avg = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
+      __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
       switch (pu_w) {
-      case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
-      case 24: // Same as case 48
-      case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
-      default:
-        assert(0 && "Unexpected block width");
-        break;
+        case 12: scatter_ymm_12x2_8bit(&dst[y * dst_stride + x], avg, dst_stride); break;
+        case 24: // Same as case 48
+        case 48: _mm256_maskstore_epi64((long long*)&dst[y * dst_stride + x], mask, avg); break;
+        default:
+          assert(0 && "Unexpected block width.");
+          break;
       }
     }
   } else {
@@ -1302,17 +1301,17 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
 
           int y = i / pu_w;
 
-          __m128i sample_px_8bit = _mm_loadu_si128((__m128i*)&px[i]);
+          __m128i sample_px_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
-          sample_px_16bit = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
           __m256i sample_ip_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
 
           __m256i sample_px_ip_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_ip_16bit);
           __m256i sample_px_ip_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_ip_16bit);
 
           __m256i all_ones = _mm256_set1_epi16(1);
-          __m256i avg_lo = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
-          __m256i avg_hi = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
+          __m256i avg_lo   = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
+          __m256i avg_hi   = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
 
           avg_lo = _mm256_add_epi32(avg_lo, offset);
           avg_hi = _mm256_add_epi32(avg_hi, offset);
@@ -1321,11 +1320,11 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
           avg_hi = _mm256_srai_epi32(avg_hi, shift);
 
           __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
-          avg256 = _mm256_packus_epi16(avg256, avg256);
-          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
-          __m128i avg = _mm256_castsi256_si128(avg256);
+          avg256         = _mm256_packus_epi16(avg256, avg256);
+          avg256         = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg    = _mm256_castsi256_si128(avg256);
 
-          _mm_storel_epi64((__m128i*) & dst[y * dst_stride], avg);
+          _mm_storel_epi64((__m128i*)&dst[y * dst_stride], avg);
           _mm_storeh_pd((double*)&dst[(y + 1) * dst_stride], _mm_castsi128_pd(avg));
         }
         break;
@@ -1334,19 +1333,20 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
 
           int y = i / pu_w;
 
-          __m128i mask128 = _mm_setr_epi32(-1, -1, -1, 0);
-          __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
-          __m128i sample_px_8bit = _mm_maskload_epi32((const int*)(&px[i]), mask128);
+          __m128i mask128         = _mm_setr_epi32(-1, -1, -1, 0);
+          __m128i sample_px_8bit  = _mm_maskload_epi32((const int*)(&px[i]), mask128);
+
+          __m256i mask            = _mm256_setr_epi64x(-1, -1, -1, 0);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
-          sample_px_16bit = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
           __m256i sample_ip_16bit = _mm256_maskload_epi64((const long long*)(&ip[i]), mask);
 
           __m256i sample_px_ip_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_ip_16bit);
           __m256i sample_px_ip_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_ip_16bit);
 
           __m256i all_ones = _mm256_set1_epi16(1);
-          __m256i avg_lo = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
-          __m256i avg_hi = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
+          __m256i avg_lo   = _mm256_madd_epi16(sample_px_ip_lo, all_ones);
+          __m256i avg_hi   = _mm256_madd_epi16(sample_px_ip_hi, all_ones);
 
           avg_lo = _mm256_add_epi32(avg_lo, offset);
           avg_hi = _mm256_add_epi32(avg_hi, offset);
@@ -1355,22 +1355,22 @@ static INLINE void bipred_average_px_ip_template_avx2(kvz_pixel *dst,
           avg_hi = _mm256_srai_epi32(avg_hi, shift);
 
           __m256i avg256 = _mm256_packus_epi32(avg_lo, avg_hi);
-          avg256 = _mm256_packus_epi16(avg256, avg256);
-          avg256 = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
-          __m128i avg = _mm256_castsi256_si128(avg256);
+          avg256         = _mm256_packus_epi16(avg256, avg256);
+          avg256         = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
+          __m128i avg    = _mm256_castsi256_si128(avg256);
 
           uint32_t elements_0123 = _mm_cvtsi128_si32(avg);
-          uint16_t elements_45 = _mm_extract_epi16(avg, 2);
-          uint16_t elements_67 = _mm_extract_epi16(avg, 3);
+          uint16_t elements_45   = _mm_extract_epi16(avg, 2);
+          uint16_t elements_67   = _mm_extract_epi16(avg, 3);
           uint32_t elements_89ab = _mm_extract_epi32(avg, 2);
-          *(uint32_t *)&dst[(y + 0) * dst_stride + 0] = elements_0123;
-          *(uint16_t *)&dst[(y + 0) * dst_stride + 4] = elements_45;
-          *(uint16_t *)&dst[(y + 1) * dst_stride + 0] = elements_67;
-          *(uint32_t *)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
+          *(uint32_t*)&dst[(y + 0) * dst_stride + 0] = elements_0123;
+          *(uint16_t*)&dst[(y + 0) * dst_stride + 4] = elements_45;
+          *(uint16_t*)&dst[(y + 1) * dst_stride + 0] = elements_67;
+          *(uint32_t*)&dst[(y + 1) * dst_stride + 2] = elements_89ab;
         }
         break;
       default:
-        assert(0 && "Unexpected block width");
+        assert(0 && "Unexpected block width.");
         break;
     }
   }
@@ -1386,19 +1386,19 @@ static void bipred_average_px_ip_avx2(kvz_pixel *dst,
   // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
   if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
-    case  4: bipred_average_px_ip_template_avx2(dst, px, ip, 4, pu_h, dst_stride); break;
-    case  8: bipred_average_px_ip_template_avx2(dst, px, ip, 8, pu_h, dst_stride); break;
-    case 16: bipred_average_px_ip_template_avx2(dst, px, ip, 16, pu_h, dst_stride); break;
-    case 32: bipred_average_px_ip_template_avx2(dst, px, ip, 32, pu_h, dst_stride); break;
-    case 64: bipred_average_px_ip_template_avx2(dst, px, ip, 64, pu_h, dst_stride); break;
+      case  4: bipred_average_px_ip_template_avx2(dst, px, ip,  4, pu_h, dst_stride); break;
+      case  8: bipred_average_px_ip_template_avx2(dst, px, ip,  8, pu_h, dst_stride); break;
+      case 16: bipred_average_px_ip_template_avx2(dst, px, ip, 16, pu_h, dst_stride); break;
+      case 32: bipred_average_px_ip_template_avx2(dst, px, ip, 32, pu_h, dst_stride); break;
+      case 64: bipred_average_px_ip_template_avx2(dst, px, ip, 64, pu_h, dst_stride); break;
 
-    case  6: bipred_average_px_ip_template_avx2(dst, px, ip,  6, pu_h, dst_stride); break;
-    case 12: bipred_average_px_ip_template_avx2(dst, px, ip, 12, pu_h, dst_stride); break;
-    case 24: bipred_average_px_ip_template_avx2(dst, px, ip, 24, pu_h, dst_stride); break;
-    case 48: bipred_average_px_ip_template_avx2(dst, px, ip, 48, pu_h, dst_stride); break;
-    default:
-      assert(0 && "Unexpected block width.");
-      break;
+      case  6: bipred_average_px_ip_template_avx2(dst, px, ip,  6, pu_h, dst_stride); break;
+      case 12: bipred_average_px_ip_template_avx2(dst, px, ip, 12, pu_h, dst_stride); break;
+      case 24: bipred_average_px_ip_template_avx2(dst, px, ip, 24, pu_h, dst_stride); break;
+      case 48: bipred_average_px_ip_template_avx2(dst, px, ip, 48, pu_h, dst_stride); break;
+      default:
+        assert(0 && "Unexpected block width.");
+        break;
     }
   } else {
     int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
@@ -1441,7 +1441,7 @@ static void bipred_average_avx2(lcu_t *const lcu,
       bipred_average_ip_ip_avx2(lcu->rec.y + pb_offset, ip_L0->y, ip_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else {
-      kvz_pixel *src_px = (ip_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      kvz_pixel *src_px    = (ip_flags_L0 & 1) ? px_L1->y : px_L0->y;
       kvz_pixel_ip *src_ip = (ip_flags_L0 & 1) ? ip_L0->y : ip_L1->y;
       bipred_average_px_ip_avx2(lcu->rec.y + pb_offset, src_px, src_ip, pu_w, pu_h, LCU_WIDTH);
     }
@@ -1460,9 +1460,9 @@ static void bipred_average_avx2(lcu_t *const lcu,
       bipred_average_ip_ip_avx2(lcu->rec.v + pb_offset, ip_L0->v, ip_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
-      kvz_pixel *src_px_u = (ip_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      kvz_pixel *src_px_u    = (ip_flags_L0 & 2) ? px_L1->u : px_L0->u;
       kvz_pixel_ip *src_ip_u = (ip_flags_L0 & 2) ? ip_L0->u : ip_L1->u;
-      kvz_pixel *src_px_v = (ip_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      kvz_pixel *src_px_v    = (ip_flags_L0 & 2) ? px_L1->v : px_L0->v;
       kvz_pixel_ip *src_ip_v = (ip_flags_L0 & 2) ? ip_L0->v : ip_L1->v;
       bipred_average_px_ip_avx2(lcu->rec.u + pb_offset, src_px_u, src_ip_u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_ip_avx2(lcu->rec.v + pb_offset, src_px_v, src_ip_v, pb_w, pb_h, LCU_WIDTH_C);
