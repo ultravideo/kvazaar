@@ -115,7 +115,7 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   int32_t block_width,
   int32_t block_height,
   const int16_t mv_param[2],
-  yuv_ip_t *out,
+  yuv_im_t *out,
   const unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 3);
@@ -248,7 +248,7 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   int32_t pu_w,
   int32_t pu_h,
   const int16_t mv_param[2],
-  yuv_ip_t *out,
+  yuv_im_t *out,
   const unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 7);
@@ -367,7 +367,7 @@ static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
  * \param height         PU height
  * \param mv_param       motion vector
  * \param lcu_px         destination lcu
- * \param lcu_ip         destination of high precision output, or NULL if not needed
+ * \param lcu_im         destination of high precision output, or NULL if not needed
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
 */
@@ -380,7 +380,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
                                     int32_t out_stride_luma,
                                     const int16_t mv_param[2],
                                     yuv_t *yuv_px,
-                                    yuv_ip_t *yuv_ip,
+                                    yuv_im_t *yuv_im,
                                     bool predict_luma,
                                     bool predict_chroma)
 {
@@ -403,11 +403,11 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
   if (predict_luma) {
     if (fractional_luma) {
       // With a fractional MV, do interpolation.
-      if (state->encoder_control->cfg.bipred && yuv_ip) {
+      if (state->encoder_control->cfg.bipred && yuv_im) {
         inter_recon_frac_luma_hi(state, ref,
           pu_x, pu_y,
           pu_w, pu_h,
-          mv_param, yuv_ip, out_stride_luma);
+          mv_param, yuv_im, out_stride_luma);
       }
       else {
         inter_recon_frac_luma(state, ref,
@@ -444,11 +444,11 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
   // Generate prediction for chroma.
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.
-    if (state->encoder_control->cfg.bipred && yuv_ip) {
+    if (state->encoder_control->cfg.bipred && yuv_im) {
       inter_recon_frac_chroma_hi(state, ref,
                                     pu_x, pu_y,
                                     pu_w, pu_h, 
-                                    mv_param, yuv_ip, out_stride_c);
+                                    mv_param, yuv_im, out_stride_c);
     } else {
       inter_recon_frac_chroma(state, ref,
                               pu_x, pu_y,
@@ -516,8 +516,8 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   // Allocate maximum size arrays for interpolated and copied samples
   ALIGNED(64) kvz_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
   ALIGNED(64) kvz_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_ip ip_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_ip ip_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im ip_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im ip_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
 
   yuv_t px_L0;
   px_L0.size = pu_w * pu_h;
@@ -531,13 +531,13 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   px_L1.u = &px_buf_L1[LCU_LUMA_SIZE];
   px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  yuv_ip_t ip_L0;
+  yuv_im_t ip_L0;
   ip_L0.size = pu_w * pu_h;
   ip_L0.y = &ip_buf_L0[0];
   ip_L0.u = &ip_buf_L0[LCU_LUMA_SIZE];
   ip_L0.v = &ip_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  yuv_ip_t ip_L1;
+  yuv_im_t ip_L1;
   ip_L1.size = pu_w * pu_h;
   ip_L1.y = &ip_buf_L1[0];
   ip_L1.u = &ip_buf_L1[LCU_LUMA_SIZE];

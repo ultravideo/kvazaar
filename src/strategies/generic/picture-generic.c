@@ -568,9 +568,9 @@ static void bipred_average_px_px(kvz_pixel *dst,
   }
 }
 
-static void bipred_average_ip_ip(kvz_pixel *dst,
-  kvz_pixel_ip *ip_L0,
-  kvz_pixel_ip *ip_L1,
+static void bipred_average_im_im(kvz_pixel *dst,
+  kvz_pixel_im *ip_L0,
+  kvz_pixel_im *ip_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -589,9 +589,9 @@ static void bipred_average_ip_ip(kvz_pixel *dst,
   }
 }
 
-static void bipred_average_px_ip(kvz_pixel *dst,
+static void bipred_average_px_im(kvz_pixel *dst,
   kvz_pixel *px,
-  kvz_pixel_ip *ip,
+  kvz_pixel_im *ip,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -604,8 +604,8 @@ static void bipred_average_px_ip(kvz_pixel *dst,
     int y = i / pu_w;
     int x = i % pu_w;
     int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
-    int16_t sample_ip = ip[i];
-    int32_t rounded = (sample_px + sample_ip + offset) >> shift;
+    int16_t sample_im = ip[i];
+    int32_t rounded = (sample_px + sample_im + offset) >> shift;
     dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
   }
 }
@@ -613,8 +613,8 @@ static void bipred_average_px_ip(kvz_pixel *dst,
 static void bipred_average_generic(lcu_t *const lcu,
   const yuv_t *const px_L0,
   const yuv_t *const px_L1,
-  const yuv_ip_t *const ip_L0,
-  const yuv_ip_t *const ip_L1,
+  const yuv_im_t *const ip_L0,
+  const yuv_im_t *const ip_L1,
   const unsigned pu_x,
   const unsigned pu_y,
   const unsigned pu_w,
@@ -632,12 +632,12 @@ static void bipred_average_generic(lcu_t *const lcu,
       bipred_average_px_px(lcu->rec.y + pb_offset, px_L0->y, px_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else if ((ip_flags_L0 & 1) && (ip_flags_L1 & 1)) {
-      bipred_average_ip_ip(lcu->rec.y + pb_offset, ip_L0->y, ip_L1->y, pu_w, pu_h, LCU_WIDTH);
+      bipred_average_im_im(lcu->rec.y + pb_offset, ip_L0->y, ip_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else {
       kvz_pixel    *src_px = (ip_flags_L0 & 1) ? px_L1->y : px_L0->y;
-      kvz_pixel_ip *src_ip = (ip_flags_L0 & 1) ? ip_L0->y : ip_L1->y;
-      bipred_average_px_ip(lcu->rec.y + pb_offset, src_px, src_ip, pu_w, pu_h, LCU_WIDTH);
+      kvz_pixel_im *src_im = (ip_flags_L0 & 1) ? ip_L0->y : ip_L1->y;
+      bipred_average_px_im(lcu->rec.y + pb_offset, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
     }
   }
   if (predict_chroma) {
@@ -650,16 +650,16 @@ static void bipred_average_generic(lcu_t *const lcu,
       bipred_average_px_px(lcu->rec.v + pb_offset, px_L0->v, px_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else if ((ip_flags_L0 & 2) && (ip_flags_L1 & 2)) {
-      bipred_average_ip_ip(lcu->rec.u + pb_offset, ip_L0->u, ip_L1->u, pb_w, pb_h, LCU_WIDTH_C);
-      bipred_average_ip_ip(lcu->rec.v + pb_offset, ip_L0->v, ip_L1->v, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_im_im(lcu->rec.u + pb_offset, ip_L0->u, ip_L1->u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_im_im(lcu->rec.v + pb_offset, ip_L0->v, ip_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
       kvz_pixel    *src_px_u = (ip_flags_L0 & 2) ? px_L1->u : px_L0->u;
-      kvz_pixel_ip *src_ip_u = (ip_flags_L0 & 2) ? ip_L0->u : ip_L1->u;
+      kvz_pixel_im *src_im_u = (ip_flags_L0 & 2) ? ip_L0->u : ip_L1->u;
       kvz_pixel    *src_px_v = (ip_flags_L0 & 2) ? px_L1->v : px_L0->v;
-      kvz_pixel_ip *src_ip_v = (ip_flags_L0 & 2) ? ip_L0->v : ip_L1->v;
-      bipred_average_px_ip(lcu->rec.u + pb_offset, src_px_u, src_ip_u, pb_w, pb_h, LCU_WIDTH_C);
-      bipred_average_px_ip(lcu->rec.v + pb_offset, src_px_v, src_ip_v, pb_w, pb_h, LCU_WIDTH_C);
+      kvz_pixel_im *src_im_v = (ip_flags_L0 & 2) ? ip_L0->v : ip_L1->v;
+      bipred_average_px_im(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_px_im(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, LCU_WIDTH_C);
     }
   }
 }

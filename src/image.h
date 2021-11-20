@@ -60,10 +60,10 @@ typedef struct {
 
 typedef struct {
   int size;
-  kvz_pixel_ip *y;
-  kvz_pixel_ip *u;
-  kvz_pixel_ip *v;
-} yuv_ip_t;
+  kvz_pixel_im *y;
+  kvz_pixel_im *u;
+  kvz_pixel_im *v;
+} yuv_im_t;
 
 kvz_picture *kvz_image_alloc_420(const int32_t width, const int32_t height);
 kvz_picture *kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height);
