@@ -948,8 +948,8 @@ static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
 }
 
 static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
-  kvz_pixel_im *ip_L0,
-  kvz_pixel_im *ip_L1,
+  kvz_pixel_im *im_L0,
+  kvz_pixel_im *im_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -968,10 +968,10 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
-      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
-      __m256i sample_L0_23_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i + 16]);
-      __m256i sample_L1_23_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i + 16]);
+      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
+      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
+      __m256i sample_L0_23_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i + 16]);
+      __m256i sample_L1_23_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i + 16]);
 
       __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
       __m256i sample_L0_L1_01_hi = _mm256_unpackhi_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
@@ -1018,10 +1018,10 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
 
       // Last 64 bits of the 256 are not used to simplify the loop
       __m256i mask               = _mm256_setr_epi64x(-1, -1, -1, 0);
-      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
-      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
-      __m256i sample_L0_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip_L0[i + 16]));
-      __m256i sample_L1_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip_L1[i + 16]));
+      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
+      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
+      __m256i sample_L0_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L0[i + 16]));
+      __m256i sample_L1_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L1[i + 16]));
 
       __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
       __m256i sample_L0_L1_01_hi = _mm256_unpackhi_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
@@ -1066,8 +1066,8 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
 
           int y = i / pu_w;
 
-          __m256i sample_L0_16bit = _mm256_loadu_si256((__m256i*)&ip_L0[i]);
-          __m256i sample_L1_16bit = _mm256_loadu_si256((__m256i*)&ip_L1[i]);
+          __m256i sample_L0_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
+          __m256i sample_L1_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
 
           __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
           __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
@@ -1097,8 +1097,8 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
           int y = i / pu_w;
 
           __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
-          __m256i sample_L0_16bit = _mm256_maskload_epi64((const long long*)(&ip_L0[i]), mask);
-          __m256i sample_L1_16bit = _mm256_maskload_epi64((const long long*)(&ip_L1[i]), mask);
+          __m256i sample_L0_16bit = _mm256_maskload_epi64((const long long*)(&im_L0[i]), mask);
+          __m256i sample_L1_16bit = _mm256_maskload_epi64((const long long*)(&im_L1[i]), mask);
 
           __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
           __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
@@ -1136,8 +1136,8 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
 }
 
 static void bipred_average_im_im_avx2(kvz_pixel *dst,
-  kvz_pixel_im *ip_L0,
-  kvz_pixel_im *ip_L1,
+  kvz_pixel_im *im_L0,
+  kvz_pixel_im *im_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -1145,16 +1145,16 @@ static void bipred_average_im_im_avx2(kvz_pixel *dst,
   // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
   if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
-      case  4: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1,  4, pu_h, dst_stride); break;
-      case  8: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1,  8, pu_h, dst_stride); break;
-      case 16: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 16, pu_h, dst_stride); break;
-      case 32: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 32, pu_h, dst_stride); break;
-      case 64: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 64, pu_h, dst_stride); break;
+      case  4: bipred_average_im_im_template_avx2(dst, im_L0, im_L1,  4, pu_h, dst_stride); break;
+      case  8: bipred_average_im_im_template_avx2(dst, im_L0, im_L1,  8, pu_h, dst_stride); break;
+      case 16: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 16, pu_h, dst_stride); break;
+      case 32: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 32, pu_h, dst_stride); break;
+      case 64: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 64, pu_h, dst_stride); break;
 
-      case  6: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1,  6, pu_h, dst_stride); break;
-      case 12: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 12, pu_h, dst_stride); break;
-      case 24: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 24, pu_h, dst_stride); break;
-      case 48: bipred_average_im_im_template_avx2(dst, ip_L0, ip_L1, 48, pu_h, dst_stride); break;
+      case  6: bipred_average_im_im_template_avx2(dst, im_L0, im_L1,  6, pu_h, dst_stride); break;
+      case 12: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 12, pu_h, dst_stride); break;
+      case 24: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 24, pu_h, dst_stride); break;
+      case 48: bipred_average_im_im_template_avx2(dst, im_L0, im_L1, 48, pu_h, dst_stride); break;
       default:
         assert(0 && "Unexpected block width.");
         break;
@@ -1167,8 +1167,8 @@ static void bipred_average_im_im_avx2(kvz_pixel *dst,
     {
       int y = i / pu_w;
       int x = i % pu_w;
-      int16_t sample_L0 = ip_L0[i];
-      int16_t sample_L1 = ip_L1[i];
+      int16_t sample_L0 = im_L0[i];
+      int16_t sample_L1 = im_L1[i];
       int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
       dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
     }
@@ -1419,14 +1419,14 @@ static void bipred_average_px_im_avx2(kvz_pixel *dst,
 static void bipred_average_avx2(lcu_t *const lcu,
   const yuv_t *const px_L0,
   const yuv_t *const px_L1,
-  const yuv_im_t *const ip_L0,
-  const yuv_im_t *const ip_L1,
+  const yuv_im_t *const im_L0,
+  const yuv_im_t *const im_L1,
   const unsigned pu_x,
   const unsigned pu_y,
   const unsigned pu_w,
   const unsigned pu_h,
-  const unsigned ip_flags_L0,
-  const unsigned ip_flags_L1,
+  const unsigned im_flags_L0,
+  const unsigned im_flags_L1,
   const bool predict_luma,
   const bool predict_chroma) {
 
@@ -1434,15 +1434,15 @@ static void bipred_average_avx2(lcu_t *const lcu,
   if (predict_luma) {
     unsigned pb_offset = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
 
-    if (!(ip_flags_L0 & 1) && !(ip_flags_L1 & 1)) {
+    if (!(im_flags_L0 & 1) && !(im_flags_L1 & 1)) {
       bipred_average_px_px_avx2(lcu->rec.y + pb_offset, px_L0->y, px_L1->y, pu_w, pu_h, LCU_WIDTH);
 
-    } else if ((ip_flags_L0 & 1) && (ip_flags_L1 & 1)) {
-      bipred_average_im_im_avx2(lcu->rec.y + pb_offset, ip_L0->y, ip_L1->y, pu_w, pu_h, LCU_WIDTH);
+    } else if ((im_flags_L0 & 1) && (im_flags_L1 & 1)) {
+      bipred_average_im_im_avx2(lcu->rec.y + pb_offset, im_L0->y, im_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else {
-      kvz_pixel *src_px    = (ip_flags_L0 & 1) ? px_L1->y : px_L0->y;
-      kvz_pixel_im *src_im = (ip_flags_L0 & 1) ? ip_L0->y : ip_L1->y;
+      kvz_pixel *src_px    = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      kvz_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
       bipred_average_px_im_avx2(lcu->rec.y + pb_offset, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
     }
   }
@@ -1451,19 +1451,19 @@ static void bipred_average_avx2(lcu_t *const lcu,
     unsigned pb_w = pu_w / 2;
     unsigned pb_h = pu_h / 2;
 
-    if (!(ip_flags_L0 & 2) && !(ip_flags_L1 & 2)) {
+    if (!(im_flags_L0 & 2) && !(im_flags_L1 & 2)) {
       bipred_average_px_px_avx2(lcu->rec.u + pb_offset, px_L0->u, px_L1->u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_px_avx2(lcu->rec.v + pb_offset, px_L0->v, px_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
-    } else if ((ip_flags_L0 & 2) && (ip_flags_L1 & 2)) {
-      bipred_average_im_im_avx2(lcu->rec.u + pb_offset, ip_L0->u, ip_L1->u, pb_w, pb_h, LCU_WIDTH_C);
-      bipred_average_im_im_avx2(lcu->rec.v + pb_offset, ip_L0->v, ip_L1->v, pb_w, pb_h, LCU_WIDTH_C);
+    } else if ((im_flags_L0 & 2) && (im_flags_L1 & 2)) {
+      bipred_average_im_im_avx2(lcu->rec.u + pb_offset, im_L0->u, im_L1->u, pb_w, pb_h, LCU_WIDTH_C);
+      bipred_average_im_im_avx2(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
-      kvz_pixel *src_px_u    = (ip_flags_L0 & 2) ? px_L1->u : px_L0->u;
-      kvz_pixel_im *src_im_u = (ip_flags_L0 & 2) ? ip_L0->u : ip_L1->u;
-      kvz_pixel *src_px_v    = (ip_flags_L0 & 2) ? px_L1->v : px_L0->v;
-      kvz_pixel_im *src_im_v = (ip_flags_L0 & 2) ? ip_L0->v : ip_L1->v;
+      kvz_pixel *src_px_u    = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
+      kvz_pixel *src_px_v    = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
       bipred_average_px_im_avx2(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_im_avx2(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, LCU_WIDTH_C);
     }

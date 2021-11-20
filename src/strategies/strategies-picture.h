@@ -136,14 +136,14 @@ typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_
 typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
   const yuv_t *const px_L0,
   const yuv_t *const px_L1,
-  const yuv_im_t *const ip_L0,
-  const yuv_im_t *const ip_L1,
+  const yuv_im_t *const im_L0,
+  const yuv_im_t *const im_L1,
   const unsigned pu_x,
   const unsigned pu_y,
   const unsigned pu_w,
   const unsigned pu_h,
-  const unsigned ip_flags_L0,
-  const unsigned ip_flags_L1,
+  const unsigned im_flags_L0,
+  const unsigned im_flags_L1,
   const bool predict_luma,
   const bool predict_chroma);
 

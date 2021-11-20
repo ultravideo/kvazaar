@@ -516,8 +516,8 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   // Allocate maximum size arrays for interpolated and copied samples
   ALIGNED(64) kvz_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
   ALIGNED(64) kvz_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_im ip_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_im ip_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
 
   yuv_t px_L0;
   px_L0.size = pu_w * pu_h;
@@ -531,29 +531,29 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   px_L1.u = &px_buf_L1[LCU_LUMA_SIZE];
   px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  yuv_im_t ip_L0;
-  ip_L0.size = pu_w * pu_h;
-  ip_L0.y = &ip_buf_L0[0];
-  ip_L0.u = &ip_buf_L0[LCU_LUMA_SIZE];
-  ip_L0.v = &ip_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
+  yuv_im_t im_L0;
+  im_L0.size = pu_w * pu_h;
+  im_L0.y = &im_buf_L0[0];
+  im_L0.u = &im_buf_L0[LCU_LUMA_SIZE];
+  im_L0.v = &im_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  yuv_im_t ip_L1;
-  ip_L1.size = pu_w * pu_h;
-  ip_L1.y = &ip_buf_L1[0];
-  ip_L1.u = &ip_buf_L1[LCU_LUMA_SIZE];
-  ip_L1.v = &ip_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
+  yuv_im_t im_L1;
+  im_L1.size = pu_w * pu_h;
+  im_L1.y = &im_buf_L1[0];
+  im_L1.u = &im_buf_L1[LCU_LUMA_SIZE];
+  im_L1.v = &im_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
   // Sample blocks from both reference picture lists.
   // Flags state if the outputs were written to high-precision / interpolated sample buffers.
-  unsigned ip_flags_L0 = inter_recon_unipred(state, ref1, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[0],
-                                             &px_L0, &ip_L0, predict_luma, predict_chroma);
-  unsigned ip_flags_L1 = inter_recon_unipred(state, ref2, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[1],
-                                             &px_L1, &ip_L1, predict_luma, predict_chroma);
+  unsigned im_flags_L0 = inter_recon_unipred(state, ref1, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[0],
+                                             &px_L0, &im_L0, predict_luma, predict_chroma);
+  unsigned im_flags_L1 = inter_recon_unipred(state, ref2, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[1],
+                                             &px_L1, &im_L1, predict_luma, predict_chroma);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  kvz_bipred_average(lcu, &px_L0, &px_L1, &ip_L0, &ip_L1,
+  kvz_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
                      pu_x, pu_y, pu_w, pu_h,
-                     ip_flags_L0, ip_flags_L1,
+                     im_flags_L0, im_flags_L1,
                      predict_luma, predict_chroma);
 }
 
