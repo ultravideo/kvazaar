@@ -591,7 +591,7 @@ static void bipred_average_im_im(kvz_pixel *dst,
 
 static void bipred_average_px_im(kvz_pixel *dst,
   kvz_pixel *px,
-  kvz_pixel_im *ip,
+  kvz_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -604,7 +604,7 @@ static void bipred_average_px_im(kvz_pixel *dst,
     int y = i / pu_w;
     int x = i % pu_w;
     int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
-    int16_t sample_im = ip[i];
+    int16_t sample_im = im[i];
     int32_t rounded = (sample_px + sample_im + offset) >> shift;
     dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
   }

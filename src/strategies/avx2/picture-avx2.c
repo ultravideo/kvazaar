@@ -1177,7 +1177,7 @@ static void bipred_average_im_im_avx2(kvz_pixel *dst,
 
 static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
   kvz_pixel *px,
-  kvz_pixel_im *ip,
+  kvz_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -1201,8 +1201,8 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
       __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i + 16]));
       sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
       sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
-      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
-      __m256i sample_im_23_16bit = _mm256_loadu_si256((__m256i*)&ip[i + 16]);
+      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
+      __m256i sample_im_23_16bit = _mm256_loadu_si256((__m256i*)&im[i + 16]);
 
       __m256i sample_px_im_01_lo = _mm256_unpacklo_epi16(sample_px_01_16bit, sample_im_01_16bit);
       __m256i sample_px_im_01_hi = _mm256_unpackhi_epi16(sample_px_01_16bit, sample_im_01_16bit);
@@ -1255,8 +1255,8 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
       __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(sample_px_23_8bit);
       sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
       sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
-      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
-      __m256i sample_im_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&ip[i + 16]));
+      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
+      __m256i sample_im_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im[i + 16]));
 
       __m256i sample_px_im_01_lo = _mm256_unpacklo_epi16(sample_px_01_16bit, sample_im_01_16bit);
       __m256i sample_px_im_01_hi = _mm256_unpackhi_epi16(sample_px_01_16bit, sample_im_01_16bit);
@@ -1304,7 +1304,7 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
           __m128i sample_px_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
           sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
-          __m256i sample_im_16bit = _mm256_loadu_si256((__m256i*)&ip[i]);
+          __m256i sample_im_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
 
           __m256i sample_px_im_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_im_16bit);
           __m256i sample_px_im_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_im_16bit);
@@ -1339,7 +1339,7 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
           __m256i mask            = _mm256_setr_epi64x(-1, -1, -1, 0);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
           sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
-          __m256i sample_im_16bit = _mm256_maskload_epi64((const long long*)(&ip[i]), mask);
+          __m256i sample_im_16bit = _mm256_maskload_epi64((const long long*)(&im[i]), mask);
 
           __m256i sample_px_im_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_im_16bit);
           __m256i sample_px_im_hi = _mm256_unpackhi_epi16(sample_px_16bit, sample_im_16bit);
@@ -1378,7 +1378,7 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
 
 static void bipred_average_px_im_avx2(kvz_pixel *dst,
   kvz_pixel *px,
-  kvz_pixel_im *ip,
+  kvz_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -1386,16 +1386,16 @@ static void bipred_average_px_im_avx2(kvz_pixel *dst,
   // Use scalar code for yet unoptimized block sizes (4x4, 2x8)
   if (!(pu_w == 4 && pu_h == 4) && pu_w > 2) {
     switch (pu_w) {
-      case  4: bipred_average_px_im_template_avx2(dst, px, ip,  4, pu_h, dst_stride); break;
-      case  8: bipred_average_px_im_template_avx2(dst, px, ip,  8, pu_h, dst_stride); break;
-      case 16: bipred_average_px_im_template_avx2(dst, px, ip, 16, pu_h, dst_stride); break;
-      case 32: bipred_average_px_im_template_avx2(dst, px, ip, 32, pu_h, dst_stride); break;
-      case 64: bipred_average_px_im_template_avx2(dst, px, ip, 64, pu_h, dst_stride); break;
+      case  4: bipred_average_px_im_template_avx2(dst, px, im,  4, pu_h, dst_stride); break;
+      case  8: bipred_average_px_im_template_avx2(dst, px, im,  8, pu_h, dst_stride); break;
+      case 16: bipred_average_px_im_template_avx2(dst, px, im, 16, pu_h, dst_stride); break;
+      case 32: bipred_average_px_im_template_avx2(dst, px, im, 32, pu_h, dst_stride); break;
+      case 64: bipred_average_px_im_template_avx2(dst, px, im, 64, pu_h, dst_stride); break;
 
-      case  6: bipred_average_px_im_template_avx2(dst, px, ip,  6, pu_h, dst_stride); break;
-      case 12: bipred_average_px_im_template_avx2(dst, px, ip, 12, pu_h, dst_stride); break;
-      case 24: bipred_average_px_im_template_avx2(dst, px, ip, 24, pu_h, dst_stride); break;
-      case 48: bipred_average_px_im_template_avx2(dst, px, ip, 48, pu_h, dst_stride); break;
+      case  6: bipred_average_px_im_template_avx2(dst, px, im,  6, pu_h, dst_stride); break;
+      case 12: bipred_average_px_im_template_avx2(dst, px, im, 12, pu_h, dst_stride); break;
+      case 24: bipred_average_px_im_template_avx2(dst, px, im, 24, pu_h, dst_stride); break;
+      case 48: bipred_average_px_im_template_avx2(dst, px, im, 48, pu_h, dst_stride); break;
       default:
         assert(0 && "Unexpected block width.");
         break;
@@ -1409,7 +1409,7 @@ static void bipred_average_px_im_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
       int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
-      int16_t sample_im = ip[i];
+      int16_t sample_im = im[i];
       int32_t rounded = (sample_px + sample_im + offset) >> shift;
       dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
     }
