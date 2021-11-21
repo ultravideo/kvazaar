@@ -133,22 +133,19 @@ typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_
                                 int32_t width, int32_t height, uint32_t pic_stride,
                                 uint32_t ref_stride, uint32_t left, uint32_t right);
 
-typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
-    const int hi_prec_luma_rec1,
-    const int hi_prec_chroma_rec0,
-    const int hi_prec_chroma_rec1,
-    int height,
-    int width,
-    int ypos,
-    int xpos,
-    const hi_prec_buf_t*high_precision_rec0,
-    const hi_prec_buf_t*high_precision_rec1,
-    lcu_t* lcu,
-    kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
-    kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-    kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C],
-    bool predict_luma,
-    bool predict_chroma);  
+typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
+  const yuv_t *const px_L0,
+  const yuv_t *const px_L1,
+  const yuv_im_t *const im_L0,
+  const yuv_im_t *const im_L1,
+  const unsigned pu_x,
+  const unsigned pu_y,
+  const unsigned pu_w,
+  const unsigned pu_h,
+  const unsigned im_flags_L0,
+  const unsigned im_flags_L1,
+  const bool predict_luma,
+  const bool predict_chroma);
 
 typedef double (pixel_var_func)(const kvz_pixel *buf, const uint32_t len);
 
@@ -184,7 +181,7 @@ extern cost_pixel_any_size_multi_func *kvz_satd_any_size_quad;
 
 extern pixels_calc_ssd_func *kvz_pixels_calc_ssd;
 
-extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
+extern inter_recon_bipred_func * kvz_bipred_average;
 
 extern get_optimized_sad_func *kvz_get_optimized_sad;
 extern ver_sad_func *kvz_ver_sad;
@@ -223,7 +220,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_64x64_dual", (void**) &kvz_satd_64x64_dual}, \
   {"satd_any_size_quad", (void**) &kvz_satd_any_size_quad}, \
   {"pixels_calc_ssd", (void**) &kvz_pixels_calc_ssd}, \
-  {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
+  {"bipred_average", (void**) &kvz_bipred_average}, \
   {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
   {"ver_sad", (void**) &kvz_ver_sad}, \
   {"hor_sad", (void**) &kvz_hor_sad}, \
