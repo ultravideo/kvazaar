@@ -366,8 +366,8 @@ static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
  * \param width          PU width
  * \param height         PU height
  * \param mv_param       motion vector
- * \param lcu_px         destination lcu
- * \param lcu_im         destination of high precision output, or NULL if not needed
+ * \param yuv_px         destination buffer for pixel precision
+ * \param yuv_im         destination buffer for high-precision, or NULL if not needed
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
 */
