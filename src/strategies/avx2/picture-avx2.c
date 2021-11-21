@@ -968,34 +968,34 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
-      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
-      __m256i sample_L0_23_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i + 16]);
-      __m256i sample_L1_23_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i + 16]);
+      __m256i sample_L0_a_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
+      __m256i sample_L1_a_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
+      __m256i sample_L0_b_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i + 16]);
+      __m256i sample_L1_b_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i + 16]);
 
-      __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
-      __m256i sample_L0_L1_01_hi = _mm256_unpackhi_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
-      __m256i sample_L0_L1_23_lo = _mm256_unpacklo_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
-      __m256i sample_L0_L1_23_hi = _mm256_unpackhi_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
+      __m256i sample_L0_L1_a_lo = _mm256_unpacklo_epi16(sample_L0_a_16bit, sample_L1_a_16bit);
+      __m256i sample_L0_L1_a_hi = _mm256_unpackhi_epi16(sample_L0_a_16bit, sample_L1_a_16bit);
+      __m256i sample_L0_L1_b_lo = _mm256_unpacklo_epi16(sample_L0_b_16bit, sample_L1_b_16bit);
+      __m256i sample_L0_L1_b_hi = _mm256_unpackhi_epi16(sample_L0_b_16bit, sample_L1_b_16bit);
 
-      __m256i all_ones  = _mm256_set1_epi16(1);
-      __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_01_lo, all_ones);
-      __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_01_hi, all_ones);
-      __m256i avg_23_lo = _mm256_madd_epi16(sample_L0_L1_23_lo, all_ones);
-      __m256i avg_23_hi = _mm256_madd_epi16(sample_L0_L1_23_hi, all_ones);
+      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i avg_a_lo = _mm256_madd_epi16(sample_L0_L1_a_lo, all_ones);
+      __m256i avg_a_hi = _mm256_madd_epi16(sample_L0_L1_a_hi, all_ones);
+      __m256i avg_b_lo = _mm256_madd_epi16(sample_L0_L1_b_lo, all_ones);
+      __m256i avg_b_hi = _mm256_madd_epi16(sample_L0_L1_b_hi, all_ones);
 
-      avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
-      avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
-      avg_23_lo = _mm256_add_epi32(avg_23_lo, offset);
-      avg_23_hi = _mm256_add_epi32(avg_23_hi, offset);
+      avg_a_lo = _mm256_add_epi32(avg_a_lo, offset);
+      avg_a_hi = _mm256_add_epi32(avg_a_hi, offset);
+      avg_b_lo = _mm256_add_epi32(avg_b_lo, offset);
+      avg_b_hi = _mm256_add_epi32(avg_b_hi, offset);
 
-      avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
-      avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
-      avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
-      avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
+      avg_a_lo = _mm256_srai_epi32(avg_a_lo, shift);
+      avg_a_hi = _mm256_srai_epi32(avg_a_hi, shift);
+      avg_b_lo = _mm256_srai_epi32(avg_b_lo, shift);
+      avg_b_hi = _mm256_srai_epi32(avg_b_hi, shift);
 
-      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_a_lo, avg_a_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_b_lo, avg_b_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
       __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
@@ -1017,35 +1017,35 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
       int x = i % pu_w;
 
       // Last 64 bits of the 256 are not used to simplify the loop
-      __m256i mask               = _mm256_setr_epi64x(-1, -1, -1, 0);
-      __m256i sample_L0_01_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
-      __m256i sample_L1_01_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
-      __m256i sample_L0_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L0[i + 16]));
-      __m256i sample_L1_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L1[i + 16]));
+      __m256i mask              = _mm256_setr_epi64x(-1, -1, -1, 0);
+      __m256i sample_L0_a_16bit = _mm256_loadu_si256((__m256i*)&im_L0[i]);
+      __m256i sample_L1_a_16bit = _mm256_loadu_si256((__m256i*)&im_L1[i]);
+      __m256i sample_L0_b_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L0[i + 16]));
+      __m256i sample_L1_b_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im_L1[i + 16]));
 
-      __m256i sample_L0_L1_01_lo = _mm256_unpacklo_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
-      __m256i sample_L0_L1_01_hi = _mm256_unpackhi_epi16(sample_L0_01_16bit, sample_L1_01_16bit);
-      __m256i sample_L0_L1_23_lo = _mm256_unpacklo_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
-      __m256i sample_L0_L1_23_hi = _mm256_unpackhi_epi16(sample_L0_23_16bit, sample_L1_23_16bit);
+      __m256i sample_L0_L1_a_lo = _mm256_unpacklo_epi16(sample_L0_a_16bit, sample_L1_a_16bit);
+      __m256i sample_L0_L1_a_hi = _mm256_unpackhi_epi16(sample_L0_a_16bit, sample_L1_a_16bit);
+      __m256i sample_L0_L1_b_lo = _mm256_unpacklo_epi16(sample_L0_b_16bit, sample_L1_b_16bit);
+      __m256i sample_L0_L1_b_hi = _mm256_unpackhi_epi16(sample_L0_b_16bit, sample_L1_b_16bit);
 
-      __m256i all_ones  = _mm256_set1_epi16(1);
-      __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_01_lo, all_ones);
-      __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_01_hi, all_ones);
-      __m256i avg_23_lo = _mm256_madd_epi16(sample_L0_L1_23_lo, all_ones);
-      __m256i avg_23_hi = _mm256_madd_epi16(sample_L0_L1_23_hi, all_ones);
+      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i avg_a_lo = _mm256_madd_epi16(sample_L0_L1_a_lo, all_ones);
+      __m256i avg_a_hi = _mm256_madd_epi16(sample_L0_L1_a_hi, all_ones);
+      __m256i avg_b_lo = _mm256_madd_epi16(sample_L0_L1_b_lo, all_ones);
+      __m256i avg_b_hi = _mm256_madd_epi16(sample_L0_L1_b_hi, all_ones);
 
-      avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
-      avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
-      avg_23_lo = _mm256_add_epi32(avg_23_lo, offset);
-      avg_23_hi = _mm256_add_epi32(avg_23_hi, offset);
+      avg_a_lo = _mm256_add_epi32(avg_a_lo, offset);
+      avg_a_hi = _mm256_add_epi32(avg_a_hi, offset);
+      avg_b_lo = _mm256_add_epi32(avg_b_lo, offset);
+      avg_b_hi = _mm256_add_epi32(avg_b_hi, offset);
 
-      avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
-      avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
-      avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
-      avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
+      avg_a_lo = _mm256_srai_epi32(avg_a_lo, shift);
+      avg_a_hi = _mm256_srai_epi32(avg_a_hi, shift);
+      avg_b_lo = _mm256_srai_epi32(avg_b_lo, shift);
+      avg_b_hi = _mm256_srai_epi32(avg_b_hi, shift);
 
-      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_a_lo, avg_a_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_b_lo, avg_b_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
       __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
@@ -1096,24 +1096,24 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
 
           int y = i / pu_w;
 
-          __m256i mask = _mm256_setr_epi64x(-1, -1, -1, 0);
+          __m256i mask            = _mm256_setr_epi64x(-1, -1, -1, 0);
           __m256i sample_L0_16bit = _mm256_maskload_epi64((const long long*)(&im_L0[i]), mask);
           __m256i sample_L1_16bit = _mm256_maskload_epi64((const long long*)(&im_L1[i]), mask);
 
           __m256i sample_L0_L1_lo = _mm256_unpacklo_epi16(sample_L0_16bit, sample_L1_16bit);
           __m256i sample_L0_L1_hi = _mm256_unpackhi_epi16(sample_L0_16bit, sample_L1_16bit);
 
-          __m256i all_ones  = _mm256_set1_epi16(1);
-          __m256i avg_01_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
-          __m256i avg_01_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
+          __m256i all_ones = _mm256_set1_epi16(1);
+          __m256i avg_a_lo = _mm256_madd_epi16(sample_L0_L1_lo, all_ones);
+          __m256i avg_a_hi = _mm256_madd_epi16(sample_L0_L1_hi, all_ones);
 
-          avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
-          avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
+          avg_a_lo = _mm256_add_epi32(avg_a_lo, offset);
+          avg_a_hi = _mm256_add_epi32(avg_a_hi, offset);
 
-          avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
-          avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
+          avg_a_lo = _mm256_srai_epi32(avg_a_lo, shift);
+          avg_a_hi = _mm256_srai_epi32(avg_a_hi, shift);
 
-          __m256i avg256 = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
+          __m256i avg256 = _mm256_packus_epi32(avg_a_lo, avg_a_hi);
           avg256         = _mm256_packus_epi16(avg256, avg256);
           avg256         = _mm256_permute4x64_epi64(avg256, _MM_SHUFFLE(3, 1, 2, 0));
           __m128i avg    = _mm256_castsi256_si128(avg256);
@@ -1197,36 +1197,36 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
       int y = i / pu_w;
       int x = i % pu_w;
 
-      __m256i sample_px_01_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i]));
-      __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i + 16]));
-      sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
-      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
-      __m256i sample_im_23_16bit = _mm256_loadu_si256((__m256i*)&im[i + 16]);
+      __m256i sample_px_a_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i]));
+      __m256i sample_px_b_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i + 16]));
+      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - KVZ_BIT_DEPTH);
+      __m256i sample_im_a_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
+      __m256i sample_im_b_16bit = _mm256_loadu_si256((__m256i*)&im[i + 16]);
 
-      __m256i sample_px_im_01_lo = _mm256_unpacklo_epi16(sample_px_01_16bit, sample_im_01_16bit);
-      __m256i sample_px_im_01_hi = _mm256_unpackhi_epi16(sample_px_01_16bit, sample_im_01_16bit);
-      __m256i sample_px_im_23_lo = _mm256_unpacklo_epi16(sample_px_23_16bit, sample_im_23_16bit);
-      __m256i sample_px_im_23_hi = _mm256_unpackhi_epi16(sample_px_23_16bit, sample_im_23_16bit);
+      __m256i sample_px_im_a_lo = _mm256_unpacklo_epi16(sample_px_a_16bit, sample_im_a_16bit);
+      __m256i sample_px_im_a_hi = _mm256_unpackhi_epi16(sample_px_a_16bit, sample_im_a_16bit);
+      __m256i sample_px_im_b_lo = _mm256_unpacklo_epi16(sample_px_b_16bit, sample_im_b_16bit);
+      __m256i sample_px_im_b_hi = _mm256_unpackhi_epi16(sample_px_b_16bit, sample_im_b_16bit);
 
       __m256i all_ones  = _mm256_set1_epi16(1);
-      __m256i avg_01_lo = _mm256_madd_epi16(sample_px_im_01_lo, all_ones);
-      __m256i avg_01_hi = _mm256_madd_epi16(sample_px_im_01_hi, all_ones);
-      __m256i avg_23_lo = _mm256_madd_epi16(sample_px_im_23_lo, all_ones);
-      __m256i avg_23_hi = _mm256_madd_epi16(sample_px_im_23_hi, all_ones);
+      __m256i avg_a_lo = _mm256_madd_epi16(sample_px_im_a_lo, all_ones);
+      __m256i avg_a_hi = _mm256_madd_epi16(sample_px_im_a_hi, all_ones);
+      __m256i avg_b_lo = _mm256_madd_epi16(sample_px_im_b_lo, all_ones);
+      __m256i avg_b_hi = _mm256_madd_epi16(sample_px_im_b_hi, all_ones);
 
-      avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
-      avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
-      avg_23_lo = _mm256_add_epi32(avg_23_lo, offset);
-      avg_23_hi = _mm256_add_epi32(avg_23_hi, offset);
+      avg_a_lo = _mm256_add_epi32(avg_a_lo, offset);
+      avg_a_hi = _mm256_add_epi32(avg_a_hi, offset);
+      avg_b_lo = _mm256_add_epi32(avg_b_lo, offset);
+      avg_b_hi = _mm256_add_epi32(avg_b_hi, offset);
 
-      avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
-      avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
-      avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
-      avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
+      avg_a_lo = _mm256_srai_epi32(avg_a_lo, shift);
+      avg_a_hi = _mm256_srai_epi32(avg_a_hi, shift);
+      avg_b_lo = _mm256_srai_epi32(avg_b_lo, shift);
+      avg_b_hi = _mm256_srai_epi32(avg_b_hi, shift);
 
-      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_a_lo, avg_a_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_b_lo, avg_b_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
       __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
@@ -1248,39 +1248,39 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
       int x = i % pu_w;
 
       // Last 64 bits of the 256 / 32 bits of the 128 are not used to simplify the loop
-      __m256i mask               = _mm256_setr_epi64x(-1, -1, -1, 0);
-      __m128i sample_px_01_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
-      __m128i sample_px_23_8bit  = _mm_loadl_epi64((__m128i*)&px[i + 16]);
-      __m256i sample_px_01_16bit = _mm256_cvtepu8_epi16(sample_px_01_8bit);
-      __m256i sample_px_23_16bit = _mm256_cvtepu8_epi16(sample_px_23_8bit);
-      sample_px_01_16bit         = _mm256_slli_epi16(sample_px_01_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_23_16bit         = _mm256_slli_epi16(sample_px_23_16bit, 14 - KVZ_BIT_DEPTH);
-      __m256i sample_im_01_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
-      __m256i sample_im_23_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im[i + 16]));
+      __m256i mask              = _mm256_setr_epi64x(-1, -1, -1, 0);
+      __m128i sample_px_a_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
+      __m128i sample_px_b_8bit  = _mm_loadl_epi64((__m128i*)&px[i + 16]);
+      __m256i sample_px_a_16bit = _mm256_cvtepu8_epi16(sample_px_a_8bit);
+      __m256i sample_px_b_16bit = _mm256_cvtepu8_epi16(sample_px_b_8bit);
+      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - KVZ_BIT_DEPTH);
+      __m256i sample_im_a_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
+      __m256i sample_im_b_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im[i + 16]));
 
-      __m256i sample_px_im_01_lo = _mm256_unpacklo_epi16(sample_px_01_16bit, sample_im_01_16bit);
-      __m256i sample_px_im_01_hi = _mm256_unpackhi_epi16(sample_px_01_16bit, sample_im_01_16bit);
-      __m256i sample_px_im_23_lo = _mm256_unpacklo_epi16(sample_px_23_16bit, sample_im_23_16bit);
-      __m256i sample_px_im_23_hi = _mm256_unpackhi_epi16(sample_px_23_16bit, sample_im_23_16bit);
+      __m256i sample_px_im_a_lo = _mm256_unpacklo_epi16(sample_px_a_16bit, sample_im_a_16bit);
+      __m256i sample_px_im_a_hi = _mm256_unpackhi_epi16(sample_px_a_16bit, sample_im_a_16bit);
+      __m256i sample_px_im_b_lo = _mm256_unpacklo_epi16(sample_px_b_16bit, sample_im_b_16bit);
+      __m256i sample_px_im_b_hi = _mm256_unpackhi_epi16(sample_px_b_16bit, sample_im_b_16bit);
 
-      __m256i all_ones  = _mm256_set1_epi16(1);
-      __m256i avg_01_lo = _mm256_madd_epi16(sample_px_im_01_lo, all_ones);
-      __m256i avg_01_hi = _mm256_madd_epi16(sample_px_im_01_hi, all_ones);
-      __m256i avg_23_lo = _mm256_madd_epi16(sample_px_im_23_lo, all_ones);
-      __m256i avg_23_hi = _mm256_madd_epi16(sample_px_im_23_hi, all_ones);
+      __m256i all_ones = _mm256_set1_epi16(1);
+      __m256i avg_a_lo = _mm256_madd_epi16(sample_px_im_a_lo, all_ones);
+      __m256i avg_a_hi = _mm256_madd_epi16(sample_px_im_a_hi, all_ones);
+      __m256i avg_b_lo = _mm256_madd_epi16(sample_px_im_b_lo, all_ones);
+      __m256i avg_b_hi = _mm256_madd_epi16(sample_px_im_b_hi, all_ones);
 
-      avg_01_lo = _mm256_add_epi32(avg_01_lo, offset);
-      avg_01_hi = _mm256_add_epi32(avg_01_hi, offset);
-      avg_23_lo = _mm256_add_epi32(avg_23_lo, offset);
-      avg_23_hi = _mm256_add_epi32(avg_23_hi, offset);
+      avg_a_lo = _mm256_add_epi32(avg_a_lo, offset);
+      avg_a_hi = _mm256_add_epi32(avg_a_hi, offset);
+      avg_b_lo = _mm256_add_epi32(avg_b_lo, offset);
+      avg_b_hi = _mm256_add_epi32(avg_b_hi, offset);
 
-      avg_01_lo = _mm256_srai_epi32(avg_01_lo, shift);
-      avg_01_hi = _mm256_srai_epi32(avg_01_hi, shift);
-      avg_23_lo = _mm256_srai_epi32(avg_23_lo, shift);
-      avg_23_hi = _mm256_srai_epi32(avg_23_hi, shift);
+      avg_a_lo = _mm256_srai_epi32(avg_a_lo, shift);
+      avg_a_hi = _mm256_srai_epi32(avg_a_hi, shift);
+      avg_b_lo = _mm256_srai_epi32(avg_b_lo, shift);
+      avg_b_hi = _mm256_srai_epi32(avg_b_hi, shift);
 
-      __m256i avg_01  = _mm256_packus_epi32(avg_01_lo, avg_01_hi);
-      __m256i avg_23  = _mm256_packus_epi32(avg_23_lo, avg_23_hi);
+      __m256i avg_01  = _mm256_packus_epi32(avg_a_lo, avg_a_hi);
+      __m256i avg_23  = _mm256_packus_epi32(avg_b_lo, avg_b_hi);
       __m256i avg0213 = _mm256_packus_epi16(avg_01, avg_23);
       __m256i avg     = _mm256_permute4x64_epi64(avg0213, _MM_SHUFFLE(3, 1, 2, 0));
 
