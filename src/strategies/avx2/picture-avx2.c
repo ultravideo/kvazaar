@@ -1460,9 +1460,9 @@ static void bipred_average_avx2(lcu_t *const lcu,
       bipred_average_im_im_avx2(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
-      kvz_pixel *src_px_u    = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      kvz_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
       kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
-      kvz_pixel *src_px_v    = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      kvz_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
       kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
       bipred_average_px_im_avx2(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_im_avx2(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, LCU_WIDTH_C);
