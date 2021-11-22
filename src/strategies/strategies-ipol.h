@@ -43,15 +43,15 @@
 #include "kvazaar.h"
 #include "search_inter.h"
 
-// AVX2 implementation of horizontal filter reads and
-// writes two rows for luma and four for chroma at a time.
-// Extra vertical padding is added to prevent segfaults.
-// Horizontal padding is not needed even if one extra byte
-// is read because kvz_image_alloc adds enough padding.
-#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * KVZ_EXT_BLOCK_W_LUMA)
-#define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA)
-#define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH)
-#define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
+ // AVX2 implementation of horizontal filter reads and
+ // writes two rows for luma and four for chroma at a time.
+ // Extra vertical padding is added to prevent segfaults.
+ // Needs one extra byte for input buffer to prevent ASAN
+ // error because AVX2 reads one extra byte in the end.
+#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD   ((KVZ_EXT_BLOCK_W_LUMA   + 1) * KVZ_EXT_BLOCK_W_LUMA   + 1)
+#define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA + 1)
+#define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD      ((KVZ_EXT_BLOCK_W_LUMA   + 1) * LCU_WIDTH)
+#define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD    ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
 
 // On top of basic interpolation, FME needs one extra
 // column and row for ME (left and up). Adding the
