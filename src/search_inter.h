@@ -64,7 +64,7 @@ enum hpel_position {
   HPEL_POS_DIA = 2
 };
 
-typedef uint32_t kvz_mvd_cost_func(const encoder_state_t *state,
+typedef double kvz_mvd_cost_func(const encoder_state_t *state,
                                   int x, int y,
                                   int mv_shift,
                                   int16_t mv_cand[2][2],

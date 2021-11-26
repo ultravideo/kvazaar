@@ -524,9 +524,8 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  int lambda_cost = (int)(state->lambda_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-    costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
+    costs[mode_i] += state->lambda_sqrt * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
   }
 
   #undef PARALLEL_BLKS
@@ -595,7 +594,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
-    costs[rdo_mode] = rdo_bitcost * (int)(state->lambda + 0.5);
+    costs[rdo_mode] = rdo_bitcost * state->lambda;
 
     // Perform transform split search and save mode RD cost for the best one.
     cu_info_t pred_cu;

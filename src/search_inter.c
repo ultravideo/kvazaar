@@ -85,7 +85,7 @@ typedef struct {
   /**
    * \brief Cost of best_mv
    */
-  uint32_t best_cost;
+  double best_cost;
   /**
    * \brief Bit cost of best_mv
    */
@@ -390,15 +390,15 @@ static int select_mv_cand(const encoder_state_t *state,
 }
 
 
-static uint32_t calc_mvd_cost(const encoder_state_t *state,
-                              int x,
-                              int y,
-                              int mv_shift,
-                              int16_t mv_cand[2][2],
-                              inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-                              int16_t num_cand,
-                              int32_t ref_idx,
-                              uint32_t *bitcost)
+static double calc_mvd_cost(const encoder_state_t *state,
+                            int x,
+                            int y,
+                            int mv_shift,
+                            int16_t mv_cand[2][2],
+                            inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                            int16_t num_cand,
+                            int32_t ref_idx,
+                            uint32_t *bitcost)
 {
   uint32_t temp_bitcost = 0;
   uint32_t merge_idx;
@@ -428,7 +428,7 @@ static uint32_t calc_mvd_cost(const encoder_state_t *state,
     temp_bitcost += mvd_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(state->lambda_sqrt + 0.5);
+  return temp_bitcost * state->lambda_sqrt;
 }
 
 
@@ -624,7 +624,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   const bool use_star_refinement = true;   // enable step 4 mode 2 (only one mode will be executed)
 
   int best_dist = 0;
-  info->best_cost = UINT32_MAX;
+  info->best_cost = MAX_DOUBLE;
 
   // Select starting point from among merge candidates. These should
   // include both mv_cand vectors and (0, 0).
@@ -732,7 +732,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
       { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 }
   };
 
-  info->best_cost = UINT32_MAX;
+  info->best_cost = MAX_DOUBLE;
 
   // Select starting point from among merge candidates. These should
   // include both mv_cand vectors and (0, 0).
@@ -832,7 +832,7 @@ static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
     {0, 0}
   };
 
-  info->best_cost = UINT32_MAX;
+  info->best_cost = MAX_DOUBLE;
 
   // Select starting point from among merge candidates. These should
   // include both mv_cand vectors and (0, 0).
@@ -997,11 +997,12 @@ static void search_frac(inter_search_info_t *info)
   // Set mv to pixel precision
   vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
 
-  unsigned best_cost = UINT32_MAX;
+  double best_cost = MAX_DOUBLE;
   uint32_t best_bitcost = 0;
   uint32_t bitcosts[4] = { 0 };
   unsigned best_index = 0;
 
+// Keep this as unsigned until SAD / SATD functions are updated
   unsigned costs[4] = { 0 };
 
   ALIGNED(64) kvz_pixel filtered[4][LCU_LUMA_SIZE];
@@ -1338,7 +1339,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     default: break;
   }
 
-  info->best_cost = UINT32_MAX;
+  info->best_cost = MAX_DOUBLE;
 
   switch (cfg->ime_algorithm) {
     case KVZ_IME_TZ:
@@ -1365,7 +1366,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   if (cfg->fme_level > 0 && info->best_cost < *inter_cost) {
     search_frac(info);
 
-  } else if (info->best_cost < UINT32_MAX) {
+  } else if (info->best_cost < MAX_DOUBLE) {
     // Recalculate inter cost with SATD.
     info->best_cost = kvz_image_calc_satd(
         info->state->tile->frame->source,
@@ -1376,7 +1377,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         info->state->tile->offset_y + info->origin.y + (info->best_mv.y >> 2),
         info->width,
         info->height);
-    info->best_cost += info->best_bitcost * (int)(info->state->lambda_sqrt + 0.5);
+    info->best_cost += info->best_bitcost * info->state->lambda_sqrt;
   }
 
   mv = info->best_mv;
@@ -1504,7 +1505,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
 
     const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
     const kvz_pixel *src = &frame->source->y[x + y * frame->source->width];
-    uint32_t cost =
+    double cost =
       kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->width);
 
     uint32_t bitcost[2] = { 0, 0 };
@@ -1529,7 +1530,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
       merge_cand[j].ref[1]
     };
     const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
-    cost += info->state->lambda_sqrt * extra_bits + 0.5;
+    cost += info->state->lambda_sqrt * extra_bits;
 
     if (cost < *inter_cost) {
       cur_cu->inter.mv_dir = 3;
@@ -1630,7 +1631,7 @@ static void search_pu_inter(encoder_state_t * const state,
                             double *inter_cost,
                             uint32_t *inter_bitcost)
 {
-  *inter_cost = MAX_INT;
+  *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
 
   const kvz_config *cfg = &state->encoder_control->cfg;
@@ -1826,7 +1827,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
       const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
       const kvz_pixel *src = &lcu->ref.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
-      uint32_t cost =
+      double cost =
         kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
 
       uint32_t bitcost[2] = { 0, 0 };
@@ -1851,7 +1852,7 @@ static void search_pu_inter(encoder_state_t * const state,
         unipreds[1].inter.mv_ref[1]
       };
       const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
-      cost += info.state->lambda_sqrt * extra_bits + 0.5;
+      cost += info.state->lambda_sqrt * extra_bits;
 
       if (cost < *inter_cost) {
         cur_cu->inter.mv_dir = 3;
@@ -2056,14 +2057,14 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     cur_pu->depth     = depth;
     cur_pu->qp        = state->qp;
 
-    double cost      = MAX_INT;
+    double cost      = MAX_DOUBLE;
     uint32_t bitcost = MAX_INT;
 
     search_pu_inter(state, x, y, depth, part_mode, i, lcu, &cost, &bitcost);
 
-    if (cost >= MAX_INT) {
+    if (cost == MAX_DOUBLE) {
       // Could not find any motion vector.
-      *inter_cost    = MAX_INT;
+      *inter_cost    = MAX_DOUBLE;
       *inter_bitcost = MAX_INT;
       return;
     }

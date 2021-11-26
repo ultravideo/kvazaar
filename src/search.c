@@ -462,8 +462,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
-  double cost = MAX_INT;
-  double inter_zero_coeff_cost = MAX_INT;
+  double cost = MAX_DOUBLE;
+  double inter_zero_coeff_cost = MAX_DOUBLE;
   uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
