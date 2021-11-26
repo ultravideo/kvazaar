@@ -1709,8 +1709,10 @@ static void search_pu_inter(encoder_state_t * const state,
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
-    if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
-        !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
+    bool active_L0 = cur_cu->inter.mv_dir & 1;
+    bool active_L1 = cur_cu->inter.mv_dir & 2;
+    if (active_L0 && !fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
+        active_L1 && !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
         is_duplicate)
     {
       continue;
