@@ -1382,36 +1382,17 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
   mv = info->best_mv;
 
-  int merged = 0;
-  int merge_idx = 0;
-  // Check every candidate to find a match
-  for (merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
-    if (info->merge_cand[merge_idx].dir != 3 &&
-        info->merge_cand[merge_idx].mv[info->merge_cand[merge_idx].dir - 1][0] == mv.x &&
-        info->merge_cand[merge_idx].mv[info->merge_cand[merge_idx].dir - 1][1] == mv.y &&
-        (uint32_t)info->state->frame->ref_LX[info->merge_cand[merge_idx].dir - 1][
-        info->merge_cand[merge_idx].ref[info->merge_cand[merge_idx].dir - 1]] == info->ref_idx)
-    {
-      merged = 1;
-      break;
-    }
-  }
-
   // Only check when candidates are different
   uint8_t mv_ref_coded = LX_idx;
-  int cu_mv_cand = 0;
-  if (!merged) {
-    cu_mv_cand =
-      select_mv_cand(info->state, info->mv_cand, mv.x, mv.y, NULL);
-      info->best_bitcost += cur_cu->inter.mv_dir - 1 + mv_ref_coded;
-  }
+  int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, mv.x, mv.y, NULL);
+  info->best_bitcost += cur_cu->inter.mv_dir - 1 + mv_ref_coded;
 
   if (info->best_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
 
-    cur_cu->merged                  = merged;
-    cur_cu->merge_idx               = merge_idx;
+    cur_cu->merged = false;
+    cur_cu->skipped = false;
     cur_cu->inter.mv_ref[ref_list]  = LX_idx;
     cur_cu->inter.mv[ref_list][0]   = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1]   = (int16_t)mv.y;
@@ -1428,6 +1409,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
     if (valid_mv) {
       // Map reference index to L0/L1 pictures
+      unipred_LX[ref_list].merged = false;
+      unipred_LX[ref_list].skipped = false;
       unipred_LX[ref_list].inter.mv_dir = ref_list + 1;
       unipred_LX[ref_list].inter.mv_ref[ref_list] = LX_idx;
       unipred_LX[ref_list].inter.mv[ref_list][0] = (int16_t)mv.x;
