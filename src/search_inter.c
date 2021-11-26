@@ -1398,16 +1398,17 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   }
 
   // Only check when candidates are different
+  uint8_t mv_ref_coded = LX_idx;
   int cu_mv_cand = 0;
   if (!merged) {
     cu_mv_cand =
       select_mv_cand(info->state, info->mv_cand, mv.x, mv.y, NULL);
+      info->best_bitcost += cur_cu->inter.mv_dir - 1 + mv_ref_coded;
   }
 
   if (info->best_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
-    uint8_t mv_ref_coded = LX_idx;
 
     cur_cu->merged                  = merged;
     cur_cu->merge_idx               = merge_idx;
@@ -1418,7 +1419,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
 
     *inter_cost = info->best_cost;
-    *inter_bitcost = info->best_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
+    *inter_bitcost = info->best_bitcost;
   }
 
 
