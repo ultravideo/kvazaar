@@ -415,6 +415,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 }
 
 
+// TODO: replace usages of this by the kvz_sort_indices_by_cost function.
 /**
  * \brief Sort modes and costs to ascending order according to costs.
  */
@@ -435,6 +436,25 @@ void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t 
     }
     costs[j] = cur_cost;
     modes[j] = cur_mode;
+  }
+}
+
+
+/**
+ * \brief Sort indices to ascending order according to costs.
+ */
+void kvz_sort_indices_by_cost(blk_stats_map_t *__restrict map)
+{
+  // Size of sorted arrays is expected to be "small". No need for faster algorithm.
+  for (uint8_t i = 1; i < map->size; ++i) {
+    const int8_t cur_idx  = map->idx[i];
+    const double cur_cost = map->stats[cur_idx].cost;
+    uint8_t j = i;
+    while (j > 0 && cur_cost < map->stats[map->idx[j - 1]].cost) {
+      map->idx[j] = map->idx[j - 1];
+      --j;
+    }
+    map->idx[j] = cur_idx;
   }
 }
 
