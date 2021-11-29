@@ -234,8 +234,8 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
       info->state,
       x, y, 2,
       info->mv_cand,
-      info->merge_cand,
-      info->num_merge_cand,
+      NULL,
+      0,
       info->ref_idx,
       &bitcost
   );
@@ -1068,8 +1068,8 @@ static void search_frac(inter_search_info_t *info)
   costs[0] += info->mvd_cost_func(state,
                                   mv.x, mv.y, 2,
                                   info->mv_cand,
-                                  info->merge_cand,
-                                  info->num_merge_cand,
+                                  NULL,
+                                  0,
                                   info->ref_idx,
                                   &bitcosts[0]);
   best_cost = costs[0];
@@ -1128,8 +1128,8 @@ static void search_frac(inter_search_info_t *info)
             mv.y + pattern[j]->y,
             mv_shift,
             info->mv_cand,
-            info->merge_cand,
-            info->num_merge_cand,
+            NULL,
+            0,
             info->ref_idx,
             &bitcosts[j]
         );
