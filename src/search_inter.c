@@ -1217,8 +1217,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   int depth,
   lcu_t *lcu,
   cu_info_t *cur_cu,
-  double *inter_cost,
-  uint32_t *inter_bitcost,
   blk_stats_map_t *amvp)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
@@ -1242,10 +1240,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   // Must find at least one reference picture
   assert(ref_list_active[0] || ref_list_active[1]);
 
-  // TODO: remove
-  double best_cost_LX[2] = { MAX_DOUBLE, MAX_DOUBLE };
-
-  for (int ref_list = 1; ref_list >= 0; --ref_list) {
+  for (int ref_list = 0; ref_list < 2; ++ref_list) {
     if (ref_list_active[ref_list]) {
 
       int LX_idx = ref_list_idx[ref_list];
@@ -1388,21 +1383,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
       // Update best unipreds for biprediction
       bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
-      if (valid_mv) {
-        if (info->best_cost < *inter_cost) {
-          // Map reference index to L0/L1 pictures
-          cur_cu->inter.mv_dir = ref_list + 1;
-
-          cur_cu->merged = false;
-          cur_cu->skipped = false;
-          cur_cu->inter.mv_ref[ref_list] = LX_idx;
-          cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
-          cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
-          CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
-
-          *inter_cost = info->best_cost;
-          *inter_bitcost = info->best_bitcost;
-        }
+      if (valid_mv && info->best_cost < MAX_DOUBLE) {
 
         // Map reference index to L0/L1 pictures
         blk_stats_map_t *cur_map = &amvp[ref_list];
@@ -1785,11 +1766,32 @@ static void search_pu_inter(encoder_state_t * const state,
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
-    search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost, amvp);
+    search_pu_inter_ref(&info, depth, lcu, cur_cu, amvp);
   }
 
   kvz_sort_indices_by_cost(&amvp[0]);
   kvz_sort_indices_by_cost(&amvp[1]);
+
+  int best_idx[2] = { amvp[0].idx[0], amvp[1].idx[0] };
+  double best_cost_L0 = MAX_DOUBLE;
+  double best_cost_L1 = MAX_DOUBLE;
+  if (amvp[0].size > 0) best_cost_L0 = amvp[0].stats[best_idx[0]].cost;
+  if (amvp[1].size > 0) best_cost_L1 = amvp[1].stats[best_idx[1]].cost;
+  int best_list = (best_cost_L0 <= best_cost_L1) ? 0 : 1;
+  int best_cost = (best_cost_L0 <= best_cost_L1) ? best_cost_L0 : best_cost_L1;
+
+  cu_info_t *best_unipred[2] = {
+    &amvp[0].stats[best_idx[0]].blk,
+    &amvp[1].stats[best_idx[1]].blk
+  };
+
+  // Set best valid unipred to cur_cu
+  if (best_cost < MAX_DOUBLE) {
+    // Map reference index to L0/L1 pictures
+    *cur_cu = *best_unipred[best_list];
+    *inter_cost    = amvp[best_list].stats[best_idx[best_list]].cost;
+    *inter_bitcost = amvp[best_list].stats[best_idx[best_list]].bits;
+  }
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
@@ -1807,12 +1809,6 @@ static void search_pu_inter(encoder_state_t * const state,
       uint8_t(*ref_LX)[16] = info.state->frame->ref_LX;
 
       inter_merge_cand_t *merge_cand = info.merge_cand;
-
-      int best_idx[2] = { amvp[0].idx[0], amvp[1].idx[0] };
-      cu_info_t *best_unipred[2] = {
-        &amvp[0].stats[best_idx[0]].blk,
-        &amvp[1].stats[best_idx[1]].blk
-      };
 
       int16_t mv[2][2];
       mv[0][0] = best_unipred[0]->inter.mv[0][0];
