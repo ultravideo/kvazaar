@@ -1219,7 +1219,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   cu_info_t *cur_cu,
   double *inter_cost,
   uint32_t *inter_bitcost,
-  double *best_LX_cost,
   blk_stats_map_t *amvp)
 {
   const kvz_config *cfg = &info->state->encoder_control->cfg;
@@ -1406,29 +1405,24 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
 
   // Update best unipreds for biprediction
-  if (info->best_cost < best_LX_cost[ref_list]) {
-    bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
-    if (valid_mv) {
-      // Map reference index to L0/L1 pictures
-      blk_stats_map_t *cur_map = &amvp[ref_list];
-      blk_stats_t *entry = &cur_map->stats[cur_map->size];
-      cu_info_t *pb = &entry->blk;
-      pb->merged = false;
-      pb->skipped = false;
-      pb->inter.mv_dir = ref_list + 1;
-      pb->inter.mv_ref[ref_list] = LX_idx;
-      pb->inter.mv[ref_list][0] = (int16_t)mv.x;
-      pb->inter.mv[ref_list][1] = (int16_t)mv.y;
+  bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
+  if (valid_mv) {
+    // Map reference index to L0/L1 pictures
+    blk_stats_map_t *cur_map = &amvp[ref_list];
+    blk_stats_t *entry = &cur_map->stats[cur_map->size];
+    cu_info_t *pb = &entry->blk;
+    pb->merged = false;
+    pb->skipped = false;
+    pb->inter.mv_dir = ref_list + 1;
+    pb->inter.mv_ref[ref_list] = LX_idx;
+    pb->inter.mv[ref_list][0] = (int16_t)mv.x;
+    pb->inter.mv[ref_list][1] = (int16_t)mv.y;
 
-      CU_SET_MV_CAND(pb, ref_list, cu_mv_cand);
+    CU_SET_MV_CAND(pb, ref_list, cu_mv_cand);
 
-      entry->cost = info->best_cost;
-      entry->bits = info->best_bitcost;
-      cur_map->size++;
-
-      // TODO: remove (this is just to keep old functionality)
-      best_LX_cost[ref_list] = info->best_cost;
-    }
+    entry->cost = info->best_cost;
+    entry->bits = info->best_bitcost;
+    cur_map->size++;
   }
 }
 
@@ -1775,7 +1769,6 @@ static void search_pu_inter(encoder_state_t * const state,
 
   // Store unipred information of L0 and L1 for biprediction
   // Best cost will be left at MAX_DOUBLE if no valid CU is found
-  double best_cost_LX[2] = { MAX_DOUBLE, MAX_DOUBLE }; // TODO: remove
   blk_stats_t stats[2][MAX_REF_PIC_COUNT];
   int8_t idx[2][MAX_REF_PIC_COUNT];
   blk_stats_map_t amvp[2];
@@ -1794,7 +1787,7 @@ static void search_pu_inter(encoder_state_t * const state,
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
-    search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost, best_cost_LX, amvp);
+    search_pu_inter_ref(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost, amvp);
   }
 
   kvz_sort_indices_by_cost(&amvp[0]);
@@ -1808,7 +1801,7 @@ static void search_pu_inter(encoder_state_t * const state,
   if (can_use_bipred) {
 
     // Try biprediction from valid acquired unipreds.
-    if (best_cost_LX[0] != MAX_DOUBLE && best_cost_LX[1] != MAX_DOUBLE) {
+    if (amvp[0].size > 0 && amvp[1].size > 0) {
 
       // TODO: logic is copy paste from search_pu_inter_bipred.
       // Get rid of duplicate code asap.
