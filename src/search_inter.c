@@ -1363,7 +1363,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       break;
   }
 
-  if (cfg->fme_level > 0 && info->best_cost < *inter_cost) {
+  if (cfg->fme_level > 0 && info->best_cost < MAX_DOUBLE) {
     search_frac(info);
 
   } else if (info->best_cost < MAX_DOUBLE) {
