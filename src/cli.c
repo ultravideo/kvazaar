@@ -167,6 +167,8 @@ static const struct option long_options[] = {
   { "fastrd-sampling",          no_argument, NULL, 0 },
   { "fastrd-accuracy-check",    no_argument, NULL, 0 },
   { "fastrd-outdir",      required_argument, NULL, 0 },
+  { "combine-intra-cus",        no_argument, NULL, 0 },
+  { "no-combine-intra-cus",     no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -578,6 +580,12 @@ void print_help(void)
     "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
     "                                learning trees, overrides the\n"
     "                                --pu-depth-intra parameter. [disabled]\n"
+    "      --(no-)combine-intra-cus: Whether the encoder tries to code a cu\n"
+    "                                   on lower depth even when search is not\n"
+    "                                   performed on said depth. Should only\n"
+    "                                   be disabled if cus absolutely must not\n"
+    "                                   be larger than limited by the search.\n"
+    "                                   [enabled]"
     "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"

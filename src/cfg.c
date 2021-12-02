@@ -183,6 +183,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->fastrd_sampling_on = 0;
   cfg->fastrd_accuracy_check_on = 0;
   cfg->fastrd_learning_outdir_fn = NULL;
+
+  cfg->combine_intra_cus = 1;
   return 1;
 }
 
@@ -1420,6 +1422,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("stats-file-prefix") {
     cfg->stats_file_prefix = strdup(value);
+  }
+  else if OPT("combine-intra-cus") {
+    cfg->combine_intra_cus = atobool(value);
   }
   else {
     return 0;

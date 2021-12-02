@@ -754,7 +754,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
-        && x + cu_width <= frame->width && y + cu_width <= frame->height)
+        && x + cu_width <= frame->width && y + cu_width <= frame->height 
+        && state->encoder_control->cfg.combine_intra_cus)
     {
       cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
 

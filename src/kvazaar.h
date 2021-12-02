@@ -479,6 +479,9 @@ typedef struct kvz_config
 
   char *fastrd_learning_outdir_fn;
 
+  /** \brief whether to try combining intra cus at the lower depth when search
+   *         is not performed at said depth*/
+  uint8_t combine_intra_cus;
 } kvz_config;
 
 /**
