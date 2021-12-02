@@ -2071,15 +2071,6 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     }
   }
 
-  // Calculate more accurate cost when needed
-  if (state->encoder_control->cfg.rdo >= 2) {
-    kvz_cu_cost_inter_rd2(state,
-      x, y, depth,
-      lcu,
-      inter_cost,
-      inter_bitcost);
-  }
-
   // Count bits spent for coding the partition mode.
   int smp_extra_bits = 1; // horizontal or vertical
   if (state->encoder_control->cfg.amp_enable) {
@@ -2092,6 +2083,16 @@ void kvz_search_cu_smp(encoder_state_t * const state,
   // coding the CBF.
   smp_extra_bits += 6;
 
-  *inter_cost += (state->encoder_control->cfg.rdo >= 2 ? state->lambda : state->lambda_sqrt) * smp_extra_bits;
   *inter_bitcost += smp_extra_bits;
+
+  // Calculate more accurate cost when needed
+  if (state->encoder_control->cfg.rdo >= 2) {
+    kvz_cu_cost_inter_rd2(state,
+      x, y, depth,
+      lcu,
+      inter_cost,
+      inter_bitcost);
+  } else {
+    *inter_cost += state->lambda_sqrt * smp_extra_bits;
+  }
 }
