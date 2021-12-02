@@ -441,20 +441,20 @@ void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t 
 
 
 /**
- * \brief Sort indices to ascending order according to costs.
+ * \brief Sort keys (indices) to ascending order according to costs.
  */
-void kvz_sort_indices_by_cost(unit_stats_map_t *__restrict map)
+void kvz_sort_keys_by_cost(unit_stats_map_t *__restrict map)
 {
   // Size of sorted arrays is expected to be "small". No need for faster algorithm.
   for (uint8_t i = 1; i < map->size; ++i) {
-    const int8_t cur_indx = map->indx[i];
+    const int8_t cur_indx = map->keys[i];
     const double cur_cost = map->cost[cur_indx];
     uint8_t j = i;
-    while (j > 0 && cur_cost < map->cost[map->indx[j - 1]]) {
-      map->indx[j] = map->indx[j - 1];
+    while (j > 0 && cur_cost < map->cost[map->keys[j - 1]]) {
+      map->keys[j] = map->keys[j - 1];
       --j;
     }
-    map->indx[j] = cur_indx;
+    map->keys[j] = cur_indx;
   }
 }
 

@@ -1650,7 +1650,7 @@ static void search_pu_inter(encoder_state_t * const state,
   // Merge Analysis starts here
   unit_stats_map_t merge = { .size = 0 };
   for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i) {
-    merge.indx[i] = -1;
+    merge.keys[i] = -1;
     merge.cost[i] = MAX_DOUBLE;
   }
 
@@ -1672,7 +1672,7 @@ static void search_pu_inter(encoder_state_t * const state,
     if (cur_pu->inter.mv_dir == 3 && !(width + height > 12)) continue;
 
     bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
-      merge.indx, 
+      merge.keys, 
       merge.size);
 
     // Don't try merge candidates that don't satisfy mv constraints.
@@ -1695,7 +1695,7 @@ static void search_pu_inter(encoder_state_t * const state,
     // Add cost of coding the merge index
     merge.cost[merge.size] += merge_idx * info.state->lambda_sqrt;
     merge.bits[merge.size] = merge_idx;
-    merge.indx[merge.size] = merge.size;
+    merge.keys[merge.size] = merge.size;
 
     merge.unit[merge.size] = *cur_pu;
     merge.unit[merge.size].type = CU_INTER;
@@ -1706,7 +1706,7 @@ static void search_pu_inter(encoder_state_t * const state,
     merge.size++;
   }
 
-  kvz_sort_indices_by_cost(&merge);
+  kvz_sort_keys_by_cost(&merge);
 
   // Try early skip decision on just one merge candidate if available
   int num_rdo_cands = MIN(1, merge.size);
@@ -1720,7 +1720,7 @@ static void search_pu_inter(encoder_state_t * const state,
       // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
-      int merge_idx = merge.unit[merge.indx[merge_rdo_idx]].merge_idx;
+      int merge_idx = merge.unit[merge.keys[merge_rdo_idx]].merge_idx;
       cur_pu->inter.mv_dir = info.merge_cand[merge_idx].dir;
       cur_pu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
       cur_pu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
@@ -1759,7 +1759,7 @@ static void search_pu_inter(encoder_state_t * const state,
   for (int ref_list = 0; ref_list < 2; ++ref_list) {
     for (int i = 0; i < MAX_REF_PIC_COUNT; ++i) {
       amvp[ref_list].unit[i] = *cur_pu; // TODO: only initialize what is necessary
-      amvp[ref_list].indx[i] = i;
+      amvp[ref_list].keys[i] = i;
     }
   }
 
@@ -1770,10 +1770,10 @@ static void search_pu_inter(encoder_state_t * const state,
     search_pu_inter_ref(&info, depth, lcu, cur_pu, amvp);
   }
 
-  kvz_sort_indices_by_cost(&amvp[0]);
-  kvz_sort_indices_by_cost(&amvp[1]);
+  kvz_sort_keys_by_cost(&amvp[0]);
+  kvz_sort_keys_by_cost(&amvp[1]);
 
-  int best_idx[2] = { amvp[0].indx[0], amvp[1].indx[0] };
+  int best_idx[2] = { amvp[0].keys[0], amvp[1].keys[0] };
   double best_cost_L0 = MAX_DOUBLE;
   double best_cost_L1 = MAX_DOUBLE;
   if (amvp[0].size > 0) best_cost_L0 = amvp[0].cost[best_idx[0]];
@@ -1908,7 +1908,7 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Compare best merge cost to amvp cost
-  int best_merge_indx = merge.indx[0];
+  int best_merge_indx = merge.keys[0];
   int best_merge_cost = merge.cost[best_merge_indx];
 
   if (merge.size > 0 && best_merge_cost < *inter_cost) {

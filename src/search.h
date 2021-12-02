@@ -51,7 +51,7 @@
   *         The intended use is to collect statistics of the
   *         searched coding/prediction units. Data related to
   *         a specific unit is found at index i. The arrays
-  *         should be indexed by elements of the "indx" array
+  *         should be indexed by elements of the "keys" array
   *         that will be sorted by the RD costs of the units.         
   */
 typedef struct unit_stats_map_t {
@@ -59,12 +59,12 @@ typedef struct unit_stats_map_t {
   cu_info_t unit[MAX_REF_PIC_COUNT]; //!< list of searched units
   double    cost[MAX_REF_PIC_COUNT]; //!< list of matching RD costs
   uint32_t  bits[MAX_REF_PIC_COUNT]; //!< list of matching bit costs  
-  int8_t    indx[MAX_REF_PIC_COUNT]; //!< list of indices to elements in the other arrays
+  int8_t    keys[MAX_REF_PIC_COUNT]; //!< list of keys (indices) to elements in the other arrays
   int       size;                    //!< number of active elements in the lists
 } unit_stats_map_t;
 
 void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
-void kvz_sort_indices_by_cost(unit_stats_map_t *__restrict map);
+void kvz_sort_keys_by_cost(unit_stats_map_t *__restrict map);
 
 void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
 
