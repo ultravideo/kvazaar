@@ -1617,7 +1617,11 @@ static void search_pu_inter(encoder_state_t * const state,
 
   const int x_local   = SUB_SCU(x);
   const int y_local   = SUB_SCU(y);
-  cu_info_t *cur_cu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  cur_pu->type = CU_NOTSET;
+  cur_pu->part_size = part_mode;
+  cur_pu->depth = depth;
+  cur_pu->qp = state->qp;
 
   inter_search_info_t info = {
     .state          = state,
@@ -1640,10 +1644,8 @@ static void search_pu_inter(encoder_state_t * const state,
   );
 
   // Default to candidate 0
-  CU_SET_MV_CAND(cur_cu, 0, 0);
-  CU_SET_MV_CAND(cur_cu, 1, 0);
-
-  cu_info_t orig_cu = *cur_cu;
+  CU_SET_MV_CAND(cur_pu, 0, 0);
+  CU_SET_MV_CAND(cur_pu, 1, 0);
 
   // Merge Analysis starts here
   unit_stats_map_t merge = { .size = 0 };
@@ -1656,18 +1658,18 @@ static void search_pu_inter(encoder_state_t * const state,
   for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
 
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
-    cur_cu->inter.mv_dir = cur_cand->dir;
-    cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
-    cur_cu->inter.mv_ref[1] = cur_cand->ref[1];
-    cur_cu->inter.mv[0][0] = cur_cand->mv[0][0];
-    cur_cu->inter.mv[0][1] = cur_cand->mv[0][1];
-    cur_cu->inter.mv[1][0] = cur_cand->mv[1][0];
-    cur_cu->inter.mv[1][1] = cur_cand->mv[1][1];
+    cur_pu->inter.mv_dir = cur_cand->dir;
+    cur_pu->inter.mv_ref[0] = cur_cand->ref[0];
+    cur_pu->inter.mv_ref[1] = cur_cand->ref[1];
+    cur_pu->inter.mv[0][0] = cur_cand->mv[0][0];
+    cur_pu->inter.mv[0][1] = cur_cand->mv[0][1];
+    cur_pu->inter.mv[1][0] = cur_cand->mv[1][0];
+    cur_pu->inter.mv[1][1] = cur_cand->mv[1][1];
 
     // If bipred is not enabled, do not try candidates with mv_dir == 3.
     // Bipred is also forbidden for 4x8 and 8x4 blocks by the standard. 
-    if (cur_cu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
-    if (cur_cu->inter.mv_dir == 3 && !(width + height > 12)) continue;
+    if (cur_pu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
+    if (cur_pu->inter.mv_dir == 3 && !(width + height > 12)) continue;
 
     bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
       merge.indx, 
@@ -1675,10 +1677,10 @@ static void search_pu_inter(encoder_state_t * const state,
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
-    bool active_L0 = cur_cu->inter.mv_dir & 1;
-    bool active_L1 = cur_cu->inter.mv_dir & 2;
-    if (active_L0 && !fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
-        active_L1 && !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
+    bool active_L0 = cur_pu->inter.mv_dir & 1;
+    bool active_L1 = cur_pu->inter.mv_dir & 2;
+    if (active_L0 && !fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]) ||
+        active_L1 && !fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]) ||
         is_duplicate)
     {
       continue;
@@ -1695,7 +1697,7 @@ static void search_pu_inter(encoder_state_t * const state,
     merge.bits[merge.size] = merge_idx;
     merge.indx[merge.size] = merge.size;
 
-    merge.unit[merge.size] = *cur_cu;
+    merge.unit[merge.size] = *cur_pu;
     merge.unit[merge.size].type = CU_INTER;
     merge.unit[merge.size].merge_idx = merge_idx;
     merge.unit[merge.size].merged = true;
@@ -1711,7 +1713,7 @@ static void search_pu_inter(encoder_state_t * const state,
     
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-  if (cfg->early_skip && cur_cu->part_size == SIZE_2Nx2N) {
+  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_rdo_idx = 0; merge_rdo_idx < num_rdo_cands; ++merge_rdo_idx) {
 
       // Reconstruct blocks with merge candidate.
@@ -1719,27 +1721,27 @@ static void search_pu_inter(encoder_state_t * const state,
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
       int merge_idx = merge.unit[merge.indx[merge_rdo_idx]].merge_idx;
-      cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
-      cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
-      cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
-      cur_cu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
-      cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
-      cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
-      cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+      cur_pu->inter.mv_dir = info.merge_cand[merge_idx].dir;
+      cur_pu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
+      cur_pu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
+      cur_pu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
+      cur_pu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
+      cur_pu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
+      cur_pu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
       kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
-      kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu, true);
+      kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_pu, lcu, true);
 
-      if (cbf_is_set(cur_cu->cbf, depth, COLOR_Y)) {
+      if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
         continue;
       }
       else if (has_chroma) {
         kvz_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-        kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_cu, lcu, true);
-        if (!cbf_is_set_any(cur_cu->cbf, depth)) {
-          cur_cu->type = CU_INTER;
-          cur_cu->merge_idx = merge_idx;
-          cur_cu->skipped = true;
+        kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_pu, lcu, true);
+        if (!cbf_is_set_any(cur_pu->cbf, depth)) {
+          cur_pu->type = CU_INTER;
+          cur_pu->merge_idx = merge_idx;
+          cur_pu->skipped = true;
           *inter_cost = 0.0;  // TODO: Check this
           *inter_bitcost = merge_idx; // TODO: Check this
           return;
@@ -1756,7 +1758,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
   for (int ref_list = 0; ref_list < 2; ++ref_list) {
     for (int i = 0; i < MAX_REF_PIC_COUNT; ++i) {
-      amvp[ref_list].unit[i] = orig_cu; // TODO: only initialize what is necessary
+      amvp[ref_list].unit[i] = *cur_pu; // TODO: only initialize what is necessary
       amvp[ref_list].indx[i] = i;
     }
   }
@@ -1765,7 +1767,7 @@ static void search_pu_inter(encoder_state_t * const state,
     info.ref_idx = ref_idx;
     info.ref = state->frame->ref->images[ref_idx];
 
-    search_pu_inter_ref(&info, depth, lcu, cur_cu, amvp);
+    search_pu_inter_ref(&info, depth, lcu, cur_pu, amvp);
   }
 
   kvz_sort_indices_by_cost(&amvp[0]);
@@ -1787,7 +1789,7 @@ static void search_pu_inter(encoder_state_t * const state,
   // Set best valid unipred to cur_cu
   if (best_cost < MAX_DOUBLE) {
     // Map reference index to L0/L1 pictures
-    *cur_cu = *best_unipred[best_list];
+    *cur_pu = *best_unipred[best_list];
     *inter_cost    = amvp[best_list].cost[best_idx[best_list]];
     *inter_bitcost = amvp[best_list].bits[best_idx[best_list]];
   }
@@ -1856,42 +1858,42 @@ static void search_pu_inter(encoder_state_t * const state,
       cost += info.state->lambda_sqrt * extra_bits;
 
       if (cost < *inter_cost) {
-        cur_cu->inter.mv_dir = 3;
+        cur_pu->inter.mv_dir = 3;
 
-        cur_cu->inter.mv_ref[0] = best_unipred[0]->inter.mv_ref[0];
-        cur_cu->inter.mv_ref[1] = best_unipred[1]->inter.mv_ref[1];
+        cur_pu->inter.mv_ref[0] = best_unipred[0]->inter.mv_ref[0];
+        cur_pu->inter.mv_ref[1] = best_unipred[1]->inter.mv_ref[1];
 
-        cur_cu->inter.mv[0][0] = best_unipred[0]->inter.mv[0][0];
-        cur_cu->inter.mv[0][1] = best_unipred[0]->inter.mv[0][1];
-        cur_cu->inter.mv[1][0] = best_unipred[1]->inter.mv[1][0];
-        cur_cu->inter.mv[1][1] = best_unipred[1]->inter.mv[1][1];
-        cur_cu->merged = 0;
+        cur_pu->inter.mv[0][0] = best_unipred[0]->inter.mv[0][0];
+        cur_pu->inter.mv[0][1] = best_unipred[0]->inter.mv[0][1];
+        cur_pu->inter.mv[1][0] = best_unipred[1]->inter.mv[1][0];
+        cur_pu->inter.mv[1][1] = best_unipred[1]->inter.mv[1][1];
+        cur_pu->merged = 0;
 
         // Check every candidate to find a match
         for (int merge_idx = 0; merge_idx < info.num_merge_cand; merge_idx++) {
-          if (merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
-            merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
-            merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
-            merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
-            merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
-            merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1])
+          if (merge_cand[merge_idx].mv[0][0] == cur_pu->inter.mv[0][0] &&
+              merge_cand[merge_idx].mv[0][1] == cur_pu->inter.mv[0][1] &&
+              merge_cand[merge_idx].mv[1][0] == cur_pu->inter.mv[1][0] &&
+              merge_cand[merge_idx].mv[1][1] == cur_pu->inter.mv[1][1] &&
+              merge_cand[merge_idx].ref[0]   == cur_pu->inter.mv_ref[0] &&
+              merge_cand[merge_idx].ref[1]   == cur_pu->inter.mv_ref[1])
           {
-            cur_cu->merged = 1;
-            cur_cu->merge_idx = merge_idx;
+            cur_pu->merged = 1;
+            cur_pu->merge_idx = merge_idx;
             break;
           }
         }
 
         // Each motion vector has its own candidate
         for (int reflist = 0; reflist < 2; reflist++) {
-          kvz_inter_get_mv_cand(info.state, x, y, width, height, info.mv_cand, cur_cu, lcu, reflist);
+          kvz_inter_get_mv_cand(info.state, x, y, width, height, info.mv_cand, cur_pu, lcu, reflist);
           int cu_mv_cand = select_mv_cand(
             info.state,
             info.mv_cand,
-            cur_cu->inter.mv[reflist][0],
-            cur_cu->inter.mv[reflist][1],
+            cur_pu->inter.mv[reflist][0],
+            cur_pu->inter.mv[reflist][1],
             NULL);
-          CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
+          CU_SET_MV_CAND(cur_pu, reflist, cu_mv_cand);
         }
 
         *inter_cost = cost;
@@ -1901,7 +1903,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
     // TODO: this probably should have a separate command line option
     if (cfg->rdo == 3) {
-      search_pu_inter_bipred(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost);
+      search_pu_inter_bipred(&info, depth, lcu, cur_pu, inter_cost, inter_bitcost);
     }
   }
 
@@ -1912,11 +1914,11 @@ static void search_pu_inter(encoder_state_t * const state,
   if (merge.size > 0 && best_merge_cost < *inter_cost) {
     *inter_cost = best_merge_cost;
     *inter_bitcost = 0; // TODO: Check this
-    *cur_cu = merge.unit[best_merge_indx];
+    *cur_pu = merge.unit[best_merge_indx];
   }
 
-  if (*inter_cost < INT_MAX && cur_cu->inter.mv_dir == 1) {
-    assert(fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]));
+  if (*inter_cost < INT_MAX && cur_pu->inter.mv_dir == 1) {
+    assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
   }
 }
 
@@ -2043,12 +2045,6 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     const int y_pu      = PU_GET_Y(part_mode, width, y_local, i);
     const int width_pu  = PU_GET_W(part_mode, width, i);
     const int height_pu = PU_GET_H(part_mode, width, i);
-    cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
-
-    cur_pu->type      = CU_INTER;
-    cur_pu->part_size = part_mode;
-    cur_pu->depth     = depth;
-    cur_pu->qp        = state->qp;
 
     double cost      = MAX_DOUBLE;
     uint32_t bitcost = MAX_INT;
@@ -2065,6 +2061,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     *inter_cost    += cost;
     *inter_bitcost += bitcost;
 
+    cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
     for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
       for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
         cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x, y);
