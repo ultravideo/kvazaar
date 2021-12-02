@@ -85,7 +85,5 @@ extern const uint32_t kvz_entropy_bits[128];
 #define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[(ctx)->uc_state ^ (val)]
 
 // Floating point fractional bits, derived from kvz_entropy_bits
-extern const float kvz_f_entropy_bits[128];
-#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #endif

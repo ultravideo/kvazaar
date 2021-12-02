@@ -248,7 +248,8 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                        const int x_px, const int y_px, const int depth,
                        const cu_info_t *const pred_cu,
-                       lcu_t *const lcu)
+                       lcu_t *const lcu,
+                       double *bit_cost)
 {
   const int width = LCU_WIDTH >> depth;
 
@@ -272,16 +273,17 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   {
     const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
+    *bit_cost += tr_tree_bits;
   }
 
   if (tr_depth > 0) {
     int offset = width / 2;
     double sum = 0;
 
-    sum += kvz_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += kvz_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, bit_cost);
 
     return sum + tr_tree_bits * state->lambda;
   }
@@ -294,6 +296,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   {
     const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
+    *bit_cost += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
+
   }
 
   // SSD between reconstruction and original
@@ -310,6 +314,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
     coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
+    *bit_cost += coeff_bits;
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -320,7 +325,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                          const int x_px, const int y_px, const int depth,
                          const cu_info_t *const pred_cu,
-                         lcu_t *const lcu)
+                         lcu_t *const lcu,
+                         double *bit_cost)
 {
   const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
@@ -347,16 +353,17 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
     }
+    *bit_cost += tr_tree_bits;
   }
 
   if (tr_cu->tr_depth > depth) {
     int offset = LCU_WIDTH >> (depth + 1);
     int sum = 0;
 
-    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, bit_cost);
+    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, bit_cost);
 
     return sum + tr_tree_bits * state->lambda;
   }
@@ -380,6 +387,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
+    *bit_cost += coeff_bits;
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -690,9 +698,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
+    double bits = 0;
+    cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu, &bits);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu, & bits);
     }
 
     double mode_bits;
@@ -701,6 +710,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else {
       mode_bits = inter_bitcost;
     }
+    bits += mode_bits;
+    uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
+    const cabac_ctx_t* ctx = &(state->cabac.ctx.split_flag_model[split_model]);
+    // bits += CTX_ENTROPY_FBITS(ctx, 0);
+    FILE_BITS(bits, x, y, depth, "final rd bits");
 
     cost += mode_bits * state->lambda;
 
@@ -746,14 +760,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
       const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
       cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
+      FILE_BITS(CTX_ENTROPY_FBITS(ctx, 0), x, y, depth, "not split");
       split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;
+      FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "split");
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
       // Add cost of intra part_size.
       const cabac_ctx_t *ctx = &(state->cabac.ctx.part_size_model[0]);
       cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;  // 2Nx2N
+      FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "not split");
       split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;  // NxN
+      FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "split");
     }
 
     // If skip mode was selected for the block, skip further search.
@@ -783,6 +801,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
       if (cu_d1->type == CU_INTRA && cu_d1->depth == depth + 1) {
         cost = 0;
+        double bits = 0;
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
@@ -799,11 +818,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            cur_cu->intra.mode, mode_chroma,
                            NULL, lcu);
 
-        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
+        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu, &bits);
         if (has_chroma) {
-          cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
+          cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu, &bits);
         }
-
+        
+        FILE_BITS(bits, x, y, depth, "merged intra bits");
         // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
@@ -979,6 +999,7 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
  */
 void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
 {
+  if (bit_cost_file == NULL) bit_cost_file = fopen("bits_file.txt", "w");
   assert(x % LCU_WIDTH == 0);
   assert(y % LCU_WIDTH == 0);
 

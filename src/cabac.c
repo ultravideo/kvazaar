@@ -37,6 +37,8 @@
 #include "extras/crypto.h"
 #include "kvazaar.h"
 
+FILE* bit_cost_file = NULL;
+
 const uint8_t kvz_g_auc_next_state_mps[128] =
 {
     2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,

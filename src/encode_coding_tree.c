@@ -923,6 +923,10 @@ end:
   if (is_last_cu_in_qg(state, x, y, depth)) {
     state->last_qp = cur_cu->qp;
   }
+  if((x % 64 != 0 && y % 64 != 0) || 1) {
+    fprintf(stderr, "%f\t%d\t%d\t%d\n", bits_written, x, y, depth);
+    bits_written = 0;
+  }
 }
 
 

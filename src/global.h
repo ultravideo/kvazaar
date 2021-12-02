@@ -110,7 +110,7 @@
 
 typedef int16_t coeff_t;
 
-//#define VERBOSE 1
+#define VERBOSE 1
 
 /* CONFIG VARIABLES */
 

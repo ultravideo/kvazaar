@@ -1967,6 +1967,8 @@ static void search_pu_inter(encoder_state_t * const state,
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
   }
+
+  FILE_BITS((double)info->inter_bitcost, x, y, depth, "regular inter bitcost");
 }
 
 /**
@@ -2009,10 +2011,13 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     lcu,
     false);
 
-  *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+  double bits;
+  *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
   if (reconstruct_chroma) {
-    *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+    *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
   }
+
+  FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
 
   *inter_cost += *inter_bitcost * state->lambda;
 }
