@@ -60,7 +60,8 @@ typedef struct
   uint32_t   buffered_byte;
   int32_t    num_buffered_bytes;
   int32_t    bits_left;
-  int8_t     only_count;
+  int8_t     only_count : 4;
+  int8_t     update : 4;
   bitstream_t *stream;
 
   // CONTEXTS

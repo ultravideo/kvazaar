@@ -253,12 +253,12 @@ static INLINE uint32_t get_coeff_cabac_cost(
   // Take a copy of the CABAC so that we don't overwrite the contexts when
   // counting the bits.
   cabac_data_t cabac_copy;
-  memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
+  memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
 
   // Clear bytes and bits and set mode to "count"
   cabac_copy.only_count = 1;
-  cabac_copy.num_buffered_bytes = 0;
-  cabac_copy.bits_left = 23;
+  int num_buffered_bytes = cabac_copy.num_buffered_bytes;
+  int bits_left = cabac_copy.bits_left;
 
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
@@ -270,8 +270,11 @@ static INLINE uint32_t get_coeff_cabac_cost(
                        type,
                        scan_mode,
                        0);
+  if(cabac_copy.update) {
 
-  return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
+    memcpy(&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
+  }
+  return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
 }
 
 static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)

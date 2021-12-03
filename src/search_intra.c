@@ -98,11 +98,11 @@ static double get_cost(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    const cabac_ctx_t *ctx = &state->search_cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      ctx = &state->search_cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
 
@@ -269,7 +269,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // Add bits for split_transform_flag = 1, because transform depth search bypasses
     // the normal recursion in the cost functions.
     if (depth >= 1 && depth <= 3) {
-      const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
       *bit_cost += tr_split_bit;
     }
@@ -283,7 +283,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
-      const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
       }
@@ -647,8 +647,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 }
 
 
-double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds)
+double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds)
 {
+  cabac_data_t* cabac = &state->search_cabac;
   double mode_bits;
 
   bool mode_in_preds = false;
@@ -658,8 +659,23 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
     }
   }
 
-  const cabac_ctx_t *ctx = &(state->cabac.ctx.intra_mode_model);
+  const cabac_ctx_t *ctx = &(cabac->ctx.intra_mode_model);
   mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds);
+  if (state->search_cabac.update) {
+    state->search_cabac.cur_ctx = ctx;
+    CABAC_BIN(&state->search_cabac, mode_in_preds, "prev_intra_luma_pred_flag_search");
+    if(mode_in_preds) {
+      CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
+      if(luma_mode != intra_preds[0]) {
+        CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[1]), "mpm_idx");        
+      }
+    }
+    else {
+      // This value should be transformed for actual coding,
+      // but here the value does not actually matter, just that we write 5 bits
+      CABAC_BINS_EP(cabac, luma_mode, 5, "rem_intra_luma_pred_mode");
+    }
+  }
 
   if (mode_in_preds) {
     mode_bits += ((luma_mode == intra_preds[0]) ? 1 : 2);
@@ -673,12 +689,21 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
 double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
-  const cabac_ctx_t *ctx = &(state->cabac.ctx.chroma_pred_model[0]);
+  cabac_data_t* cabac = &state->search_cabac;
+  const cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model[0]);
   double mode_bits;
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
   } else {
     mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+  }
+  if(cabac->update) {
+    cabac->cur_ctx = ctx;
+    CABAC_BIN(cabac, chroma_mode != luma_mode, "intra_chroma_pred_mode");
+    if(chroma_mode != luma_mode) {
+      // Again it does not matter what we actually write here
+      CABAC_BINS_EP(cabac, 0, 2, "intra_chroma_pred_mode");      
+    }
   }
 
   return mode_bits;
