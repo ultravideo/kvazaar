@@ -633,19 +633,7 @@ static void tz_search(inter_search_info_t *info,
   const bool use_star_refinement = true;   // enable step 4 mode 2 (only one mode will be executed)
 
   int best_dist = 0;
-  *best_cost = MAX_DOUBLE;
-
-  // Select starting point from among merge candidates. These should
-  // include both mv_cand vectors and (0, 0).
-  select_starting_point(info, extra_mv, best_cost, best_bits, best_mv);
-
-  // Check if we should stop search
-  if (info->state->encoder_control->cfg.me_early_termination &&
-      early_terminate(info, best_cost, best_bits, best_mv))
-  {
-    return;
-  }
-
+  
   vector2d_t start = { best_mv->x >> 2, best_mv->y >> 2 };
 
   // step 2, grid search
@@ -746,19 +734,6 @@ static void hexagon_search(inter_search_info_t *info,
       { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 }
   };
 
-  *best_cost = MAX_DOUBLE;
-
-  // Select starting point from among merge candidates. These should
-  // include both mv_cand vectors and (0, 0).
-  select_starting_point(info, extra_mv, best_cost, best_bits, best_mv);
-
-  // Check if we should stop search
-  if (info->state->encoder_control->cfg.me_early_termination &&
-      early_terminate(info, best_cost, best_bits, best_mv))
-  {
-    return;
-  }
-
   vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
 
   // Current best index, either to merge_cands, large_hexbs or small_hexbs.
@@ -850,19 +825,6 @@ static void diamond_search(inter_search_info_t *info,
     {0, -1}, {1, 0}, {0, 1}, {-1, 0},
     {0, 0}
   };
-
-  *best_cost = MAX_DOUBLE;
-
-  // Select starting point from among merge candidates. These should
-  // include both mv_cand vectors and (0, 0).
-  select_starting_point(info, extra_mv, best_cost, best_bits, best_mv);
-
-  // Check if we should stop search
-  if (info->state->encoder_control->cfg.me_early_termination &&
-    early_terminate(info, best_cost, best_bits, best_mv))
-  {
-    return;
-  }
   
   // current motion vector
   vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
@@ -1361,34 +1323,44 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       double best_cost = MAX_DOUBLE;
       uint32_t best_bits = MAX_INT;
 
-      switch (cfg->ime_algorithm) {
-        case KVZ_IME_TZ:
-          tz_search(info, best_mv, &best_cost, &best_bits, &best_mv);
-          break;
+      // Select starting point from among merge candidates. These should
+      // include both mv_cand vectors and (0, 0).
+      select_starting_point(info, best_mv, &best_cost, &best_bits, &best_mv);
+      bool skip_me = early_terminate(info, &best_cost, &best_bits, &best_mv);
+      
+      if (!(info->state->encoder_control->cfg.me_early_termination && skip_me)) {
 
-        case KVZ_IME_FULL64:
-        case KVZ_IME_FULL32:
-        case KVZ_IME_FULL16:
-        case KVZ_IME_FULL8:
-        case KVZ_IME_FULL:
-          search_mv_full(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
-          break;
+        switch (cfg->ime_algorithm) {
+          case KVZ_IME_TZ:
+            tz_search(info, best_mv, &best_cost, &best_bits, &best_mv);
+            break;
 
-        case KVZ_IME_DIA:
-          diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-                         &best_cost, &best_bits, &best_mv);
-          break;
+          case KVZ_IME_FULL64:
+          case KVZ_IME_FULL32:
+          case KVZ_IME_FULL16:
+          case KVZ_IME_FULL8:
+          case KVZ_IME_FULL:
+            search_mv_full(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
+            break;
 
-        default:
-          hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-                         &best_cost, &best_bits, &best_mv);
-          break;
+          case KVZ_IME_DIA:
+            diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
+              &best_cost, &best_bits, &best_mv);
+            break;
+
+          default:
+            hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
+              &best_cost, &best_bits, &best_mv);
+            break;
+        }
+
+        if (cfg->fme_level > 0 && best_cost < MAX_DOUBLE) {
+          search_frac(info, &best_cost, &best_bits, &best_mv);
+
+        }
       }
 
-      if (cfg->fme_level > 0 && best_cost < MAX_DOUBLE) {
-        search_frac(info, &best_cost, &best_bits, &best_mv);
-
-      } else if (best_cost < MAX_DOUBLE) {
+      if (cfg->fme_level == 0 && best_cost < MAX_DOUBLE) {
         // Recalculate inter cost with SATD.
         best_cost = kvz_image_calc_satd(
           info->state->tile->frame->source,
