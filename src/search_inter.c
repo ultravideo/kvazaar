@@ -1409,9 +1409,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
  */
 static void search_pu_inter_bipred(inter_search_info_t *info,
                                    int depth,
-                                   lcu_t *lcu, cu_info_t *cur_cu,
-                                   double *inter_cost,
-                                   uint32_t *inter_bitcost)
+                                   lcu_t *lcu,
+                                   unit_stats_map_t *amvp_bipred)
 {
   const image_list_t *const ref = info->state->frame->ref;
   uint8_t (*ref_LX)[16] = info->state->frame->ref_LX;
@@ -1443,22 +1442,24 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
       continue;
     }
 
-    cur_cu->inter.mv_dir = 3;
+    cu_info_t *bipred_pu = &amvp_bipred->unit[amvp_bipred->size];
 
-    cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
-    cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
+    bipred_pu->inter.mv_dir = 3;
 
-    int16_t(*mv)[2] = cur_cu->inter.mv;
+    bipred_pu->inter.mv_ref[0] = merge_cand[i].ref[0];
+    bipred_pu->inter.mv_ref[1] = merge_cand[j].ref[1];
+
+    int16_t(*mv)[2] = bipred_pu->inter.mv;
     mv[0][0] = merge_cand[i].mv[0][0];
     mv[0][1] = merge_cand[i].mv[0][1];
     mv[1][0] = merge_cand[j].mv[1][0];
     mv[1][1] = merge_cand[j].mv[1][1];
     
-    cur_cu->merged  = false;
-    cur_cu->skipped = false;
+    bipred_pu->merged  = false;
+    bipred_pu->skipped = false;
 
     for (int reflist = 0; reflist < 2; reflist++) {
-      kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, cur_cu, lcu, reflist);
+      kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, bipred_pu, lcu, reflist);
     }
 
     // Don't try merge candidates that don't satisfy mv constraints.
@@ -1508,37 +1509,35 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
     cost += info->state->lambda_sqrt * extra_bits;
 
-    if (cost < *inter_cost) {
-
-      // Check every candidate to find a match
-      for (int merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
-        if (merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
-            merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
-            merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
-            merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
-            merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
-            merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1])
-        {
-          cur_cu->merged = 1;
-          cur_cu->merge_idx = merge_idx;
-          break;
-        }
+    // Check every candidate to find a match
+    for (int merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
+      if (merge_cand[merge_idx].mv[0][0] == bipred_pu->inter.mv[0][0] &&
+          merge_cand[merge_idx].mv[0][1] == bipred_pu->inter.mv[0][1] &&
+          merge_cand[merge_idx].mv[1][0] == bipred_pu->inter.mv[1][0] &&
+          merge_cand[merge_idx].mv[1][1] == bipred_pu->inter.mv[1][1] &&
+          merge_cand[merge_idx].ref[0]   == bipred_pu->inter.mv_ref[0] &&
+          merge_cand[merge_idx].ref[1]   == bipred_pu->inter.mv_ref[1])
+      {
+        bipred_pu->merged = true;
+        bipred_pu->merge_idx = merge_idx;
+        break;
       }
-
-      // Each motion vector has its own candidate
-      for (int reflist = 0; reflist < 2; reflist++) {
-        int cu_mv_cand = select_mv_cand(
-            info->state,
-            info->mv_cand,
-            cur_cu->inter.mv[reflist][0],
-            cur_cu->inter.mv[reflist][1],
-            NULL);
-        CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
-      }
-
-      *inter_cost = cost;
-      *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
     }
+
+    // Each motion vector has its own candidate
+    for (int reflist = 0; reflist < 2; reflist++) {
+      int cu_mv_cand = select_mv_cand(
+        info->state,
+        info->mv_cand,
+        bipred_pu->inter.mv[reflist][0],
+        bipred_pu->inter.mv[reflist][1],
+        NULL);
+      CU_SET_MV_CAND(bipred_pu, reflist, cu_mv_cand);
+    }
+
+    amvp_bipred->cost[amvp_bipred->size] = cost;
+    amvp_bipred->bits[amvp_bipred->size] = bitcost[0] + bitcost[1] + extra_bits;
+    amvp_bipred->size++;
   }
 }
 
@@ -1801,6 +1800,8 @@ static void search_pu_inter(encoder_state_t * const state,
   if (can_use_bipred) {
 
     cu_info_t *bipred_pu = &amvp[2].unit[0];
+    double   best_bipred_cost = MAX_DOUBLE;
+    uint32_t best_bipred_bits = MAX_INT;
 
     // Try biprediction from valid acquired unipreds.
     if (amvp[0].size > 0 && amvp[1].size > 0) {
@@ -1843,19 +1844,19 @@ static void search_pu_inter(encoder_state_t * const state,
 
       const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
       const kvz_pixel *src = &lcu->ref.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
-      double cost =
+      best_bipred_cost =
         kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
 
       uint32_t bitcost[2] = { 0, 0 };
 
-      cost += info.mvd_cost_func(info.state,
+      best_bipred_cost += info.mvd_cost_func(info.state,
         bipred_pu->inter.mv[0][0],
         bipred_pu->inter.mv[0][1],
         0,
         info.mv_cand,
         NULL, 0, 0,
         &bitcost[0]);
-      cost += info.mvd_cost_func(info.state,
+      best_bipred_cost += info.mvd_cost_func(info.state,
         bipred_pu->inter.mv[1][0],
         bipred_pu->inter.mv[1][1],
         0,
@@ -1868,9 +1869,9 @@ static void search_pu_inter(encoder_state_t * const state,
         bipred_pu->inter.mv_ref[1]
       };
       const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
-      cost += info.state->lambda_sqrt * extra_bits;
+      best_bipred_cost += info.state->lambda_sqrt * extra_bits;
 
-      if (cost < *inter_cost) {
+      if (best_bipred_cost < *inter_cost) {
 
         // Check every candidate to find a match
         for (int merge_idx = 0; merge_idx < info.num_merge_cand; merge_idx++) {
@@ -1898,22 +1899,22 @@ static void search_pu_inter(encoder_state_t * const state,
           CU_SET_MV_CAND(bipred_pu, reflist, cu_mv_cand);
         }
 
-        *inter_cost = cost;
-        *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
-
-        *cur_pu = *bipred_pu;
+        amvp[2].cost[amvp[2].size] = best_bipred_cost;
+        amvp[2].bits[amvp[2].size] = bitcost[0] + bitcost[1] + extra_bits;
+        amvp[2].size++;
       }
     }
 
     // TODO: this probably should have a separate command line option
-    if (cfg->rdo == 3) {
-      cu_info_t bipred_pu = *cur_pu;
-      double prior_cost = *inter_cost;
-      search_pu_inter_bipred(&info, depth, lcu, &bipred_pu, inter_cost, inter_bitcost);
+    if (cfg->rdo == 3) search_pu_inter_bipred(&info, depth, lcu, &amvp[2]);
+    
+    kvz_sort_keys_by_cost(&amvp[2]);
+    int best_bipred_key = amvp[2].keys[0];
 
-      if (*inter_cost < prior_cost) {
-        *cur_pu = bipred_pu;
-      }
+    if (amvp[2].size > 0 && amvp[2].cost[best_bipred_key] < *inter_cost) {
+      *inter_cost    = amvp[2].cost[best_bipred_key];
+      *inter_bitcost = amvp[2].bits[best_bipred_key];
+      *cur_pu        = amvp[2].unit[best_bipred_key];
     }
   }
 
