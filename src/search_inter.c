@@ -68,7 +68,7 @@ typedef struct {
   /**
    * \brief Top-left corner of the PU
    */
-  const vector2d_t origin;
+  vector2d_t origin;
   int32_t width;
   int32_t height;
 
@@ -1555,7 +1555,7 @@ static bool merge_candidate_in_list(inter_merge_cand_t * all_cands,
 }
 
 /**
- * \brief Update PU to have best modes at this depth.
+ * \brief Collect PU parameters and costs at this depth.
  *
  * \param state       encoder state
  * \param x_cu        x-coordinate of the containing CU
@@ -1565,28 +1565,26 @@ static bool merge_candidate_in_list(inter_merge_cand_t * all_cands,
  * \param i_pu        index of the PU in the CU
  * \param lcu         containing LCU
  *
- * \param inter_cost    Return inter cost of the best mode
- * \param inter_bitcost Return inter bitcost of the best mode
+ * \param amvp        Return searched AMVP PUs sorted by costs
+ * \param merge       Return searched Merge PUs sorted by costs
  */
 static void search_pu_inter(encoder_state_t * const state,
-                            int x_cu, int y_cu,
-                            int depth,
-                            part_mode_t part_mode,
-                            int i_pu,
-                            lcu_t *lcu,
-                            double *inter_cost,
-                            uint32_t *inter_bitcost)
+  int x_cu, int y_cu,
+  int depth,
+  part_mode_t part_mode,
+  int i_pu,
+  lcu_t *lcu,
+  unit_stats_map_t *amvp,
+  unit_stats_map_t *merge,
+  inter_search_info_t *info)
 {
-  *inter_cost = MAX_DOUBLE;
-  *inter_bitcost = MAX_INT;
-
   const kvz_config *cfg = &state->encoder_control->cfg;
   const videoframe_t * const frame = state->tile->frame;
-  const int width_cu  = LCU_WIDTH >> depth;
-  const int x         = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
-  const int y         = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
-  const int width     = PU_GET_W(part_mode, width_cu, i_pu);
-  const int height    = PU_GET_H(part_mode, width_cu, i_pu);
+  const int width_cu = LCU_WIDTH >> depth;
+  const int x = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
+  const int y = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
+  const int width = PU_GET_W(part_mode, width_cu, i_pu);
+  const int height = PU_GET_H(part_mode, width_cu, i_pu);
 
   // Merge candidate A1 may not be used for the second PU of Nx2N, nLx2N and
   // nRx2N partitions.
@@ -1595,31 +1593,31 @@ static void search_pu_inter(encoder_state_t * const state,
   // 2NxnD partitions.
   const bool merge_b1 = i_pu == 0 || width <= height;
 
-  const int x_local   = SUB_SCU(x);
-  const int y_local   = SUB_SCU(y);
-  cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  const int x_local = SUB_SCU(x);
+  const int y_local = SUB_SCU(y);
+  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   cur_pu->type = CU_NOTSET;
   cur_pu->part_size = part_mode;
   cur_pu->depth = depth;
   cur_pu->qp = state->qp;
 
-  inter_search_info_t info = {
-    .state          = state,
-    .pic            = frame->source,
-    .origin         = { x, y },
-    .width          = width,
-    .height         = height,
-    .mvd_cost_func  = cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost,
-    .optimized_sad  = kvz_get_optimized_sad(width),
-  };
+
+  info->state          = state;
+  info->pic            = frame->source;
+  info->origin.x       = x;
+  info->origin.y       = y;
+  info->width          = width;
+  info->height         = height;
+  info->mvd_cost_func  = cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost;
+  info->optimized_sad  = kvz_get_optimized_sad(width);
 
   // Search for merge mode candidates
-  info.num_merge_cand = kvz_inter_get_merge_cand(
+  info->num_merge_cand = kvz_inter_get_merge_cand(
       state,
       x, y,
       width, height,
       merge_a1, merge_b1,
-      info.merge_cand,
+      info->merge_cand,
       lcu
   );
 
@@ -1628,16 +1626,16 @@ static void search_pu_inter(encoder_state_t * const state,
   CU_SET_MV_CAND(cur_pu, 1, 0);
 
   // Merge Analysis starts here
-  unit_stats_map_t merge = { .size = 0 };
+  merge->size = 0;
   for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i) {
-    merge.keys[i] = -1;
-    merge.cost[i] = MAX_DOUBLE;
+    merge->keys[i] = -1;
+    merge->cost[i] = MAX_DOUBLE;
   }
 
   // Check motion vector constraints and perform rough search
-  for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
+  for (int merge_idx = 0; merge_idx < info->num_merge_cand; ++merge_idx) {
 
-    inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+    inter_merge_cand_t *cur_cand = &info->merge_cand[merge_idx];
     cur_pu->inter.mv_dir = cur_cand->dir;
     cur_pu->inter.mv_ref[0] = cur_cand->ref[0];
     cur_pu->inter.mv_ref[1] = cur_cand->ref[1];
@@ -1651,16 +1649,16 @@ static void search_pu_inter(encoder_state_t * const state,
     if (cur_pu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
     if (cur_pu->inter.mv_dir == 3 && !(width + height > 12)) continue;
 
-    bool is_duplicate = merge_candidate_in_list(info.merge_cand, cur_cand,
-      merge.keys, 
-      merge.size);
+    bool is_duplicate = merge_candidate_in_list(info->merge_cand, cur_cand,
+      merge->keys, 
+      merge->size);
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
     bool active_L0 = cur_pu->inter.mv_dir & 1;
     bool active_L1 = cur_pu->inter.mv_dir & 2;
-    if (active_L0 && !fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]) ||
-        active_L1 && !fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]) ||
+    if (active_L0 && !fracmv_within_tile(info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]) ||
+        active_L1 && !fracmv_within_tile(info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]) ||
         is_duplicate)
     {
       continue;
@@ -1668,28 +1666,28 @@ static void search_pu_inter(encoder_state_t * const state,
 
     kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
     
-    merge.cost[merge.size] = kvz_satd_any_size(width, height,
+    merge->cost[merge->size] = kvz_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
       lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
     
     // Add cost of coding the merge index
-    merge.cost[merge.size] += merge_idx * info.state->lambda_sqrt;
-    merge.bits[merge.size] = merge_idx;
-    merge.keys[merge.size] = merge.size;
+    merge->cost[merge->size] += merge_idx * info->state->lambda_sqrt;
+    merge->bits[merge->size] = merge_idx;
+    merge->keys[merge->size] = merge->size;
 
-    merge.unit[merge.size] = *cur_pu;
-    merge.unit[merge.size].type = CU_INTER;
-    merge.unit[merge.size].merge_idx = merge_idx;
-    merge.unit[merge.size].merged = true;
-    merge.unit[merge.size].skipped = false;
+    merge->unit[merge->size] = *cur_pu;
+    merge->unit[merge->size].type = CU_INTER;
+    merge->unit[merge->size].merge_idx = merge_idx;
+    merge->unit[merge->size].merged = true;
+    merge->unit[merge->size].skipped = false;
 
-    merge.size++;
+    merge->size++;
   }
 
-  kvz_sort_keys_by_cost(&merge);
+  kvz_sort_keys_by_cost(merge);
 
   // Try early skip decision on just one merge candidate if available
-  int num_rdo_cands = MIN(1, merge.size);
+  int num_rdo_cands = MIN(1, merge->size);
     
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
@@ -1700,14 +1698,14 @@ static void search_pu_inter(encoder_state_t * const state,
       // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
-      int merge_idx = merge.unit[merge.keys[merge_key]].merge_idx;
-      cur_pu->inter.mv_dir = info.merge_cand[merge_idx].dir;
-      cur_pu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
-      cur_pu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
-      cur_pu->inter.mv[0][0] = info.merge_cand[merge_idx].mv[0][0];
-      cur_pu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
-      cur_pu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
-      cur_pu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+      int merge_idx           = merge->unit[merge->keys[merge_key]].merge_idx;
+      cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
+      cur_pu->inter.mv_ref[0] = info->merge_cand[merge_idx].ref[0];
+      cur_pu->inter.mv_ref[1] = info->merge_cand[merge_idx].ref[1];
+      cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
+      cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
+      cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
+      cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
       kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
       kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_pu, lcu, true);
@@ -1722,8 +1720,11 @@ static void search_pu_inter(encoder_state_t * const state,
           cur_pu->type = CU_INTER;
           cur_pu->merge_idx = merge_idx;
           cur_pu->skipped = true;
-          *inter_cost = 0.0;  // TODO: Check this
-          *inter_bitcost = merge_idx; // TODO: Check this
+
+          merge->size = 1;
+          merge->cost[0] = 0.0; // TODO: Check this
+          merge->bits[0] = merge_idx; // TODO: Check this
+          merge->unit[0] = *cur_pu;
           return;
         }
       }
@@ -1732,9 +1733,9 @@ static void search_pu_inter(encoder_state_t * const state,
 
   // AMVP search starts here
 
-  // Store information of L0, L1, and bipredictions
-  // Best cost will be left at MAX_DOUBLE if no valid CU is found
-  unit_stats_map_t amvp[3] = { { .size = 0 }, { .size = 0 }, { .size = 0 } };
+  amvp[0].size = 0;
+  amvp[1].size = 0;
+  amvp[2].size = 0;
 
   for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
     for (int i = 0; i < MAX_REF_PIC_COUNT; ++i) {
@@ -1745,10 +1746,10 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
-    info.ref_idx = ref_idx;
-    info.ref = state->frame->ref->images[ref_idx];
+    info->ref_idx = ref_idx;
+    info->ref = state->frame->ref->images[ref_idx];
 
-    search_pu_inter_ref(&info, depth, lcu, cur_pu, amvp);
+    search_pu_inter_ref(info, depth, lcu, cur_pu, amvp);
   }
 
   kvz_sort_keys_by_cost(&amvp[0]);
@@ -1782,8 +1783,8 @@ static void search_pu_inter(encoder_state_t * const state,
 
       // TODO: logic is copy paste from search_pu_inter_bipred.
       // Get rid of duplicate code asap.
-      const image_list_t *const ref = info.state->frame->ref;
-      uint8_t(*ref_LX)[16] = info.state->frame->ref_LX;
+      const image_list_t *const ref = info->state->frame->ref;
+      uint8_t(*ref_LX)[16] = info->state->frame->ref_LX;
 
       bipred_pu->inter.mv_dir = 3;
 
@@ -1800,10 +1801,10 @@ static void search_pu_inter(encoder_state_t * const state,
       bipred_pu->skipped = false;
 
       for (int reflist = 0; reflist < 2; reflist++) {
-        kvz_inter_get_mv_cand(info.state, x, y, width, height, info.mv_cand, bipred_pu, lcu, reflist);
+        kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, bipred_pu, lcu, reflist);
       }
 
-      kvz_inter_recon_bipred(info.state,
+      kvz_inter_recon_bipred(info->state,
         ref->images[ref_LX[0][bipred_pu->inter.mv_ref[0]]],
         ref->images[ref_LX[1][bipred_pu->inter.mv_ref[1]]],
         x, y,
@@ -1821,18 +1822,18 @@ static void search_pu_inter(encoder_state_t * const state,
 
       uint32_t bitcost[2] = { 0, 0 };
 
-      best_bipred_cost += info.mvd_cost_func(info.state,
+      best_bipred_cost += info->mvd_cost_func(info->state,
         bipred_pu->inter.mv[0][0],
         bipred_pu->inter.mv[0][1],
         0,
-        info.mv_cand,
+        info->mv_cand,
         NULL, 0, 0,
         &bitcost[0]);
-      best_bipred_cost += info.mvd_cost_func(info.state,
+      best_bipred_cost += info->mvd_cost_func(info->state,
         bipred_pu->inter.mv[1][0],
         bipred_pu->inter.mv[1][1],
         0,
-        info.mv_cand,
+        info->mv_cand,
         NULL, 0, 0,
         &bitcost[1]);
 
@@ -1841,15 +1842,15 @@ static void search_pu_inter(encoder_state_t * const state,
         bipred_pu->inter.mv_ref[1]
       };
       const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
-      best_bipred_cost += info.state->lambda_sqrt * extra_bits;
+      best_bipred_cost += info->state->lambda_sqrt * extra_bits;
 
       if (best_bipred_cost < MAX_DOUBLE) {
 
         // Each motion vector has its own candidate
         for (int reflist = 0; reflist < 2; reflist++) {
           int cu_mv_cand = select_mv_cand(
-            info.state,
-            info.mv_cand,
+            info->state,
+            info->mv_cand,
             bipred_pu->inter.mv[reflist][0],
             bipred_pu->inter.mv[reflist][1],
             NULL);
@@ -1863,44 +1864,9 @@ static void search_pu_inter(encoder_state_t * const state,
     }
 
     // TODO: this probably should have a separate command line option
-    if (cfg->rdo == 3) search_pu_inter_bipred(&info, depth, lcu, &amvp[2]);
+    if (cfg->rdo == 3) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
     
     kvz_sort_keys_by_cost(&amvp[2]);
-  }
-
-  cu_info_t* best_inter_pu = NULL;
-
-  for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
-
-    int best_key = amvp[mv_dir - 1].keys[0];
-
-    if (amvp[mv_dir - 1].size > 0 && 
-        amvp[mv_dir - 1].cost[best_key] < *inter_cost) {
-
-      best_inter_pu  = &amvp[mv_dir - 1].unit[best_key];
-      *inter_cost    =  amvp[mv_dir - 1].cost[best_key];
-      *inter_bitcost =  amvp[mv_dir - 1].bits[best_key];
-    }
-  }
-
-  // Compare best merge cost to amvp cost
-  int best_merge_key = merge.keys[0];
-  
-  if (merge.size > 0 && merge.cost[best_merge_key] < *inter_cost) {
-
-    best_inter_pu  = &merge.unit[best_merge_key];
-    *inter_cost    =  merge.cost[best_merge_key];
-    *inter_bitcost =  0; // TODO: Check this
-  }
-
-  *cur_pu = *best_inter_pu;
-
-  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
-    assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
-  }
-
-  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
-    assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
   }
 }
 
@@ -1973,13 +1939,69 @@ void kvz_search_cu_inter(encoder_state_t * const state,
                          double   *inter_cost,
                          uint32_t *inter_bitcost)
 {
+  *inter_cost = MAX_DOUBLE;
+  *inter_bitcost = MAX_INT;
+
+  // Store information of L0, L1, and bipredictions.
+  // Best cost will be left at MAX_DOUBLE if no valid CU is found.
+  // These will be initialized by the following function.
+  unit_stats_map_t amvp[3];
+  unit_stats_map_t merge;
+  inter_search_info_t info;
+
   search_pu_inter(state,
                   x, y, depth,
                   SIZE_2Nx2N, 0,
                   lcu,
-                  inter_cost,
-                  inter_bitcost);
+                  amvp,
+                  &merge,
+                  &info);
 
+  // Early Skip CU decision
+  if (merge.size == 1 && merge.unit[0].skipped) {
+    *inter_cost    = merge.cost[0];
+    *inter_bitcost = merge.bits[0];
+    return;
+  }
+
+  cu_info_t *best_inter_pu = NULL;
+
+  // Find best AMVP PU
+  for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
+
+    int best_key = amvp[mv_dir - 1].keys[0];
+
+    if (amvp[mv_dir - 1].size > 0 &&
+        amvp[mv_dir - 1].cost[best_key] < *inter_cost) {
+
+      best_inter_pu  = &amvp[mv_dir - 1].unit[best_key];
+      *inter_cost    =  amvp[mv_dir - 1].cost[best_key];
+      *inter_bitcost =  amvp[mv_dir - 1].bits[best_key];
+    }
+  }
+
+  // Compare best AMVP against best Merge mode
+  int best_merge_key = merge.keys[0];
+
+  if (merge.size > 0 && merge.cost[best_merge_key] < *inter_cost) {
+
+    best_inter_pu  = &merge.unit[best_merge_key];
+    *inter_cost    =  merge.cost[best_merge_key];
+    *inter_bitcost =  0; // TODO: Check this
+  }
+
+  if (*inter_cost == MAX_DOUBLE) {
+    // Could not find any motion vector.
+    *inter_cost = MAX_DOUBLE;
+    *inter_bitcost = MAX_INT;
+    return;
+  }
+
+  const int x_local = SUB_SCU(x);
+  const int y_local = SUB_SCU(y);
+  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  *cur_pu = *best_inter_pu;
+   
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
     kvz_cu_cost_inter_rd2(state,
@@ -1987,6 +2009,14 @@ void kvz_search_cu_inter(encoder_state_t * const state,
       lcu,
       inter_cost,
       inter_bitcost);
+  }
+
+  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
+    assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
+  }
+
+  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
+    assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
   }
 }
 
@@ -2014,6 +2044,16 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        double *inter_cost,
                        uint32_t *inter_bitcost)
 {
+  *inter_cost = MAX_DOUBLE;
+  *inter_bitcost = MAX_INT;
+
+  // Store information of L0, L1, and bipredictions.
+  // Best cost will be left at MAX_DOUBLE if no valid CU is found.
+  // These will be initialized by the following function.
+  unit_stats_map_t amvp[3];
+  unit_stats_map_t merge;
+  inter_search_info_t info;
+
   const int num_pu  = kvz_part_mode_num_parts[part_mode];
   const int width   = LCU_WIDTH >> depth;
   const int y_local = SUB_SCU(y);
@@ -2031,25 +2071,61 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     double cost      = MAX_DOUBLE;
     uint32_t bitcost = MAX_INT;
 
-    search_pu_inter(state, x, y, depth, part_mode, i, lcu, &cost, &bitcost);
+    search_pu_inter(state, x, y, depth, part_mode, i, lcu, amvp, &merge, &info);
+
+    cu_info_t *best_inter_pu = NULL;
+
+    // Find best AMVP PU
+    for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
+
+      int best_key = amvp[mv_dir - 1].keys[0];
+
+      if (amvp[mv_dir - 1].size > 0 &&
+          amvp[mv_dir - 1].cost[best_key] < cost) {
+
+        best_inter_pu  = &amvp[mv_dir - 1].unit[best_key];
+        cost           =  amvp[mv_dir - 1].cost[best_key];
+        bitcost        =  amvp[mv_dir - 1].bits[best_key];
+      }
+    }
+
+    // Compare best AMVP against best Merge mode
+    int best_merge_key = merge.keys[0];
+
+    if (merge.size > 0 && merge.cost[best_merge_key] < cost) {
+
+      best_inter_pu = &merge.unit[best_merge_key];
+      cost          =  merge.cost[best_merge_key];
+      bitcost       =  0; // TODO: Check this
+    }
 
     if (cost == MAX_DOUBLE) {
       // Could not find any motion vector.
-      *inter_cost    = MAX_DOUBLE;
+      *inter_cost = MAX_DOUBLE;
       *inter_bitcost = MAX_INT;
       return;
     }
 
-    *inter_cost    += cost;
+    *inter_cost += cost;
     *inter_bitcost += bitcost;
 
     cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
+    *cur_pu = *best_inter_pu;
+
     for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
       for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
         cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x, y);
         scu->type = CU_INTER;
         scu->inter = cur_pu->inter;
       }
+    }
+
+    if (cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
+      assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
+    }
+
+    if (cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
+      assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
     }
   }
 
