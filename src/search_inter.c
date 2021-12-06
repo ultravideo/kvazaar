@@ -1381,6 +1381,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         unit_stats_map_t *cur_map = &amvp[ref_list];
         int entry = cur_map->size;
         cu_info_t *unipred_pu = &cur_map->unit[entry];
+        unipred_pu->type = CU_INTER;
         unipred_pu->merged  = false;
         unipred_pu->skipped = false;
         unipred_pu->inter.mv_dir = ref_list + 1;
@@ -1513,6 +1514,8 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
         NULL);
       CU_SET_MV_CAND(bipred_pu, reflist, cu_mv_cand);
     }
+
+    bipred_pu->type = CU_INTER;
 
     amvp_bipred->cost[amvp_bipred->size] = cost;
     amvp_bipred->bits[amvp_bipred->size] = bitcost[0] + bitcost[1] + extra_bits;
