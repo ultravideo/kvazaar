@@ -1386,14 +1386,14 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         // Map reference index to L0/L1 pictures
         unit_stats_map_t *cur_map = &amvp[ref_list];
         int entry = cur_map->size;
-        cu_info_t *pb = &cur_map->unit[entry];
-        pb->merged = false;
-        pb->skipped = false;
-        pb->inter.mv_dir = ref_list + 1;
-        pb->inter.mv_ref[ref_list] = LX_idx;
-        pb->inter.mv[ref_list][0] = (int16_t)best_mv.x;
-        pb->inter.mv[ref_list][1] = (int16_t)best_mv.y;
-        CU_SET_MV_CAND(pb, ref_list, cu_mv_cand);
+        cu_info_t *unipred_pu = &cur_map->unit[entry];
+        unipred_pu->merged  = false;
+        unipred_pu->skipped = false;
+        unipred_pu->inter.mv_dir = ref_list + 1;
+        unipred_pu->inter.mv_ref[ref_list] = LX_idx;
+        unipred_pu->inter.mv[ref_list][0] = (int16_t)best_mv.x;
+        unipred_pu->inter.mv[ref_list][1] = (int16_t)best_mv.y;
+        CU_SET_MV_CAND(unipred_pu, ref_list, cu_mv_cand);
 
         cur_map->cost[entry] = best_cost;
         cur_map->bits[entry] = best_bits;
@@ -1697,13 +1697,13 @@ static void search_pu_inter(encoder_state_t * const state,
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
   if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
-    for (int merge_rdo_idx = 0; merge_rdo_idx < num_rdo_cands; ++merge_rdo_idx) {
+    for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
 
       // Reconstruct blocks with merge candidate.
       // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
-      int merge_idx = merge.unit[merge.keys[merge_rdo_idx]].merge_idx;
+      int merge_idx = merge.unit[merge.keys[merge_key]].merge_idx;
       cur_pu->inter.mv_dir = info.merge_cand[merge_idx].dir;
       cur_pu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
       cur_pu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
@@ -1756,25 +1756,25 @@ static void search_pu_inter(encoder_state_t * const state,
   kvz_sort_keys_by_cost(&amvp[0]);
   kvz_sort_keys_by_cost(&amvp[1]);
 
-  int best_idx[2] = { amvp[0].keys[0], amvp[1].keys[0] };
+  int best_keys[2] = { amvp[0].keys[0], amvp[1].keys[0] };
   double best_cost_L0 = MAX_DOUBLE;
   double best_cost_L1 = MAX_DOUBLE;
-  if (amvp[0].size > 0) best_cost_L0 = amvp[0].cost[best_idx[0]];
-  if (amvp[1].size > 0) best_cost_L1 = amvp[1].cost[best_idx[1]];
+  if (amvp[0].size > 0) best_cost_L0 = amvp[0].cost[best_keys[0]];
+  if (amvp[1].size > 0) best_cost_L1 = amvp[1].cost[best_keys[1]];
   int best_list = (best_cost_L0 <= best_cost_L1) ? 0 : 1;
   int best_cost = (best_cost_L0 <= best_cost_L1) ? best_cost_L0 : best_cost_L1;
 
   cu_info_t *best_unipred[2] = {
-    &amvp[0].unit[best_idx[0]],
-    &amvp[1].unit[best_idx[1]]
+    &amvp[0].unit[best_keys[0]],
+    &amvp[1].unit[best_keys[1]]
   };
 
   // Set best valid unipred to cur_cu
   if (best_cost < MAX_DOUBLE) {
     // Map reference index to L0/L1 pictures
     *cur_pu = *best_unipred[best_list];
-    *inter_cost    = amvp[best_list].cost[best_idx[best_list]];
-    *inter_bitcost = amvp[best_list].bits[best_idx[best_list]];
+    *inter_cost    = amvp[best_list].cost[best_keys[best_list]];
+    *inter_bitcost = amvp[best_list].bits[best_keys[best_list]];
   }
 
   // Search bi-pred positions
@@ -1886,13 +1886,13 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Compare best merge cost to amvp cost
-  int best_merge_indx = merge.keys[0];
-  int best_merge_cost = merge.cost[best_merge_indx];
+  int best_merge_key  = merge.keys[0];
+  int best_merge_cost = merge.cost[best_merge_key];
 
   if (merge.size > 0 && best_merge_cost < *inter_cost) {
     *inter_cost = best_merge_cost;
     *inter_bitcost = 0; // TODO: Check this
-    *cur_pu = merge.unit[best_merge_indx];
+    *cur_pu = merge.unit[best_merge_key];
   }
 
   if (*inter_cost < INT_MAX && cur_pu->inter.mv_dir == 1) {
