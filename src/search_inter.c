@@ -1893,11 +1893,15 @@ static void search_pu_inter(encoder_state_t * const state,
     *inter_bitcost =  0; // TODO: Check this
   }
 
-  if (*inter_cost < INT_MAX && cur_pu->inter.mv_dir == 1) {
+  *cur_pu = *best_inter_pu;
+
+  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
   }
 
-  *cur_pu = *best_inter_pu;
+  if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
+    assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
+  }
 }
 
 /**
