@@ -1740,6 +1740,7 @@ static void search_pu_inter(encoder_state_t * const state,
     for (int i = 0; i < MAX_REF_PIC_COUNT; ++i) {
       amvp[mv_dir - 1].unit[i] = *cur_pu; // TODO: only initialize what is necessary
       amvp[mv_dir - 1].keys[i] = i;
+      amvp[mv_dir - 1].cost[i] = MAX_DOUBLE;
     }
   }
 
@@ -1765,14 +1766,6 @@ static void search_pu_inter(encoder_state_t * const state,
     &amvp[0].unit[best_keys[0]],
     &amvp[1].unit[best_keys[1]]
   };
-
-  // Set best valid unipred to cur_cu
-  if (best_cost < MAX_DOUBLE) {
-    // Map reference index to L0/L1 pictures
-    *cur_pu = *best_unipred[best_list];
-    *inter_cost    = amvp[best_list].cost[best_keys[best_list]];
-    *inter_bitcost = amvp[best_list].bits[best_keys[best_list]];
-  }
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
@@ -1850,7 +1843,7 @@ static void search_pu_inter(encoder_state_t * const state,
       const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
       best_bipred_cost += info.state->lambda_sqrt * extra_bits;
 
-      if (best_bipred_cost < *inter_cost) {
+      if (best_bipred_cost < MAX_DOUBLE) {
 
         // Each motion vector has its own candidate
         for (int reflist = 0; reflist < 2; reflist++) {
@@ -1873,28 +1866,38 @@ static void search_pu_inter(encoder_state_t * const state,
     if (cfg->rdo == 3) search_pu_inter_bipred(&info, depth, lcu, &amvp[2]);
     
     kvz_sort_keys_by_cost(&amvp[2]);
-    int best_bipred_key = amvp[2].keys[0];
+  }
 
-    if (amvp[2].size > 0 && amvp[2].cost[best_bipred_key] < *inter_cost) {
-      *inter_cost    = amvp[2].cost[best_bipred_key];
-      *inter_bitcost = amvp[2].bits[best_bipred_key];
-      *cur_pu        = amvp[2].unit[best_bipred_key];
+  cu_info_t* best_inter_pu = NULL;
+
+  for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
+
+    int best_key = amvp[mv_dir - 1].keys[0];
+
+    if (amvp[mv_dir - 1].size > 0 && 
+        amvp[mv_dir - 1].cost[best_key] < *inter_cost) {
+
+      best_inter_pu  = &amvp[mv_dir - 1].unit[best_key];
+      *inter_cost    =  amvp[mv_dir - 1].cost[best_key];
+      *inter_bitcost =  amvp[mv_dir - 1].bits[best_key];
     }
   }
 
   // Compare best merge cost to amvp cost
-  int best_merge_key  = merge.keys[0];
-  int best_merge_cost = merge.cost[best_merge_key];
+  int best_merge_key = merge.keys[0];
+  
+  if (merge.size > 0 && merge.cost[best_merge_key] < *inter_cost) {
 
-  if (merge.size > 0 && best_merge_cost < *inter_cost) {
-    *inter_cost = best_merge_cost;
-    *inter_bitcost = 0; // TODO: Check this
-    *cur_pu = merge.unit[best_merge_key];
+    best_inter_pu  = &merge.unit[best_merge_key];
+    *inter_cost    =  merge.cost[best_merge_key];
+    *inter_bitcost =  0; // TODO: Check this
   }
 
   if (*inter_cost < INT_MAX && cur_pu->inter.mv_dir == 1) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
   }
+
+  *cur_pu = *best_inter_pu;
 }
 
 /**
