@@ -1232,9 +1232,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
       int LX_idx = ref_list_idx[ref_list];
 
-      // store temp values to be stored back later
-      int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
-
       // Get MV candidates
       cur_cu->inter.mv_ref[ref_list] = ref_list_idx[ref_list];
 
@@ -1247,9 +1244,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         cur_cu,
         lcu,
         ref_list);
-
-      // store old values back
-      cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
       vector2d_t best_mv = { 0, 0 };
 
