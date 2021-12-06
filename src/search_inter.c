@@ -1732,7 +1732,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
   // AMVP search starts here
 
-  // Store unipred information of L0 and L1 for biprediction
+  // Store information of L0, L1, and bipredictions
   // Best cost will be left at MAX_DOUBLE if no valid CU is found
   unit_stats_map_t amvp[3] = { { .size = 0 }, { .size = 0 }, { .size = 0 } };
 
