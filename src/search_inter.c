@@ -1509,21 +1509,6 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
     cost += info->state->lambda_sqrt * extra_bits;
 
-    // Check every candidate to find a match
-    for (int merge_idx = 0; merge_idx < info->num_merge_cand; merge_idx++) {
-      if (merge_cand[merge_idx].mv[0][0] == bipred_pu->inter.mv[0][0] &&
-          merge_cand[merge_idx].mv[0][1] == bipred_pu->inter.mv[0][1] &&
-          merge_cand[merge_idx].mv[1][0] == bipred_pu->inter.mv[1][0] &&
-          merge_cand[merge_idx].mv[1][1] == bipred_pu->inter.mv[1][1] &&
-          merge_cand[merge_idx].ref[0]   == bipred_pu->inter.mv_ref[0] &&
-          merge_cand[merge_idx].ref[1]   == bipred_pu->inter.mv_ref[1])
-      {
-        bipred_pu->merged = true;
-        bipred_pu->merge_idx = merge_idx;
-        break;
-      }
-    }
-
     // Each motion vector has its own candidate
     for (int reflist = 0; reflist < 2; reflist++) {
       int cu_mv_cand = select_mv_cand(
@@ -1801,7 +1786,6 @@ static void search_pu_inter(encoder_state_t * const state,
 
     cu_info_t *bipred_pu = &amvp[2].unit[0];
     double   best_bipred_cost = MAX_DOUBLE;
-    uint32_t best_bipred_bits = MAX_INT;
 
     // Try biprediction from valid acquired unipreds.
     if (amvp[0].size > 0 && amvp[1].size > 0) {
@@ -1810,8 +1794,6 @@ static void search_pu_inter(encoder_state_t * const state,
       // Get rid of duplicate code asap.
       const image_list_t *const ref = info.state->frame->ref;
       uint8_t(*ref_LX)[16] = info.state->frame->ref_LX;
-
-      inter_merge_cand_t *merge_cand = info.merge_cand;
 
       bipred_pu->inter.mv_dir = 3;
 
@@ -1872,21 +1854,6 @@ static void search_pu_inter(encoder_state_t * const state,
       best_bipred_cost += info.state->lambda_sqrt * extra_bits;
 
       if (best_bipred_cost < *inter_cost) {
-
-        // Check every candidate to find a match
-        for (int merge_idx = 0; merge_idx < info.num_merge_cand; merge_idx++) {
-          if (merge_cand[merge_idx].mv[0][0] == bipred_pu->inter.mv[0][0] &&
-              merge_cand[merge_idx].mv[0][1] == bipred_pu->inter.mv[0][1] &&
-              merge_cand[merge_idx].mv[1][0] == bipred_pu->inter.mv[1][0] &&
-              merge_cand[merge_idx].mv[1][1] == bipred_pu->inter.mv[1][1] &&
-              merge_cand[merge_idx].ref[0]   == bipred_pu->inter.mv_ref[0] &&
-              merge_cand[merge_idx].ref[1]   == bipred_pu->inter.mv_ref[1])
-          {
-            bipred_pu->merged = 1;
-            bipred_pu->merge_idx = merge_idx;
-            break;
-          }
-        }
 
         // Each motion vector has its own candidate
         for (int reflist = 0; reflist < 2; reflist++) {
