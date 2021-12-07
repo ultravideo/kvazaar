@@ -1347,11 +1347,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
               &best_cost, &best_bits, &best_mv);
             break;
         }
-
-        if (cfg->fme_level > 0 && best_cost < MAX_DOUBLE) {
-          search_frac(info, &best_cost, &best_bits, &best_mv);
-
-        }
       }
 
       if (cfg->fme_level == 0 && best_cost < MAX_DOUBLE) {
@@ -1767,6 +1762,75 @@ static void search_pu_inter(encoder_state_t * const state,
     &amvp[0].unit[best_keys[0]],
     &amvp[1].unit[best_keys[1]]
   };
+
+  // Fractional-pixel motion estimation.
+  // Refine the best PUs so far from both lists, if available.
+  for (int list = 0; list < 2; ++list) {
+
+    // TODO: make configurable
+    int n_best = MIN(1, amvp[list].size);
+    if (cfg->fme_level > 0) {
+
+      for (int i = 0; i < n_best; ++i) {
+
+        int key = amvp[list].keys[i];
+        cu_info_t *unipred_pu = &amvp[list].unit[key];
+
+        // Find the reference picture
+        const image_list_t *const ref = info->state->frame->ref;
+        uint8_t(*ref_LX)[16] = info->state->frame->ref_LX;
+
+        int LX_idx = unipred_pu->inter.mv_ref[list];
+        info->ref_idx = ref_LX[list][LX_idx];
+        info->ref = ref->images[info->ref_idx];
+
+        kvz_inter_get_mv_cand(info->state,
+          info->origin.x,
+          info->origin.y,
+          info->width,
+          info->height,
+          info->mv_cand,
+          unipred_pu,
+          lcu,
+          list);
+
+        double *cost = &amvp[list].cost[key];
+
+        double     frac_cost = MAX_DOUBLE;
+        uint32_t   frac_bits = MAX_INT;
+        vector2d_t frac_mv = { unipred_pu->inter.mv[list][0], unipred_pu->inter.mv[list][1] };
+
+        search_frac(info, &frac_cost, &frac_bits, &frac_mv);
+
+        uint8_t mv_ref_coded = LX_idx;
+        int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, frac_mv.x, frac_mv.y, NULL);
+        frac_bits += list + mv_ref_coded;
+
+        bool valid_mv = fracmv_within_tile(info, frac_mv.x, frac_mv.y);
+        if (valid_mv) {
+
+          unipred_pu->inter.mv[list][0] = frac_mv.x;
+          unipred_pu->inter.mv[list][1] = frac_mv.y;
+          CU_SET_MV_CAND(unipred_pu, list, cu_mv_cand);
+
+          amvp[list].cost[key] = frac_cost;
+          amvp[list].bits[key] = frac_bits;
+        }
+      }
+
+      // Invalidate PUs with SAD-based costs. (FME not performed).
+      // TODO: Recalculate SAD costs with SATD for further processing.
+      for (int i = n_best; i < amvp[list].size; ++i) {
+        int key = amvp[list].keys[i];
+        amvp[list].cost[key] = MAX_DOUBLE;
+      }
+    }
+
+    // Costs are now, SATD-based. Omit PUs with SAD-based costs.
+    // TODO: Recalculate SAD costs with SATD for further processing.
+    kvz_sort_keys_by_cost(&amvp[list]);
+    amvp[list].size = n_best;
+  }
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
