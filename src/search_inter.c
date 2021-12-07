@@ -1371,7 +1371,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       // Only check when candidates are different
       uint8_t mv_ref_coded = LX_idx;
       int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, best_mv.x, best_mv.y, NULL);
-      best_bits += cur_cu->inter.mv_dir - 1 + mv_ref_coded;
+      best_bits += ref_list + mv_ref_coded;
 
       // Update best unipreds for biprediction
       bool valid_mv = fracmv_within_tile(info, best_mv.x, best_mv.y);
