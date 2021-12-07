@@ -97,6 +97,7 @@ void kvz_cabac_start(cabac_data_t * const data)
   data->num_buffered_bytes = 0;
   data->buffered_byte = 0xff;
   data->only_count = 0; // By default, write bits out
+  data->update = 0; 
 }
 
 /**
