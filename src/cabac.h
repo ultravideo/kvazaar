@@ -139,7 +139,11 @@ extern double bits_written;
 #define CTX_UPDATE_LPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_lps[ (ctx)->uc_state ]; }
 #define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_mps[ (ctx)->uc_state ]; }
 
-#define FILE_BITS(bits, x, y, depth, name) fprintf(bit_cost_file, "%s\t%d\t%d\t%d\t%f\n", (name), (x), (y), (depth), (bits)) 
+#ifdef VERBOSE
+#define FILE_BITS(bits, x, y, depth, name) fprintf(bit_cost_file, "%s\t%d\t%d\t%d\t%f\n", (name), (x), (y), (depth), (bits))
+#else
+#define FILE_BITS(bits, x, y, depth, name) {}
+#endif
 
 #ifdef VERBOSE
   #define CABAC_BIN(data, value, name) { \
