@@ -1366,7 +1366,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   double LX_bits[2] = { best_bits, best_bits };
 
   // Compute costs and add entries for both lists, if necessary
-  for (; ref_list_active[ref_list] && ref_list < 2; ++ref_list) {
+  for (; ref_list < 2 && ref_list_active[ref_list]; ++ref_list) {
 
     LX_idx = ref_list_idx[ref_list];
     uint8_t mv_ref_coded = LX_idx;
