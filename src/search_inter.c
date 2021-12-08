@@ -1760,17 +1760,44 @@ static void search_pu_inter(encoder_state_t * const state,
   kvz_sort_keys_by_cost(&amvp[1]);
 
   int best_keys[2] = { amvp[0].keys[0], amvp[1].keys[0] };
+
+  cu_info_t *best_unipred[2] = {
+    &amvp[0].unit[best_keys[0]],
+    &amvp[1].unit[best_keys[1]]
+  };
+
+  // Prevent using the same ref picture with both lists.
+  // TODO: allow searching two MVs from the same reference picture.
+  if (cfg->bipred && amvp[0].size > 0 && amvp[1].size > 0) {
+
+    const image_list_t *const ref = info->state->frame->ref;
+    uint8_t(*ref_LX)[16] = info->state->frame->ref_LX;
+
+    int L0_idx = best_unipred[0]->inter.mv_ref[0];
+    int L1_idx = best_unipred[1]->inter.mv_ref[1];
+    
+    int L0_ref_idx = ref_LX[0][L0_idx];
+    int L1_ref_idx = ref_LX[1][L1_idx];
+
+    if (L0_ref_idx == L1_ref_idx) {
+      // Invalidate the other based the list that has the 2nd best PU
+      double L0_2nd_cost = amvp[0].size > 1 ? amvp[0].cost[amvp[0].keys[1]] : MAX_DOUBLE;
+      double L1_2nd_cost = amvp[1].size > 1 ? amvp[1].cost[amvp[1].keys[1]] : MAX_DOUBLE;
+      int list = (L0_2nd_cost <= L1_2nd_cost) ? 1 : 0;
+      amvp[list].cost[best_keys[list]] = MAX_DOUBLE;
+      kvz_sort_keys_by_cost(&amvp[list]);
+      amvp[list].size--;
+      best_keys[list]    =  amvp[list].keys[0];
+      best_unipred[list] = &amvp[list].unit[best_keys[list]];
+    }
+  }
+
   double best_cost_L0 = MAX_DOUBLE;
   double best_cost_L1 = MAX_DOUBLE;
   if (amvp[0].size > 0) best_cost_L0 = amvp[0].cost[best_keys[0]];
   if (amvp[1].size > 0) best_cost_L1 = amvp[1].cost[best_keys[1]];
   int best_list = (best_cost_L0 <= best_cost_L1) ? 0 : 1;
   int best_cost = (best_cost_L0 <= best_cost_L1) ? best_cost_L0 : best_cost_L1;
-
-  cu_info_t *best_unipred[2] = {
-    &amvp[0].unit[best_keys[0]],
-    &amvp[1].unit[best_keys[1]]
-  };
 
   // Fractional-pixel motion estimation.
   // Refine the best PUs so far from both lists, if available.
