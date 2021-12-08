@@ -1534,14 +1534,14 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
  *
  * \return                Does an identical candidate exist in list
  */
-static bool merge_candidate_in_list(inter_merge_cand_t * all_cands,
-                                    inter_merge_cand_t * cand_to_add,
-                                    int8_t * added_idx_list,
-                                    int list_size)
+static bool merge_candidate_in_list(inter_merge_cand_t *all_cands,
+                                    inter_merge_cand_t *cand_to_add,
+                                    unit_stats_map_t *merge)
 {
   bool found = false;
-  for (int i = 0; i < list_size && !found; ++i) {
-    inter_merge_cand_t * list_cand = &all_cands[added_idx_list[i]];
+  for (int i = 0; i < merge->size && !found; ++i) {
+    int key = merge->keys[i];
+    inter_merge_cand_t * list_cand = &all_cands[merge->unit[key].merge_idx];
 
     found = cand_to_add->dir == list_cand->dir &&
         cand_to_add->ref[0] == list_cand->ref[0] &&
@@ -1606,6 +1606,8 @@ static void search_pu_inter(encoder_state_t * const state,
   CU_SET_MV_CAND(cur_pu, 0, 0);
   CU_SET_MV_CAND(cur_pu, 1, 0);
 
+  FILL(*info, 0);
+
   info->state          = state;
   info->pic            = frame->source;
   info->origin.x       = x;
@@ -1649,9 +1651,7 @@ static void search_pu_inter(encoder_state_t * const state,
     if (cur_pu->inter.mv_dir == 3 && !state->encoder_control->cfg.bipred) continue;
     if (cur_pu->inter.mv_dir == 3 && !(width + height > 12)) continue;
 
-    bool is_duplicate = merge_candidate_in_list(info->merge_cand, cur_cand,
-      merge->keys, 
-      merge->size);
+    bool is_duplicate = merge_candidate_in_list(info->merge_cand, cur_cand, merge);
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
