@@ -1227,170 +1227,174 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   // Must find at least one reference picture
   assert(ref_list_active[0] || ref_list_active[1]);
 
-  for (int ref_list = 0; ref_list < 2; ++ref_list) {
-    if (ref_list_active[ref_list]) {
+  // Does not matter which list is used, if in both.
+  int ref_list = ref_list_active[0] ? 0 : 1;
+  int LX_idx = ref_list_idx[ref_list];
 
-      int LX_idx = ref_list_idx[ref_list];
+  // Get MV candidates
+  cur_cu->inter.mv_ref[ref_list] = ref_list_idx[ref_list];
 
-      // Get MV candidates
-      cur_cu->inter.mv_ref[ref_list] = ref_list_idx[ref_list];
+  kvz_inter_get_mv_cand(info->state,
+    info->origin.x,
+    info->origin.y,
+    info->width,
+    info->height,
+    info->mv_cand,
+    cur_cu,
+    lcu,
+    ref_list);
 
-      kvz_inter_get_mv_cand(info->state,
-        info->origin.x,
-        info->origin.y,
-        info->width,
-        info->height,
-        info->mv_cand,
-        cur_cu,
-        lcu,
-        ref_list);
+  vector2d_t best_mv = { 0, 0 };
 
-      vector2d_t best_mv = { 0, 0 };
-
-      // Take starting point for MV search from previous frame.
-      // When temporal motion vector candidates are added, there is probably
-      // no point to this anymore, but for now it helps.
-      const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
-      const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
-      const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
-      const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
-      if (ref_cu->type == CU_INTER) {
-        vector2d_t mv_previous = { 0, 0 };
-        if (ref_cu->inter.mv_dir & 1) {
-          mv_previous.x = ref_cu->inter.mv[0][0];
-          mv_previous.y = ref_cu->inter.mv[0][1];
-        } else {
-          mv_previous.x = ref_cu->inter.mv[1][0];
-          mv_previous.y = ref_cu->inter.mv[1][1];
-        }
-        // Apply mv scaling if neighbor poc is available
-        if (info->state->frame->ref_LX_size[ref_list] > 0) {
-          // When there are reference pictures from the future (POC > current POC)
-          // in L0 or L1, the primary list for the colocated PU is the inverse of
-          // collocated_from_l0_flag. Otherwise it is equal to reflist.
-          //
-          // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
-          // there are future references.
-          int col_list = ref_list;
-          for (int i = 0; i < info->state->frame->ref->used_size; i++) {
-            if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
-              col_list = 1;
-              break;
-            }
-          }
-          if ((ref_cu->inter.mv_dir & (col_list + 1)) == 0) {
-            // Use the other list if the colocated PU does not have a MV for the
-            // primary list.
-            col_list = 1 - col_list;
-          }
-
-          uint8_t neighbor_poc_index = info->state->frame->ref_LX[ref_list][LX_idx];
-          // Scaling takes current POC, reference POC, neighbor POC and neighbor reference POC as argument
-          apply_mv_scaling(
-            info->state->frame->poc,
-            info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
-            info->state->frame->ref->pocs[neighbor_poc_index],
-            info->state->frame->ref->images[neighbor_poc_index]->ref_pocs[
-              info->state->frame->ref->ref_LXs[neighbor_poc_index]
-                [col_list]
-              [ref_cu->inter.mv_ref[col_list]]
-            ],
-            &mv_previous
-              );
-        }
-
-        // Check if the mv is valid after scaling
-        if (fracmv_within_tile(info, mv_previous.x, mv_previous.y)) {
-          best_mv = mv_previous;
+  // Take starting point for MV search from previous frame.
+  // When temporal motion vector candidates are added, there is probably
+  // no point to this anymore, but for now it helps.
+  const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
+  const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
+  const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
+  const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
+  if (ref_cu->type == CU_INTER) {
+    vector2d_t mv_previous = { 0, 0 };
+    if (ref_cu->inter.mv_dir & 1) {
+      mv_previous.x = ref_cu->inter.mv[0][0];
+      mv_previous.y = ref_cu->inter.mv[0][1];
+    } else {
+      mv_previous.x = ref_cu->inter.mv[1][0];
+      mv_previous.y = ref_cu->inter.mv[1][1];
+    }
+    // Apply mv scaling if neighbor poc is available
+    if (info->state->frame->ref_LX_size[ref_list] > 0) {
+      // When there are reference pictures from the future (POC > current POC)
+      // in L0 or L1, the primary list for the colocated PU is the inverse of
+      // collocated_from_l0_flag. Otherwise it is equal to reflist.
+      //
+      // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+      // there are future references.
+      int col_list = ref_list;
+      for (int i = 0; i < info->state->frame->ref->used_size; i++) {
+        if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
+          col_list = 1;
+          break;
         }
       }
-
-      int search_range = 32;
-      switch (cfg->ime_algorithm) {
-        case KVZ_IME_FULL64: search_range = 64; break;
-        case KVZ_IME_FULL32: search_range = 32; break;
-        case KVZ_IME_FULL16: search_range = 16; break;
-        case KVZ_IME_FULL8: search_range = 8; break;
-        default: break;
+      if ((ref_cu->inter.mv_dir & (col_list + 1)) == 0) {
+        // Use the other list if the colocated PU does not have a MV for the
+        // primary list.
+        col_list = 1 - col_list;
       }
 
-      double best_cost = MAX_DOUBLE;
-      uint32_t best_bits = MAX_INT;
+      uint8_t neighbor_poc_index = info->state->frame->ref_LX[ref_list][LX_idx];
+      // Scaling takes current POC, reference POC, neighbor POC and neighbor reference POC as argument
+      apply_mv_scaling(
+        info->state->frame->poc,
+        info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]],
+        info->state->frame->ref->pocs[neighbor_poc_index],
+        info->state->frame->ref->images[neighbor_poc_index]->ref_pocs[
+          info->state->frame->ref->ref_LXs[neighbor_poc_index]
+            [col_list]
+          [ref_cu->inter.mv_ref[col_list]]
+        ],
+        &mv_previous
+          );
+    }
 
-      // Select starting point from among merge candidates. These should
-      // include both mv_cand vectors and (0, 0).
-      select_starting_point(info, best_mv, &best_cost, &best_bits, &best_mv);
-      bool skip_me = early_terminate(info, &best_cost, &best_bits, &best_mv);
+    // Check if the mv is valid after scaling
+    if (fracmv_within_tile(info, mv_previous.x, mv_previous.y)) {
+      best_mv = mv_previous;
+    }
+  }
+
+  int search_range = 32;
+  switch (cfg->ime_algorithm) {
+    case KVZ_IME_FULL64: search_range = 64; break;
+    case KVZ_IME_FULL32: search_range = 32; break;
+    case KVZ_IME_FULL16: search_range = 16; break;
+    case KVZ_IME_FULL8: search_range = 8; break;
+    default: break;
+  }
+
+  double best_cost = MAX_DOUBLE;
+  uint32_t best_bits = MAX_INT;
+
+  // Select starting point from among merge candidates. These should
+  // include both mv_cand vectors and (0, 0).
+  select_starting_point(info, best_mv, &best_cost, &best_bits, &best_mv);
+  bool skip_me = early_terminate(info, &best_cost, &best_bits, &best_mv);
       
-      if (!(info->state->encoder_control->cfg.me_early_termination && skip_me)) {
+  if (!(info->state->encoder_control->cfg.me_early_termination && skip_me)) {
 
-        switch (cfg->ime_algorithm) {
-          case KVZ_IME_TZ:
-            tz_search(info, best_mv, &best_cost, &best_bits, &best_mv);
-            break;
+    switch (cfg->ime_algorithm) {
+      case KVZ_IME_TZ:
+        tz_search(info, best_mv, &best_cost, &best_bits, &best_mv);
+        break;
 
-          case KVZ_IME_FULL64:
-          case KVZ_IME_FULL32:
-          case KVZ_IME_FULL16:
-          case KVZ_IME_FULL8:
-          case KVZ_IME_FULL:
-            search_mv_full(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
-            break;
+      case KVZ_IME_FULL64:
+      case KVZ_IME_FULL32:
+      case KVZ_IME_FULL16:
+      case KVZ_IME_FULL8:
+      case KVZ_IME_FULL:
+        search_mv_full(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
+        break;
 
-          case KVZ_IME_DIA:
-            diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-              &best_cost, &best_bits, &best_mv);
-            break;
+      case KVZ_IME_DIA:
+        diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
+          &best_cost, &best_bits, &best_mv);
+        break;
 
-          default:
-            hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-              &best_cost, &best_bits, &best_mv);
-            break;
-        }
-      }
+      default:
+        hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
+          &best_cost, &best_bits, &best_mv);
+        break;
+    }
+  }
 
-      if (cfg->fme_level == 0 && best_cost < MAX_DOUBLE) {
-        // Recalculate inter cost with SATD.
-        best_cost = kvz_image_calc_satd(
-          info->state->tile->frame->source,
-          info->ref,
-          info->origin.x,
-          info->origin.y,
-          info->state->tile->offset_x + info->origin.x + (best_mv.x >> 2),
-          info->state->tile->offset_y + info->origin.y + (best_mv.y >> 2),
-          info->width,
-          info->height);
-        best_cost += best_bits * info->state->lambda_sqrt;
-      }
+  if (cfg->fme_level == 0 && best_cost < MAX_DOUBLE) {
+    // Recalculate inter cost with SATD.
+    best_cost = kvz_image_calc_satd(
+      info->state->tile->frame->source,
+      info->ref,
+      info->origin.x,
+      info->origin.y,
+      info->state->tile->offset_x + info->origin.x + (best_mv.x >> 2),
+      info->state->tile->offset_y + info->origin.y + (best_mv.y >> 2),
+      info->width,
+      info->height);
+    best_cost += best_bits * info->state->lambda_sqrt;
+  }
 
-      // Only check when candidates are different
-      uint8_t mv_ref_coded = LX_idx;
-      int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, best_mv.x, best_mv.y, NULL);
-      const int extra_bits = ref_list + mv_ref_coded; // TODO: check if mv_dir bits are missing
-      best_cost += extra_bits * info->state->lambda_sqrt;
-      best_bits += extra_bits;
+  double LX_cost[2] = { best_cost, best_cost };
+  double LX_bits[2] = { best_bits, best_bits };
 
-      // Update best unipreds for biprediction
-      bool valid_mv = fracmv_within_tile(info, best_mv.x, best_mv.y);
-      if (valid_mv && best_cost < MAX_DOUBLE) {
+  // Compute costs and add entries for both lists, if necessary
+  for (; ref_list_active[ref_list] && ref_list < 2; ++ref_list) {
 
-        // Map reference index to L0/L1 pictures
-        unit_stats_map_t *cur_map = &amvp[ref_list];
-        int entry = cur_map->size;
-        cu_info_t *unipred_pu = &cur_map->unit[entry];
-        unipred_pu->type = CU_INTER;
-        unipred_pu->merged  = false;
-        unipred_pu->skipped = false;
-        unipred_pu->inter.mv_dir = ref_list + 1;
-        unipred_pu->inter.mv_ref[ref_list] = LX_idx;
-        unipred_pu->inter.mv[ref_list][0] = (int16_t)best_mv.x;
-        unipred_pu->inter.mv[ref_list][1] = (int16_t)best_mv.y;
-        CU_SET_MV_CAND(unipred_pu, ref_list, cu_mv_cand);
+    LX_idx = ref_list_idx[ref_list];
+    uint8_t mv_ref_coded = LX_idx;
+    int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, best_mv.x, best_mv.y, NULL);
+    const int extra_bits = ref_list + mv_ref_coded; // TODO: check if mv_dir bits are missing
+    LX_cost[ref_list] += extra_bits * info->state->lambda_sqrt;
+    LX_bits[ref_list] += extra_bits;
 
-        cur_map->cost[entry] = best_cost;
-        cur_map->bits[entry] = best_bits;
-        cur_map->size++;
-      }
+    // Update best unipreds for biprediction
+    bool valid_mv = fracmv_within_tile(info, best_mv.x, best_mv.y);
+    if (valid_mv && best_cost < MAX_DOUBLE) {
+
+      // Map reference index to L0/L1 pictures
+      unit_stats_map_t *cur_map = &amvp[ref_list];
+      int entry = cur_map->size;
+      cu_info_t *unipred_pu = &cur_map->unit[entry];
+      unipred_pu->type = CU_INTER;
+      unipred_pu->merged  = false;
+      unipred_pu->skipped = false;
+      unipred_pu->inter.mv_dir = ref_list + 1;
+      unipred_pu->inter.mv_ref[ref_list] = LX_idx;
+      unipred_pu->inter.mv[ref_list][0] = (int16_t)best_mv.x;
+      unipred_pu->inter.mv[ref_list][1] = (int16_t)best_mv.y;
+      CU_SET_MV_CAND(unipred_pu, ref_list, cu_mv_cand);
+
+      cur_map->cost[entry] = best_cost;
+      cur_map->bits[entry] = best_bits;
+      cur_map->size++;
     }
   }
 }
