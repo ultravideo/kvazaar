@@ -44,6 +44,7 @@
 #include "image.h"
 #include "constraint.h"
 
+#define MAX_UNIT_STATS_MAP_SIZE MAX(MAX_REF_PIC_COUNT, MRG_MAX_NUM_CANDS)
 
  /**
   *  \brief Data collected during search processes.
@@ -56,10 +57,10 @@
   */
 typedef struct unit_stats_map_t {
 
-  cu_info_t unit[MAX_REF_PIC_COUNT]; //!< list of searched units
-  double    cost[MAX_REF_PIC_COUNT]; //!< list of matching RD costs
-  uint32_t  bits[MAX_REF_PIC_COUNT]; //!< list of matching bit costs  
-  int8_t    keys[MAX_REF_PIC_COUNT]; //!< list of keys (indices) to elements in the other arrays
+  cu_info_t unit[MAX_UNIT_STATS_MAP_SIZE]; //!< list of searched units
+  double    cost[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching RD costs
+  uint32_t  bits[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching bit costs  
+  int8_t    keys[MAX_UNIT_STATS_MAP_SIZE]; //!< list of keys (indices) to elements in the other arrays
   int       size;                    //!< number of active elements in the lists
 } unit_stats_map_t;
 

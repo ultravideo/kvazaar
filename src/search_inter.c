@@ -1681,6 +1681,7 @@ static void search_pu_inter(encoder_state_t * const state,
     merge->size++;
   }
 
+  assert(merge->size <= MAX_UNIT_STATS_MAP_SIZE);
   kvz_sort_keys_by_cost(merge);
 
   // Try early skip decision on just one merge candidate if available
@@ -1735,7 +1736,7 @@ static void search_pu_inter(encoder_state_t * const state,
   amvp[2].size = 0;
 
   for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
-    for (int i = 0; i < MAX_REF_PIC_COUNT; ++i) {
+    for (int i = 0; i < state->frame->ref->used_size; ++i) {
       amvp[mv_dir - 1].unit[i] = *cur_pu; // TODO: only initialize what is necessary
       amvp[mv_dir - 1].keys[i] = i;
       amvp[mv_dir - 1].cost[i] = MAX_DOUBLE;
@@ -1749,6 +1750,8 @@ static void search_pu_inter(encoder_state_t * const state,
     search_pu_inter_ref(info, depth, lcu, cur_pu, amvp);
   }
 
+  assert(amvp[0].size <= MAX_UNIT_STATS_MAP_SIZE);
+  assert(amvp[1].size <= MAX_UNIT_STATS_MAP_SIZE);
   kvz_sort_keys_by_cost(&amvp[0]);
   kvz_sort_keys_by_cost(&amvp[1]);
 
@@ -1934,6 +1937,7 @@ static void search_pu_inter(encoder_state_t * const state,
     // TODO: this probably should have a separate command line option
     if (cfg->rdo == 3) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
     
+    assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
   }
 }
