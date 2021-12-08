@@ -1602,6 +1602,9 @@ static void search_pu_inter(encoder_state_t * const state,
   cur_pu->depth = depth;
   cur_pu->qp = state->qp;
 
+  // Default to candidate 0
+  CU_SET_MV_CAND(cur_pu, 0, 0);
+  CU_SET_MV_CAND(cur_pu, 1, 0);
 
   info->state          = state;
   info->pic            = frame->source;
@@ -1621,10 +1624,6 @@ static void search_pu_inter(encoder_state_t * const state,
       info->merge_cand,
       lcu
   );
-
-  // Default to candidate 0
-  CU_SET_MV_CAND(cur_pu, 0, 0);
-  CU_SET_MV_CAND(cur_pu, 1, 0);
 
   // Merge Analysis starts here
   merge->size = 0;
