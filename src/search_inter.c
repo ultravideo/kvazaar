@@ -1658,8 +1658,8 @@ static void search_pu_inter(encoder_state_t * const state,
     // Don't add duplicates to list
     bool active_L0 = cur_pu->inter.mv_dir & 1;
     bool active_L1 = cur_pu->inter.mv_dir & 2;
-    if (active_L0 && !fracmv_within_tile(info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]) ||
-        active_L1 && !fracmv_within_tile(info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]) ||
+    if ((active_L0 && !fracmv_within_tile(info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1])) ||
+        (active_L1 && !fracmv_within_tile(info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1])) ||
         is_duplicate)
     {
       continue;
@@ -1770,7 +1770,6 @@ static void search_pu_inter(encoder_state_t * const state,
   // TODO: allow searching two MVs from the same reference picture.
   if (cfg->bipred && amvp[0].size > 0 && amvp[1].size > 0) {
 
-    const image_list_t *const ref = info->state->frame->ref;
     uint8_t(*ref_LX)[16] = info->state->frame->ref_LX;
 
     int L0_idx = best_unipred[0]->inter.mv_ref[0];
@@ -1791,13 +1790,6 @@ static void search_pu_inter(encoder_state_t * const state,
       best_unipred[list] = &amvp[list].unit[best_keys[list]];
     }
   }
-
-  double best_cost_L0 = MAX_DOUBLE;
-  double best_cost_L1 = MAX_DOUBLE;
-  if (amvp[0].size > 0) best_cost_L0 = amvp[0].cost[best_keys[0]];
-  if (amvp[1].size > 0) best_cost_L1 = amvp[1].cost[best_keys[1]];
-  int best_list = (best_cost_L0 <= best_cost_L1) ? 0 : 1;
-  int best_cost = (best_cost_L0 <= best_cost_L1) ? best_cost_L0 : best_cost_L1;
 
   // Fractional-pixel motion estimation.
   // Refine the best PUs so far from both lists, if available.
@@ -1829,8 +1821,6 @@ static void search_pu_inter(encoder_state_t * const state,
           unipred_pu,
           lcu,
           list);
-
-        double *cost = &amvp[list].cost[key];
 
         double     frac_cost = MAX_DOUBLE;
         uint32_t   frac_bits = MAX_INT;
