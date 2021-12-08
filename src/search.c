@@ -245,7 +245,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 * Takes into account SSD of reconstruction and the cost of encoding whatever
 * prediction unit data needs to be coded.
 */
-double kvz_cu_rd_cost_luma(encoder_state_t *const state,
+double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                        const int x_px, const int y_px, const int depth,
                        const cu_info_t *const pred_cu,
                        lcu_t *const lcu,
@@ -265,7 +265,7 @@ double kvz_cu_rd_cost_luma(encoder_state_t *const state,
 
   const uint8_t tr_depth = tr_cu->tr_depth - depth;
 
-  cabac_data_t* cabac = &state->search_cabac;
+  cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
 
   // Add transform_tree split_transform_flag bit cost.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
@@ -308,9 +308,9 @@ double kvz_cu_rd_cost_luma(encoder_state_t *const state,
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
-    const cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
+    cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
     int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
-    if (cabac->update) {
+    if (cabac->update && tr_cu->tr_depth == 0) {
       // Because these need to be coded before the luma cbf they also need to be counted
       // before the cabac state changes. However, since this branch is only executed when
       // calculating the last RD cost it is not problem to include the chroma cbf costs in
@@ -325,10 +325,12 @@ double kvz_cu_rd_cost_luma(encoder_state_t *const state,
         tr_tree_bits += CTX_ENTROPY_FBITS(cr_ctx, v_is_set);
         CABAC_BIN(cabac, v_is_set, "cbf_cr_search");        
       }
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, is_set);
-      *bit_cost += tr_tree_bits;
-      state->search_cabac.cur_ctx = ctx;
-      CABAC_BIN(&state->search_cabac, is_set, "luma_cbf_search");
+    }
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, is_set);
+    *bit_cost += tr_tree_bits;
+    if(cabac->update) {
+      cabac->cur_ctx = ctx;
+      CABAC_BIN(cabac, is_set, "luma_cbf_search");
     }
 
   }
@@ -378,14 +380,20 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // See luma for why the second condition
-  if (depth < MAX_PU_DEPTH && !state->search_cabac.update) {
+  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth)) {
     const int tr_depth = depth - pred_cu->depth;
-    const cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+    cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
+    cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
+    cabac->cur_ctx = ctx;
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
+      int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, u_is_set);
+      if(state->search_cabac.update) CABAC_BIN(cabac, u_is_set, "cbf_cb_search");
     }
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
+      int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, v_is_set);
+      if (state->search_cabac.update) CABAC_BIN(cabac, v_is_set, "cbf_cb_search");
     }
     *bit_cost += tr_tree_bits;
   }
