@@ -628,6 +628,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
             copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
           }
         }
+        cost += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_pred_mode_model, 0) * state->lambda;
       }
     }
 
@@ -654,6 +655,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       double intra_cost;
       kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_cost);
+      if(state->frame->slicetype != KVZ_SLICE_I) {
+        intra_cost += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_pred_mode_model, 1) * state->lambda;
+      }
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
@@ -755,6 +759,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     double mode_bits;
     if (cur_cu->type == CU_INTRA) {
+      cabac_ctx_t* ctx = &(state->search_cabac.ctx.cu_pred_mode_model);
+      bits += CTX_ENTROPY_FBITS(ctx, 1);  // Intra
+      state->search_cabac.cur_ctx = ctx;
+      CABAC_BIN(&state->search_cabac, 1, "pred_mode");
       mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
     }
     else {
