@@ -1366,7 +1366,9 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       // Only check when candidates are different
       uint8_t mv_ref_coded = LX_idx;
       int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, best_mv.x, best_mv.y, NULL);
-      best_bits += ref_list + mv_ref_coded;
+      const int extra_bits = ref_list + mv_ref_coded; // TODO: check if mv_dir bits are missing
+      best_cost += extra_bits * info->state->lambda_sqrt;
+      best_bits += extra_bits;
 
       // Update best unipreds for biprediction
       bool valid_mv = fracmv_within_tile(info, best_mv.x, best_mv.y);
@@ -1804,7 +1806,9 @@ static void search_pu_inter(encoder_state_t * const state,
 
         uint8_t mv_ref_coded = LX_idx;
         int cu_mv_cand = select_mv_cand(info->state, info->mv_cand, frac_mv.x, frac_mv.y, NULL);
-        frac_bits += list + mv_ref_coded;
+        const int extra_bits = list + mv_ref_coded; // TODO: check if mv_dir bits are missing
+        frac_cost += extra_bits * info->state->lambda_sqrt;
+        frac_bits += extra_bits;
 
         bool valid_mv = fracmv_within_tile(info, frac_mv.x, frac_mv.y);
         if (valid_mv) {
