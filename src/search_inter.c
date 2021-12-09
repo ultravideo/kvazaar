@@ -1759,7 +1759,10 @@ static void search_pu_inter(encoder_state_t * const state,
   kvz_sort_keys_by_cost(&amvp[0]);
   kvz_sort_keys_by_cost(&amvp[1]);
 
-  int best_keys[2] = { amvp[0].keys[0], amvp[1].keys[0] };
+  int best_keys[2] = { 
+    amvp[0].size > 0 ? amvp[0].keys[0] : 0, 
+    amvp[1].size > 0 ? amvp[1].keys[0] : 0
+  };
 
   cu_info_t *best_unipred[2] = {
     &amvp[0].unit[best_keys[0]],
