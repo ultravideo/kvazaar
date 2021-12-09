@@ -1383,6 +1383,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       unit_stats_map_t *cur_map = &amvp[ref_list];
       int entry = cur_map->size;
       cu_info_t *unipred_pu = &cur_map->unit[entry];
+      *unipred_pu = *cur_cu;
       unipred_pu->type = CU_INTER;
       unipred_pu->merged  = false;
       unipred_pu->skipped = false;
@@ -1440,6 +1441,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     }
 
     cu_info_t *bipred_pu = &amvp_bipred->unit[amvp_bipred->size];
+    *bipred_pu = *LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
 
     bipred_pu->inter.mv_dir = 3;
 
@@ -1742,7 +1744,6 @@ static void search_pu_inter(encoder_state_t * const state,
 
   for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
     for (int i = 0; i < state->frame->ref->used_size; ++i) {
-      amvp[mv_dir - 1].unit[i] = *cur_pu; // TODO: only initialize what is necessary
       amvp[mv_dir - 1].cost[i] = MAX_DOUBLE;
     }
   }
@@ -1871,6 +1872,7 @@ static void search_pu_inter(encoder_state_t * const state,
   if (can_use_bipred) {
 
     cu_info_t *bipred_pu = &amvp[2].unit[0];
+    *bipred_pu = *cur_pu;
     double   best_bipred_cost = MAX_DOUBLE;
 
     // Try biprediction from valid acquired unipreds.
