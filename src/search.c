@@ -270,7 +270,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   // Add transform_tree split_transform_flag bit cost.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
   int max_tr_depth;
-  if (tr_cu->type == CU_INTRA) {
+  if (pred_cu->type == CU_INTRA) {
     max_tr_depth = state->encoder_control->cfg.tr_depth_intra + intra_split_flag;
   }
   else {
@@ -279,9 +279,9 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   if (width <= TR_MAX_WIDTH
       && width > TR_MIN_WIDTH
       && !intra_split_flag
-      && tr_depth < max_tr_depth)
+      && MIN(tr_cu->tr_depth, depth) - tr_cu->depth < max_tr_depth)
   {
-    const cabac_ctx_t *ctx = &(cabac->ctx.trans_subdiv_model[5 - (6 - depth)]);
+    cabac_ctx_t *ctx = &(cabac->ctx.trans_subdiv_model[5 - (6 - depth)]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
     if (cabac->update) {
       cabac->cur_ctx = ctx;
@@ -310,11 +310,13 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   {
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
     int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
-    if (cabac->update && tr_cu->tr_depth == 0) {
+    if (cabac->update && tr_cu->tr_depth == tr_cu->depth) {
       // Because these need to be coded before the luma cbf they also need to be counted
       // before the cabac state changes. However, since this branch is only executed when
       // calculating the last RD cost it is not problem to include the chroma cbf costs in
       // luma, because the chroma cost is calculated right after the luma cost.
+      // However, if we have different tr_depth, the bits cannot be written in correct
+      // order anyways so do not touch the chroma cbf here.
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         const cabac_ctx_t* cr_ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
         cabac->cur_ctx = cr_ctx;
@@ -380,7 +382,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // See luma for why the second condition
-  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth)) {
+  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth)) {
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
@@ -767,10 +769,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     double mode_bits;
     if (cur_cu->type == CU_INTRA) {
-      cabac_ctx_t* ctx = &(state->search_cabac.ctx.cu_pred_mode_model);
-      bits += CTX_ENTROPY_FBITS(ctx, 1);  // Intra
-      state->search_cabac.cur_ctx = ctx;
-      CABAC_BIN(&state->search_cabac, 1, "pred_mode");
+      if(state->frame->slicetype != KVZ_SLICE_I) {
+        cabac_ctx_t* ctx = &(state->search_cabac.ctx.cu_pred_mode_model);
+        bits += CTX_ENTROPY_FBITS(ctx, 1);  // Intra
+        state->search_cabac.cur_ctx = ctx;
+        CABAC_BIN(&state->search_cabac, 1, "pred_mode");
+      }
       mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
     }
     else {
