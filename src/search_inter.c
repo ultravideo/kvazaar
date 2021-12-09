@@ -1394,6 +1394,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
       cur_map->cost[entry] = best_cost;
       cur_map->bits[entry] = best_bits;
+      cur_map->keys[entry] = entry;
       cur_map->size++;
     }
   }
@@ -1520,6 +1521,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
 
     amvp_bipred->cost[amvp_bipred->size] = cost;
     amvp_bipred->bits[amvp_bipred->size] = bitcost[0] + bitcost[1] + extra_bits;
+    amvp_bipred->keys[amvp_bipred->size] = amvp_bipred->size;
     amvp_bipred->size++;
   }
 }
@@ -1741,7 +1743,6 @@ static void search_pu_inter(encoder_state_t * const state,
   for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
     for (int i = 0; i < state->frame->ref->used_size; ++i) {
       amvp[mv_dir - 1].unit[i] = *cur_pu; // TODO: only initialize what is necessary
-      amvp[mv_dir - 1].keys[i] = i;
       amvp[mv_dir - 1].cost[i] = MAX_DOUBLE;
     }
   }
@@ -1950,6 +1951,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
         amvp[2].cost[amvp[2].size] = best_bipred_cost;
         amvp[2].bits[amvp[2].size] = bitcost[0] + bitcost[1] + extra_bits;
+        amvp[2].keys[amvp[2].size] = amvp[2].size;
         amvp[2].size++;
       }
     }
