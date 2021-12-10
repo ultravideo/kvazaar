@@ -1968,7 +1968,6 @@ static void search_pu_inter(encoder_state_t * const state,
     kvz_sort_keys_by_cost(&amvp[2]);
   }
 
-  FILE_BITS((double)info->inter_bitcost, x, y, depth, "regular inter bitcost");
 }
 
 /**
@@ -2122,6 +2121,7 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
   }
+  FILE_BITS((double)*inter_bitcost, x, y, depth, "regular inter bitcost");
 }
 
 
