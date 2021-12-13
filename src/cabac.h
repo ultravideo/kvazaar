@@ -131,6 +131,14 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
 
 extern const float kvz_f_entropy_bits[128];
 #define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
+
+#define CABAC_FBITS_UPDATE(cabac, ctx, val, bits, name) do { \
+  (bits) += kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]; \
+  if((cabac)->update) {\
+    (cabac)->cur_ctx = ctx;\
+    CABAC_BIN((cabac), (val), (name));\
+  } \
+} while(0)
 extern double bits_written;
 
 // Macros

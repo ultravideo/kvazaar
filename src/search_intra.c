@@ -270,7 +270,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // the normal recursion in the cost functions.
     if (depth >= 1 && depth <= 3) {
       const cabac_ctx_t *ctx = &(state->search_cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
-      tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
+      CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 1, tr_split_bit, "tr_split");
       *bit_cost += tr_split_bit;
     }
 
@@ -285,10 +285,10 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
       const cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
+        CABAC_FBITS_UPDATE(&state->search_cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U), cbf_bits, "cbf_cb");
       }
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
+        CABAC_FBITS_UPDATE(&state->search_cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V), cbf_bits, "cbf_cr");
       }
       *bit_cost += cbf_bits;
     }
@@ -650,7 +650,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds)
 {
   cabac_data_t* cabac = &state->search_cabac;
-  double mode_bits;
+  double mode_bits = 0;
 
   bool mode_in_preds = false;
   for (int i = 0; i < 3; ++i) {
@@ -660,10 +660,8 @@ double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t
   }
 
   const cabac_ctx_t *ctx = &(cabac->ctx.intra_mode_model);
-  mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds);
+  CABAC_FBITS_UPDATE(cabac, ctx, mode_in_preds, mode_bits, "prev_intra_luma_pred_flag_search");
   if (state->search_cabac.update) {
-    state->search_cabac.cur_ctx = ctx;
-    CABAC_BIN(&state->search_cabac, mode_in_preds, "prev_intra_luma_pred_flag_search");
     if(mode_in_preds) {
       CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
       if(luma_mode != intra_preds[0]) {
@@ -689,17 +687,16 @@ double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t
 
 double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
-  cabac_data_t* cabac = &state->search_cabac;
+  cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
   const cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model[0]);
-  double mode_bits;
-  if (chroma_mode == luma_mode) {
-    mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
-  } else {
-    mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+
+  double mode_bits = 0;
+  CABAC_FBITS_UPDATE(cabac, ctx, chroma_mode != luma_mode, mode_bits, "intra_chroma_pred_mode");
+  if (chroma_mode != luma_mode) {
+    mode_bits += 2.0;
   }
+
   if(cabac->update) {
-    cabac->cur_ctx = ctx;
-    CABAC_BIN(cabac, chroma_mode != luma_mode, "intra_chroma_pred_mode");
     if(chroma_mode != luma_mode) {
       // Again it does not matter what we actually write here
       CABAC_BINS_EP(cabac, 0, 2, "intra_chroma_pred_mode");      
