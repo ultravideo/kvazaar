@@ -308,11 +308,11 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 }
 
-static void encode_inter_prediction_unit(encoder_state_t * const state,
+void kvz_encode_inter_prediction_unit(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const cu_info_t * const cur_cu,
                                          int x, int y, int width, int height,
-                                         int depth)
+                                         int depth, lcu_t* lcu)
 {
   // Mergeflag
   int16_t num_cand = 0;
@@ -385,10 +385,20 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       if (state->frame->ref_list != REF_PIC_LIST_1 || cur_cu->inter.mv_dir != 3) {
 
         int16_t mv_cand[2][2];
-        kvz_inter_get_mv_cand_cua(
+        if (lcu) {
+          kvz_inter_get_mv_cand(
+            state, 
+            x, y, width, height,
+            mv_cand, cur_cu, 
+            lcu, ref_list_idx);
+        }
+        else {
+          kvz_inter_get_mv_cand_cua(
             state,
             x, y, width, height,
-            mv_cand, cur_cu, ref_list_idx);
+            mv_cand, cur_cu, ref_list_idx
+          );
+        }
 
         uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
         const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
@@ -855,7 +865,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
-      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
+      kvz_encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth, NULL);
     }
 
     {

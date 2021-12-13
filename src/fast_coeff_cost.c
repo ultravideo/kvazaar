@@ -40,7 +40,7 @@ static uint16_t to_q88(float f)
   return (uint16_t)(f * 256.0f + 0.5f);
 }
 
-static uint64_t to_4xq88(const float f[4])
+static uint64_t to_4xq88(const double f[4])
 {
   int i;
   uint64_t result = 0;
@@ -58,9 +58,9 @@ int kvz_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_
   uint64_t *wts_by_qp = fast_coeff_table->wts_by_qp;
 
   for (i = 0; i < MAX_FAST_COEFF_COST_QP; i++) {
-    float curr_wts[4];
+    double curr_wts[4];
 
-    if (fscanf(fast_coeff_table_f, "%f %f %f %f\n", curr_wts + 0,
+    if (fscanf(fast_coeff_table_f, "%lf %lf %lf %lf\n", curr_wts + 0,
                                                     curr_wts + 1,
                                                     curr_wts + 2,
                                                     curr_wts + 3) != 4) {

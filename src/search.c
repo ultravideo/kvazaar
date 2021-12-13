@@ -318,7 +318,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
       // However, if we have different tr_depth, the bits cannot be written in correct
       // order anyways so do not touch the chroma cbf here.
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-        const cabac_ctx_t* cr_ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+        cabac_ctx_t* cr_ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
         cabac->cur_ctx = cr_ctx;
         int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
         int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
@@ -536,7 +536,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
-  uint32_t inter_bitcost = MAX_INT;
+  double inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
   cabac_data_t pre_search_cabac;
   memcpy(&pre_search_cabac, &state->search_cabac, sizeof(pre_search_cabac));
@@ -600,7 +600,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (can_use_inter) {
       double mode_cost;
-      uint32_t mode_bitcost;
+      double mode_bitcost;
       kvz_search_cu_inter(state,
                           x, y,
                           depth,
@@ -760,7 +760,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     }
     else if(depth == MAX_DEPTH && cur_cu->type == CU_INTRA) {
       // Add cost of intra part_size.
-      const cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
+      cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
       bits += CTX_ENTROPY_FBITS(ctx, 1);  // NxN
       state->search_cabac.cur_ctx = ctx;
       FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "split");
@@ -835,7 +835,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.split_flag_model[split_model]);
+      cabac_ctx_t *ctx = &(state->search_cabac.ctx.split_flag_model[split_model]);
       split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;
       state->search_cabac.cur_ctx = ctx;
       FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "split");
@@ -844,7 +844,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
       // Add cost of intra part_size.
-      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.part_size_model[0]);
+      cabac_ctx_t *ctx = &(state->search_cabac.ctx.part_size_model[0]);
       split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;  // NxN
       state->search_cabac.cur_ctx = ctx;
       FILE_BITS(CTX_ENTROPY_FBITS(ctx, 0), x, y, depth, "split");
@@ -893,7 +893,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
         else if (depth == MAX_DEPTH && cur_cu->type == CU_INTRA) {
           // Add cost of intra part_size.
-          const cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
+          cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
           bits += CTX_ENTROPY_FBITS(ctx, 1);  // NxN
           state->search_cabac.cur_ctx = ctx;
           FILE_BITS(CTX_ENTROPY_FBITS(ctx, 1), x, y, depth, "split");

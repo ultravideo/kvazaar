@@ -1228,7 +1228,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                         int32_t width,
                                         int32_t height,
                                         const merge_candidates_t *merge_cand,
-                                        const cu_info_t *cur_cu,
+                                        const cu_info_t * const cur_cu,
                                         int8_t reflist,
                                         int16_t mv_cand[2][2])
 {
@@ -1335,7 +1335,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t width,
                            int32_t height,
                            int16_t mv_cand[2][2],
-                           cu_info_t* cur_cu,
+                           const cu_info_t  * const cur_cu,
                            lcu_t *lcu,
                            int8_t reflist)
 {

@@ -199,15 +199,15 @@ static INLINE bool intmv_within_tile(const inter_search_info_t *info, int x, int
  * \return true if best_mv was changed, false otherwise
  */
 static bool check_mv_cost(inter_search_info_t *info,
-  int x,
-  int y,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                          int x,
+                          int y,
+                          double *best_cost,
+                          double* best_bits,
+                          vector2d_t *best_mv)
 {
   if (!intmv_within_tile(info, x, y)) return false;
 
-  uint32_t bitcost = 0;
+  double bitcost = 0;
   double cost = kvz_image_calc_sad(
       info->pic,
       info->ref,
@@ -292,10 +292,10 @@ static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
  * best_mv to the best one.
  */
 static void select_starting_point(inter_search_info_t *info,
-  vector2d_t extra_mv,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                                  vector2d_t extra_mv,
+                                  double *best_cost,
+                                  double* best_bits,
+                                  vector2d_t *best_mv)
 {
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   check_mv_cost(info, 0, 0, best_cost, best_bits, best_mv);
@@ -394,9 +394,9 @@ static double calc_mvd_cost(const encoder_state_t *state,
                             inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                             int16_t num_cand,
                             int32_t ref_idx,
-                            uint32_t *bitcost)
+                            double* bitcost)
 {
-  uint32_t temp_bitcost = 0;
+  double temp_bitcost = 0;
   uint32_t merge_idx;
   int8_t merged      = 0;
 
@@ -429,9 +429,9 @@ static double calc_mvd_cost(const encoder_state_t *state,
 
 
 static bool early_terminate(inter_search_info_t *info,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                            double *best_cost,
+                            double* best_bits,
+                            vector2d_t *best_mv)
 {
   static const vector2d_t small_hexbs[7] = {
       { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 },
@@ -485,7 +485,7 @@ void kvz_tz_pattern_search(inter_search_info_t *info,
                            vector2d_t mv,
                            int *best_dist,
                            double *best_cost,
-                           uint32_t *best_bits,
+                           double* best_bits,
                            vector2d_t *best_mv)
 {
   assert(pattern_type < 4);
@@ -603,7 +603,7 @@ void kvz_tz_raster_search(inter_search_info_t *info,
                           int iSearchRange,
                           int iRaster,
                           double *best_cost,
-                          uint32_t *best_bits,
+                          double* best_bits,
                           vector2d_t *best_mv)
 {
   const vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
@@ -618,10 +618,10 @@ void kvz_tz_raster_search(inter_search_info_t *info,
 
 
 static void tz_search(inter_search_info_t *info,
-  vector2d_t extra_mv,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                      vector2d_t extra_mv,
+                      double *best_cost,
+                      double* best_bits,
+                      vector2d_t *best_mv)
 {
   //TZ parameters
   const int iSearchRange = 96;  // search range for each stage
@@ -705,11 +705,11 @@ static void tz_search(inter_search_info_t *info,
  * points like 0,0 might be used, such as vectors from top or left.
  */
 static void hexagon_search(inter_search_info_t *info,
-  vector2d_t extra_mv,
-  uint32_t steps,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                           vector2d_t extra_mv,
+                           uint32_t steps,
+                           double *best_cost,
+                           double* best_bits,
+                           vector2d_t *best_mv)
 {
   // The start of the hexagonal pattern has been repeated at the end so that
   // the indices between 1-6 can be used as the start of a 3-point list of new
@@ -803,11 +803,11 @@ static void hexagon_search(inter_search_info_t *info,
 * points like 0,0 might be used, such as vectors from top or left.
 **/
 static void diamond_search(inter_search_info_t *info,
-  vector2d_t extra_mv,
-  uint32_t steps,
-  double *best_cost,
-  uint32_t *best_bits,
-  vector2d_t *best_mv)
+                           vector2d_t extra_mv,
+                           uint32_t steps,
+                           double *best_cost,
+                           double* best_bits,
+                           vector2d_t *best_mv)
 {
   enum diapos {
     DIA_UP = 0,
@@ -888,7 +888,7 @@ static void search_mv_full(inter_search_info_t *info,
                            int32_t search_range,
                            vector2d_t extra_mv,
                            double *best_cost,
-                           uint32_t *best_bits,
+                           double* best_bits,
                            vector2d_t *best_mv)
 {
   // Search around the 0-vector.
@@ -968,7 +968,7 @@ static void search_mv_full(inter_search_info_t *info,
  */
 static void search_frac(inter_search_info_t *info,
                         double *best_cost,
-                        uint32_t *best_bits,
+                        double *best_bits,
                         vector2d_t *best_mv)
 {
   // Map indexes to relative coordinates in the following way:
@@ -985,8 +985,8 @@ static void search_frac(inter_search_info_t *info,
   vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
 
   double cost = MAX_DOUBLE;
-  uint32_t bitcost = 0;
-  uint32_t bitcosts[4] = { 0 };
+  double bitcost = 0;
+  double bitcosts[4] = { 0 };
   unsigned best_index = 0;
 
 // Keep this as unsigned until SAD / SATD functions are updated
@@ -1314,7 +1314,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   }
 
   double best_cost = MAX_DOUBLE;
-  uint32_t best_bits = MAX_INT;
+  double best_bits = MAX_INT;
 
   // Select starting point from among merge candidates. These should
   // include both mv_cand vectors and (0, 0).
@@ -1338,12 +1338,12 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
       case KVZ_IME_DIA:
         diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-          &best_cost, &best_bits, &best_mv);
+                       &best_cost, &best_bits, &best_mv);
         break;
 
       default:
         hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
-          &best_cost, &best_bits, &best_mv);
+                       &best_cost, &best_bits, &best_mv);
         break;
     }
   }
@@ -1484,7 +1484,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     double cost =
       kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->width);
 
-    uint32_t bitcost[2] = { 0, 0 };
+    double bitcost[2] = { 0, 0 };
 
     cost += info->mvd_cost_func(info->state,
                                merge_cand[i].mv[0][0],
@@ -1827,7 +1827,7 @@ static void search_pu_inter(encoder_state_t * const state,
           list);
 
         double     frac_cost = MAX_DOUBLE;
-        uint32_t   frac_bits = MAX_INT;
+        double   frac_bits = MAX_INT;
         vector2d_t frac_mv = { unipred_pu->inter.mv[list][0], unipred_pu->inter.mv[list][1] };
 
         search_frac(info, &frac_cost, &frac_bits, &frac_mv);
@@ -1917,7 +1917,7 @@ static void search_pu_inter(encoder_state_t * const state,
       best_bipred_cost =
         kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
 
-      uint32_t bitcost[2] = { 0, 0 };
+      double bitcost[2] = { 0, 0 };
 
       best_bipred_cost += info->mvd_cost_func(info->state,
         bipred_pu->inter.mv[0][0],
@@ -1990,10 +1990,10 @@ static void search_pu_inter(encoder_state_t * const state,
 * \param inter_bitcost Return inter bitcost
 */
 void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
-  int x, int y, int depth,
-  lcu_t *lcu,
-  double   *inter_cost,
-  uint32_t *inter_bitcost){
+                           int x, int y, int depth,
+                           lcu_t *lcu,
+                           double   *inter_cost,
+                           double* inter_bitcost){
 
   cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   int tr_depth = MAX(1, depth);
@@ -2040,7 +2040,7 @@ void kvz_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
                          lcu_t *lcu,
                          double   *inter_cost,
-                         uint32_t *inter_bitcost)
+                         double* inter_bitcost)
 {
   *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
@@ -2108,10 +2108,10 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
     kvz_cu_cost_inter_rd2(state,
-      x, y, depth,
-      lcu,
-      inter_cost,
-      inter_bitcost);
+                          x, y, depth,
+                          lcu,
+                          inter_cost,
+                          inter_bitcost);
   }
 
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
@@ -2146,7 +2146,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        part_mode_t part_mode,
                        lcu_t *lcu,
                        double *inter_cost,
-                       uint32_t *inter_bitcost)
+                       double* inter_bitcost)
 {
   *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
@@ -2173,7 +2173,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     const int height_pu = PU_GET_H(part_mode, width, i);
 
     double cost      = MAX_DOUBLE;
-    uint32_t bitcost = MAX_INT;
+    double bitcost = MAX_INT;
 
     search_pu_inter(state, x, y, depth, part_mode, i, lcu, amvp, &merge, &info);
 
@@ -2250,10 +2250,10 @@ void kvz_search_cu_smp(encoder_state_t * const state,
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
     kvz_cu_cost_inter_rd2(state,
-      x, y, depth,
-      lcu,
-      inter_cost,
-      inter_bitcost);
+                          x, y, depth,
+                          lcu,
+                          inter_cost,
+                          inter_bitcost);
   } else {
     *inter_cost += state->lambda_sqrt * smp_extra_bits;
   }

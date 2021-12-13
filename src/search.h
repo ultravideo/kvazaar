@@ -59,7 +59,7 @@ typedef struct unit_stats_map_t {
 
   cu_info_t unit[MAX_UNIT_STATS_MAP_SIZE]; //!< list of searched units
   double    cost[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching RD costs
-  uint32_t  bits[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching bit costs  
+  double    bits[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching bit costs  
   int8_t    keys[MAX_UNIT_STATS_MAP_SIZE]; //!< list of keys (indices) to elements in the other arrays
   int       size;                    //!< number of active elements in the lists
 } unit_stats_map_t;

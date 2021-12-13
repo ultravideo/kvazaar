@@ -51,6 +51,12 @@ void kvz_encode_mvd(encoder_state_t * const state,
                     int32_t mvd_hor,
                     int32_t mvd_ver);
 
+void kvz_encode_inter_prediction_unit(encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const cu_info_t* const cur_cu,
+  int x, int y, int width, int height,
+  int depth, lcu_t* lcu);
+
 void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
                                     uint8_t lastpos_x, uint8_t lastpos_y,
                                     uint8_t width, uint8_t height,
