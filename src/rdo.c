@@ -1029,15 +1029,15 @@ uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
 */
-uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
-                                 int x,
-                                 int y,
-                                 int mv_shift,
-                                 int16_t mv_cand[2][2],
-                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-                                 int16_t num_cand,
-                                 int32_t ref_idx,
-                                 uint32_t *bitcost)
+double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
+                               int x,
+                               int y,
+                               int mv_shift,
+                               int16_t mv_cand[2][2],
+                               inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                               int16_t num_cand,
+                               int32_t ref_idx,
+                               uint32_t *bitcost)
 {
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;
@@ -1174,7 +1174,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
 
   // Store bitcost before restoring cabac
-  return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
+  return *bitcost * state->lambda_sqrt;
 }
 
 void kvz_close_rdcost_outfiles(void)
