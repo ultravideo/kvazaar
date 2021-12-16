@@ -271,8 +271,7 @@ static INLINE uint32_t get_coeff_cabac_cost(
                        scan_mode,
                        0);
   if(cabac_copy.update) {
-
-    memcpy(&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
+    memcpy((cabac_data_t *)&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
   }
   return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
 }
@@ -1036,7 +1035,7 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
                                inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand,
                                int32_t ref_idx,
-                               uint32_t *bitcost)
+                               double* bitcost)
 {
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;

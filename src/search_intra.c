@@ -269,7 +269,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // Add bits for split_transform_flag = 1, because transform depth search bypasses
     // the normal recursion in the cost functions.
     if (depth >= 1 && depth <= 3) {
-      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+      cabac_ctx_t *ctx = &(state->search_cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 1, tr_split_bit, "tr_split");
       *bit_cost += tr_split_bit;
     }
@@ -283,7 +283,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
-      const cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+      cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
         CABAC_FBITS_UPDATE(&state->search_cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U), cbf_bits, "cbf_cb");
       }
@@ -647,9 +647,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 }
 
 
-double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds)
+double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds)
 {
-  cabac_data_t* cabac = &state->search_cabac;
+  cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
   double mode_bits = 0;
 
   bool mode_in_preds = false;
@@ -659,7 +659,7 @@ double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t
     }
   }
 
-  const cabac_ctx_t *ctx = &(cabac->ctx.intra_mode_model);
+  cabac_ctx_t *ctx = &(cabac->ctx.intra_mode_model);
   CABAC_FBITS_UPDATE(cabac, ctx, mode_in_preds, mode_bits, "prev_intra_luma_pred_flag_search");
   if (state->search_cabac.update) {
     if(mode_in_preds) {
@@ -688,7 +688,7 @@ double kvz_luma_mode_bits(encoder_state_t *state, int8_t luma_mode, const int8_t
 double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
-  const cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model[0]);
+  cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model[0]);
 
   double mode_bits = 0;
   CABAC_FBITS_UPDATE(cabac, ctx, chroma_mode != luma_mode, mode_bits, "intra_chroma_pred_mode");
