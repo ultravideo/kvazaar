@@ -754,6 +754,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     }
     else {
       // Intra 4×4 PUs
+      if (state->frame->slicetype != KVZ_SLICE_I) {
+        cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
+        CABAC_FBITS_UPDATE(cabac, ctx, 1, bits, "pred_mode_flag");
+      }
+      bits += calc_mode_bits(state, lcu, cur_cu, x, y);
     }
     
     cost = bits * state->lambda;
