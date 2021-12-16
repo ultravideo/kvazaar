@@ -122,7 +122,7 @@ void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param);
 void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac, const uint32_t symbol,
                                         const uint32_t r_param, int32_t base_level);
-void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
+uint32_t kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                                   uint32_t symbol, uint32_t count);
 void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
@@ -133,7 +133,7 @@ extern const float kvz_f_entropy_bits[128];
 #define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #define CABAC_FBITS_UPDATE(cabac, ctx, val, bits, name) do { \
-  (bits) += kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]; \
+  if((cabac)->only_count) (bits) += kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]; \
   if((cabac)->update) {\
     (cabac)->cur_ctx = ctx;\
     CABAC_BIN((cabac), (val), (name));\

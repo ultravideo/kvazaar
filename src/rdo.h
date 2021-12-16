@@ -71,10 +71,10 @@ uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double
 
 kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
 
-uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
-                                       const cabac_data_t* cabac,
-                                       int32_t mvd_hor,
-                                       int32_t mvd_ver);
+double kvz_get_mvd_coding_cost_cabac(const encoder_state_t* state,
+                                     const cabac_data_t* cabac,
+                                     int32_t mvd_hor,
+                                     int32_t mvd_ver);
 
 // Number of fixed point fractional bits used in the fractional bit table.
 #define CTX_FRAC_BITS 15

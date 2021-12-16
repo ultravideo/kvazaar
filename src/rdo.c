@@ -1010,22 +1010,18 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 /**
  * Calculate cost of actual motion vectors using CABAC coding
  */
-uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
-                                       const cabac_data_t* cabac,
-                                       const int32_t mvd_hor,
-                                       const int32_t mvd_ver)
+double kvz_get_mvd_coding_cost_cabac(const encoder_state_t* state,
+                                     const cabac_data_t* cabac,
+                                     const int32_t mvd_hor,
+                                     const int32_t mvd_ver)
 {
   cabac_data_t cabac_copy = *cabac;
   cabac_copy.only_count = 1;
-
+  double bits = 0;
   // It is safe to drop const here because cabac->only_count is set.
-  kvz_encode_mvd((encoder_state_t*) state, &cabac_copy, mvd_hor, mvd_ver);
+  kvz_encode_mvd((encoder_state_t*) state, &cabac_copy, mvd_hor, mvd_ver, &bits);
 
-  uint32_t bitcost =
-    ((23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3)) -
-    ((23 - cabac->bits_left)     + (cabac->num_buffered_bytes << 3));
-
-  return bitcost;
+  return bits;
 }
 
 /** MVD cost calculation with CABAC
@@ -1160,7 +1156,7 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         // ToDo: Bidir vector support
         if (!(state->frame->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
           // It is safe to drop const here because cabac->only_count is set.
-          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y);
+          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y, NULL);
         }
 
         // Signal which candidate MV to use

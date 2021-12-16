@@ -323,19 +323,19 @@ static void select_starting_point(inter_search_info_t *info,
 }
 
 
-static uint32_t get_mvd_coding_cost(const encoder_state_t *state,
+static double get_mvd_coding_cost(const encoder_state_t *state,
                                     const cabac_data_t* cabac,
                                     const int32_t mvd_hor,
                                     const int32_t mvd_ver)
 {
-  unsigned bitcost = 0;
+  double bitcost = 0;
   const vector2d_t abs_mvd = { abs(mvd_hor), abs(mvd_ver) };
 
   bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x) << CTX_FRAC_BITS;
   bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y) << CTX_FRAC_BITS;
 
   // Round and shift back to integer bits.
-  return (bitcost + CTX_FRAC_HALF_BIT) >> CTX_FRAC_BITS;
+  return bitcost  / (1 << CTX_FRAC_BITS);
 }
 
 
@@ -353,7 +353,7 @@ static int select_mv_cand(const encoder_state_t *state,
     return 0;
   }
 
-  uint32_t (*mvd_coding_cost)(const encoder_state_t * const state,
+  double (*mvd_coding_cost)(const encoder_state_t * const state,
                               const cabac_data_t*,
                               int32_t, int32_t);
   if (state->encoder_control->cfg.mv_rdo) {

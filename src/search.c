@@ -740,29 +740,61 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     double bits = 0;
-    state->search_cabac.update = 1;
+    cabac_data_t* cabac  = &state->search_cabac;
+    cabac->update = 1;
 
     if(depth < MAX_DEPTH) {
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-      cabac_ctx_t* ctx = &(state->search_cabac.ctx.split_flag_model[split_model]);
-      CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 0, bits, "no_split_search");
+      cabac_ctx_t* ctx = &(cabac->ctx.split_flag_model[split_model]);
+      CABAC_FBITS_UPDATE(cabac, ctx, 0, bits, "no_split_search");
     }
     else if(depth == MAX_DEPTH && cur_cu->type == CU_INTRA) {
       // Add cost of intra part_size.
-      cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
-      CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 0, bits, "no_split_search");
+      cabac_ctx_t* ctx = &(cabac->ctx.part_size_model[0]);
+      CABAC_FBITS_UPDATE(cabac, ctx, 0, bits, "no_split_search");
     }
 
-    double mode_bits;
+    double mode_bits = 0;
+    if (state->frame->slicetype != KVZ_SLICE_I) {
+      int ctx_skip = 0;
+      if (x > 0) {
+        ctx_skip += LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local)->skipped;
+      }
+      if (y > 0) {
+        ctx_skip += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->skipped;
+      }
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_skip_flag_model[ctx_skip]), cur_cu->skipped, mode_bits, "skip_flag");
+      if (cur_cu->skipped) {
+        int16_t num_cand = state->encoder_control->cfg.max_merge;
+        if (num_cand > 1) {
+          for (int ui = 0; ui < num_cand - 1; ui++) {
+            int32_t symbol = (ui != cur_cu->merge_idx);
+            if (ui == 0) {
+              CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_idx_ext_model), symbol, mode_bits, "MergeIndex");
+            }
+            else {
+              CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+              mode_bits += 1;
+            }
+            if (symbol == 0) {
+              break;
+            }
+          }
+        }
+      }
+
+    }
     if (cur_cu->type == CU_INTRA) {
       if(state->frame->slicetype != KVZ_SLICE_I) {
-        cabac_ctx_t* ctx = &(state->search_cabac.ctx.cu_pred_mode_model);
-        CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.cu_pred_mode_model, 1, bits, "pred_mode_flag");
+        cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
+        CABAC_FBITS_UPDATE(cabac, ctx, 1, mode_bits, "pred_mode_flag");
       }
-      mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
+      mode_bits += calc_mode_bits(state, lcu, cur_cu, x, y);
     }
-    else {
-      mode_bits = inter_bitcost;
+    else if (!cur_cu->skipped) {
+      cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
+      CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "pred_mode_flag");
+      mode_bits += inter_bitcost;
     }
     bits += mode_bits;
     cost = mode_bits * state->lambda;
@@ -795,7 +827,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       cur_cu->cbf = 0;
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
-    state->search_cabac.update = 0;
+    cabac->update = 0;
   } 
 
   bool can_split_cu =

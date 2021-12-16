@@ -547,7 +547,7 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int
 /**
  * \brief
  */
-void kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
+uint32_t kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
                                   cabac_data_t * const data,
                                   uint32_t symbol,
                                   uint32_t count)
@@ -576,4 +576,5 @@ void kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
     }
   }
   kvz_cabac_encode_bins_ep(data, bins, num_bins);
+  return num_bins;
 }
