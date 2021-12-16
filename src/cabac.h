@@ -125,8 +125,8 @@ void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, ca
 uint32_t kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                                   uint32_t symbol, uint32_t count);
 void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
-                                  uint32_t symbol, int32_t offset,
-                                  uint32_t max_symbol);
+                                      uint32_t symbol, int32_t offset,
+                                      uint32_t max_symbol, double* bits_out);
 void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
 
 extern const float kvz_f_entropy_bits[128];

@@ -52,11 +52,11 @@ void kvz_encode_mvd(encoder_state_t * const state,
                     int32_t mvd_ver,
                     double* bits_out);
 
-void kvz_mock_encode_coding_unit(
+double kvz_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
   int x, int y, int depth,
-  lcu_t* lcu);
+  lcu_t* lcu, cu_info_t* cur_cu);
 
 void kvz_encode_inter_prediction_unit(encoder_state_t* const state,
                                       cabac_data_t* const cabac,

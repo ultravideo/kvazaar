@@ -491,26 +491,28 @@ void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, ca
 /**
  * \brief
  */
-void kvz_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
+void kvz_cabac_write_unary_max_symbol(cabac_data_t * const data, 
+  cabac_ctx_t * const ctx, 
+  uint32_t symbol,
+  const int32_t offset,
+  const uint32_t max_symbol, 
+  double* bits_out)
 {
   int8_t code_last = max_symbol > symbol;
 
   assert(symbol <= max_symbol);
 
   if (!max_symbol) return;
-
-  data->cur_ctx = &ctx[0];
-  CABAC_BIN(data, symbol, "ums");
+  
+  CABAC_FBITS_UPDATE(data, &ctx[0], symbol, *bits_out, "ums");
 
   if (!symbol) return;
 
   while (--symbol) {
-    data->cur_ctx = &ctx[offset];
-    CABAC_BIN(data, 1, "ums");
+    CABAC_FBITS_UPDATE(data, &ctx[offset], 1, *bits_out, "ums");
   }
   if (code_last) {
-    data->cur_ctx = &ctx[offset];
-    CABAC_BIN(data, 0, "ums");
+    CABAC_FBITS_UPDATE(data, &ctx[offset], 0,*bits_out, "ums");
   }
 }
 

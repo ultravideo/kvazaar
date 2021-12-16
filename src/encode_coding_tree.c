@@ -290,7 +290,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
       // cu_qp_delta_abs prefix
       cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
-      kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
+      kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5, NULL);
 
       if (qp_delta_abs >= 5) {
         // cu_qp_delta_abs suffix
@@ -412,7 +412,7 @@ void kvz_encode_inter_prediction_unit(encoder_state_t * const state,
                                        cabac->ctx.mvp_idx_model,
                                        CU_GET_MV_CAND(cur_cu, ref_list_idx),
                                        1,
-                                       AMVP_MAX_NUM_CANDS - 1);
+                                       AMVP_MAX_NUM_CANDS - 1, bits_out);
 
     } // for ref_list
   } // if !merge
@@ -467,7 +467,7 @@ static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
 static void encode_intra_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
-                                     int x, int y, int depth, double* bits_out)
+                                     int x, int y, int depth, lcu_t* lcu, double* bits_out)
 {
   const videoframe_t * const frame = state->tile->frame;
   uint8_t intra_pred_mode_actual[4];
@@ -506,19 +506,19 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   for (int j = 0; j < num_pred_units; ++j) {
     const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
     const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-    const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+    const cu_info_t *cur_pu = lcu ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y)) : kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
     const cu_info_t *left_pu = NULL;
     const cu_info_t *above_pu = NULL;
 
     if (pu_x > 0) {
       assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y);
+      left_pu = lcu ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x -1), SUB_SCU(pu_y)) : kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y);
     }
     // Don't take the above PU across the LCU boundary.
     if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
       assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
+      above_pu = lcu ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y - 1)) : kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
     }
 
     if (do_crypto) {
@@ -893,7 +893,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, NULL);
+    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
   }
 
 #if ENABLE_PCM
@@ -952,11 +952,11 @@ end:
 
 }
 
-void kvz_mock_encode_coding_unit(
+double kvz_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
   int x, int y, int depth,
-  lcu_t* lcu) {
+  lcu_t* lcu, cu_info_t* cur_cu) {
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
 
@@ -964,9 +964,7 @@ void kvz_mock_encode_coding_unit(
   int y_local = SUB_SCU(y);
 
   const int cu_width = LCU_WIDTH >> depth;
-  const int half_cu = cu_width >> 1;
-
-  const cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  
   const cu_info_t* left_cu = NULL, *above_cu = NULL;
   if (x) {
     left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
@@ -1037,7 +1035,7 @@ void kvz_mock_encode_coding_unit(
           }
         }
       }
-      return;
+      return bits;
     }
   }
   // Prediction mode
@@ -1072,8 +1070,9 @@ void kvz_mock_encode_coding_unit(
     }
   }
   else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, NULL);
+    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
   }
+  return bits;
 }
 
 

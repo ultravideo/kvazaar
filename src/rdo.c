@@ -1081,8 +1081,8 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
       x - mv_cand[1][0],
       y - mv_cand[1][1],
     };
-    uint32_t cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
-    uint32_t cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
+    double cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
+    double cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -1161,11 +1161,12 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
 
         // Signal which candidate MV to use
         kvz_cabac_write_unary_max_symbol(
-            cabac,
-            cabac->ctx.mvp_idx_model,
-            cur_mv_cand,
-            1,
-            AMVP_MAX_NUM_CANDS - 1);
+          cabac,
+          cabac->ctx.mvp_idx_model,
+          cur_mv_cand,
+          1,
+          AMVP_MAX_NUM_CANDS - 1,
+          NULL);
       }
     }
   }

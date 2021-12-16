@@ -37,6 +37,7 @@
 
 #include "cabac.h"
 #include "encoder.h"
+#include "encode_coding_tree.h"
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
@@ -743,61 +744,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;
 
-    if(depth < MAX_DEPTH) {
-      uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-      cabac_ctx_t* ctx = &(cabac->ctx.split_flag_model[split_model]);
-      CABAC_FBITS_UPDATE(cabac, ctx, 0, bits, "no_split_search");
+    if(cur_cu->type != CU_INTRA || cur_cu->part_size == SIZE_2Nx2N) {
+      bits += kvz_mock_encode_coding_unit(
+        state,
+        cabac,
+        x, y, depth,
+        lcu,
+        cur_cu);
     }
-    else if(depth == MAX_DEPTH && cur_cu->type == CU_INTRA) {
-      // Add cost of intra part_size.
-      cabac_ctx_t* ctx = &(cabac->ctx.part_size_model[0]);
-      CABAC_FBITS_UPDATE(cabac, ctx, 0, bits, "no_split_search");
+    else {
+      // Intra 4×4 PUs
     }
-
-    double mode_bits = 0;
-    if (state->frame->slicetype != KVZ_SLICE_I) {
-      int ctx_skip = 0;
-      if (x > 0) {
-        ctx_skip += LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local)->skipped;
-      }
-      if (y > 0) {
-        ctx_skip += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->skipped;
-      }
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_skip_flag_model[ctx_skip]), cur_cu->skipped, mode_bits, "skip_flag");
-      if (cur_cu->skipped) {
-        int16_t num_cand = state->encoder_control->cfg.max_merge;
-        if (num_cand > 1) {
-          for (int ui = 0; ui < num_cand - 1; ui++) {
-            int32_t symbol = (ui != cur_cu->merge_idx);
-            if (ui == 0) {
-              CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_idx_ext_model), symbol, mode_bits, "MergeIndex");
-            }
-            else {
-              CABAC_BIN_EP(cabac, symbol, "MergeIndex");
-              mode_bits += 1;
-            }
-            if (symbol == 0) {
-              break;
-            }
-          }
-        }
-      }
-
-    }
-    if (cur_cu->type == CU_INTRA) {
-      if(state->frame->slicetype != KVZ_SLICE_I) {
-        cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
-        CABAC_FBITS_UPDATE(cabac, ctx, 1, mode_bits, "pred_mode_flag");
-      }
-      mode_bits += calc_mode_bits(state, lcu, cur_cu, x, y);
-    }
-    else if (!cur_cu->skipped) {
-      cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
-      CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "pred_mode_flag");
-      mode_bits += inter_bitcost;
-    }
-    bits += mode_bits;
-    cost = mode_bits * state->lambda;
+    
+    cost = bits * state->lambda;
 
     cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu, &bits);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
