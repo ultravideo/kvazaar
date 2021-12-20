@@ -156,7 +156,6 @@ extern double bits_written;
 #ifdef VERBOSE
   #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
-    if(!(data)->only_count) bits_written += CTX_ENTROPY_FBITS((data)->cur_ctx, (value));\
     kvz_cabac_encode_bin((data), (value)); \
     if(!(data)->only_count)  printf("%s = %u, state = %u -> %u MPS = %u bits = %f\n", \
            (name), (uint32_t)(value), prev_state, (data)->cur_ctx->uc_state, CTX_MPS((data)->cur_ctx), bits_written); }

@@ -685,6 +685,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
 
   //Encode SAO
+  state->cabac.update = 1;
   if (encoder->cfg.sao_type) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
@@ -737,6 +738,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       kvz_crypto_delete(&state->crypto_hdl);
     }
   }
+  state->cabac.update = 0;
 
   pthread_mutex_lock(&state->frame->rc_lock);
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;

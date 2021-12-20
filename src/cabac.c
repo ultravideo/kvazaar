@@ -106,8 +106,8 @@ void kvz_cabac_start(cabac_data_t * const data)
 void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 {
   uint32_t lps;
-
-
+  
+  if (!(data)->only_count) bits_written += CTX_ENTROPY_FBITS((data)->cur_ctx, (bin_value)); 
   lps = kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][(data->range >> 6) & 3];
   data->range -= lps;
 
@@ -577,6 +577,6 @@ uint32_t kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
       bins                     = ( (bins >> (num_bins >>1) ) << (num_bins >>1) ) | state->crypto_prev_pos;
     }
   }
-  kvz_cabac_encode_bins_ep(data, bins, num_bins);
+  CABAC_BINS_EP(data, bins, num_bins, "ep_ex_golomb");
   return num_bins;
 }
