@@ -437,6 +437,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   double* bit_cost) {
   const int width = LCU_WIDTH >> depth;
 
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
   // cur_cu is used for TU parameters.
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
@@ -466,17 +467,18 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   if (width <= TR_MAX_WIDTH
     && width > TR_MIN_WIDTH
     && !intra_split_flag
-    && MIN(tr_cu->tr_depth, depth) - tr_cu->depth < max_tr_depth)
+    && MIN(tr_cu->tr_depth, depth) - tr_cu->depth < max_tr_depth
+    && !skip_residual_coding)
   {
     cabac_ctx_t* ctx = &(cabac->ctx.trans_subdiv_model[5 - (6 - depth)]);
     CABAC_FBITS_UPDATE(cabac, ctx, tr_depth > 0, tr_tree_bits, "tr_split_search");
   }
 
-  if(state->encoder_control->chroma_format != KVZ_CSP_400) {
-    if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_U)) {
+  if(state->encoder_control->chroma_format != KVZ_CSP_400 && !skip_residual_coding) {
+    if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_u, tr_tree_bits, "cbf_cb");
     } 
-    if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_V)) {
+    if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_v, tr_tree_bits, "cbf_cr");
     } 
   }
@@ -496,10 +498,11 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = depth - tr_cu->depth;
-  if (pred_cu->type == CU_INTRA ||
+  if ((pred_cu->type == CU_INTRA ||
     is_tr_split ||
     cb_flag_u ||
-    cb_flag_v)
+    cb_flag_v) 
+      && !skip_residual_coding)
   {
     cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[!is_tr_split]);
 
