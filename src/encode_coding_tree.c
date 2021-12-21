@@ -656,7 +656,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     encode_transform_coeff(state, x, y, depth, 0, 0, 0);
 }
 
-static double encode_part_mode(encoder_state_t * const state,
+double kvz_encode_part_mode(encoder_state_t * const state,
                              cabac_data_t * const cabac,
                              const cu_info_t * const cur_cu,
                              int depth)
@@ -863,7 +863,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // part_mode
-  encode_part_mode(state, cabac, cur_cu, depth);
+  kvz_encode_part_mode(state, cabac, cur_cu, depth);
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
@@ -1044,7 +1044,7 @@ double kvz_mock_encode_coding_unit(
   }
 
   // part_mode
-  bits += encode_part_mode(state, cabac, cur_cu, depth);
+  bits += kvz_encode_part_mode(state, cabac, cur_cu, depth);
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];

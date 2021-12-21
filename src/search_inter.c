@@ -37,6 +37,7 @@
 
 #include "cabac.h"
 #include "encoder.h"
+#include "encode_coding_tree.h"
 #include "image.h"
 #include "imagelist.h"
 #include "inter.h"
@@ -343,7 +344,7 @@ static int select_mv_cand(const encoder_state_t *state,
                           int16_t mv_cand[2][2],
                           int32_t mv_x,
                           int32_t mv_y,
-                          uint32_t *cost_out)
+                          double*cost_out)
 {
   const bool same_cand =
     (mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]);
@@ -362,12 +363,12 @@ static int select_mv_cand(const encoder_state_t *state,
     mvd_coding_cost = get_mvd_coding_cost;
   }
 
-  uint32_t cand1_cost = mvd_coding_cost(
+  double cand1_cost = mvd_coding_cost(
       state, &state->cabac,
       mv_x - mv_cand[0][0],
       mv_y - mv_cand[0][1]);
 
-  uint32_t cand2_cost;
+  double cand2_cost;
   if (same_cand) {
     cand2_cost = cand1_cost;
   } else {
@@ -419,7 +420,7 @@ static double calc_mvd_cost(const encoder_state_t *state,
 
   // Check mvd cost only if mv is not merged
   if (!merged) {
-    uint32_t mvd_cost = 0;
+    double mvd_cost = 0;
     select_mv_cand(state, mv_cand, x, y, &mvd_cost);
     temp_bitcost += mvd_cost;
   }
@@ -2165,7 +2166,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
 
   *inter_cost    = 0;
   *inter_bitcost = 0;
-
+  
   for (int i = 0; i < num_pu; ++i) {
     const int x_pu      = PU_GET_X(part_mode, width, x_local, i);
     const int y_pu      = PU_GET_Y(part_mode, width, y_local, i);
@@ -2233,14 +2234,13 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     }
   }
 
-  // Count bits spent for coding the partition mode.
-  int smp_extra_bits = 1; // horizontal or vertical
-  if (state->encoder_control->cfg.amp_enable) {
-    smp_extra_bits += 1; // symmetric or asymmetric
-    if (part_mode != SIZE_2NxN && part_mode != SIZE_Nx2N) {
-      smp_extra_bits += 1; // U,L or D,R
-    }
-  }
+  double smp_extra_bits = kvz_encode_part_mode(
+    state,
+    &state->search_cabac,
+    LCU_GET_CU_AT_PX(lcu, x_local, y_local),
+    depth
+  );
+
   // The transform is split for SMP and AMP blocks so we need more bits for
   // coding the CBF.
   smp_extra_bits += 6;

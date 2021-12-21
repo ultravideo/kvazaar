@@ -58,6 +58,11 @@ double kvz_mock_encode_coding_unit(
   int x, int y, int depth,
   lcu_t* lcu, cu_info_t* cur_cu);
 
+double kvz_encode_part_mode(encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const cu_info_t* const cur_cu,
+  int depth);
+
 void kvz_encode_inter_prediction_unit(encoder_state_t* const state,
                                       cabac_data_t* const cabac,
                                       const cu_info_t* const cur_cu,

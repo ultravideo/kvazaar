@@ -1062,14 +1062,13 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   }
 
   // Store cabac state and contexts
-  memcpy(&state_cabac_copy, &state->cabac, sizeof(cabac_data_t));
+  memcpy(&state_cabac_copy, &state->search_cabac, sizeof(cabac_data_t));
 
   // Clear bytes and bits and set mode to "count"
   state_cabac_copy.only_count = 1;
-  state_cabac_copy.num_buffered_bytes = 0;
-  state_cabac_copy.bits_left = 23;
 
   cabac = &state_cabac_copy;
+  double bits = 0;
 
   if (!merged) {
     vector2d_t mvd1 = {
@@ -1094,7 +1093,7 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
 
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
 
-  CABAC_BIN(cabac, merged, "MergeFlag");
+  CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_flag_ext_model), merged, bits, "MergeFlag");
   num_cand = state->encoder_control->cfg.max_merge;
   if (merged) {
     if (num_cand > 1) {
@@ -1102,10 +1101,10 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
       for (ui = 0; ui < num_cand - 1; ui++) {
         int32_t symbol = (ui != merge_idx);
         if (ui == 0) {
-          cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
-          CABAC_BIN(cabac, symbol, "MergeIndex");
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_idx_ext_model), symbol, bits, "MergeIndex");
         } else {
           CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+          bits += 1;
         }
         if (symbol == 0) break;
       }
@@ -1128,24 +1127,23 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         if (ref_list[ref_list_idx] > 1) {
           // parseRefFrmIdx
           int32_t ref_frame = ref_idx;
-
-          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+          
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_ref_pic_model[0]), (ref_frame != 0), bits, "ref_idx_lX");
 
           if (ref_frame > 0) {
             int32_t i;
             int32_t ref_num = ref_list[ref_list_idx] - 2;
-
-            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+            
             ref_frame--;
 
             for (i = 0; i < ref_num; ++i) {
               const uint32_t symbol = (i == ref_frame) ? 0 : 1;
 
               if (i == 0) {
-                CABAC_BIN(cabac, symbol, "ref_idx_lX");
+                CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_ref_pic_model[1]), symbol, bits, "ref_idx_lX");
               } else {
                 CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+                bits += 1;
               }
               if (symbol == 0) break;
             }
@@ -1155,7 +1153,7 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         // ToDo: Bidir vector support
         if (!(state->frame->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
           // It is safe to drop const here because cabac->only_count is set.
-          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y, NULL);
+          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y, &bits);
         }
 
         // Signal which candidate MV to use
@@ -1165,12 +1163,12 @@ double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
           cur_mv_cand,
           1,
           AMVP_MAX_NUM_CANDS - 1,
-          NULL);
+          &bits);
       }
     }
   }
 
-  *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
+  *bitcost = bits;
 
   // Store bitcost before restoring cabac
   return *bitcost * state->lambda_sqrt;
