@@ -247,10 +247,10 @@ static bool check_mv_cost(inter_search_info_t *info,
 
 static unsigned get_ep_ex_golomb_bitcost(unsigned symbol)
 {
-  // Calculate 2 * log2(symbol + 2)
+  // Calculate 2 * log2(symbol )
 
   unsigned bins = 0;
-  symbol += 2;
+  symbol += 0;
   if (symbol >= 1 << 8) { bins += 16; symbol >>= 8; }
   if (symbol >= 1 << 4) { bins += 8; symbol >>= 4; }
   if (symbol >= 1 << 2) { bins += 4; symbol >>= 2; }
@@ -324,19 +324,21 @@ static void select_starting_point(inter_search_info_t *info,
 }
 
 
-static double get_mvd_coding_cost(const encoder_state_t *state,
-                                    const cabac_data_t* cabac,
-                                    const int32_t mvd_hor,
-                                    const int32_t mvd_ver)
+static double get_mvd_coding_cost(const encoder_state_t* state,
+  const cabac_data_t* cabac,
+  const int32_t mvd_hor,
+  const int32_t mvd_ver)
 {
-  double bitcost = 0;
+  double bitcost = 4 << CTX_FRAC_BITS;
   const vector2d_t abs_mvd = { abs(mvd_hor), abs(mvd_ver) };
+  bitcost += abs_mvd.x == 1 ? 1 << CTX_FRAC_BITS : (0 * (1 << CTX_FRAC_BITS));
+  bitcost += abs_mvd.y == 1 ? 1 << CTX_FRAC_BITS : (0 * (1 << CTX_FRAC_BITS));
 
   bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x) << CTX_FRAC_BITS;
   bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y) << CTX_FRAC_BITS;
 
   // Round and shift back to integer bits.
-  return bitcost  / (1 << CTX_FRAC_BITS);
+  return bitcost / (1 << CTX_FRAC_BITS);
 }
 
 
