@@ -1641,6 +1641,7 @@ static void search_pu_inter(encoder_state_t * const state,
     merge->cost[i] = MAX_DOUBLE;
   }
 
+  const double merge_flag_cost = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_merge_flag_ext_model, 1);
   // Check motion vector constraints and perform rough search
   for (int merge_idx = 0; merge_idx < info->num_merge_cand; ++merge_idx) {
 
@@ -1678,8 +1679,9 @@ static void search_pu_inter(encoder_state_t * const state,
       lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
     
     // Add cost of coding the merge index
-    merge->cost[merge->size] += merge_idx * info->state->lambda_sqrt;
-    merge->bits[merge->size] = merge_idx;
+    double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
+    merge->cost[merge->size] += bits * info->state->lambda_sqrt;
+    merge->bits[merge->size] = bits;
     merge->keys[merge->size] = merge->size;
 
     merge->unit[merge->size] = *cur_pu;
@@ -2013,7 +2015,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     lcu,
     false);
 
-  double bits;
+  double bits = 0;
   *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
   if (reconstruct_chroma) {
     *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
