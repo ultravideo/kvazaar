@@ -2016,9 +2016,14 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     false);
 
   double bits = 0;
-  *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
-  if (reconstruct_chroma) {
-    *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
+  int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+  *inter_bitcost += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, !!cbf);
+
+  if(cbf) {
+    *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
+    if (reconstruct_chroma) {
+      *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
+    }
   }
 
   FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
