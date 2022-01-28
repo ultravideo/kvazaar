@@ -92,5 +92,10 @@ unsigned kvz_inter_satd_cost(const encoder_state_t* state,
                              const lcu_t *lcu,
                              int x,
                              int y);
+void kvz_cu_cost_inter_rd2(encoder_state_t* const state,
+  int x, int y, int depth,
+  lcu_t* lcu,
+  double* inter_cost,
+  double* inter_bitcost);
 
 #endif // SEARCH_INTER_H_

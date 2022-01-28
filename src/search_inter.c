@@ -1673,13 +1673,17 @@ static void search_pu_inter(encoder_state_t * const state,
     }
 
     kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
-    
-    merge->cost[merge->size] = kvz_satd_any_size(width, height,
-      lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
-      lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
-    
-    // Add cost of coding the merge index
+
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
+    if(state->encoder_control->cfg.rdo >= 2) {
+      kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &merge->cost[merge->size], &bits);
+    }
+    else {
+      merge->cost[merge->size] = kvz_satd_any_size(width, height,
+        lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
+        lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
+    }
+    // Add cost of coding the merge index
     merge->cost[merge->size] += bits * info->state->lambda_sqrt;
     merge->bits[merge->size] = bits;
     merge->keys[merge->size] = merge->size;
@@ -1769,6 +1773,10 @@ static void search_pu_inter(encoder_state_t * const state,
     amvp[0].size > 0 ? amvp[0].keys[0] : 0, 
     amvp[1].size > 0 ? amvp[1].keys[0] : 0
   };
+  if (state->encoder_control->cfg.rdo >= 2) {
+    kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]]);
+    kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[1].cost[best_keys[1]], &amvp[1].bits[best_keys[1]]);
+  }
 
   cu_info_t *best_unipred[2] = {
     &amvp[0].unit[best_keys[0]],
@@ -1850,6 +1858,10 @@ static void search_pu_inter(encoder_state_t * const state,
           unipred_pu->inter.mv[list][1] = frac_mv.y;
           CU_SET_MV_CAND(unipred_pu, list, cu_mv_cand);
 
+          if (state->encoder_control->cfg.rdo >= 2) {
+            kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &frac_cost, &frac_bits);
+          }
+
           amvp[list].cost[key] = frac_cost;
           amvp[list].bits[key] = frac_bits;
         }
@@ -1919,6 +1931,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
       const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
       const kvz_pixel *src = &lcu->ref.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
+
       best_bipred_cost =
         kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
 
@@ -1971,6 +1984,9 @@ static void search_pu_inter(encoder_state_t * const state,
     
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
+    if (state->encoder_control->cfg.rdo >= 2) {
+      kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
+    }
   }
 
 }
@@ -2115,14 +2131,6 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   *cur_pu = *best_inter_pu;
    
-  // Calculate more accurate cost when needed
-  if (state->encoder_control->cfg.rdo >= 2) {
-    kvz_cu_cost_inter_rd2(state,
-                          x, y, depth,
-                          lcu,
-                          inter_cost,
-                          inter_bitcost);
-  }
 
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
