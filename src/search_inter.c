@@ -1707,7 +1707,12 @@ static void search_pu_inter(encoder_state_t * const state,
     if(state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
       if(state->encoder_control->cfg.early_skip && merge->unit[merge->size].skipped) {
-        
+        *cur_pu = merge->unit[merge->size];
+        merge->unit[0] = *cur_pu;
+        merge->size = 1;
+        merge->cost[0] = merge->cost[merge->size];
+        merge->bits[0] = bits;
+        return;
       }
     }
     else {
@@ -1732,7 +1737,7 @@ static void search_pu_inter(encoder_state_t * const state,
     
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
+  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N && cfg->rdo < 2) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
 
       // Reconstruct blocks with merge candidate.
@@ -2115,7 +2120,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
 
   *inter_cost += (*inter_bitcost +bits )* state->lambda;
 
-  if(no_cbf_cost < *inter_cost && 0) {
+  if(no_cbf_cost < *inter_cost) {
     cur_cu->cbf = 0;
     if (cur_cu->merged) {
       cur_cu->skipped = 1;
