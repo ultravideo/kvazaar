@@ -60,14 +60,6 @@
 // Cost threshold for doing intra search in inter frames with --rd=0.
 static const int INTRA_THRESHOLD = 8;
 
-// Modify weight of luma SSD.
-#ifndef LUMA_MULT
-# define LUMA_MULT 0.8
-#endif
-// Modify weight of chroma SSD.
-#ifndef CHROMA_MULT
-# define CHROMA_MULT 1.5
-#endif
 
 static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
@@ -216,16 +208,16 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
   const int chroma_index = (y_local / 2) * LCU_WIDTH_C + (x_local / 2);
 
   double ssd = 0.0;
-  ssd += LUMA_MULT * kvz_pixels_calc_ssd(
+  ssd += KVZ_LUMA_MULT * kvz_pixels_calc_ssd(
     &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
   if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += KVZ_CHROMA_MULT * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += KVZ_CHROMA_MULT * kvz_pixels_calc_ssd(
       &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
@@ -253,6 +245,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                        double *bit_cost)
 {
   const int width = LCU_WIDTH >> depth;
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
 
   // cur_cu is used for TU parameters.
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
@@ -280,7 +273,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   if (width <= TR_MAX_WIDTH
       && width > TR_MIN_WIDTH
       && !intra_split_flag
-      && MIN(tr_cu->tr_depth, depth) - tr_cu->depth < max_tr_depth)
+      && MIN(tr_cu->tr_depth, depth) - tr_cu->depth < max_tr_depth
+      && !skip_residual_coding)
   {
     cabac_ctx_t *ctx = &(cabac->ctx.trans_subdiv_model[5 - (6 - depth)]);
     CABAC_FBITS_UPDATE(cabac, ctx, tr_depth > 0, tr_tree_bits, "tr_split_search");
@@ -300,7 +294,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
 
-  if (cabac->update && tr_cu->tr_depth == tr_cu->depth) {
+  if (cabac->update && tr_cu->tr_depth == tr_cu->depth && !skip_residual_coding) {
     // Because these need to be coded before the luma cbf they also need to be counted
     // before the cabac state changes. However, since this branch is only executed when
     // calculating the last RD cost it is not problem to include the chroma cbf costs in
@@ -340,7 +334,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                                         width);
   }
 
-  {
+
+  if (!skip_residual_coding) {
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
@@ -349,7 +344,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * LUMA_MULT + bits * state->lambda;
+  return (double)ssd * KVZ_LUMA_MULT + bits * state->lambda;
 }
 
 
@@ -362,6 +357,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -376,7 +372,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // See luma for why the second condition
-  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth)) {
+  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
@@ -417,6 +413,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     ssd = ssd_u + ssd_v;
   }
 
+  if (!skip_residual_coding)
   {
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
@@ -427,7 +424,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->lambda;
+  return (double)ssd * KVZ_CHROMA_MULT + bits * state->lambda;
 }
 
 static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
@@ -553,7 +550,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
   *bit_cost += coeff_bits;
   double bits = tr_tree_bits + coeff_bits;
-  return luma_ssd * LUMA_MULT + chroma_ssd * CHROMA_MULT + bits * state->lambda;
+  return luma_ssd * KVZ_LUMA_MULT + chroma_ssd * KVZ_CHROMA_MULT + bits * state->lambda;
 }
 
 

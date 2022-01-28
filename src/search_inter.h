@@ -94,8 +94,11 @@ unsigned kvz_inter_satd_cost(const encoder_state_t* state,
                              int y);
 void kvz_cu_cost_inter_rd2(encoder_state_t* const state,
   int x, int y, int depth,
+  cu_info_t* cur_cu,
   lcu_t* lcu,
   double* inter_cost,
   double* inter_bitcost);
+
+int kvz_get_skip_context(int x, int y, lcu_t* const lcu, cu_array_t* const cu_a);
 
 #endif // SEARCH_INTER_H_

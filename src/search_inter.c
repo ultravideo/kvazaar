@@ -1160,6 +1160,30 @@ static void search_frac(inter_search_info_t *info,
   *best_bits = bitcost;
 }
 
+int kvz_get_skip_context(int x, int y, lcu_t* const lcu, cu_array_t* const cu_a) {
+  assert(!(lcu && cu_a));
+  int context = 0;
+  if(lcu) {
+    int x_local = SUB_SCU(x);
+    int y_local = SUB_SCU(y);
+    if (x) {
+      context += LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local)->skipped;
+    }
+    if (y) {
+      context += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->skipped;
+    }
+  }
+  else {
+    if (x > 0) {
+      context += kvz_cu_array_at_const(cu_a, x - 1, y)->skipped;
+    }
+    if (y > 0) {
+      context += kvz_cu_array_at_const(cu_a, x, y - 1)->skipped;
+    }
+  }
+  return context;
+}
+
 /**
 * \brief Calculate the scaled MV
 */
@@ -1676,7 +1700,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
     if(state->encoder_control->cfg.rdo >= 2) {
-      kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &merge->cost[merge->size], &bits);
+      kvz_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
     }
     else {
       merge->cost[merge->size] = kvz_satd_any_size(width, height,
@@ -1773,10 +1797,6 @@ static void search_pu_inter(encoder_state_t * const state,
     amvp[0].size > 0 ? amvp[0].keys[0] : 0, 
     amvp[1].size > 0 ? amvp[1].keys[0] : 0
   };
-  if (state->encoder_control->cfg.rdo >= 2) {
-    kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]]);
-    kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[1].cost[best_keys[1]], &amvp[1].bits[best_keys[1]]);
-  }
 
   cu_info_t *best_unipred[2] = {
     &amvp[0].unit[best_keys[0]],
@@ -1806,6 +1826,11 @@ static void search_pu_inter(encoder_state_t * const state,
       best_keys[list]    =  amvp[list].keys[0];
       best_unipred[list] = &amvp[list].unit[best_keys[list]];
     }
+  }
+
+  if (state->encoder_control->cfg.rdo >= 2) {
+    kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[0].unit[best_keys[0]], lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]]);
+    kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[1].unit[best_keys[1]], lcu, &amvp[1].cost[best_keys[1]], &amvp[1].bits[best_keys[1]]);
   }
 
   // Fractional-pixel motion estimation.
@@ -1859,7 +1884,7 @@ static void search_pu_inter(encoder_state_t * const state,
           CU_SET_MV_CAND(unipred_pu, list, cu_mv_cand);
 
           if (state->encoder_control->cfg.rdo >= 2) {
-            kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &frac_cost, &frac_bits);
+            kvz_cu_cost_inter_rd2(state, x, y, depth, unipred_pu, lcu, &frac_cost, &frac_bits);
           }
 
           amvp[list].cost[key] = frac_cost;
@@ -1985,7 +2010,7 @@ static void search_pu_inter(encoder_state_t * const state,
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
     if (state->encoder_control->cfg.rdo >= 2) {
-      kvz_cu_cost_inter_rd2(state, x, y, depth, lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
+      kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[2].unit[amvp[2].keys[0]], lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
     }
   }
 
@@ -2012,39 +2037,96 @@ static void search_pu_inter(encoder_state_t * const state,
 */
 void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
                            int x, int y, int depth,
+                           cu_info_t* cur_cu,
                            lcu_t *lcu,
                            double   *inter_cost,
                            double* inter_bitcost){
-
-  cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  
   int tr_depth = MAX(1, depth);
   if (cur_cu->part_size != SIZE_2Nx2N) {
     tr_depth = depth + 1;
   }
   kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
 
+  const int x_px = SUB_SCU(x);
+  const int y_px = SUB_SCU(y);
+  const int width = LCU_WIDTH >> depth;
+
   const bool reconstruct_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
   kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
-  kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
-    x, y, depth,
-    NULL,
-    lcu,
-    false);
 
+  int index = y_px * LCU_WIDTH + x_px;
+  double ssd = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
+                                   LCU_WIDTH, LCU_WIDTH,
+                                   width) * KVZ_LUMA_MULT;
+  if (reconstruct_chroma) {
+    int index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
+    double ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
+                                       LCU_WIDTH_C, LCU_WIDTH_C,
+                                       width);
+    double ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
+                                       LCU_WIDTH_C, LCU_WIDTH_C,
+                                       width);
+    ssd += ssd_u + ssd_v;
+    ssd *= KVZ_CHROMA_MULT;
+  }
+  double no_cbf_bits;
   double bits = 0;
-  int cbf = cbf_is_set_any(cur_cu->cbf, depth);
-  *inter_bitcost += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, !!cbf);
+  int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
+  if (cur_cu->merged) {
+    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1);
+    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 0);
+  }
+  else {
+    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 0);
+    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1);
+  }
+  double no_cbf_cost = ssd + (no_cbf_bits + *inter_bitcost) * state->lambda;
 
+  kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
+                            x, y, depth,
+                            NULL,
+                            lcu,
+                            false);
+
+  int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+
+  double temp_bits = 0;
   if(cbf) {
-    *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
+    *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu, &temp_bits);
     if (reconstruct_chroma) {
-      *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu, &bits);
+      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu, &temp_bits);
     }
+  }
+  else {
+    // If we have no coeffs after quant we already have the cost calculated
+    *inter_cost = no_cbf_cost;
+    if(cur_cu->merged) {
+      *inter_bitcost += no_cbf_bits;
+    }
+    return;
   }
 
   FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
 
-  *inter_cost += *inter_bitcost * state->lambda;
+  *inter_cost += (*inter_bitcost +bits )* state->lambda;
+
+  if(no_cbf_cost < *inter_cost && 0) {
+    cur_cu->cbf = 0;
+    if (cur_cu->merged) {
+      cur_cu->skipped = 1;
+    }
+    kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
+    *inter_cost = no_cbf_cost;
+    if (cur_cu->merged) {
+      *inter_bitcost += no_cbf_bits;
+    }
+  }
+  else if(cur_cu->merged) {
+    if (cur_cu->merged) {
+      *inter_bitcost += bits;
+    }
+  }
 }
 
 
@@ -2267,7 +2349,8 @@ void kvz_search_cu_smp(encoder_state_t * const state,
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
     kvz_cu_cost_inter_rd2(state,
-                          x, y, depth,
+                          x, y, depth, 
+                          LCU_GET_CU_AT_PX(lcu, x_local, y_local),
                           lcu,
                           inter_cost,
                           inter_bitcost);
