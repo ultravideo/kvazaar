@@ -1697,10 +1697,18 @@ static void search_pu_inter(encoder_state_t * const state,
     }
 
     kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
+    merge->unit[merge->size] = *cur_pu;
+    merge->unit[merge->size].type = CU_INTER;
+    merge->unit[merge->size].merge_idx = merge_idx;
+    merge->unit[merge->size].merged = true;
+    merge->unit[merge->size].skipped = false;
 
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
     if(state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
+      if(state->encoder_control->cfg.early_skip && merge->unit[merge->size].skipped) {
+        
+      }
     }
     else {
       merge->cost[merge->size] = kvz_satd_any_size(width, height,
@@ -1712,11 +1720,6 @@ static void search_pu_inter(encoder_state_t * const state,
     merge->bits[merge->size] = bits;
     merge->keys[merge->size] = merge->size;
 
-    merge->unit[merge->size] = *cur_pu;
-    merge->unit[merge->size].type = CU_INTER;
-    merge->unit[merge->size].merge_idx = merge_idx;
-    merge->unit[merge->size].merged = true;
-    merge->unit[merge->size].skipped = false;
 
     merge->size++;
   }
