@@ -2085,7 +2085,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
 
   kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
                             x, y, depth,
-                            NULL,
+                            cur_cu,
                             lcu,
                             false);
 
