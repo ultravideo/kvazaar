@@ -2082,7 +2082,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   double no_cbf_bits;
   double bits = 0;
   int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
-  if (cur_cu->merged) {
+  if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1);
     bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 0);
   }
@@ -2110,7 +2110,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   else {
     // If we have no coeffs after quant we already have the cost calculated
     *inter_cost = no_cbf_cost;
-    if(cur_cu->merged) {
+    if(cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
       *inter_bitcost += no_cbf_bits;
     }
     return;
@@ -2122,12 +2122,12 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
 
   if(no_cbf_cost < *inter_cost) {
     cur_cu->cbf = 0;
-    if (cur_cu->merged) {
+    if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
       cur_cu->skipped = 1;
     }
     kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
     *inter_cost = no_cbf_cost;
-    if (cur_cu->merged) {
+    if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
       *inter_bitcost += no_cbf_bits;
     }
   }
