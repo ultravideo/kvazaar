@@ -2351,7 +2351,9 @@ void kvz_search_cu_smp(encoder_state_t * const state,
 
   // The transform is split for SMP and AMP blocks so we need more bits for
   // coding the CBF.
-  smp_extra_bits += 6;
+  if(state->encoder_control->cfg.rdo < 2) {
+    smp_extra_bits += 6;
+  }
 
   *inter_bitcost += smp_extra_bits;
 
