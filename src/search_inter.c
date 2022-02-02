@@ -1706,14 +1706,6 @@ static void search_pu_inter(encoder_state_t * const state,
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
     if(state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
-      if(state->encoder_control->cfg.early_skip && merge->unit[merge->size].skipped) {
-        *cur_pu = merge->unit[merge->size];
-        merge->unit[0] = *cur_pu;
-        merge->size = 1;
-        merge->cost[0] = merge->cost[merge->size];
-        merge->bits[0] = bits;
-        return;
-      }
     }
     else {
       merge->cost[merge->size] = kvz_satd_any_size(width, height,
@@ -1737,41 +1729,49 @@ static void search_pu_inter(encoder_state_t * const state,
     
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N && cfg->rdo < 2) {
+  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
-
-      // Reconstruct blocks with merge candidate.
-      // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
-      // and chroma exists.
-      // Early terminate if merge candidate with zero CBF is found.
-      int merge_idx           = merge->unit[merge->keys[merge_key]].merge_idx;
-      cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
-      cur_pu->inter.mv_ref[0] = info->merge_cand[merge_idx].ref[0];
-      cur_pu->inter.mv_ref[1] = info->merge_cand[merge_idx].ref[1];
-      cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
-      cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
-      cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
-      cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
-      kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
-      kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
-      kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_pu, lcu, true);
-
-      if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
-        continue;
+      if(cfg->rdo >= 2 && merge->unit[merge->keys[merge_key]].skipped) {
+        merge->size = 1;
+        merge->bits[0] = merge->bits[merge->keys[merge_key]];
+        merge->cost[0] = merge->cost[merge->keys[merge_key]];
+        merge->unit[0] = merge->unit[merge->keys[merge_key]];
+        merge->keys[0] = 0;
       }
-      else if (has_chroma) {
-        kvz_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-        kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_pu, lcu, true);
-        if (!cbf_is_set_any(cur_pu->cbf, depth)) {
-          cur_pu->type = CU_INTER;
-          cur_pu->merge_idx = merge_idx;
-          cur_pu->skipped = true;
+      else if(cfg->rdo < 2) {
+        // Reconstruct blocks with merge candidate.
+        // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
+        // and chroma exists.
+        // Early terminate if merge candidate with zero CBF is found.
+        int merge_idx           = merge->unit[merge->keys[merge_key]].merge_idx;
+        cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
+        cur_pu->inter.mv_ref[0] = info->merge_cand[merge_idx].ref[0];
+        cur_pu->inter.mv_ref[1] = info->merge_cand[merge_idx].ref[1];
+        cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
+        cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
+        cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
+        cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+        kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
+        kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_pu, lcu, true);
 
-          merge->size = 1;
-          merge->cost[0] = 0.0; // TODO: Check this
-          merge->bits[0] = merge_idx; // TODO: Check this
-          merge->unit[0] = *cur_pu;
-          return;
+        if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
+          continue;
+        }
+        else if (has_chroma) {
+          kvz_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
+          kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_pu, lcu, true);
+          if (!cbf_is_set_any(cur_pu->cbf, depth)) {
+            cur_pu->type = CU_INTER;
+            cur_pu->merge_idx = merge_idx;
+            cur_pu->skipped = true;
+
+            merge->size = 1;
+            merge->cost[0] = 0.0; // TODO: Check this
+            merge->bits[0] = merge_idx; // TODO: Check this
+            merge->unit[0] = *cur_pu;
+            return;
+          }
         }
       }
     }
