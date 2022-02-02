@@ -2021,7 +2021,15 @@ static void search_pu_inter(encoder_state_t * const state,
       kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[2].unit[amvp[2].keys[0]], lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
     }
   }
-
+  const int skip_contest = kvz_get_skip_context(x, y, lcu, NULL);
+  const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[skip_contest], 0);
+  for(int i = 0; i < 3; i++) {
+    if(amvp[i].size > 0) {
+      const uint8_t best_key = amvp[i].keys[0];
+      amvp[i].bits[best_key] += no_skip_flag;
+      amvp[i].cost[best_key] += no_skip_flag * state->lambda;
+    }
+  }
 }
 
 /**
@@ -2081,14 +2089,15 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   }
   double no_cbf_bits;
   double bits = 0;
-  int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
+  const int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
+  double no_skip_flag_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 0);
   if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1);
-    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 0);
+    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1) + no_skip_flag_bits;
   }
   else {
-    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 0);
-    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1);
+    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 0) + no_skip_flag_bits;
+    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1) + no_skip_flag_bits;
   }
   double no_cbf_cost = ssd + (no_cbf_bits + *inter_bitcost) * state->lambda;
 
@@ -2118,7 +2127,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
 
   FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
 
-  *inter_cost += (*inter_bitcost +bits )* state->lambda;
+  *inter_cost += (*inter_bitcost + bits)* state->lambda;
 
   if(no_cbf_cost < *inter_cost) {
     cur_cu->cbf = 0;
@@ -2131,10 +2140,8 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
       *inter_bitcost += no_cbf_bits;
     }
   }
-  else if(cur_cu->merged) {
-    if (cur_cu->merged) {
-      *inter_bitcost += bits;
-    }
+  else if(cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
+    *inter_bitcost += no_skip_flag_bits;
   }
 }
 
@@ -2348,6 +2355,8 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     LCU_GET_CU_AT_PX(lcu, x_local, y_local),
     depth
   );
+
+  CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.cu_skip_flag_model[kvz_get_skip_context(x, y, lcu, NULL)], 0, smp_extra_bits, "skip_flag");
 
   // The transform is split for SMP and AMP blocks so we need more bits for
   // coding the CBF.
