@@ -2067,6 +2067,10 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   const int x_px = SUB_SCU(x);
   const int y_px = SUB_SCU(y);
   const int width = LCU_WIDTH >> depth;
+  cabac_data_t cabac_copy;
+  memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
+  cabac_copy.update = 1;
+
   cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   *cur_pu = *cur_cu;
 
@@ -2090,16 +2094,15 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   double no_cbf_bits;
   double bits = 0;
   const int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
-  double no_skip_flag_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 0);
   if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1);
-    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1) + no_skip_flag_bits;
+    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
+    bits += kvz_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
   }
   else {
-    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 0) + no_skip_flag_bits;
-    bits += CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_qt_root_cbf_model, 1) + no_skip_flag_bits;
+    no_cbf_bits = kvz_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
+    bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 1);
   }
-  double no_cbf_cost = ssd + (no_cbf_bits + *inter_bitcost) * state->lambda;
+  double no_cbf_cost = ssd + no_cbf_bits * state->lambda;
 
   kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
                             x, y, depth,
@@ -2120,14 +2123,15 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     // If we have no coeffs after quant we already have the cost calculated
     *inter_cost = no_cbf_cost;
     if(cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-      *inter_bitcost += no_cbf_bits;
+      *inter_bitcost = no_cbf_bits;
     }
     return;
   }
 
   FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
 
-  *inter_cost += (*inter_bitcost + bits)* state->lambda;
+  *inter_cost += (bits)* state->lambda;
+  *inter_bitcost = bits;
 
   if(no_cbf_cost < *inter_cost) {
     cur_cu->cbf = 0;
@@ -2136,12 +2140,8 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     }
     kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
     *inter_cost = no_cbf_cost;
-    if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-      *inter_bitcost += no_cbf_bits;
-    }
-  }
-  else if(cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-    *inter_bitcost += no_skip_flag_bits;
+    *inter_bitcost = no_cbf_bits;
+    
   }
 }
 
