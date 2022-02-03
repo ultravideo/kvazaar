@@ -451,9 +451,6 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   const int cb_flag_v = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
-  if(pred_cu->type == CU_INTER && !pred_cu->skipped && depth == pred_cu->depth) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_qt_root_cbf_model, cbf_is_set_any(pred_cu->cbf, depth), tr_tree_bits, "root_cbf");
-  }
 
   // Add transform_tree split_transform_flag bit cost.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
@@ -753,9 +750,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
             copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
           }
         }
-        double pred_mode_type_bits = 0;
-        CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.cu_pred_mode_model, 0, pred_mode_type_bits, "pred_mode_flag");
-        cost += pred_mode_type_bits * state->lambda;
       }
     }
 
