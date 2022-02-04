@@ -452,6 +452,15 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
 
+  {
+    int cbf = cbf_is_set_any(pred_cu->cbf, depth);
+    // Only need to signal coded block flag if not skipped or merged
+    // skip = no coded residual, merge = coded residual
+    if (pred_cu->type == CU_INTER && (pred_cu->part_size != SIZE_2Nx2N || !pred_cu->merged)) {
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, tr_tree_bits, "rqt_root_cbf");
+    }
+
+  }
   // Add transform_tree split_transform_flag bit cost.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
   int max_tr_depth;
@@ -851,9 +860,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           cur_cu->merged = 0;
           cur_cu->skipped = 1;
           // Selecting skip reduces bits needed to code the CU
-          if (inter_bitcost > 1) {
-            inter_bitcost -= 1;
-          }
+          int skip_ctx = kvz_get_skip_context(x, y, lcu, NULL);
+          inter_bitcost = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[skip_ctx], 1);
+          inter_bitcost += CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), cur_cu->merge_idx != 0);
+          inter_bitcost += cur_cu->merge_idx;        
         }
       }
       lcu_fill_inter(lcu, x_local, y_local, cu_width);

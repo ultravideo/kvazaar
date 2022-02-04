@@ -1058,16 +1058,6 @@ double kvz_mock_encode_coding_unit(
 
       kvz_encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth, lcu, &bits);
     }
-
-    {
-      int cbf = cbf_is_set_any(cur_cu->cbf, depth);
-      // Only need to signal coded block flag if not skipped or merged
-      // skip = no coded residual, merge = coded residual
-      if (cur_cu->part_size != SIZE_2Nx2N || !cur_cu->merged) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, bits, "rqt_root_cbf");
-      }
-
-    }
   }
   else if (cur_cu->type == CU_INTRA) {
     encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
