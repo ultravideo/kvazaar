@@ -32,9 +32,6 @@
 
 #include "encoder.h"
 
-// This define is required for M_PI on Windows.
-#define _USE_MATH_DEFINES
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -44,14 +41,6 @@
 #include "strategyselector.h"
 #include "kvz_math.h"
 #include "fast_coeff_cost.h"
-
-/**
- * \brief Strength of QP adjustments when using adaptive QP for 360 video.
- *
- * Determined empirically.
- */
-static const double ERP_AQP_STRENGTH = 3.0;
-
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
@@ -133,82 +122,6 @@ static int get_max_parallelism(const encoder_control_t *const encoder)
   }
 
   return parallelism;
-}
-
-
-/**
- * \brief Return weight for 360 degree ERP video
- *
- * Returns the scaling factor of area from equirectangular projection to
- * spherical surface.
- *
- * \param y   y-coordinate of the pixel
- * \param h   height of the picture
- */
-static double ws_weight(int y, int h)
-{
-  return cos((y - 0.5 * h + 0.5) * (M_PI / h));
-}
-
-
-
-/**
- * \brief Update ROI QPs for 360 video with equirectangular projection.
- *
- * Writes updated ROI parameters to encoder->cfg.roi.
- *
- * \param encoder       encoder control
- * \param orig_roi      original delta QPs or NULL
- * \param orig_width    width of orig_roi
- * \param orig_height   height of orig_roi
- */
-static void init_erp_aqp_roi(encoder_control_t* encoder,
-                             int8_t *orig_roi,
-                             int32_t orig_width,
-                             int32_t orig_height)
-{
-  // Update ROI with WS-PSNR delta QPs.
-  int height = encoder->in.height_in_lcu;
-  int width  = orig_roi ? orig_width : 1;
-
-  int frame_height = encoder->in.real_height;
-
-  encoder->cfg.roi.width  = width;
-  encoder->cfg.roi.height = height;
-  encoder->cfg.roi.dqps   = calloc(width * height, sizeof(orig_roi[0]));
-
-  double total_weight = 0.0;
-  for (int y = 0; y < frame_height; y++) {
-    total_weight += ws_weight(y, frame_height);
-  }
-
-  for (int y_lcu = 0; y_lcu < height; y_lcu++) {
-    int y_orig = LCU_WIDTH * y_lcu;
-    int lcu_height = MIN(LCU_WIDTH, frame_height - y_orig);
-
-    double lcu_weight = 0.0;
-    for (int y = y_orig; y < y_orig + lcu_height; y++) {
-      lcu_weight += ws_weight(y, frame_height);
-    }
-    // Normalize.
-    lcu_weight = (lcu_weight * frame_height) / (total_weight * lcu_height);
-
-    int8_t qp_delta = round(-ERP_AQP_STRENGTH * log2(lcu_weight));
-
-    if (orig_roi) {
-      // If a ROI array already exists, we copy the existing values to the
-      // new array while adding qp_delta to each.
-      int y_roi = y_lcu * orig_height / height;
-      for (int x = 0; x < width; x++) {
-        encoder->cfg.roi.dqps[x + y_lcu * width] =
-          CLIP(-51, 51, orig_roi[x + y_roi * width] + qp_delta);
-      }
-
-    } else {
-      // Otherwise, simply write qp_delta to the ROI array.
-      encoder->cfg.roi.dqps[y_lcu] = qp_delta;
-    }
-  }
 }
 
 
@@ -353,6 +266,16 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     encoder->scaling_list.use_default_list = 1;
   }
 
+  // ROI / delta QP
+  if (cfg->roi.file_path) {
+    const char *mode[2] = { "r", "rb" };
+    encoder->roi_file = fopen(cfg->roi.file_path, mode[cfg->roi.format]);
+    if (!encoder->roi_file) {
+      fprintf(stderr, "Could not open ROI file.\n");
+      goto init_failed;
+    }
+  }
+
   if (cfg->fast_coeff_table_fn) {
     FILE *fast_coeff_table_f = fopen(cfg->fast_coeff_table_fn, "rb");
     if (fast_coeff_table_f == NULL) {
@@ -396,31 +319,9 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     goto init_failed;
   }
 
-  if (cfg->erp_aqp) {
-    init_erp_aqp_roi(encoder,
-                     cfg->roi.dqps,
-                     cfg->roi.width,
-                     cfg->roi.height);
-
-  } else if (cfg->roi.dqps) {
-    // Copy delta QP array for ROI coding.
-    const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
-    encoder->cfg.roi.dqps = calloc(roi_size, sizeof(cfg->roi.dqps[0]));
-    memcpy(encoder->cfg.roi.dqps,
-           cfg->roi.dqps,
-           roi_size * sizeof(*cfg->roi.dqps));
-
-  }
-
   // NOTE: When tr_depth_inter is equal to 0, the transform is still split
   // for SMP and AMP partition units.
   encoder->tr_depth_inter = 0;
-
-  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps || encoder->cfg.roi_file || encoder->cfg.set_qp_in_cu || encoder->cfg.vaq) {
-    encoder->max_qp_delta_depth = 0;
-  } else {
-    encoder->max_qp_delta_depth = -1;
-  }
 
   //Tiles
   encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
@@ -724,7 +625,7 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   FREE_POINTER(encoder->tiles_tile_id);
 
-  FREE_POINTER(encoder->cfg.roi.dqps);
+  FREE_POINTER(encoder->cfg.roi.file_path);
   FREE_POINTER(encoder->cfg.optional_key);
 
   kvz_scalinglist_destroy(&encoder->scaling_list);
@@ -733,6 +634,10 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
   encoder->threadqueue = NULL;
 
   kvz_close_rdcost_outfiles();
+
+  if (encoder->roi_file) {
+    fclose(encoder->roi_file);
+  }
 
   free(encoder);
 }

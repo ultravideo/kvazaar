@@ -32,6 +32,9 @@
 
 #include "encoderstate.h"
 
+ // This define is required for M_PI on Windows.
+#define _USE_MATH_DEFINES
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +53,13 @@
 #include "threadqueue.h"
 
 #include "strategies/strategies-picture.h"
+
+/**
+ * \brief Strength of QP adjustments when using adaptive QP for 360 video.
+ *
+ * Determined empirically.
+ */
+static const double ERP_AQP_STRENGTH = 3.0;
 
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
@@ -570,7 +580,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   cu_info_t *cu = kvz_cu_array_at(state->tile->frame->cu_array, x, y);
   const int cu_width = LCU_WIDTH >> depth;
 
-  if (depth <= state->encoder_control->max_qp_delta_depth) {
+  if (depth <= state->frame->max_qp_delta_depth) {
     *prev_qp = -1;
   }
 
@@ -650,7 +660,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
-  if (encoder->max_qp_delta_depth >= 0) {
+  if (state->frame->max_qp_delta_depth >= 0) {
     int last_qp = state->last_qp;
     int prev_qp = -1;
     set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
@@ -1252,6 +1262,154 @@ static bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
   }
 }
 
+
+/**
+ * \brief Return weight for 360 degree ERP video
+ *
+ * Returns the scaling factor of area from equirectangular projection to
+ * spherical surface.
+ *
+ * \param y   y-coordinate of the pixel
+ * \param h   height of the picture
+ */
+static double ws_weight(int y, int h)
+{
+  return cos((y - 0.5 * h + 0.5) * (M_PI / h));
+}
+
+
+/**
+ * \brief Update ROI QPs for 360 video with equirectangular projection.
+ *
+ * Updates the ROI parameters in frame->roi.
+ *
+ * \param encoder       encoder control
+ * \param frame         frame that will have the ROI map
+ */
+static void init_erp_aqp_roi(const encoder_control_t *encoder, kvz_picture *frame)
+{
+  int8_t *orig_roi    = frame->roi.roi_array;
+  int32_t orig_width  = frame->roi.width;
+  int32_t orig_height = frame->roi.height;
+
+  // Update ROI with WS-PSNR delta QPs.
+  int new_height = encoder->in.height_in_lcu;
+  int new_width = orig_roi ? orig_width : 1;
+  int8_t *new_array = calloc(new_width * new_height, sizeof(orig_roi[0]));
+
+  int frame_height = encoder->in.real_height;
+
+  double total_weight = 0.0;
+  for (int y = 0; y < frame_height; y++) {
+    total_weight += ws_weight(y, frame_height);
+  }
+
+  for (int y_lcu = 0; y_lcu < new_height; y_lcu++) {
+    int y_orig = LCU_WIDTH * y_lcu;
+    int lcu_height = MIN(LCU_WIDTH, frame_height - y_orig);
+
+    double lcu_weight = 0.0;
+    for (int y = y_orig; y < y_orig + lcu_height; y++) {
+      lcu_weight += ws_weight(y, frame_height);
+    }
+    // Normalize.
+    lcu_weight = (lcu_weight * frame_height) / (total_weight * lcu_height);
+
+    int8_t qp_delta = round(-ERP_AQP_STRENGTH * log2(lcu_weight));
+
+    if (orig_roi) {
+      // If a ROI array already exists, we copy the existing values to the
+      // new array while adding qp_delta to each.
+      int y_roi = y_lcu * orig_height / new_height;
+      for (int x = 0; x < new_width; x++) {
+        new_array[x + y_lcu * new_width] =
+          CLIP(-51, 51, orig_roi[x + y_roi * new_width] + qp_delta);
+      }
+
+    } else {
+      // Otherwise, simply write qp_delta to the ROI array.
+      new_array[y_lcu] = qp_delta;
+    }
+  }
+
+  // Update new values
+  frame->roi.width = new_width;
+  frame->roi.height = new_height;
+  frame->roi.roi_array = new_array;
+  FREE_POINTER(orig_roi);
+}
+
+
+static void next_roi_frame_from_file(kvz_picture *frame, FILE *file, enum kvz_roi_format format) {
+  // The ROI description is as follows:
+  // First number is width, second number is height,
+  // then follows width * height number of dqp values.
+
+  // Rewind the (seekable) ROI file when end of file is reached.
+  // Allows a single ROI frame to be used for a whole sequence
+  // and looping with --loop-input. Skips possible whitespace.
+  if (ftell(file) != -1L) {
+    int c = fgetc(file);
+    while (format == KVZ_ROI_TXT && isspace(c)) c = fgetc(file);
+    ungetc(c, file);
+    if (c == EOF) rewind(file);
+  }
+
+  int *width  = &frame->roi.width;
+  int *height = &frame->roi.height;
+
+  bool failed = false;
+
+  if (format == KVZ_ROI_TXT) failed = !fscanf(file, "%d", width) || !fscanf(file, "%d", height);
+  if (format == KVZ_ROI_BIN) failed = fread(&frame->roi, 4, 2, file) != 2;
+  
+  if (failed) {
+    fprintf(stderr, "Failed to read ROI size.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  if (*width <= 0 || *height <= 0) {
+    fprintf(stderr, "Invalid ROI size: %dx%d.\n", *width, *height);
+    fclose(file);
+    assert(0);
+  }
+
+  if (*width > 10000 || *height > 10000) {
+    fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  const unsigned size = (*width) * (*height);
+  int8_t *dqp_array = calloc((size_t)size, sizeof(frame->roi.roi_array[0]));
+  if (!dqp_array) {
+    fprintf(stderr, "Failed to allocate memory for ROI table.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  FREE_POINTER(frame->roi.roi_array);
+  frame->roi.roi_array = dqp_array;
+
+  if (format == KVZ_ROI_TXT) {
+    for (int i = 0; i < size; ++i) {
+      int number; // Need a pointer to int for fscanf
+      if (fscanf(file, "%d", &number) != 1) {
+        fprintf(stderr, "Reading ROI file failed.\n");
+        fclose(file);
+        assert(0);
+      }
+      dqp_array[i] = CLIP(-51, 51, number);
+    }
+  } else if (format == KVZ_ROI_BIN) {
+    if (fread(dqp_array, 1, size, file) != size) {
+      fprintf(stderr, "Reading ROI file failed.\n");
+      assert(0);
+    }
+  }
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1264,6 +1422,21 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->width,
       state->tile->frame->height
   );
+
+  // ROI / delta QP maps
+  if (frame->roi.roi_array && cfg->roi.file_path) {
+    assert(0 && "Conflict: Other ROI data was supplied when a ROI file was specified.");
+  }
+
+  // Read frame from the file. If no file is specified,
+  // ROI data should be already set by the application.
+  if (cfg->roi.file_path) {
+    next_roi_frame_from_file(frame, state->encoder_control->roi_file, cfg->roi.format);
+  }
+  
+  if (cfg->erp_aqp) {
+    init_erp_aqp_roi(state->encoder_control, state->tile->frame->source);
+  }
 
   // Variance adaptive quantization
   if (cfg->vaq) {
@@ -1350,6 +1523,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     }
   }
   // Variance adaptive quantization - END
+
+  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq) {
+    state->frame->max_qp_delta_depth = 0;
+  } else {
+    state->frame->max_qp_delta_depth = -1;
+  }
 
   // Use this flag to handle closed gop irap picture selection.
   // If set to true, irap is already set and we avoid
@@ -1603,10 +1782,9 @@ lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
 
 int kvz_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
 {
-  const encoder_control_t *ctrl = state->encoder_control;
   const cu_array_t *cua = state->tile->frame->cu_array;
   // Quantization group width
-  const int qg_width = LCU_WIDTH >> MIN(ctrl->max_qp_delta_depth, kvz_cu_array_at_const(cua, x, y)->depth);
+  const int qg_width = LCU_WIDTH >> MIN(state->frame->max_qp_delta_depth, kvz_cu_array_at_const(cua, x, y)->depth);
 
   // Coordinates of the top-left corner of the quantization group
   const int x_qg = x & ~(qg_width - 1);

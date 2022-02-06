@@ -139,11 +139,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_lp_definition.t = 1;
   cfg->open_gop = true;
 
-  cfg->roi.width = 0;
-  cfg->roi.height = 0;
-  cfg->roi.dqps = NULL;
-  
-  cfg->roi_file = NULL;
+  cfg->roi.file_path = NULL;
+  cfg->roi.format = KVZ_ROI_TXT;
+
   cfg->set_qp_in_cu = false;
 
   cfg->erp_aqp = false;
@@ -192,12 +190,11 @@ int kvz_config_destroy(kvz_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
-    FREE_POINTER(cfg->roi_file);
+    FREE_POINTER(cfg->roi.file_path);
     FREE_POINTER(cfg->fast_coeff_table_fn);
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
-    FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
     FREE_POINTER(cfg->fastrd_learning_outdir_fn);
   }
@@ -1244,70 +1241,29 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("implicit-rdpcm")
     cfg->implicit_rdpcm = (bool)atobool(value);
+
   else if OPT("roi") {
-    // The ROI description is as follows:
-    // First number is width, second number is height,
-    // then follows width * height number of dqp values.
-    FILE* f = fopen(value, "rb");
-    if (!f) {
-      fprintf(stderr, "Could not open ROI file.\n");
+    static enum kvz_roi_format const formats[] = { KVZ_ROI_TXT, KVZ_ROI_BIN };
+    static const char * const format_names[] = { "txt", "bin", NULL };
+
+    char *roi_file = strdup(value);
+    if (!roi_file) {
+      fprintf(stderr, "Failed to allocate memory for ROI file name.\n");
       return 0;
     }
+    FREE_POINTER(cfg->roi.file_path);
+    cfg->roi.file_path = roi_file;
 
-    int width = 0;
-    int height = 0;
-    if (!fscanf(f, "%d", &width) || !fscanf(f, "%d", &height)) {
-      fprintf(stderr, "Failed to read ROI size.\n");
-      fclose(f);
-      return 0;
+    // Get file extension or the substring after the last dot
+    char *maybe_extension = strrchr(cfg->roi.file_path, '.');
+    if (!maybe_extension) {
+      cfg->roi.format = KVZ_ROI_TXT;
+    } else {
+      maybe_extension++;
+      int8_t format;
+      bool unknown_format = !parse_enum(maybe_extension, format_names, &format);
+      cfg->roi.format = unknown_format ? KVZ_ROI_TXT : formats[format];
     }
-
-    if (width <= 0 || height <= 0) {
-      fprintf(stderr, "Invalid ROI size: %dx%d.\n", width, height);
-      fclose(f);
-      return 0;
-    }
-
-    if (width > 10000 || height > 10000) {
-      fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
-      fclose(f);
-      return 0;
-    }
-
-    const unsigned size = width * height;
-    int8_t *dqp_array  = calloc((size_t)size, sizeof(cfg->roi.dqps[0]));
-    if (!dqp_array) {
-      fprintf(stderr, "Failed to allocate memory for ROI table.\n");
-      fclose(f);
-      return 0;
-    }
-
-    FREE_POINTER(cfg->roi.dqps);
-    cfg->roi.dqps   = dqp_array;
-    cfg->roi.width  = width;
-    cfg->roi.height = height;
-
-    for (int i = 0; i < size; ++i) {
-      int number; // Need a pointer to int for fscanf
-      if (fscanf(f, "%d", &number) != 1) {
-        fprintf(stderr, "Reading ROI file failed.\n");
-        fclose(f);
-        return 0;
-      }
-      dqp_array[i] = CLIP(-51, 51, number);
-    }
-
-    fclose(f);
-  }
-  else if OPT("roi-file")
-  {
-    char* roifile = strdup(value);
-    if (!roifile) {
-      fprintf(stderr, "Failed to allocate memory for roi file name.\n");
-      return 0;
-    }
-    FREE_POINTER(cfg->roi_file);
-    cfg->roi_file = roifile;
   }
   else if OPT("set-qp-in-cu") {
     cfg->set_qp_in_cu = (bool)atobool(value);

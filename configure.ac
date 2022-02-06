@@ -22,8 +22,8 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #   - Increment when making new releases and major or minor was not changed since last release.
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
-ver_major=6
-ver_minor=6
+ver_major=7
+ver_minor=0
 ver_release=0
 
 # Prevents configure from adding a lot of defines to the CFLAGS

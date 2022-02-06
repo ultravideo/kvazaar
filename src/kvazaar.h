@@ -250,6 +250,11 @@ enum kvz_file_format
   KVZ_FORMAT_YUV = 2
 };
 
+enum kvz_roi_format
+{
+  KVZ_ROI_TXT = 0,
+  KVZ_ROI_BIN = 1
+};
 
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
@@ -388,12 +393,9 @@ typedef struct kvz_config
   int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
 
   struct {
-    int32_t width;
-    int32_t height;
-    int8_t *dqps;
-  } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
-
-  char *roi_file;
+    char *file_path;
+    enum kvz_roi_format format;
+  } roi; /*!< \brief Specify delta QPs for region of interest coding. */
 
   unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
 
@@ -764,6 +766,9 @@ typedef struct kvz_api {
    * the bitstream, length of the bitstream, the reconstructed frame, the
    * original frame and frame info in data_out, len_out, pic_out, src_out and
    * info_out, respectively. Otherwise, set the output parameters to NULL.
+   * 
+   * Region of interest (ROI) / delta QP map can be specified in the input
+   * picture's ROI field but only when a ROI file is not used.
    *
    * After passing all of the input frames, the caller should keep calling this
    * function with pic_in set to NULL, until no more data is returned in the

@@ -156,11 +156,20 @@ Video structure:
                                    - frametile: Constrain within the tile.
                                    - frametilemargin: Constrain even more.
       --roi <filename>       : Use a delta QP map for region of interest.
-                               Reads an array of delta QP values from a text
-                               file. The file format is: width and height of
-                               the QP delta map followed by width*height delta
-                               QP values in raster order. The map can be of any
-                               size and will be scaled to the video size.
+                               Reads an array of delta QP values from a file.
+                               Text and binary files are supported and detected
+                               from the file extension (.txt/.bin). If a known
+                               extension is not found, the file is treated as
+                               a text file. The file can include one or many
+                               ROI frames each in the following format:
+                               width and height of the QP delta map followed
+                               by width * height delta QP values in raster
+                               order. In binary format, width and height are
+                               32-bit integers whereas the delta QP values are
+                               signed 8-bit values. The map can be of any size
+                               and will be scaled to the video size. The file
+                               reading will loop if end of the file is reached.
+                               See roi.txt in the examples folder.
       --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.
                                in PPS and slice_qp_delta in slize header zero.
       --(no-)erp-aqp         : Use adaptive QP for 360 degree video with

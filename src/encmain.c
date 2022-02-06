@@ -147,7 +147,6 @@ typedef struct {
 
   // Parameters passed from main thread to input thread.
   FILE* input;
-  FILE* roi_file;
   const kvz_api *api;
   const cmdline_opts_t *opts;
   const encoder_control_t *encoder;
@@ -244,21 +243,6 @@ static void* input_read_thread(void* in_args)
         }
       } else {
         fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-        retval = RETVAL_FAILURE;
-        goto done;
-      }
-    }
-
-    if(args->roi_file) {
-      if (fread(&frame_in->roi, 4, 2, args->roi_file) != 2) {
-        fprintf(stderr, "Failed to read roi matrix size for frame: %d. Shutting down.\n", frames_read);
-        retval = RETVAL_FAILURE;
-        goto done;
-      }
-      const size_t roi_size = frame_in->roi.height*frame_in->roi.width;
-      frame_in->roi.roi_array = malloc(roi_size);
-      if(fread(frame_in->roi.roi_array, 1, roi_size, args->roi_file) != roi_size) {
-        fprintf(stderr, "Failed to read roi matrix for frame: %d. Shutting down.\n", frames_read);
         retval = RETVAL_FAILURE;
         goto done;
       }
@@ -510,14 +494,6 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  if(opts->config->roi_file) {
-    roifile = fopen(opts->config->roi_file, "rb");
-    if(roifile == NULL) {
-      fprintf(stderr, "Could not open roi file although it was required. Shutting down!\n");
-      goto exit_failure;
-    }
-  }
-
 #ifdef _WIN32
   // Set stdin and stdout to binary for pipes.
   if (input == stdin) {
@@ -594,7 +570,6 @@ int main(int argc, char *argv[])
       .filled_input_slots = filled_input_slots,
 
       .input = input,
-      .roi_file = roifile,
       .api = api,
       .opts = opts,
       .encoder = encoder,
