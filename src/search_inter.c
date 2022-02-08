@@ -1713,9 +1713,9 @@ static void search_pu_inter(encoder_state_t * const state,
         lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
         lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
       bits += no_skip_flag;
+      merge->cost[merge->size] += bits * info->state->lambda_sqrt;
     }
     // Add cost of coding the merge index
-    merge->cost[merge->size] += bits * info->state->lambda_sqrt;
     merge->bits[merge->size] = bits;
     merge->keys[merge->size] = merge->size;
 
@@ -2127,9 +2127,8 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   else {
     // If we have no coeffs after quant we already have the cost calculated
     *inter_cost = no_cbf_cost;
-    if(cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-      *inter_bitcost = no_cbf_bits;
-    }
+    cur_cu->cbf = 0;
+    *inter_bitcost = no_cbf_bits;
     return;
   }
 
@@ -2143,7 +2142,6 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
       cur_cu->skipped = 1;
     }
-    kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
     *inter_cost = no_cbf_cost;
     *inter_bitcost = no_cbf_bits;
     
@@ -2233,7 +2231,9 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   const int y_local = SUB_SCU(y);
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   *cur_pu = *best_inter_pu;
-   
+
+  kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
+    true, state->encoder_control->chroma_format != KVZ_CSP_400);   
 
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
