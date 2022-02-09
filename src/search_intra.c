@@ -605,6 +605,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
+    pred_cu.skipped = 0;
+    pred_cu.merged = 0;
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
     FILL(pred_cu.cbf, 0);
