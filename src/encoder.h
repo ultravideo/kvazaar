@@ -130,7 +130,7 @@ typedef struct encoder_control_t
   //! Picture weights when GOP is used.
   double gop_layer_weights[MAX_GOP_LAYERS];
 
-  int8_t max_qp_delta_depth;
+  FILE *roi_file;
 
   int tr_depth_inter;
 

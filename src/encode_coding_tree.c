@@ -758,7 +758,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   bool border_split_y = ctrl->in.height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
   bool border = border_x || border_y; /*!< are we in any border CU */
 
-  if (depth <= ctrl->max_qp_delta_depth) {
+  if (depth <= state->frame->max_qp_delta_depth) {
     state->must_code_qp_delta = true;
   }
 

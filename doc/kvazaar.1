@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "October 2021" "kvazaar v2.1.0" "User Commands"
+.TH KVAZAAR "1" "February 2022" "kvazaar v2.1.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -180,11 +180,20 @@ Constrain movement vectors. [none]
 .TP
 \fB\-\-roi <filename>      
 Use a delta QP map for region of interest.
-Reads an array of delta QP values from a text
-file. The file format is: width and height of
-the QP delta map followed by width*height delta
-QP values in raster order. The map can be of any
-size and will be scaled to the video size.
+Reads an array of delta QP values from a file.
+Text and binary files are supported and detected
+from the file extension (.txt/.bin). If a known
+extension is not found, the file is treated as
+a text file. The file can include one or many
+ROI frames each in the following format:
+width and height of the QP delta map followed
+by width * height delta QP values in raster
+order. In binary format, width and height are
+32\-bit integers whereas the delta QP values are
+signed 8\-bit values. The map can be of any size
+and will be scaled to the video size. The file
+reading will loop if end of the file is reached.
+See roi.txt in the examples folder.
 .TP
 \fB\-\-set\-qp\-in\-cu        
 Set QP at CU level keeping pic_init_qp_minus26.

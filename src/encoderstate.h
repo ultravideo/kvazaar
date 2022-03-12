@@ -180,6 +180,8 @@ typedef struct encoder_state_config_frame_t {
   */
   double *aq_offsets;
 
+  int8_t max_qp_delta_depth;
+
   /**
    * \brief Whether next NAL is the first NAL in the access unit.
    */
@@ -380,10 +382,10 @@ static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
  */
 static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, int x, int y, int depth)
 {
-  if (state->encoder_control->max_qp_delta_depth < 0) return false;
+  if (state->frame->max_qp_delta_depth < 0) return false;
 
   const int cu_width = LCU_WIDTH >> depth;
-  const int qg_width = LCU_WIDTH >> state->encoder_control->max_qp_delta_depth;
+  const int qg_width = LCU_WIDTH >> state->frame->max_qp_delta_depth;
   const int right  = x + cu_width;
   const int bottom = y + cu_width;
   return (right % qg_width == 0 || right >= state->tile->frame->width) &&

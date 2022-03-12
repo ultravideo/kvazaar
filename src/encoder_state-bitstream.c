@@ -503,10 +503,10 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
 
-  if (encoder->max_qp_delta_depth >= 0) {
+  if (state->frame->max_qp_delta_depth >= 0) {
     // Use separate QP for each LCU when rate control is enabled.
     WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
-    WRITE_UE(stream, encoder->max_qp_delta_depth, "diff_cu_qp_delta_depth");
+    WRITE_UE(stream, state->frame->max_qp_delta_depth, "diff_cu_qp_delta_depth");
   } else {
     WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   }
