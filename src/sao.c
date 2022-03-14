@@ -510,7 +510,6 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   if (state->encoder_control->cfg.sao_type & 1){
     sao_search_edge_sao(state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_edge(state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left, buf_cnt);
-    FILE_BITS(mode_bits, 0, 0, 0, "sao mode bits");
     int ddistortion = (int)(mode_bits * state->lambda + 0.5);
     unsigned buf_i;
     
@@ -557,7 +556,6 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   {
     float mode_bits_none = sao_mode_bits_none(state, sao_top, sao_left);
     int cost_of_nothing = (int)(mode_bits_none * state->lambda + 0.5);
-    FILE_BITS(mode_bits_none, 0, 0, 0, "Sao cost of nothing");
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
       merge_cost[0] = cost_of_nothing;
@@ -574,7 +572,6 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
       if (merge_cand) {
         unsigned buf_i;
         float mode_bits = sao_mode_bits_merge(state, i + 1);
-        FILE_BITS(mode_bits, 0, 0, 0,  (i == 0 ? "sao merge ""left" : "sao merge ""top"));
         int ddistortion = (int)(mode_bits * state->lambda + 0.5);
 
         switch (merge_cand->type) {

@@ -2120,12 +2120,11 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
                             false);
 
   int cbf = cbf_is_set_any(cur_cu->cbf, depth);
-
-  double temp_bits = 0;
+  
   if(cbf) {
-    *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu, &temp_bits);
+    *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu);
     if (reconstruct_chroma) {
-      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu, &temp_bits);
+      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
     }
   }
   else {
@@ -2135,9 +2134,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     *inter_bitcost = no_cbf_bits;
     return;
   }
-
-  FILE_BITS(bits, x, y, depth, "inter rd 2 bits");
-
+  
   *inter_cost += (bits)* state->lambda;
   *inter_bitcost = bits;
 
@@ -2246,7 +2243,6 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 2) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[1][0], cur_pu->inter.mv[1][1]));
   }
-  FILE_BITS((double)*inter_bitcost, x, y, depth, "regular inter bitcost");
 }
 
 

@@ -179,8 +179,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
                                    int x_px, int y_px, int depth, int max_depth,
                                    int intra_mode, int cost_treshold,
                                    cu_info_t *const pred_cu,
-                                   lcu_t *const lcu,
-  double *bit_cost)
+                                   lcu_t *const lcu)
 {
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
@@ -202,7 +201,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
-  double nosplit_bits = 0;
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
@@ -223,9 +221,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
                        intra_mode, chroma_mode,
                        pred_cu, lcu);
 
-    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu, &nosplit_bits);
+    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     if (reconstruct_chroma) {
-      nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu, &nosplit_bits);
+      nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
 
     // Early stop codition for the recursive search.
@@ -252,15 +250,15 @@ static double search_intra_trdepth(encoder_state_t * const state,
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
     split_cost = 0;
 
-    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, bit_cost);
+    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, bit_cost);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, bit_cost);
+      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, bit_cost);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     }
 
     double tr_split_bit = 0.0;
@@ -271,7 +269,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
     if (depth >= 1 && depth <= 3) {
       cabac_ctx_t *ctx = &(state->search_cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 1, tr_split_bit, "tr_split");
-      *bit_cost += tr_split_bit;
     }
 
     // Add cost of cbf chroma bits on transform tree.
@@ -290,7 +287,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
         CABAC_FBITS_UPDATE(&state->search_cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V), cbf_bits, "cbf_cr");
       }
-      *bit_cost += cbf_bits;
     }
 
     double bits = tr_split_bit + cbf_bits;
@@ -613,9 +609,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     // Reset transform split data in lcu.cu for this area.
     kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
-
-    double bit_costs = 0;
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu, &bit_costs);
+    
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
 
     // Early termination if no coefficients has to be coded
@@ -640,9 +635,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.intra.mode = modes[0];
     pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
-    double bit_cost = 0;
-    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, &bit_cost);
-    FILE_BITS(bit_cost, x_px, y_px, depth, "tr_depth bits");
+    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
 
   return modes_to_check;
@@ -738,7 +731,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                          -1, chroma.mode, // skip luma
                          NULL, lcu);
       double bits = 0;
-      chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu, &bits);
+      chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
       bits += mode_bits;

@@ -37,8 +37,6 @@
 #include "extras/crypto.h"
 #include "kvazaar.h"
 
-FILE* bit_cost_file = NULL;
-
 const uint8_t kvz_g_auc_next_state_mps[128] =
 {
     2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,
@@ -107,7 +105,6 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 {
   uint32_t lps;
   
-  if (!(data)->only_count) bits_written += CTX_ENTROPY_FBITS((data)->cur_ctx, (bin_value)); 
   lps = kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][(data->range >> 6) & 3];
   data->range -= lps;
 

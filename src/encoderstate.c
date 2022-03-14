@@ -1661,11 +1661,9 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
   }
 }
 
-double bits_written;
 
 void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 {
-  bits_written = 0;
   encoder_state_init_new_frame(state, frame);
   encoder_state_encode(state);
 
