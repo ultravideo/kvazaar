@@ -2031,7 +2031,7 @@ static void search_pu_inter(encoder_state_t * const state,
       if(amvp[i].size > 0) {
         const uint8_t best_key = amvp[i].keys[0];
         amvp[i].bits[best_key] += no_skip_flag + part_mode_bits;
-        amvp[i].cost[best_key] += (no_skip_flag + part_mode_bits)* state->lambda;
+        amvp[i].cost[best_key] += (no_skip_flag + part_mode_bits)* state->lambda_sqrt;
       }
     }
   }
