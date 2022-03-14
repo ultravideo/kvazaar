@@ -2026,12 +2026,16 @@ static void search_pu_inter(encoder_state_t * const state,
   if(cfg->rdo < 2) {
     const int skip_contest = kvz_get_skip_context(x, y, lcu, NULL);
     const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[skip_contest], 0);
-    const double part_mode_bits = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.part_size_model[0], 1);
+    const double part_mode_bits = state->encoder_control->cfg.smp_enable || state->encoder_control->cfg.amp_enable ?
+      CTX_ENTROPY_FBITS(&state->search_cabac.ctx.part_size_model[0], 1)
+        : 0;
+    const double pred_mode_bits = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_pred_mode_model, 0);
+    const double total_bits = no_skip_flag + part_mode_bits + pred_mode_bits;
     for(int i = 0; i < 3; i++) {
       if(amvp[i].size > 0) {
         const uint8_t best_key = amvp[i].keys[0];
-        amvp[i].bits[best_key] += no_skip_flag + part_mode_bits;
-        amvp[i].cost[best_key] += (no_skip_flag + part_mode_bits)* state->lambda_sqrt;
+        amvp[i].bits[best_key] += total_bits;
+        amvp[i].cost[best_key] += (total_bits)* state->lambda_sqrt;
       }
     }
   }
