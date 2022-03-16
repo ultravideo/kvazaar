@@ -775,12 +775,16 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       double intra_cost;
       kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_cost);
+#ifdef COMPLETE_PRED_MODE_BITS
+      // Technically counting these bits would be correct, however counting
+      // them universally degrades quality so this block is disabled by default
       if(state->frame->slicetype != KVZ_SLICE_I) {
         double pred_mode_type_bits = 0;
         CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.cu_pred_mode_model, 1, pred_mode_type_bits, "pred_mode_flag");
         CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.cu_skip_flag_model[kvz_get_skip_context(x, y, lcu, NULL)], 0, pred_mode_type_bits, "skip_flag");
         intra_cost += pred_mode_type_bits * state->lambda;
       }
+#endif
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;

@@ -1666,7 +1666,13 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   const double merge_flag_cost = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_merge_flag_ext_model, 1);
+#ifdef COMPLETE_PRED_MODE_BITS
+  // Technically counting these bits would be correct, however counting
+  // them universally degrades quality so this block is disabled by default
   const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[kvz_get_skip_context(x, y, lcu, NULL)], 0);
+#else
+  const double no_skip_flag = 0;
+#endif
   // Check motion vector constraints and perform rough search
   for (int merge_idx = 0; merge_idx < info->num_merge_cand; ++merge_idx) {
 
