@@ -732,8 +732,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       kvz_bitstream_align_zero(state->cabac.stream);
 
       kvz_cabac_start(&state->cabac);
-      memcpy(&state->search_cabac, &state->cabac, sizeof(cabac_data_t));
-      state->search_cabac.only_count = 1;
 
       kvz_crypto_delete(&state->crypto_hdl);
     }
@@ -1218,8 +1216,6 @@ static void encoder_state_init_children(encoder_state_t * const state) {
     //Leaf states have cabac and context
     kvz_cabac_start(&state->cabac);
     kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
-    memcpy(&state->search_cabac, &state->cabac, sizeof(cabac_data_t));
-    state->search_cabac.only_count = 1;
   }
 
   //Clear the jobs
