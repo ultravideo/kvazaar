@@ -169,6 +169,8 @@ static const struct option long_options[] = {
   { "fastrd-outdir",      required_argument, NULL, 0 },
   { "combine-intra-cus",        no_argument, NULL, 0 },
   { "no-combine-intra-cus",     no_argument, NULL, 0 },
+  { "force-inter",              no_argument, NULL, 0 },
+  { "no-force-inter",           no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -586,6 +588,10 @@ void print_help(void)
     "                                   be disabled if cus absolutely must not\n"
     "                                   be larger than limited by the search.\n"
     "                                   [enabled]"
+    "      --force-inter          : Force the encoder to use inter always.\n"
+    "                               This is mostly for debugging and is not\n"
+    "                               guaranteed to produce sensible bitstream or\n"
+    "                               work at all. [disabled]"
     "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"

@@ -185,6 +185,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->fastrd_learning_outdir_fn = NULL;
 
   cfg->combine_intra_cus = 1;
+  cfg->force_inter = 0;
   return 1;
 }
 
@@ -1425,6 +1426,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("combine-intra-cus") {
     cfg->combine_intra_cus = atobool(value);
+  }
+  else if OPT("force-inter") {
+    cfg->force_inter = atobool(value);
   }
   else {
     return 0;

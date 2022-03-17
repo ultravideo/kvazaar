@@ -577,12 +577,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     int32_t cu_width_intra_min = LCU_WIDTH >> pu_depth_intra.max;
     bool can_use_intra =
-        WITHIN(depth, pu_depth_intra.min, pu_depth_intra.max) ||
+      (WITHIN(depth, pu_depth_intra.min, pu_depth_intra.max) ||
         // When the split was forced because the CTU is partially outside
         // the frame, we permit intra coding even if pu_depth_intra would
         // otherwise forbid it.
         (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->width ||
-        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->height;
+        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->height) &&
+      !(state->encoder_control->cfg.force_inter && state->frame->slicetype != KVZ_SLICE_I);
 
     if (can_use_intra && !skip_intra) {
       int8_t intra_mode;
@@ -710,7 +711,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
     cur_cu->type == CU_NOTSET ||
-    depth < pu_depth_intra.max ||
+    (depth < pu_depth_intra.max && !(state->encoder_control->cfg.force_inter&& state->frame->slicetype != KVZ_SLICE_I)) ||
     (state->frame->slicetype != KVZ_SLICE_I &&
       depth < pu_depth_inter.max);
 
