@@ -45,7 +45,7 @@ typedef struct {
 
 // Weights for 4 buckets (coeff 0, coeff 1, coeff 2, coeff >= 3), for QPs from
 // 0 to MAX_FAST_COEFF_COST_QP
-static const float default_fast_coeff_cost_wts[][4] = {
+static const double default_fast_coeff_cost_wts[][4] = {
   // Just extend it by stretching the first actual values..
   {0.164240, 4.161530, 3.509033, 6.928047},
   {0.164240, 4.161530, 3.509033, 6.928047},

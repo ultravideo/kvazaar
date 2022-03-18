@@ -46,6 +46,15 @@
 
 #define MAX_UNIT_STATS_MAP_SIZE MAX(MAX_REF_PIC_COUNT, MRG_MAX_NUM_CANDS)
 
+ // Modify weight of luma SSD.
+#ifndef KVZ_LUMA_MULT
+# define KVZ_LUMA_MULT 0.8
+#endif
+// Modify weight of chroma SSD.
+#ifndef KVZ_CHROMA_MULT
+# define KVZ_CHROMA_MULT 1.5
+#endif
+
  /**
   *  \brief Data collected during search processes.
   * 
@@ -59,7 +68,7 @@ typedef struct unit_stats_map_t {
 
   cu_info_t unit[MAX_UNIT_STATS_MAP_SIZE]; //!< list of searched units
   double    cost[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching RD costs
-  uint32_t  bits[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching bit costs  
+  double    bits[MAX_UNIT_STATS_MAP_SIZE]; //!< list of matching bit costs  
   int8_t    keys[MAX_UNIT_STATS_MAP_SIZE]; //!< list of keys (indices) to elements in the other arrays
   int       size;                    //!< number of active elements in the lists
 } unit_stats_map_t;
@@ -70,13 +79,13 @@ void kvz_sort_keys_by_cost(unit_stats_map_t *__restrict map);
 void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
 
 double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
-                       const int x_px, const int y_px, const int depth,
-                       const cu_info_t *const pred_cu,
-                       lcu_t *const lcu);
+                           const int x_px, const int y_px, const int depth,
+                           const cu_info_t *const pred_cu,
+                           lcu_t *const lcu);
 double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
-                         const int x_px, const int y_px, const int depth,
-                         const cu_info_t *const pred_cu,
-                         lcu_t *const lcu);
+                             const int x_px, const int y_px, const int depth,
+                             const cu_info_t *const pred_cu,
+                             lcu_t *const lcu);
 void kvz_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth);
 
 void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);

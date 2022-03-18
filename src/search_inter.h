@@ -71,13 +71,13 @@ typedef double kvz_mvd_cost_func(const encoder_state_t *state,
                                   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                   int16_t num_cand,
                                   int32_t ref_idx,
-                                  uint32_t *bitcost);
+                                  double *bitcost);
 
 void kvz_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
                          lcu_t *lcu,
                          double *inter_cost,
-                         uint32_t *inter_bitcost);
+                         double* inter_bitcost);
 
 void kvz_search_cu_smp(encoder_state_t * const state,
                        int x, int y,
@@ -85,12 +85,20 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        part_mode_t part_mode,
                        lcu_t *lcu,
                        double *inter_cost,
-                       uint32_t *inter_bitcost);
+                       double* inter_bitcost);
 
 
 unsigned kvz_inter_satd_cost(const encoder_state_t* state,
                              const lcu_t *lcu,
                              int x,
                              int y);
+void kvz_cu_cost_inter_rd2(encoder_state_t* const state,
+  int x, int y, int depth,
+  cu_info_t* cur_cu,
+  lcu_t* lcu,
+  double* inter_cost,
+  double* inter_bitcost);
+
+int kvz_get_skip_context(int x, int y, lcu_t* const lcu, cu_array_t* const cu_a);
 
 #endif // SEARCH_INTER_H_

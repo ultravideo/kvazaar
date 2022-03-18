@@ -294,6 +294,7 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
+  cabac_data_t search_cabac;
 
   // Crypto stuff
   crypto_handle_t *crypto_hdl;

@@ -49,63 +49,64 @@ static void init_sao_info(sao_info_t *sao) {
 }
 
 
-static float sao_mode_bits_none(const encoder_state_t * const state, sao_info_t *sao_top, sao_info_t *sao_left)
+static double sao_mode_bits_none(const encoder_state_t * const state, sao_info_t *sao_top, sao_info_t *sao_left)
 {
-  float mode_bits = 0.0;
-  const cabac_data_t * const cabac = &state->cabac;
-  const cabac_ctx_t *ctx = NULL;
+  double mode_bits = 0.0;
+  cabac_data_t * cabac = (cabac_data_t*)&state->search_cabac;
+  cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx.sao_merge_flag_model);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
   if (sao_top != NULL) {    
     ctx = &(cabac->ctx.sao_merge_flag_model);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
 
   // TR coded type_idx_, none = 0
   ctx = &(cabac->ctx.sao_type_idx_model);
-  mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+  CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_type");
 
   return mode_bits;
 }
 
-static float sao_mode_bits_merge(const encoder_state_t * const state,
+static double sao_mode_bits_merge(const encoder_state_t * const state,
                                  int8_t merge_cand) {
-  float mode_bits = 0.0;
-  const cabac_data_t * const cabac = &state->cabac;
-  const cabac_ctx_t *ctx = NULL;
+  double mode_bits = 0.0;
+  cabac_data_t * cabac = (cabac_data_t*)&state->search_cabac;
+  cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   ctx = &(cabac->ctx.sao_merge_flag_model);
 
-  mode_bits += CTX_ENTROPY_FBITS(ctx, merge_cand == 1);
+  CABAC_FBITS_UPDATE(cabac, ctx, merge_cand == 1, mode_bits, "sao_merge_flag");
   if (merge_cand == 1) return mode_bits;
-  mode_bits += CTX_ENTROPY_FBITS(ctx, merge_cand == 2);
+  CABAC_FBITS_UPDATE(cabac, ctx, merge_cand == 2, mode_bits, "sao_merge_flag");
   return mode_bits;
 }
 
 
-static float sao_mode_bits_edge(const encoder_state_t * const state,
+static double sao_mode_bits_edge(const encoder_state_t * const state,
                               int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
                               sao_info_t *sao_top, sao_info_t *sao_left, unsigned buf_cnt)
 {
-  float mode_bits = 0.0;
-  const cabac_data_t * const cabac = &state->cabac;
-  const cabac_ctx_t *ctx = NULL;
+  double mode_bits = 0.0;
+  cabac_data_t * cabac = (cabac_data_t*)&state->search_cabac;
+  cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    ctx = &(cabac->ctx.sao_merge_flag_model);   
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx.sao_merge_flag_model);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
 
   // TR coded type_idx_, edge = 2 = cMax
   ctx = &(cabac->ctx.sao_type_idx_model);
-  mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
+  CABAC_FBITS_UPDATE(cabac, ctx, 1, mode_bits, "sao_type");
+  mode_bits += 1.0;
 
   // TR coded offsets.
   for (unsigned buf_index = 0; buf_index < buf_cnt; buf_index++) {
@@ -126,26 +127,27 @@ static float sao_mode_bits_edge(const encoder_state_t * const state,
 }
 
 
-static float sao_mode_bits_band(const encoder_state_t * const state,
+static double sao_mode_bits_band(const encoder_state_t * const state,
                               int band_position[2], int offsets[10],
                               sao_info_t *sao_top, sao_info_t *sao_left, unsigned buf_cnt)
 {
-  float mode_bits = 0.0;
-  const cabac_data_t * const cabac = &state->cabac;
-  const cabac_ctx_t *ctx = NULL;
+  double mode_bits = 0.0;
+  cabac_data_t * cabac = (cabac_data_t*)&state->search_cabac;
+  cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx.sao_merge_flag_model);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx.sao_merge_flag_model);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    CABAC_FBITS_UPDATE(cabac, ctx, 0, mode_bits, "sao_merge_flag");
   }
 
   // TR coded sao_type_idx_, band = 1
   ctx = &(cabac->ctx.sao_type_idx_model);
-  mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
+  CABAC_FBITS_UPDATE(cabac, ctx, 1, mode_bits, "sao_type");
+  mode_bits += 1.0;
 
   // TR coded offsets and possible FL coded offset signs.
   for (unsigned buf_index = 0; buf_index < buf_cnt; buf_index++)
@@ -552,7 +554,8 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   // Choose between SAO and doing nothing, taking into account the
   // rate-distortion cost of coding do nothing.
   {
-    int cost_of_nothing = (int)(sao_mode_bits_none(state, sao_top, sao_left) * state->lambda + 0.5);
+    float mode_bits_none = sao_mode_bits_none(state, sao_top, sao_left);
+    int cost_of_nothing = (int)(mode_bits_none * state->lambda + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
       merge_cost[0] = cost_of_nothing;
