@@ -790,6 +790,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
+        cur_cu->skipped = 0;
+        cur_cu->merged = 0;
       }
     }
 

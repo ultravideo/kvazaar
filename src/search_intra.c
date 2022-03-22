@@ -593,7 +593,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
-    int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
+    double rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * state->lambda;
 
     // Perform transform split search and save mode RD cost for the best one.
