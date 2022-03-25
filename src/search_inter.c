@@ -2025,7 +2025,7 @@ static void search_pu_inter(encoder_state_t * const state,
     
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
-    if (state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
+    if (amvp[2].size > 0 && state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[2].unit[amvp[2].keys[0]], lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
     }
   }
