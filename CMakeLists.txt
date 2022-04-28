@@ -33,13 +33,13 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
 endif()
 
 # Add all sources in src/ base
-file(GLOB LIB_SOURCES "src/*.h" "src/*.c")
+file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
 
 # We don't want CLI main in the library
 list(REMOVE_ITEM LIB_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/encmain.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/cli.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/yuv_io.c")
 
 # Add also all the strategies
-file(GLOB_RECURSE LIB_SOURCES_STRATEGIES "src/strategies/*.c")
+file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c")
 
 # ToDo: do something with encode_coding_tree-avx2, currently not converted to VVC
 list(REMOVE_ITEM LIB_SOURCES_STRATEGIES "${CMAKE_CURRENT_SOURCE_DIR}/src/strategies/avx2/encode_coding_tree-avx2.c")
@@ -72,7 +72,7 @@ target_include_directories(kvazaar PUBLIC src)
 target_include_directories(kvazaar PUBLIC src/extras)
 target_include_directories(kvazaar PUBLIC src/strategies)
 
-file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
+file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
 
@@ -123,7 +123,7 @@ install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PR
 
 # DIST
 
-file(GLOB_RECURSE DIST_SOURCES "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
+file(GLOB_RECURSE DIST_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
 list(APPEND DIST_SOURCES ".clang-format" ".gitignore" ".gitmodules" "tests/tsan_suppressions.txt" ".travis-install.bash" "CREDITS" "Dockerfile" "docs.doxy" "LICENSE" "LICENSE.EXT.greatest")
 
 add_custom_target(dist
