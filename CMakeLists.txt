@@ -68,9 +68,9 @@ else()
   add_library(kvazaar STATIC ${LIB_SOURCES})
 endif()
 
-target_include_directories(libkvazaar PUBLIC src)
-target_include_directories(libkvazaar PUBLIC src/extras)
-target_include_directories(libkvazaar PUBLIC src/strategies)
+target_include_directories(kvazaar PUBLIC src)
+target_include_directories(kvazaar PUBLIC src/extras)
+target_include_directories(kvazaar PUBLIC src/strategies)
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
 
@@ -81,8 +81,7 @@ if(MSVC)
   list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
 endif()
 
-add_executable(kvazaar ${CLI_SOURCES})
-target_link_libraries(kvazaar PUBLIC libkvazaar)
+add_executable(kvazaar-bin ${CLI_SOURCES})
 
 set_target_properties(kvazaar-bin PROPERTIES OUTPUT_NAME kvazaar)
 set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
@@ -90,7 +89,7 @@ set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
 target_link_libraries(kvazaar-bin PUBLIC kvazaar)
 
 if(MSVC)
-  target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
+  target_include_directories(kvazaar-bin PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
@@ -117,10 +116,21 @@ install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_P
 install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
-  install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+  install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
+
+# DIST
+
+file(GLOB_RECURSE DIST_SOURCES "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
+list(APPEND DIST_SOURCES ".clang-format" ".gitignore" ".gitmodules" "tests/tsan_suppressions.txt" ".travis-install.bash" "CREDITS" "Dockerfile" "docs.doxy" "LICENSE" "LICENSE.EXT.greatest")
+
+add_custom_target(dist
+                COMMAND tar -zcvf "${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz" --transform 's,^,${PROJECT_NAME}-${PROJECT_VERSION}/,' -- ${DIST_SOURCES}
+                COMMENT "Make distribution ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            )
 
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
