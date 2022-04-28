@@ -139,5 +139,64 @@ if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
 endif()
 
 if(NOT DEFINED MSVC)
-  add_test( NAME external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  list(APPEND XFAIL "off")
+  if(DEFINED ENV{XFAIL_TESTS})
+    list(APPEND XFAIL $ENV{XFAIL_TESTS})
+  endif()
+
+  if(NOT "test_tools.sh" IN_LIST XFAIL)
+    add_test( NAME test_tools COMMAND ${PROJECT_SOURCE_DIR}/tests/test_tools.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_smp.sh" IN_LIST XFAIL)
+    add_test( NAME test_smp COMMAND ${PROJECT_SOURCE_DIR}/tests/test_smp.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_pu_depth_constraints.sh" IN_LIST XFAIL)
+    add_test( NAME test_pu_depth_constraints COMMAND ${PROJECT_SOURCE_DIR}/tests/test_pu_depth_constraints.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_mv_constraint.sh" IN_LIST XFAIL)
+    add_test( NAME test_mv_constraint COMMAND ${PROJECT_SOURCE_DIR}/tests/test_mv_constraint.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_interlace.sh" IN_LIST XFAIL)
+    add_test( NAME test_interlace COMMAND ${PROJECT_SOURCE_DIR}/tests/test_interlace.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_gop.sh" IN_LIST XFAIL)
+    add_test( NAME test_gop COMMAND ${PROJECT_SOURCE_DIR}/tests/test_gop.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_owf_wpp_tiles.sh" IN_LIST XFAIL)
+    add_test( NAME test_owf_wpp_tiles COMMAND ${PROJECT_SOURCE_DIR}/tests/test_owf_wpp_tiles.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_weird_shapes.sh" IN_LIST XFAIL)
+    add_test( NAME test_weird_shapes COMMAND ${PROJECT_SOURCE_DIR}/tests/test_weird_shapes.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_external_symbols.sh" IN_LIST XFAIL)
+    add_test( NAME test_external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "util.sh" IN_LIST XFAIL)
+    add_test( NAME util COMMAND ${PROJECT_SOURCE_DIR}/tests/util.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_invalid_input.sh" IN_LIST XFAIL)
+    add_test( NAME test_invalid_input COMMAND ${PROJECT_SOURCE_DIR}/tests/test_invalid_input.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_slices.sh" IN_LIST XFAIL)
+    add_test( NAME test_slices COMMAND ${PROJECT_SOURCE_DIR}/tests/test_slices.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_intra.sh" IN_LIST XFAIL)
+    add_test( NAME test_intra COMMAND ${PROJECT_SOURCE_DIR}/tests/test_intra.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
+  if(NOT "test_rate_control.sh" IN_LIST XFAIL)
+    add_test( NAME test_rate_control COMMAND ${PROJECT_SOURCE_DIR}/tests/test_rate_control.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
 endif()
