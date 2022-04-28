@@ -86,7 +86,7 @@ set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
 target_link_libraries(kvazaar-bin PUBLIC kvazaar)
 
 if(MSVC)
-  target_include_directories(kvazaar-bin PUBLIC src/threadwrapper/include)
+  target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
@@ -130,16 +130,14 @@ add_custom_target(dist
             )
 
 # TESTS
+
+enable_testing()
+
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
   add_subdirectory( "tests/" )
   add_test( NAME Test_kvazaar COMMAND kvazaar_tests )
 endif()
 
 if(NOT DEFINED MSVC)
-add_custom_target(
-    check
-    COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh
-    COMMENT "Building and running test..."
-    VERBATIM
-  )
+  add_test( NAME external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh)
 endif()
