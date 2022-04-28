@@ -139,5 +139,5 @@ if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
 endif()
 
 if(NOT DEFINED MSVC)
-  add_test( NAME external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh)
+  add_test( NAME external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
 endif()
