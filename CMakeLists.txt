@@ -4,9 +4,11 @@ project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
-VERSION 0.2.3)
+VERSION 0.2.3 )
 
-configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY) 
+# Apply dynamic info to the config files
+configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
 option(USE_SHARED_LIB "Build using shared kvazaar library" ON)
 
@@ -47,26 +49,24 @@ list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
-if(NOT USE_SHARED_LIB) 
+if(NOT USE_SHARED_LIB)
   add_definitions(-DPIC -DKVZ_DLL_EXPORTS)
 endif()
 
 # For visual studio / windows we also need our own pthread implementation and getopt
 if(MSVC)
   list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
-  add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)  
+  add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)
 endif()
 
 # ToDo: allow compiling on other than x86
 add_definitions(-DCOMPILE_INTEL)
 
-if(USE_SHARED_LIB) 
+if(USE_SHARED_LIB)
   add_library(libkvazaar SHARED ${LIB_SOURCES})
 else()
   add_library(libkvazaar STATIC ${LIB_SOURCES})
 endif()
-
-target_compile_definitions(libkvazaar PUBLIC libkvazaar)
 
 target_include_directories(libkvazaar PUBLIC src)
 target_include_directories(libkvazaar PUBLIC src/extras)
@@ -76,16 +76,30 @@ file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
 
+add_executable(kvazaar ${CLI_SOURCES})
+target_link_libraries(kvazaar PUBLIC libuvg266)
+
 if(MSVC)
   target_include_directories(libkvazaar PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
   list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
 else()
-  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2" )
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_package(Threads REQUIRED)
+  target_link_libraries(kvazaar PUBLIC Threads::Threads)
+
+  include(CheckLibraryExists)
+
+  CHECK_LIBRARY_EXISTS(m sin "" HAVE_LIB_M)
+
+  if (HAVE_LIB_M)
+      set(EXTRA_LIBS ${EXTRA_LIBS} m)
+  endif (HAVE_LIB_M)
+
+  target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
 endif()
 
-add_executable(kvazaar ${CLI_SOURCES})
-target_link_libraries(kvazaar PUBLIC libkvazaar)
 
 #source_group( "Header Files"   FILES ${INC_FILES} )
 #source_group( "Resource Files" FILES ${RESOURCE_FILE} )

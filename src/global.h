@@ -47,6 +47,10 @@
 #include "config.h" // IWYU pragma: export
 #endif
 
+#ifdef CMAKE_BUILD
+#include "version.h"
+#endif
+
 // Include some basics in all files, like assert, primitives and NULL.
 // If you add anything to this list with export pragma, think long and
 // and hard if it's actually a good idea to incude it for every c-file.
@@ -215,12 +219,11 @@ typedef int16_t coeff_t;
 #define QUOTE(x) #x
 #define QUOTE_EXPAND(x) QUOTE(x)
 
-// NOTE: When making a release, check to see if incrementing libversion in 
-// configure.ac is necessary.
 #ifndef KVZ_VERSION
 #define KVZ_VERSION 2.2.0
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
+
 
 //#define VERBOSE 1
 

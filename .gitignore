@@ -15,6 +15,7 @@
 .deps
 .dirstamp
 .libs
+.vs
 Makefile
 Makefile.in
 /aclocal.m4
@@ -53,5 +54,6 @@ configure.scan
 src/kvazaar
 src/libkvazaar.so.*
 src/kvazaar.pc
+src/version.h
 tests/kvazaar_tests
 tests/kvazaar_tests.trs
