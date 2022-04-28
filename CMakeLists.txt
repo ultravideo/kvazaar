@@ -63,9 +63,9 @@ endif()
 add_definitions(-DCOMPILE_INTEL)
 
 if(USE_SHARED_LIB)
-  add_library(libkvazaar SHARED ${LIB_SOURCES})
+  add_library(kvazaar SHARED ${LIB_SOURCES})
 else()
-  add_library(libkvazaar STATIC ${LIB_SOURCES})
+  add_library(kvazaar STATIC ${LIB_SOURCES})
 endif()
 
 target_include_directories(libkvazaar PUBLIC src)
@@ -84,8 +84,13 @@ endif()
 add_executable(kvazaar ${CLI_SOURCES})
 target_link_libraries(kvazaar PUBLIC libkvazaar)
 
+set_target_properties(kvazaar-bin PROPERTIES OUTPUT_NAME kvazaar)
+set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
+
+target_link_libraries(kvazaar-bin PUBLIC kvazaar)
+
 if(MSVC)
-  target_include_directories(libkvazaar PUBLIC src/threadwrapper/include)
+  target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
@@ -101,7 +106,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} m)
   endif (HAVE_LIB_M)
 
-  target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
+  target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS})
 endif()
 
 # INSTALL
@@ -109,7 +114,7 @@ endif()
 # ToDo: make configurable
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
-install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
   install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
@@ -120,8 +125,14 @@ install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PR
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
   add_subdirectory( "tests/" )
-
-  #enable_testing()
-
   add_test( NAME Test_kvazaar COMMAND kvazaar_tests )
+endif()
+
+if(NOT DEFINED MSVC)
+add_custom_target(
+    check
+    COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh
+    COMMENT "Building and running test..."
+    VERBATIM
+  )
 endif()

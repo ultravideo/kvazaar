@@ -37,5 +37,5 @@ endif()
 
 add_definitions(-DCOMPILE_INTEL)
 
-target_link_libraries(kvazaar_tests PUBLIC libuvg266)
+target_link_libraries(kvazaar_tests PUBLIC kvazaar)
 
