@@ -36,13 +36,10 @@ endif()
 file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
 
 # We don't want CLI main in the library
-list(REMOVE_ITEM LIB_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/encmain.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/cli.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/yuv_io.c")
+list(REMOVE_ITEM LIB_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
 
 # Add also all the strategies
 file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c")
-
-# ToDo: do something with encode_coding_tree-avx2, currently not converted to VVC
-list(REMOVE_ITEM LIB_SOURCES_STRATEGIES "${CMAKE_CURRENT_SOURCE_DIR}/src/strategies/avx2/encode_coding_tree-avx2.c")
 
 list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 
