@@ -1,0 +1,100 @@
+cmake_minimum_required(VERSION 3.12)
+
+project(kvazaar
+LANGUAGES C CXX
+HOMEPAGE_URL https://github.com/ultravideo/kvazaar
+DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
+VERSION 0.2.3)
+
+configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY) 
+
+option(USE_SHARED_LIB "Build using shared kvazaar library" ON)
+
+
+find_package(Git QUIET)
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+# Update submodules as needed
+    option(GIT_SUBMODULE "Check submodules during build" ON)
+    if(GIT_SUBMODULE)
+        message(STATUS "Submodule update")
+        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_SUBMOD_RESULT)
+        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+            message(WARNING "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+        endif()
+    endif()
+endif()
+
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
+    message(WARNING "The submodule greatest was not loaded, some tests may fail")
+endif()
+
+# Add all sources in src/ base
+file(GLOB LIB_SOURCES "src/*.h" "src/*.c")
+
+# We don't want CLI main in the library
+list(REMOVE_ITEM LIB_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/encmain.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/cli.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/yuv_io.c")
+
+# Add also all the strategies
+file(GLOB_RECURSE LIB_SOURCES_STRATEGIES "src/strategies/*.c")
+
+# ToDo: do something with encode_coding_tree-avx2, currently not converted to VVC
+list(REMOVE_ITEM LIB_SOURCES_STRATEGIES "${CMAKE_CURRENT_SOURCE_DIR}/src/strategies/avx2/encode_coding_tree-avx2.c")
+
+list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
+
+# We also need the libmd5
+list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
+
+if(NOT USE_SHARED_LIB) 
+  add_definitions(-DPIC -DKVZ_DLL_EXPORTS)
+endif()
+
+# For visual studio / windows we also need our own pthread implementation and getopt
+if(MSVC)
+  list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+  add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)  
+endif()
+
+# ToDo: allow compiling on other than x86
+add_definitions(-DCOMPILE_INTEL)
+
+if(USE_SHARED_LIB) 
+  add_library(libkvazaar SHARED ${LIB_SOURCES})
+else()
+  add_library(libkvazaar STATIC ${LIB_SOURCES})
+endif()
+
+target_compile_definitions(libkvazaar PUBLIC libkvazaar)
+
+target_include_directories(libkvazaar PUBLIC src)
+target_include_directories(libkvazaar PUBLIC src/extras)
+target_include_directories(libkvazaar PUBLIC src/strategies)
+
+file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
+
+set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
+
+if(MSVC)
+  target_include_directories(libkvazaar PUBLIC src/threadwrapper/include)
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
+  list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+else()
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2" )
+endif()
+
+add_executable(kvazaar ${CLI_SOURCES})
+target_link_libraries(kvazaar PUBLIC libkvazaar)
+
+#source_group( "Header Files"   FILES ${INC_FILES} )
+#source_group( "Resource Files" FILES ${RESOURCE_FILE} )
+
+# TESTS
+if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
+  add_subdirectory( "tests/" )
+
+  #enable_testing()
+
+  add_test( NAME Test_kvazaar COMMAND kvazaar_tests )
+endif()
