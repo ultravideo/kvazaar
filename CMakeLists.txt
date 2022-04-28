@@ -76,13 +76,17 @@ file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
 
+# Add the getopt and pthread for visual studio
+if(MSVC) 
+  list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+endif()
+
 add_executable(kvazaar ${CLI_SOURCES})
-target_link_libraries(kvazaar PUBLIC libuvg266)
+target_link_libraries(kvazaar PUBLIC libkvazaar)
 
 if(MSVC)
   target_include_directories(libkvazaar PUBLIC src/threadwrapper/include)
-  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
-  list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
   set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -100,9 +104,18 @@ else()
   target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
 endif()
 
+# INSTALL
 
-#source_group( "Header Files"   FILES ${INC_FILES} )
-#source_group( "Resource Files" FILES ${RESOURCE_FILE} )
+# ToDo: make configurable
+
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
+install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
+  install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+endif()
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
 
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
