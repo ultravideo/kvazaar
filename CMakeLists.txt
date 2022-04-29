@@ -36,7 +36,7 @@ endif()
 file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
 
 # We don't want CLI main in the library
-list(REMOVE_ITEM LIB_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
+list(REMOVE_ITEM LIB_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
 
 # Add also all the strategies
 file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c")
@@ -79,7 +79,7 @@ target_include_directories(kvazaar PUBLIC src/strategies)
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
 
-set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
+set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
 
 # Add the getopt and pthread for visual studio
 if(MSVC) 
@@ -112,6 +112,48 @@ else()
 
   target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS})
 endif()
+
+# Source grouping
+
+# Some basic structuring of the files based on previous visual studio project files
+file(GLOB SOURCE_GROUP_BITSTREAM RELATIVE ${PROJECT_SOURCE_DIR} "src/encode_coding_tree.*" "src/encoder_state-bitstream.*" "src/nal.*")
+file(GLOB SOURCE_GROUP_CABAC RELATIVE ${PROJECT_SOURCE_DIR} "src/bitstream.*" "src/cabac.*" "src/context.*")
+file(GLOB SOURCE_GROUP_COMPRESSION RELATIVE ${PROJECT_SOURCE_DIR} "src/search*" "src/rdo.*" "src/fast_coeff*")
+file(GLOB SOURCE_GROUP_CONSTRAINT RELATIVE ${PROJECT_SOURCE_DIR} "src/constraint.*" "src/ml_*")
+file(GLOB SOURCE_GROUP_CONTROL RELATIVE ${PROJECT_SOURCE_DIR} "src/cfg.*" "src/encoder.*" "src/encoder_state-c*" "src/encoder_state-g*" "src/encoderstate*" "src/gop.*" "src/input_frame_buffer.*" "src/kvazaar*" "src/rate_control.*" "src/mip_data.h")
+file(GLOB SOURCE_GROUP_DATA_STRUCTURES RELATIVE ${PROJECT_SOURCE_DIR} "src/cu.*" "src/image.*" "src/imagelist.*" "src/videoframe.*")
+file(GLOB SOURCE_GROUP_EXTRAS RELATIVE ${PROJECT_SOURCE_DIR} "src/extras/*.h" "src/extras/*.c")
+file(GLOB_RECURSE SOURCE_GROUP_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.h" "src/strategies/*.c")
+file(GLOB SOURCE_GROUP_RECON RELATIVE ${PROJECT_SOURCE_DIR} "src/alf.*" "src/filter.*" "src/inter.*" "src/intra.*" "src/reshape.*" "src/sao.*" "src/scalinglist.*" "src/tables.*" "src/transform.*")
+file(GLOB SOURCE_GROUP_THREADING RELATIVE ${PROJECT_SOURCE_DIR} "src/threadqueue.*" "src/threads.*")
+file(GLOB_RECURSE SOURCE_GROUP_THREADWRAPPER RELATIVE ${PROJECT_SOURCE_DIR} "src/threadwrapper/*.cpp" "src/threadwrapper/*.h")
+file(GLOB SOURCE_GROUP_TOPLEVEL RELATIVE ${PROJECT_SOURCE_DIR} "src/debug.*" "src/global.h" "src/version.h" "src/kvz_math.h" "src/checkpoint.*")
+
+source_group( "Bitstream" FILES  ${SOURCE_GROUP_BITSTREAM})
+source_group( "CABAC" FILES ${SOURCE_GROUP_CABAC})
+source_group( "Compression" FILES ${SOURCE_GROUP_COMPRESSION})
+source_group( "Constraint" FILES ${SOURCE_GROUP_CONSTRAINT})
+source_group( "Control" FILES ${SOURCE_GROUP_CONTROL})
+source_group( "Data Structures" FILES ${SOURCE_GROUP_DATA_STRUCTURES})
+source_group( "Extras" FILES ${SOURCE_GROUP_EXTRAS})
+
+# Handle the strategies directory structure better in visual studio
+if(MSVC)
+  foreach(source IN LISTS SOURCE_GROUP_STRATEGIES)
+      get_filename_component(source_path "${source}" PATH)
+      string(REPLACE "src/" "" source_path_msvc "${source_path}")
+      string(REPLACE "/" "\\" source_path_msvc "${source_path_msvc}")
+      source_group("Optimization\\${source_path_msvc}" FILES "${source}")
+  endforeach()
+else()
+  source_group( "Optimization" FILES ${SOURCE_GROUP_STRATEGIES})
+endif()
+source_group( "Optimization" FILES "src/strategyselector.c" "src/strategyselector.h")
+
+source_group( "Reconstruction" FILES ${SOURCE_GROUP_RECON})
+source_group( "Threading" FILES ${SOURCE_GROUP_THREADING})
+source_group( "Threadwrapper" FILES ${SOURCE_GROUP_THREADWRAPPER})
+source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 
 # INSTALL
 
