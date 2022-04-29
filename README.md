@@ -422,11 +422,15 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
+**CMakeLists.txt assumes that the x86 based CPUs are 64bit and support AVX2**
 
 ### Autotools
 Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
-For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`. Yasm is
-optional, but some of the optimization will not be compiled in if it's missing.
+For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential`.
+
+### CMake
+Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
+For Ubuntu, the required packages are `build-essential cmake`.
 
 Run the following commands to compile and install Kvazaar.
 
@@ -437,6 +441,7 @@ Run the following commands to compile and install Kvazaar.
     sudo ldconfig
 
 See `./configure --help` for more options.
+**When building shared library with visual studio the tests will fail to link, the main binary will still work**
 
 ### Autotools on MinGW
 It is recommended to use Clang instead of GCC in MinGW environments. GCC also works, but AVX2 optimizations will be disabled because of a known GCC issue from 2012, so performance will suffer badly. Instead of `./configure`, run
@@ -482,7 +487,7 @@ Optional font file `arial.ttf` is to be placed in the working directory, if bloc
 
 Please cite [this paper](https://dl.acm.org/citation.cfm?doid=2964284.2973796) for Kvazaar:
 
-```M. Viitanen, A. Koivula, A. Lemmetti, A. Yl√§-Outinen, J. Vanne, and T. D. H√§m√§l√§inen, ‚ÄúKvazaar: open-source HEVC/H.265 encoder,‚Äù in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
+```M. Viitanen, A. Koivula, A. Lemmetti, A. Yl‰-Outinen, J. Vanne, and T. D. H‰m‰l‰inen, ìKvazaar: open-source HEVC/H.265 encoder,î in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
 
 Or in BibTex:
 
@@ -522,7 +527,7 @@ You can generate Doxygen documentation pages by running the command
 - Main automatic way of testing is with Travis CI. Commits, branches
   and pull requests are tested automatically.
   - Uninitialized variables and such are checked with Valgrind.
-  - Bitstream validity is checked with HM.
+  - Bitstream validity is checked with VTM.
   - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
 - Windows msys2 and msvc builds are checked automatically on Appveyor.
 - If your changes change the bitstream, decode with HM to check that
