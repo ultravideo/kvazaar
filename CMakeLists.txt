@@ -10,7 +10,7 @@ VERSION 0.2.3 )
 configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
-option(USE_SHARED_LIB "Build using shared kvazaar library" ON)
+option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 
 find_package(Git QUIET)
@@ -46,8 +46,10 @@ list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
-if(NOT USE_SHARED_LIB)
-  add_definitions(-DPIC -DKVZ_DLL_EXPORTS)
+add_definitions(-DKVZ_DLL_EXPORTS)
+
+if(BUILD_SHARED_LIBS)
+  add_definitions(-DPIC)
 endif()
 
 # For visual studio / windows we also need our own pthread implementation and getopt
@@ -59,10 +61,16 @@ endif()
 # ToDo: allow compiling on other than x86
 add_definitions(-DCOMPILE_INTEL)
 
-if(USE_SHARED_LIB)
+if(BUILD_SHARED_LIBS)
+  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib" "./" "../lib" )  
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(kvazaar SHARED ${LIB_SOURCES})
 else()
   add_library(kvazaar STATIC ${LIB_SOURCES})
+  if(MSVC) # Fix a linking problem with visual studio when the library is the same name as the binary
+    set_target_properties(kvazaar PROPERTIES OUTPUT_NAME libkvazaar)
+  endif()
+  
 endif()
 
 target_include_directories(kvazaar PUBLIC src)
@@ -112,8 +120,10 @@ endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
 install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS libkvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
-  install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+if(BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
+  if(MSVC)
+    install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+  endif()
 endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
