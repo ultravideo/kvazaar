@@ -53,27 +53,26 @@ endif()
 # Grab <year>-<month>-<day> timestamp for debug purposes
 string(TIMESTAMP CMAKE_BUILD_DATE %Y-%m-%d)
 
-# Format compiler info based on platform
-set(UVG_COMPILER_VERSION "${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+set(KVZ_COMPILER_VERSION "${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 
 if(MSVC)
     if(MSVC_VERSION LESS 1800)
-        set(UVG_COMPILER_VERSION "VS")
+        set(KVZ_COMPILER_VERSION "VS")
     elseif(MSVC_VERSION LESS 1900)
-        set(UVG_COMPILER_VERSION "VS2013")
+        set(KVZ_COMPILER_VERSION "VS2013")
     elseif(MSVC_VERSION LESS 1910)
-        set(UVG_COMPILER_VERSION "VS2015")
+        set(KVZ_COMPILER_VERSION "VS2015")
     elseif(MSVC_VERSION LESS 1920)
-        set(UVG_COMPILER_VERSION "VS2017")
+        set(KVZ_COMPILER_VERSION "VS2017")
     elseif(MSVC_VERSION LESS 1930)
-        set(UVG_COMPILER_VERSION "VS2019")
+        set(KVZ_COMPILER_VERSION "VS2019")
     else()
-        set(UVG_COMPILER_VERSION "VS2022")
+        set(KVZ_COMPILER_VERSION "VS2022")
     endif()
 endif()
 
 # Set compiler info to print at runtime
-set(UVG_COMPILER_STRING "${UVG_COMPILER_VERSION}")
+set(KVZ_COMPILER_STRING "${KVZ_COMPILER_VERSION}")
 
 add_definitions(-DCMAKE_BUILD)
 
@@ -221,6 +220,7 @@ endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
 
+IF(UNIX)
 # DIST
 
 file(GLOB_RECURSE DIST_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
@@ -232,8 +232,35 @@ add_custom_target(dist
                 WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
             )
 
-# TESTS
+# DISTCHECK
 
+set(TEMP_DISTCHECK_DIR "_distcheck")
+
+add_custom_target(distcheck
+                  COMMAND cd ${PROJECT_SOURCE_DIR}
+                  COMMAND mkdir -p ${TEMP_DISTCHECK_DIR}
+                  COMMAND cd ${TEMP_DISTCHECK_DIR}
+                  COMMAND tar -xf ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz || (echo \"\\033[0;31mfailed to unpack ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz.\\033\[m\" && false)
+                  COMMAND cd ${PROJECT_NAME}-${PROJECT_VERSION}
+                  COMMAND mkdir -p build; cd build
+                  COMMAND cmake -DCMAKE_INSTALL_PREFIX=./ -DBUILD_SHARED_LIBS=OFF -G 'Unix Makefiles' .. || (echo \"\\e[0;31mcmake failed to configure.\\033[m\" && false)
+                  COMMAND make -j || (echo \"\\e[0;31mmake failed.\\033[m\" && false)
+                  # ToDo: Full tests might be too demanding to run, enable with parameter?
+                  #COMMAND make test || (echo \"\\e[0;31mmake test failed.\\033[m\" && false)
+                  COMMAND tests/kvazaar_tests || (echo \"\\e[0;31mtests failed.\\033[m\" && false)
+                  COMMAND make install || (echo \"\\e[0;31mmake install failed.\\033[m\" && false)                  
+                  COMMAND bin/kvazaar --help || (echo \"\\e[0;31mkvazaar binary failed to run.\\033[m\" && false)
+                  COMMAND make clean || (echo \"\\e[0;31mmake clean failed.\\033[m\" && false)
+                  COMMAND cd ${PROJECT_SOURCE_DIR}
+                  COMMAND rm -rf "${PROJECT_SOURCE_DIR}/${TEMP_DISTCHECK_DIR}"
+                  COMMAND echo \"\\e[0;32m==============================================================\\033[m\"
+                  COMMAND echo \"\\e[0;32m${PROJECT_NAME}-${PROJECT_VERSION} archives ready for distribution:\\033[m\\n\"
+                               \"\\e[0;32m${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz\\033[m\"
+                  COMMAND echo \"\\e[0;32m==============================================================\\033[m\"
+                  COMMENT "Checking ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz..")
+endif() #Unix
+
+# TESTS
 enable_testing()
 
 if(MSVC OR MINGW OR MSYS)
