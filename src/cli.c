@@ -172,6 +172,10 @@ static const struct option long_options[] = {
   { "no-combine-intra-cus",     no_argument, NULL, 0 },
   { "force-inter",              no_argument, NULL, 0 },
   { "no-force-inter",           no_argument, NULL, 0 },
+  { "intra-chroma-search",      no_argument, NULL, 0 },
+  { "no-intra-chroma-search",   no_argument, NULL, 0 },
+  { "fast-bipred",              no_argument, NULL, 0 },
+  { "no-fast-bipred",           no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -550,18 +554,21 @@ void print_help(void)
     "      --(no-)signhide        : Sign hiding [disabled]\n"
     "      --(no-)smp             : Symmetric motion partition [disabled]\n"
     "      --(no-)amp             : Asymmetric motion partition [disabled]\n"
-    "      --rd <integer>         : Intra mode search complexity [0]\n"
+    "      --rd <integer>         : Mode search complexity [0]\n"
     "                                   - 0: Skip intra if inter is good enough.\n"
     "                                   - 1: Rough intra mode search with SATD.\n"
     "                                   - 2: Refine intra mode search with SSE.\n"
-    "                                   - 3: Try all intra modes and enable intra\n"
-    "                                        chroma mode search.\n"
+    "                                   - 3: Try SSE cost for all inter merge\n"
+    "                                        candidates and modes.\n"
+    "                                   - 4: Try SSE cost for all intra modes.\n"
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
     "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
     "                               residual improves the RD cost. [enabled]\n"
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
+    "      --(no-)intra-chroma-search : Test non-derived intra chroma modes.\n"
+    "                                   [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
     "      --me <string>          : Integer motion estimation algorithm [hexbs]\n"
     "                                   - hexbs: Hexagon Based Search\n"
@@ -577,6 +584,7 @@ void print_help(void)
     "                                   - 2: + 1/2-pixel diagonal\n"
     "                                   - 3: + 1/4-pixel horizontal and vertical\n"
     "                                   - 4: + 1/4-pixel diagonal\n"
+    "      --(no-)fast-bipred     : Only perform fast bipred search. [enabled]\n"
     "      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]\n"
     "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
     "                                   - Accepts a list of values separated by ','\n"

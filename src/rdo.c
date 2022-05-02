@@ -172,10 +172,10 @@ int kvz_init_rdcost_outfiles(const char *dir_path)
   // As long as QP is a two-digit number, template and produced string should
   // be equal in length ("%i" -> "22")
   assert(RD_SAMPLING_MAX_LAST_QP <= 99);
-  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
   strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
     pthread_mutex_t *curr = outfile_mutex + qp;

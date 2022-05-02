@@ -488,6 +488,10 @@ typedef struct kvz_config
   uint8_t combine_intra_cus;
 
   uint8_t force_inter;
+
+  uint8_t intra_chroma_search;
+
+  uint8_t fast_bipred;
 } kvz_config;
 
 /**
