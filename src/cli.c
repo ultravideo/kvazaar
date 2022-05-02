@@ -382,22 +382,28 @@ void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
 
 void print_usage(void)
 {
+  print_version();
   fprintf(stdout,
-    "Kvazaar usage: -i and --input-res to set input, -o to set output\n"
-    "               --help for more information\n");
+    "usage: -i and --input-res to set input, -o to set output\n"
+    "              --help for more information\n");
 }
 
 
 void print_version(void)
 {
   fprintf(stdout,
-    "Kvazaar " VERSION_STRING "\n"
+#ifdef CMAKE_BUILD
+    "kvazaar " VERSION_STRING " [" KVZ_COMPILER_STRING "] " KVZ_COMPILE_DATE "\n");
+#else
+  "Kvazaar " VERSION_STRING "\n"
     "Kvazaar license: 3-clause BSD\n");
+#endif
 }
 
 
 void print_help(void)
 {
+  print_version();
   fprintf(stdout,
     "Usage:\n"
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"

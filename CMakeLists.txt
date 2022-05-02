@@ -6,10 +6,6 @@ HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
 VERSION 0.2.3 )
 
-# Apply dynamic info to the config files
-configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
-configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
-
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
@@ -17,7 +13,7 @@ option(BUILD_TESTS "Build tests" ON)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-# Update submodules as needed
+    # Update submodules as needed
     option(GIT_SUBMODULE "Check submodules during build" ON)
     if(GIT_SUBMODULE)
         message(STATUS "Submodule update")
@@ -28,11 +24,62 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
             message(WARNING "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
         endif()
     endif()
+    # Check git hash and fetch tag
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE GIT_HEAD_OK
+                    OUTPUT_VARIABLE GIT_HEAD)
+    if(GIT_HEAD_OK EQUAL "0")
+        string(SUBSTRING ${GIT_HEAD} 0 30 GIT_TAG_LONG)    
+        execute_process(COMMAND ${GIT_EXECUTABLE} name-rev --tags --name-only ${GIT_TAG_LONG}
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_TAG_OK
+                        OUTPUT_VARIABLE GIT_TAG)
+        string(SUBSTRING ${GIT_TAG} 0 9 GIT_TAG_STRIP)
+      
+        # If tag is not defined, add part of the commit hash to the version
+        if(GIT_TAG_OK EQUAL "0" AND GIT_TAG_STRIP STREQUAL "undefined")
+          string(SUBSTRING ${GIT_HEAD} 0 7 GIT_TAG_SHORT)
+          set(PROJECT_VERSION ${PROJECT_VERSION}-${GIT_TAG_SHORT})
+          message(INFO " No tag detected, version changed to ${PROJECT_VERSION}")
+        endif()
+    endif()    
 endif()
 
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
     message(WARNING "The submodule greatest was not loaded, some tests may fail")
 endif()
+
+# Grab <year>-<month>-<day> timestamp for debug purposes
+string(TIMESTAMP CMAKE_BUILD_DATE %Y-%m-%d)
+
+# Format compiler info based on platform
+set(UVG_COMPILER_VERSION "${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+
+if(MSVC)
+    if(MSVC_VERSION LESS 1800)
+        set(UVG_COMPILER_VERSION "VS")
+    elseif(MSVC_VERSION LESS 1900)
+        set(UVG_COMPILER_VERSION "VS2013")
+    elseif(MSVC_VERSION LESS 1910)
+        set(UVG_COMPILER_VERSION "VS2015")
+    elseif(MSVC_VERSION LESS 1920)
+        set(UVG_COMPILER_VERSION "VS2017")
+    elseif(MSVC_VERSION LESS 1930)
+        set(UVG_COMPILER_VERSION "VS2019")
+    else()
+        set(UVG_COMPILER_VERSION "VS2022")
+    endif()
+endif()
+
+# Set compiler info to print at runtime
+set(UVG_COMPILER_STRING "${UVG_COMPILER_VERSION}")
+
+add_definitions(-DCMAKE_BUILD)
+
+# Apply dynamic info to the config files
+configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
 # Add all sources in src/ base
 file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
