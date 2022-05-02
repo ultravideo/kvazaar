@@ -17,10 +17,6 @@ endif()
 
 if(MSVC)
   target_include_directories(kvazaar_tests PUBLIC ../src/threadwrapper/include)
-  if(BUILD_SHARED_LIBS) 
-    message(INFO " tests do not work with shared lib at the moment")
-  endif()
-  target_include_directories(kvazaar_tests PUBLIC ../src/threadwrapper/include)
 
   set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
   add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)

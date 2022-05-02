@@ -422,15 +422,10 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
-**CMakeLists.txt assumes that the x86 based CPUs are 64bit and support AVX2**
-
 ### Autotools
 Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
 For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential`.
 
-### CMake
-Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
-For Ubuntu, the required packages are `build-essential cmake`.
 
 Run the following commands to compile and install Kvazaar.
 
@@ -449,6 +444,11 @@ It is recommended to use Clang instead of GCC in MinGW environments. GCC also wo
     CC=clang ./configure
 
 to build Kvazaar using Clang.
+
+### CMake
+Depending on the platform, some additional tools are required for compiling Kvazzar with CMake.
+For Ubuntu, the required packages are `build-essential cmake`.
+
 
 ### OS X
 - Install Homebrew
