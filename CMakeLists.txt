@@ -223,13 +223,31 @@ install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PR
 IF(UNIX)
 # DIST
 
-file(GLOB_RECURSE DIST_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
-list(APPEND DIST_SOURCES ".clang-format" ".gitignore" ".gitmodules" "tests/tsan_suppressions.txt" ".travis-install.bash" "CREDITS" "Dockerfile" "docs.doxy" "LICENSE" "LICENSE.EXT.greatest")
+set(GIT_LS_TREE_OK "1")
+
+# By default grab the list of files in the git repo
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    execute_process(COMMAND ${GIT_EXECUTABLE} ls-tree --name-only -r HEAD
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE GIT_LS_TREE_OK
+                    OUTPUT_VARIABLE GIT_LS_TREE)
+    if(GIT_LS_TREE_OK EQUAL "0")
+        string(REGEX REPLACE "\n" ";" GIT_LS_TREE "${GIT_LS_TREE}")
+        string(REGEX REPLACE "\r" "" GIT_LS_TREE "${GIT_LS_TREE}")
+        list(APPEND DIST_SOURCES ${GIT_LS_TREE})
+    endif()
+endif()
+if(NOT GIT_LS_TREE_OK EQUAL "0")
+    file(GLOB_RECURSE DIST_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.c" "src/*.h" "tests/*.sh" "tools/*.sh" "tools/*.py" ".github/*.yml" "src/*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "examples/*" "rdcost-weight-tool/*" "greatest/*.h" "greatest/*.md")
+    list(APPEND DIST_SOURCES ".clang-format" ".gitignore" ".gitmodules" "tests/tsan_suppressions.txt" ".travis-install.bash" "CREDITS" "Dockerfile" "docs.doxy" ".gitlab-ci.yml" "LICENSE" "LICENSE.EXT.greatest" "README.md")
+endif()
 
 add_custom_target(dist
-                COMMAND tar -zcvf "${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz" --transform 's,^,${PROJECT_NAME}-${PROJECT_VERSION}/,' -- ${DIST_SOURCES}
+                COMMAND echo \"Writing log to ${PROJECT_SOURCE_DIR}/dist.log\"
+                 && tar -zcvf "${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz" --transform 's,^,${PROJECT_NAME}-${PROJECT_VERSION}/,' -- ${DIST_SOURCES} > dist.log 2>&1 || { echo \"\\033[0;31mfailed to pack ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz, check ${PROJECT_SOURCE_DIR}/dist.log.\\033\[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                 COMMENT "Make distribution ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
                 WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+                BYPRODUCTS ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz
             )
 
 # DISTCHECK
@@ -237,27 +255,39 @@ add_custom_target(dist
 set(TEMP_DISTCHECK_DIR "_distcheck")
 
 add_custom_target(distcheck
-                  COMMAND cd ${PROJECT_SOURCE_DIR}
-                  COMMAND mkdir -p ${TEMP_DISTCHECK_DIR}
-                  COMMAND cd ${TEMP_DISTCHECK_DIR}
-                  COMMAND tar -xf ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz || (echo \"\\033[0;31mfailed to unpack ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz.\\033\[m\" && false)
-                  COMMAND cd ${PROJECT_NAME}-${PROJECT_VERSION}
-                  COMMAND mkdir -p build; cd build
-                  COMMAND cmake -DCMAKE_INSTALL_PREFIX=./ -DBUILD_SHARED_LIBS=OFF -G 'Unix Makefiles' .. || (echo \"\\e[0;31mcmake failed to configure.\\033[m\" && false)
-                  COMMAND make -j || (echo \"\\e[0;31mmake failed.\\033[m\" && false)
-                  # ToDo: Full tests might be too demanding to run, enable with parameter?
-                  #COMMAND make test || (echo \"\\e[0;31mmake test failed.\\033[m\" && false)
-                  COMMAND tests/kvazaar_tests || (echo \"\\e[0;31mtests failed.\\033[m\" && false)
-                  COMMAND make install || (echo \"\\e[0;31mmake install failed.\\033[m\" && false)                  
-                  COMMAND bin/kvazaar --help || (echo \"\\e[0;31mkvazaar binary failed to run.\\033[m\" && false)
-                  COMMAND make clean || (echo \"\\e[0;31mmake clean failed.\\033[m\" && false)
-                  COMMAND cd ${PROJECT_SOURCE_DIR}
-                  COMMAND rm -rf "${PROJECT_SOURCE_DIR}/${TEMP_DISTCHECK_DIR}"
-                  COMMAND echo \"\\e[0;32m==============================================================\\033[m\"
-                  COMMAND echo \"\\e[0;32m${PROJECT_NAME}-${PROJECT_VERSION} archives ready for distribution:\\033[m\\n\"
-                               \"\\e[0;32m${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz\\033[m\"
-                  COMMAND echo \"\\e[0;32m==============================================================\\033[m\"
-                  COMMENT "Checking ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz..")
+                  COMMAND echo \"Writing log to ${PROJECT_SOURCE_DIR}/distcheck.log\"
+                  && cd ${PROJECT_SOURCE_DIR}
+                  && mkdir -p ${TEMP_DISTCHECK_DIR}
+                  && cd ${TEMP_DISTCHECK_DIR}
+                  && tar -zxf ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz > ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mfailed to unpack ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz.\\033\[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mFile unpack ok\\033[m\"
+                  && cd ${PROJECT_NAME}-${PROJECT_VERSION}
+                  && mkdir -p build
+                  && cd build                  
+                  && cmake -DCMAKE_INSTALL_PREFIX=./ -DBUILD_SHARED_LIBS=OFF -G "Unix Makefiles" .. >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mcmake failed to configure.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mCMake configure ok\\033[m\"
+                  && make -j >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mMake ok\\033[m\"
+                  # Full tests might be too demanding to run, enable with parameter?
+                  #&& make test || (echo \"\\e[0;31mmake test failed.\\033[m\" && false)
+                  && tests/kvazaar_tests >> ${PROJECT_SOURCE_DIR}/distcheck.log 2>&1 || { echo \"\\033[0;31mtests failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mTests ok\\033[m\"
+                  && make install >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake install failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mInstall ok\\033[m\"
+                  && bin/uvg266 --help >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mkvazaar binary failed to run.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mbin/kvazaar ok\\033[m\"
+                  && make clean >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake clean failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32mmake clean ok\\033[m\"
+                  && cd ${PROJECT_SOURCE_DIR}
+                  && rm -rf "${PROJECT_SOURCE_DIR}/${TEMP_DISTCHECK_DIR}"
+                  && echo \"\\033[0;32m==============================================================\\033[m\"
+                  && echo \"\\033[0;32m${PROJECT_NAME}-${PROJECT_VERSION} archives ready for distribution:\\033[m\"
+                  && echo \"\\033[0;32m${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz\\033[m\"
+                  && echo \"\\033[0;32m==============================================================\\033[m\"
+                  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                  DEPENDS ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz
+                  COMMENT "Checking ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz.."
+                  )
 endif() #Unix
 
 # TESTS
