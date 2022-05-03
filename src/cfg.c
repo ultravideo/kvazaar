@@ -705,7 +705,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       },
       {
         "veryslow",
-        "rd", "2",
+        "rd", "3",
         "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "tz",
@@ -733,7 +733,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       },
       {
         "placebo",
-        "rd", "2",
+        "rd", "3",
         "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "tz",
