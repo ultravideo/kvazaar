@@ -10,6 +10,19 @@ option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
+# https://www.kitware.com/cmake-and-the-default-build-type/
+# Set a default build type if none was specified
+set(KVZ_DEFAULT_BUILD_TYPE "RelWithDebInfo")
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type specified, setting to '${KVZ_DEFAULT_BUILD_TYPE}'.")
+  set(CMAKE_BUILD_TYPE "${KVZ_DEFAULT_BUILD_TYPE}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -274,7 +287,7 @@ add_custom_target(distcheck
                   && echo \"\\033[0;32mTests ok\\033[m\"
                   && make install >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake install failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mInstall ok\\033[m\"
-                  && bin/uvg266 --help >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mkvazaar binary failed to run.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && bin/kvzaar --help >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mkvazaar binary failed to run.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mbin/kvazaar ok\\033[m\"
                   && make clean >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake clean failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mmake clean ok\\033[m\"
