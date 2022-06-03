@@ -2,7 +2,7 @@ Kvazaar
 =======
 An open-source HEVC encoder licensed under 3-clause BSD
 
-Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us.
+Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us or come to our Discord [![Discord](https://img.shields.io/discord/973260924288901140?style=plastic)](https://discord.gg/fZpub7BPUA)
 
 Kvazaar is still under development. Speed and RD-quality will continue to improve.
 
