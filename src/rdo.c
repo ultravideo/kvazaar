@@ -165,7 +165,7 @@ int kvz_init_rdcost_outfiles(const char *dir_path)
 {
 #define RD_SAMPLING_MAX_FN_LENGTH 4095
   static const char *basename_tmpl = "/%02i.txt";
-  char fn_template[RD_SAMPLING_MAX_FN_LENGTH + 1];
+  char fn_template[RD_SAMPLING_MAX_FN_LENGTH + 1] = {0};
   char fn[RD_SAMPLING_MAX_FN_LENGTH + 1];
   int rv = 0, qp;
 
