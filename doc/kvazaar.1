@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "February 2022" "kvazaar v2.1.0" "User Commands"
+.TH KVAZAAR "1" "June 2022" "kvazaar v2.1.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -315,6 +315,19 @@ Predict the pu\-depth\-intra using machine
  learning trees, overrides the
  \-\-pu\-depth\-intra parameter. [disabled]
 .TP
+\fB\-\-(no\-)combine\-intra\-cus: Whether the encoder tries to code a cu
+    on lower depth even when search is not
+    performed on said depth. Should only
+    be disabled if cus absolutely must not
+    be larger than limited by the search.
+    [enabled]
+.TP
+\fB\-\-force\-inter         
+Force the encoder to use inter always.
+This is mostly for debugging and is not
+guaranteed to produce sensible bitstream or
+work at all. [disabled]
+.TP
 \fB\-\-tr\-depth\-intra <int>
 Transform split depth for intra blocks [0]
 .TP
@@ -407,8 +420,8 @@ Split picture into width x height uniform tiles.
               width.
 .TP
 \fB\-\-tiles\-height\-split <string>|u<int>
-    \- <string>: A comma\-separated list of tile row
-                column pixel coordinates.
+    \- <string>: A comma\-separated list of tile
+                row column pixel coordinates.
     \- u<int>: Number of tile rows of uniform
               height.
 .TP

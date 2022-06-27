@@ -242,6 +242,16 @@ Compression tools:
       --ml-pu-depth-intra    : Predict the pu-depth-intra using machine
                                 learning trees, overrides the
                                 --pu-depth-intra parameter. [disabled]
+      --(no-)combine-intra-cus: Whether the encoder tries to code a cu
+                                   on lower depth even when search is not
+                                   performed on said depth. Should only
+                                   be disabled if cus absolutely must not
+                                   be larger than limited by the search.
+                                   [enabled]
+      --force-inter          : Force the encoder to use inter always.
+                               This is mostly for debugging and is not
+                               guaranteed to produce sensible bitstream or
+                               work at all. [disabled]
       --tr-depth-intra <int> : Transform split depth for intra blocks [0]
       --(no-)bipred          : Bi-prediction [disabled]
       --cu-split-termination <string> : CU split search termination [zero]
@@ -296,8 +306,8 @@ Parallel processing:
                                    - u<int>: Number of tile columns of uniform
                                              width.
       --tiles-height-split <string>|u<int> :
-                                   - <string>: A comma-separated list of tile row
-                                               column pixel coordinates.
+                                   - <string>: A comma-separated list of tile
+                                               row column pixel coordinates.
                                    - u<int>: Number of tile rows of uniform
                                              height.
       --slices <string>      : Control how slices are used.
