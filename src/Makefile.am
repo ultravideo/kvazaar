@@ -54,7 +54,7 @@ libkvazaar_la_SOURCES = \
 	cfg.c \
 	cfg.h \
 	constraint.c \
-	constraint.h \ 
+	constraint.h \
 	context.c \
 	context.h \
 	cu.c \
