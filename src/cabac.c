@@ -272,15 +272,19 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
  * \param symbol Value of coeff_abs_level_minus3.
  * \param r_param Reference to Rice parameter.
  */
-void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t symbol, const uint32_t r_param)
+int kvz_cabac_write_coeff_remain(cabac_data_t* const cabac, const uint32_t symbol, const uint32_t r_param)
 {
   int32_t code_number = symbol;
   uint32_t length;
 
+  int bits = 0;
+
   if (code_number < (3 << r_param)) {
     length = code_number >> r_param;
     CABAC_BINS_EP(cabac, (1 << (length + 1)) - 2 , length + 1, "coeff_abs_level_remaining");
+    bits += length + 1;
     CABAC_BINS_EP(cabac, (code_number % (1 << r_param)), r_param, "coeff_abs_level_remaining");
+    bits += r_param;
   } else {
     length = r_param;
     code_number = code_number - (3 << r_param);
@@ -289,8 +293,11 @@ void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t sym
       ++length;
     }
     CABAC_BINS_EP(cabac, (1 << (3 + length + 1 - r_param)) - 2, 3 + length + 1 - r_param, "coeff_abs_level_remaining");
+    bits += 3 + length + 1 - r_param;
     CABAC_BINS_EP(cabac, code_number, length, "coeff_abs_level_remaining");
+    bits += length;
   }
+  return bits;
 }
 
 void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac,const uint32_t symbol, const uint32_t r_param, int32_t base_level)

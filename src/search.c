@@ -311,13 +311,13 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
+  int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
   if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[!is_tr_split]);
-    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
 
     CABAC_FBITS_UPDATE(cabac, ctx, is_set, tr_tree_bits, "cbf_y_search");
   }
@@ -336,7 +336,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
+    if(is_set)
+      coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -366,6 +367,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     return 0;
   }
 
+  int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
+  int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
   // See luma for why the second condition
   if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
     const int tr_depth = depth - pred_cu->depth;
@@ -373,11 +376,9 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     cabac->cur_ctx = ctx;
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-      int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
       CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
     }
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-      int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
       CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
     }
   }
@@ -412,8 +413,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
+    if(u_is_set)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
+    if(v_is_set)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -518,7 +519,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
+    if(cb_flag_y)
+      coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
   unsigned chroma_ssd = 0;
@@ -540,8 +542,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
       const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order);
-      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], chroma_width, 2, scan_order);
+      if(cb_flag_u)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order);
+      if (cb_flag_v)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], chroma_width, 2, scan_order);
     }
   }
 

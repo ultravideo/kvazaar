@@ -805,7 +805,7 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
+static double fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
 {
   const __m256i zero           = _mm256_setzero_si256();
   const __m256i threes         = _mm256_set1_epi16(3);
@@ -859,7 +859,8 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64
   __m256i sum4   = _mm256_add_epi64        (sum2, sum3);
 
   __m128i sum128 = _mm256_castsi256_si128  (sum4);
-  return (_mm_cvtsi128_si32(sum128) + (1 << 7)) >> 8;
+  uint32_t temp = _mm_cvtsi128_si32(sum128);
+  return (double)(temp) / 256.0;
 }
 
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

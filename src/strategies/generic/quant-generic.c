@@ -356,7 +356,7 @@ static INLINE void get_coeff_weights(uint64_t wts_packed, uint16_t *weights)
   weights[3] = (wts_packed >> 48) & 0xffff;
 }
 
-static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uint64_t weights)
+static double fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uint64_t weights)
 {
   uint32_t sum = 0;
   uint16_t weights_unpacked[4];
@@ -371,7 +371,7 @@ static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uin
     }
     sum += weights_unpacked[curr_abs];
   }
-  return (sum + (1 << 7)) >> 8;
+  return (double) sum  / 256.0;
 }
 
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)

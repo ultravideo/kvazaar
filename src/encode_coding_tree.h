@@ -74,6 +74,6 @@ void kvz_encode_inter_prediction_unit(encoder_state_t* const state,
 void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
                                     uint8_t lastpos_x, uint8_t lastpos_y,
                                     uint8_t width, uint8_t height,
-                                    uint8_t type, uint8_t scan);
+                                    uint8_t type, uint8_t scan, double* bits_out);
 
 #endif // ENCODE_CODING_TREE_H_
