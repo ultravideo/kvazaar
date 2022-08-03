@@ -1960,9 +1960,8 @@ static void search_pu_inter(encoder_state_t * const state,
         amvp[2].size++;
       }
     }
-
-    // TODO: this probably should have a separate command line option
-    if (cfg->rdo == 3) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
+    
+    if (!cfg->fast_bipred) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
     
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);

@@ -608,13 +608,27 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (can_use_intra && !skip_intra) {
       int8_t intra_mode;
       double intra_cost;
+      int8_t chroma_mode;
       kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_cost);
+      chroma_mode = intra_mode;
+      if (x % 8 == 0 && y % 8 == 0 && 
+        state->encoder_control->chroma_format != KVZ_CSP_400) {
+        if(ctrl->cfg.intra_chroma_search) {
+          double best_cost = 0;
+          chroma_mode = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, &best_cost, intra_mode);
+          intra_cost += best_cost;
+        }
+      }
+
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
+        cur_cu->intra.mode_chroma = chroma_mode;
+        cur_cu->skipped = 0;
+        cur_cu->merged = 0;
       }
     }
 
@@ -622,7 +636,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
-      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       kvz_intra_recon_cu(state,
                          x, y,
@@ -635,10 +649,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        if (ctrl->cfg.rdo == 3) {
-          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu);
-          lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-        }
 
         kvz_intra_recon_cu(state,
                            x, y,
@@ -814,7 +824,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost += mode_bits * state->lambda;
       }
     }
-
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;

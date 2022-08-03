@@ -320,6 +320,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
   num_cand = state->encoder_control->cfg.max_merge;
   if (cur_cu->merged) { //merge
+    //if (!cabac->only_count) printf("%d %d %d %d", state->frame->num, x, y, depth);
     if (num_cand > 1) {
       int32_t ui;
       for (ui = 0; ui < num_cand - 1; ui++) {

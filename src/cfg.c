@@ -186,6 +186,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->combine_intra_cus = 1;
   cfg->force_inter = 0;
+  cfg->intra_chroma_search = 0;
+  cfg->fast_bipred = 1;
   return 1;
 }
 
@@ -1399,6 +1401,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("force-inter") {
     cfg->force_inter = atobool(value);
   }
+  else if OPT("intra-chroma-search") {
+    cfg->intra_chroma_search = atobool(value);
+  }
+  else if OPT("fast-bipred") {
+    cfg->fast_bipred = atobool(value);
+  }
   else {
     return 0;
   }
@@ -1590,8 +1598,8 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->rdo < 0 || cfg->rdo > 3) {
-    fprintf(stderr, "Input error: --rd parameter out of range [0..3]\n");
+  if (cfg->rdo < 0 || cfg->rdo > 4) {
+    fprintf(stderr, "Input error: --rd parameter out of range [0..4]\n");
     error = 1;
   }
 

@@ -190,7 +190,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) &&
+    state->encoder_control->chroma_format != KVZ_CSP_400 &&
+    !state->encoder_control->cfg.intra_chroma_search;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -354,6 +356,12 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
     kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
+  }
+
+  for (int i = 0; i < 5; ++i) {
+    costs[i] += (i == 0 ? CTX_ENTROPY_FBITS(&state->cabac.ctx.chroma_pred_model[0], 0)
+      : (CTX_ENTROPY_FBITS(&state->cabac.ctx.chroma_pred_model[0], 1) + 2.))
+    * state->lambda_sqrt;
   }
 
   kvz_sort_modes(modes, costs, 5);
@@ -678,10 +686,10 @@ double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
 
 
 int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
-                                  int x_px, int y_px, int depth,
-                                  int8_t intra_mode,
-                                  int8_t modes[5], int8_t num_modes,
-                                  lcu_t *const lcu)
+                                   int x_px, int y_px, int depth,
+                                   int8_t intra_mode,
+                                   int8_t modes[5], int8_t num_modes,
+                                   lcu_t *const lcu, double* best_cost)
 {
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
@@ -714,7 +722,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
         best_chroma = chroma;
       }
     }
-
+    *best_cost = best_chroma.cost;
     return best_chroma.mode;
   }
 
@@ -723,13 +731,10 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
 
 
 int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
-                              const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu)
+                                  const int x_px, const int y_px,
+                                  const int depth, lcu_t *lcu, double* best_cost, int8_t intra_mode)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-
-  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-  int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
   int8_t modes[5] = { 0, 26, 10, 1, 34 };
@@ -772,9 +777,13 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               intra_mode, modes, costs);
   }
 
-  int8_t intra_mode_chroma = intra_mode;
-  if (num_modes > 1) {
-    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, intra_mode, modes, num_modes, lcu);
+  int8_t intra_mode_chroma;
+  if (state->encoder_control->cfg.rdo >= 2) {
+    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, intra_mode, modes, num_modes, lcu, best_cost);
+  }
+  else {
+    intra_mode_chroma = modes[0];
+    // *best_cost = costs[0];
   }
 
   return intra_mode_chroma;
@@ -826,7 +835,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
   int8_t number_of_modes;
-  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
+  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
@@ -847,9 +856,9 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
-    if (rdo_level == 3) {
+    if (rdo_level == 4) {
       number_of_modes_to_search = 35;
-    } else if (rdo_level == 2) {
+    } else if (rdo_level >= 2) {
       number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
       // Check only the predicted modes.
