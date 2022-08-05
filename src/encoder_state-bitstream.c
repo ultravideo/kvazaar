@@ -48,6 +48,7 @@
 #include "kvz_math.h"
 #include "nal.h"
 #include "scalinglist.h"
+#include "sei.h"
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
@@ -570,21 +571,46 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
+static void sei_write_payload_type(bitstream_t *stream, const int payloadType)
+{
+  int i;
+  for (i = 0; i <= payloadType - 255; i += 255) {
+    WRITE_U(stream, FF_BYTE, 8, "ff_byte");
+  }
+  WRITE_U(stream, payloadType - i, 8, "last_payload_type_byte");
+}
+
+static void sei_write_payload_size(bitstream_t *stream, const int payloadSize)
+{
+  int i;
+  for (i = 0; i <= payloadSize - 255; i += 255) {
+    WRITE_U(stream, FF_BYTE, 8, "ff_byte");
+  }
+  WRITE_U(stream, payloadSize - i, 8, "last_payload_size_byte");
+}
+
+static void sei_write_user_defined_unregistered(bitstream_t *stream, const uint8_t * const uuid, const uint8_t * const user_data_payload_byte, const int length)
+{
+  int i;
+  sei_write_payload_type(stream, SEI_PAYLOAD_TYPE_USER_DATA_UNREGISTERED);
+  sei_write_payload_size(stream, (sizeof encoder_info_uuid) + length);
+  for (i = 0; i < 16; i++) {
+    WRITE_U(stream, uuid[i], 8, "uuid_iso_iec_11578");
+  }
+  for (i = 0; i < length; i++) {
+    WRITE_U(stream, user_data_payload_byte[i], 8, "user_data_payload_byte");
+  }
+  kvz_bitstream_align(stream);
+}
+
 static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const state)
 {
 #define STR_BUF_LEN 1000
   bitstream_t * const stream = &state->stream;
-  int i, length;
+  int length;
   char buf[STR_BUF_LEN] = { 0 };
-  char *s = buf + 16;
+  char *s = buf;
   const kvz_config * const cfg = &state->encoder_control->cfg;
-
-  // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
-  static const uint8_t uuid[16] = {
-    0x32, 0xfe, 0x46, 0x6c, 0x98, 0x41, 0x42, 0x69,
-    0xae, 0x35, 0x6a, 0x91, 0x54, 0x9e, 0xf3, 0xf1
-  };
-  memcpy(buf, uuid, 16);
 
   // user_data_payload_byte
   s += sprintf(s, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
@@ -603,19 +629,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   // to increase the buf len. Divide by 2 for margin.
   assert(length < STR_BUF_LEN / 2);
 
-  // payloadType = 5 -> user_data_unregistered
-  WRITE_U(stream, 5, 8, "last_payload_type_byte");
-
-  // payloadSize
-  for (i = 0; i <= length - 255; i += 255)
-    WRITE_U(stream, 255, 8, "ff_byte");
-  WRITE_U(stream, length - i, 8, "last_payload_size_byte");
-
-  for (i = 0; i < length; i++)
-    WRITE_U(stream, ((uint8_t *)buf)[i], 8, "sei_payload");
-
-  // The bitstream is already aligned, but align it anyway.
-  kvz_bitstream_align(stream);
+  sei_write_user_defined_unregistered(stream, encoder_info_uuid, (uint8_t*)buf, length);
 
 #undef STR_BUF_LEN
 }
@@ -683,8 +697,8 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
       break;
     }
 
-    WRITE_U(stream, 1, 8, "last_payload_type_byte"); //pic_timing
-    WRITE_U(stream, 1, 8, "last_payload_size_byte");
+    sei_write_payload_type(stream, SEI_PAYLOAD_TYPE_PIC_TIMING);
+    sei_write_payload_size(stream, 1);
     WRITE_U(stream, pic_struct, 4, "pic_struct");
     WRITE_U(stream, source_scan_type, 2, "source_scan_type");
     WRITE_U(stream, 0, 1, "duplicate_flag");
@@ -938,7 +952,6 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 }
 
-
 /**
  * \brief Add a checksum SEI message to the bitstream.
  * \param encoder The encoder.
@@ -952,7 +965,7 @@ static void add_checksum(encoder_state_t * const state)
 
   kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
 
-  WRITE_U(stream, 132, 8, "sei_type");
+  sei_write_payload_type(stream, SEI_PAYLOAD_TYPE_DECODED_PICTURE_HASH);
 
   int num_colors = (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : 3);
 
@@ -961,7 +974,7 @@ static void add_checksum(encoder_state_t * const state)
   case KVZ_HASH_CHECKSUM:
     kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + num_colors * 4, 8, "size");
+    sei_write_payload_size(stream, 1 + num_colors * 4);
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
 
     for (int i = 0; i < num_colors; ++i) {
@@ -977,7 +990,7 @@ static void add_checksum(encoder_state_t * const state)
   case KVZ_HASH_MD5:
     kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + num_colors * 16, 8, "size");
+    sei_write_payload_size(stream, 1 + num_colors * 16);
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
 
     for (int i = 0; i < num_colors; ++i) {
