@@ -39,12 +39,12 @@
 
 #include "global.h" // IWYU pragma: keep
 
-static const uint8_t SEI_PAYLOAD_TYPE_PIC_TIMING = 1;
-static const uint8_t SEI_PAYLOAD_TYPE_USER_DATA_UNREGISTERED = 5;
-static const uint8_t SEI_PAYLOAD_TYPE_DECODED_PICTURE_HASH = 132;
+#define SEI_PAYLOAD_TYPE_PIC_TIMING 1
+#define SEI_PAYLOAD_TYPE_USER_DATA_UNREGISTERED 5
+#define SEI_PAYLOAD_TYPE_DECODED_PICTURE_HASH 132
 
 // Flag value used for length / value extension.
-static const uint8_t FF_BYTE = 0xFF;
+#define FF_BYTE 0xFF
 
 // UUID for the encoder info user defined unregistered message
 // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
