@@ -53,9 +53,9 @@ typedef struct cmdline_opts_t {
   int32_t frames;
   /** \brief Encoder configuration */
   kvz_config *config;
-  /** \brief Encoder configuration */
+  /** \brief Show help message and exit */
   bool help;
-  /** \brief Encoder configuration */
+  /** \brief Show version information and exit */
   bool version;
   /** \brief Whether to loop input */
   bool loop_input;
