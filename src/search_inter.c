@@ -1849,7 +1849,7 @@ static void search_pu_inter(encoder_state_t * const state,
   for (int list = 0; list < 2; ++list) {
 
     // TODO: make configurable
-    int n_best = MIN(1, amvp[list].size);
+    int n_best = MIN(state->encoder_control->cfg.rdo >= 4 ? 2 : 1, amvp[list].size);
     if (cfg->fme_level > 0) {
 
       for (int i = 0; i < n_best; ++i) {
