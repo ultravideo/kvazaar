@@ -163,7 +163,7 @@ int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
 void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  kvz_g_convert_to_bit[block_size] + 2;
-  int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - KVZ_BIT_DEPTH - log2_tr_size;
   int32_t  j,k;
   for (j = 0; j < block_size; j++) {
     for(k = 0; k < block_size; k ++) {
@@ -182,7 +182,7 @@ void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,i
 void kvz_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  kvz_g_convert_to_bit[block_size] + 2;
-  int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - KVZ_BIT_DEPTH - log2_tr_size;
   int32_t  j,k;
   int32_t offset;
   offset = (1 << (shift -1)); // For rounding
@@ -207,7 +207,7 @@ void kvz_transform2d(const encoder_control_t * const encoder,
                      cu_type_t type)
 {
   dct_func *dct_func = kvz_get_dct_func(block_size, color, type);
-  dct_func(encoder->bitdepth, block, coeff);
+  dct_func(KVZ_BIT_DEPTH, block, coeff);
 }
 
 void kvz_itransform2d(const encoder_control_t * const encoder,
@@ -218,7 +218,7 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
                       cu_type_t type)
 {
   dct_func *idct_func = kvz_get_idct_func(block_size, color, type);
-  idct_func(encoder->bitdepth, coeff, block);
+  idct_func(KVZ_BIT_DEPTH, coeff, block);
 }
 
 /**

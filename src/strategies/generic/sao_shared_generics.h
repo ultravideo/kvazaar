@@ -96,7 +96,7 @@ static int sao_band_ddistortion_generic(const encoder_state_t * const state,
                                         const int sao_bands[4])
 {
   int y, x;
-  int shift = state->encoder_control->bitdepth-5;
+  int shift = KVZ_BIT_DEPTH - 5;
   int sum = 0;
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {

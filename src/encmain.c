@@ -211,7 +211,7 @@ static void* input_read_thread(void* in_args)
                                     args->opts->config->width,
                                     args->opts->config->height,
                                     args->encoder->cfg.input_bitdepth,
-                                    args->encoder->bitdepth,
+                                    KVZ_BIT_DEPTH,
                                     frame_in, args->opts->config->file_format);
     if (!read_success) {
       // reading failed
@@ -230,7 +230,7 @@ static void* input_read_thread(void* in_args)
                                           args->opts->config->width,
                                           args->opts->config->height,
                                           args->encoder->cfg.input_bitdepth,
-                                          args->encoder->bitdepth,
+                                          KVZ_BIT_DEPTH,
                                           frame_in, args->opts->config->file_format);
           if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");

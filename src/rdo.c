@@ -537,14 +537,12 @@ void kvz_rdoq_sign_hiding(
     const coeff_t *const coeffs,
     coeff_t *const quant_coeffs)
 {
-  const encoder_control_t * const ctrl = state->encoder_control;
-
   int inv_quant = kvz_g_inv_quant_scales[qp_scaled % 6];
   // This somehow scales quant_delta into fractional bits. Instead of the bits
   // being multiplied by lambda, the residual is divided by it, or something
   // like that.
   const int64_t rd_factor = (inv_quant * inv_quant * (1 << (2 * (qp_scaled / 6)))
-                      / state->lambda / 16 / (1 << (2 * (ctrl->bitdepth - 8))) + 0.5);
+                      / state->lambda / 16 / (1 << (2 * (KVZ_BIT_DEPTH - 8))) + 0.5);
   const int last_cg = (last_pos - 1) >> LOG2_SCAN_SET_SIZE;
 
   for (int32_t cg_scan = last_cg; cg_scan >= 0; cg_scan--) {
@@ -677,12 +675,12 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
   uint32_t log2_tr_size      = kvz_g_convert_to_bit[ width ] + 2;
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - KVZ_BIT_DEPTH - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (KVZ_BIT_DEPTH - 8) * 6);
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 

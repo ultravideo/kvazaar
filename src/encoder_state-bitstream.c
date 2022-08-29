@@ -76,7 +76,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, (state->encoder_control->bitdepth == 8) ? 1 : 2, 5, "general_profile_idc");
+  WRITE_U(stream, (KVZ_BIT_DEPTH == 8) ? 1 : 2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
@@ -410,8 +410,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //IF window flag
   //END IF
 
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
+  WRITE_UE(stream, KVZ_BIT_DEPTH-8, "bit_depth_luma_minus8");
+  WRITE_UE(stream, KVZ_BIT_DEPTH-8, "bit_depth_chroma_minus8");
   WRITE_UE(stream, encoder->poc_lsb_bits - 4, "log2_max_pic_order_cnt_lsb_minus4");
 
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
@@ -972,7 +972,7 @@ static void add_checksum(encoder_state_t * const state)
   switch (state->encoder_control->cfg.hash)
   {
   case KVZ_HASH_CHECKSUM:
-    kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
+    kvz_image_checksum(frame->rec, checksum, KVZ_BIT_DEPTH);
 
     sei_write_payload_size(stream, 1 + num_colors * 4);
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
@@ -988,7 +988,7 @@ static void add_checksum(encoder_state_t * const state)
     break;
 
   case KVZ_HASH_MD5:
-    kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
+    kvz_image_md5(frame->rec, checksum, KVZ_BIT_DEPTH);
 
     sei_write_payload_size(stream, 1 + num_colors * 16);
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5

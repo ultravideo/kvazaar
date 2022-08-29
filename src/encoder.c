@@ -238,8 +238,6 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     goto init_failed;
   }
 
-  encoder->bitdepth = KVZ_BIT_DEPTH;
-
   encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
 
   // Interlacing
@@ -301,7 +299,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     }
   }
 
-  kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
+  kvz_scalinglist_process(&encoder->scaling_list, KVZ_BIT_DEPTH);
 
   kvz_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);
 

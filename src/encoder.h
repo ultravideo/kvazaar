@@ -79,7 +79,6 @@ typedef struct encoder_control_t
     int range;
   } me;
 
-  int8_t bitdepth;
   enum kvz_chroma_format chroma_format;
 
   /* VUI */

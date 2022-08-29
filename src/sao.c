@@ -180,8 +180,8 @@ static double sao_mode_bits_band(const encoder_state_t * const state,
 void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
   int32_t val;
-  const int32_t values = (1<<encoder->bitdepth);
-  const int32_t shift = encoder->bitdepth-5;
+  const int32_t values = (1<<KVZ_BIT_DEPTH);
+  const int32_t shift = KVZ_BIT_DEPTH-5;
   const int32_t band_pos = (color_i == COLOR_V) ? 1 : 0;
   const int32_t cur_bp   = sao->band_position[band_pos];
 
@@ -270,7 +270,7 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
                            int sao_bands[2][32])
 {
   int y, x;
-  int shift = state->encoder_control->bitdepth-5;
+  int shift = KVZ_BIT_DEPTH-5;
 
   //Loop pixels and take top 5 bits to classify different bands
   for (y = 0; y < block_height; ++y) {
