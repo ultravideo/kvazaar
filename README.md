@@ -49,7 +49,7 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 ### Parameters
 
-[comment]: # (BEGIN KVAZAAR HELP MESSAGE)
+[comment]: # "BEGIN KVAZAAR HELP MESSAGE"
 ```
 Usage:
 kvazaar -i <input> --input-res <width>x<height> -o <output>
@@ -347,7 +347,7 @@ Deprecated parameters: (might be removed at some point)
   -w, --width <integer>       : Use --input-res.
   -h, --height <integer>      : Use --input-res.
 ```
-[comment]: # (END KVAZAAR HELP MESSAGE)
+[comment]: # "END KVAZAAR HELP MESSAGE"
 
 
 ### LP-GOP syntax
@@ -429,6 +429,7 @@ Run the following commands to compile and install Kvazaar.
     ./configure
     make
     sudo make install
+    sudo ldconfig
 
 See `./configure --help` for more options.
 
