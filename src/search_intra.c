@@ -819,7 +819,6 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          int8_t *mode_out, double *cost_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-  const int8_t cu_width = LCU_WIDTH >> depth;
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
 
   cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
