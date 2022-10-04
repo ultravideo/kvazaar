@@ -108,6 +108,7 @@ libkvazaar_la_SOURCES = \
 	search_inter.h \
 	search_intra.c \
 	search_intra.h \
+	sei.h \
 	tables.c \
 	tables.h \
 	threadqueue.c \
