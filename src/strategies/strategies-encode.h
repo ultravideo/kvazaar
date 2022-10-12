@@ -46,7 +46,7 @@
 
 
 // Declare function pointers.
-typedef unsigned (encode_coeff_nxn_func)(encoder_state_t * const state,
+typedef void (encode_coeff_nxn_func)(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const coeff_t *coeff,
                                          uint8_t width,

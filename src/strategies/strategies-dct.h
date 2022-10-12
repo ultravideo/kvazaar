@@ -41,7 +41,7 @@
 #include "global.h" // IWYU pragma: keep
 #include "cu.h"
 
-typedef unsigned (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *output);
+typedef void (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *output);
 
 
 // Declare function pointers.
