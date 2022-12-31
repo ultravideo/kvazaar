@@ -79,6 +79,7 @@ CFLAGS="$KVZ_CFLAGS $CFLAGS"
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
+AC_SEARCH_LIBS([sem_init], [rt c], [], [exit 1])
 
 AC_ARG_WITH([cryptopp],
     AS_HELP_STRING([--with-cryptopp],
@@ -157,7 +158,6 @@ AS_CASE([$host_os],
         [linux*|*kfreebsd*], [
          ASFLAGS="$ASFLAGS -f elf$BITS"
          LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
-         LIBS="$LIBS -lrt"
         ], [
          ASFLAGS="$ASFLAGS -f elf$BITS"
          LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
