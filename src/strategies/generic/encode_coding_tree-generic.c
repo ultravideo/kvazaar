@@ -43,9 +43,11 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
                                   uint8_t width,
                                   uint8_t type,
                                   int8_t scan_mode,
-                                  int8_t tr_skip)
+                                  int8_t tr_skip,
+                                  double* bits_out)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+  double bits = 0;
   int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -111,7 +113,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   // transform skip flag
   if(width == 4 && encoder->cfg.trskip_enable) {
     cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
-    CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
+    CABAC_FBITS_UPDATE(cabac, cabac->cur_ctx, tr_skip, bits, "transform_skip_flag");
   }
 
   last_coeff_x = pos_last & (width - 1);
@@ -124,7 +126,8 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
                                  width,
                                  width,
                                  type,
-                                 scan_mode);
+                                 scan_mode,
+                                 bits_out);
 
   scan_pos_sig  = scan_pos_last;
 
@@ -157,8 +160,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
       uint32_t sig_coeff_group   = (sig_coeffgroup_flag[cg_blk_pos] != 0);
       uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                       cg_pos_y, width);
-      cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
-      CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
+      CABAC_FBITS_UPDATE(cabac, &base_coeff_group_ctx[ctx_sig], sig_coeff_group, bits, "coded_sub_block_flag");
     }
 
     if (sig_coeffgroup_flag[cg_blk_pos]) {
@@ -174,8 +176,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         if (scan_pos_sig > sub_pos || i == 0 || num_non_zero) {
           ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
-          cabac->cur_ctx = &baseCtx[ctx_sig];
-          CABAC_BIN(cabac, sig, "sig_coeff_flag");
+          CABAC_FBITS_UPDATE(cabac, &baseCtx[ctx_sig], sig, bits, "sig_coeff_flag");
         }
 
         if (sig) {
@@ -214,8 +215,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
       for (idx = 0; idx < num_c1_flag; idx++) {
         uint32_t symbol = (abs_coeff[idx] > 1) ? 1 : 0;
-        cabac->cur_ctx = &base_ctx_mod[c1];
-        CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
+        CABAC_FBITS_UPDATE(cabac, &base_ctx_mod[c1], symbol, bits, "coeff_abs_level_greater1_flag");
 
         if (symbol) {
           c1 = 0;
@@ -234,8 +234,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
         if (first_c2_flag_idx != -1) {
           uint8_t symbol = (abs_coeff[first_c2_flag_idx] > 2) ? 1 : 0;
-          cabac->cur_ctx      = &base_ctx_mod[0];
-          CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
+          CABAC_FBITS_UPDATE(cabac, &base_ctx_mod[0], symbol, bits, "coeff_abs_level_greater2_flag");
         }
       }
       if (be_valid && sign_hidden) {
@@ -245,11 +244,13 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
             coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->crypto_hdl, num_non_zero-1);
           }
         CABAC_BINS_EP(cabac, coeff_signs , (num_non_zero - 1), "coeff_sign_flag");
+        if (cabac->only_count) bits += num_non_zero - 1;
       } else {
         if (!cabac->only_count)
           if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
             coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->crypto_hdl, num_non_zero);
         CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
+        if (cabac->only_count) bits += num_non_zero;
       }
 
       if (c1 == 0 || num_non_zero > C1FLAG_NUMBER) {
@@ -263,9 +264,9 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
               if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
                 kvz_cabac_write_coeff_remain_encry(state, cabac, abs_coeff[idx] - base_level, go_rice_param, base_level);
               else
-                kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
+                bits += kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
             } else
-              kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
+              bits += kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
 
             if (abs_coeff[idx] > 3 * (1 << go_rice_param)) {
               go_rice_param = MIN(go_rice_param + 1, 4);
@@ -279,6 +280,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
       }
     }
   }
+  if (cabac->only_count) *bits_out += bits;
 }
 
 int kvz_strategy_register_encode_generic(void* opaque, uint8_t bitdepth)

@@ -1711,7 +1711,7 @@ static void search_pu_inter(encoder_state_t * const state,
     merge->unit[merge->size].skipped = false;
 
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
-    if(state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
+    if(state->encoder_control->cfg.rdo >= 3 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
     }
     else {
@@ -1739,14 +1739,14 @@ static void search_pu_inter(encoder_state_t * const state,
   bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
   if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
-      if(cfg->rdo >= 2 && merge->unit[merge->keys[merge_key]].skipped) {
+      if(cfg->rdo >= 3 && merge->unit[merge->keys[merge_key]].skipped) {
         merge->size = 1;
         merge->bits[0] = merge->bits[merge->keys[merge_key]];
         merge->cost[0] = merge->cost[merge->keys[merge_key]];
         merge->unit[0] = merge->unit[merge->keys[merge_key]];
         merge->keys[0] = 0;
       }
-      else if(cfg->rdo < 2) {
+      else if(cfg->rdo < 3) {
         // Reconstruct blocks with merge candidate.
         // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
         // and chroma exists.
@@ -1849,7 +1849,7 @@ static void search_pu_inter(encoder_state_t * const state,
   for (int list = 0; list < 2; ++list) {
 
     // TODO: make configurable
-    int n_best = MIN(1, amvp[list].size);
+    int n_best = MIN(state->encoder_control->cfg.rdo >= 4 ? 2 : 1, amvp[list].size);
     if (cfg->fme_level > 0) {
 
       for (int i = 0; i < n_best; ++i) {
@@ -1894,7 +1894,7 @@ static void search_pu_inter(encoder_state_t * const state,
           unipred_pu->inter.mv[list][1] = frac_mv.y;
           CU_SET_MV_CAND(unipred_pu, list, cu_mv_cand);
 
-          if (state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
+          if (state->encoder_control->cfg.rdo >= 3 && cur_pu->part_size == SIZE_2Nx2N) {
             kvz_cu_cost_inter_rd2(state, x, y, depth, unipred_pu, lcu, &frac_cost, &frac_bits);
           }
 
@@ -1917,7 +1917,7 @@ static void search_pu_inter(encoder_state_t * const state,
     amvp[list].size = n_best;
   }
 
-  if (state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N && cfg->fme_level == 0) {
+  if (state->encoder_control->cfg.rdo >= 3 && cur_pu->part_size == SIZE_2Nx2N && cfg->fme_level == 0) {
     if (amvp[0].size) kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[0].unit[best_keys[0]], lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]]);
     if (amvp[1].size) kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[1].unit[best_keys[1]], lcu, &amvp[1].cost[best_keys[1]], &amvp[1].bits[best_keys[1]]);
   }
@@ -2019,13 +2019,12 @@ static void search_pu_inter(encoder_state_t * const state,
         amvp[2].size++;
       }
     }
-
-    // TODO: this probably should have a separate command line option
-    if (cfg->rdo == 3) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
+    
+    if (!cfg->fast_bipred) search_pu_inter_bipred(info, depth, lcu, &amvp[2]);
     
     assert(amvp[2].size <= MAX_UNIT_STATS_MAP_SIZE);
     kvz_sort_keys_by_cost(&amvp[2]);
-    if (amvp[2].size > 0 && state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
+    if (amvp[2].size > 0 && state->encoder_control->cfg.rdo >= 3 && cur_pu->part_size == SIZE_2Nx2N) {
       kvz_cu_cost_inter_rd2(state, x, y, depth, &amvp[2].unit[amvp[2].keys[0]], lcu, &amvp[2].cost[amvp[2].keys[0]], &amvp[2].bits[amvp[2].keys[0]]);
     }
   }
@@ -2238,9 +2237,21 @@ void kvz_search_cu_inter(encoder_state_t * const state,
   const int y_local = SUB_SCU(y);
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   *cur_pu = *best_inter_pu;
-
-  kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
-    true, state->encoder_control->chroma_format != KVZ_CSP_400);   
+  // Calculate more accurate cost when needed
+  if (state->encoder_control->cfg.rdo == 2) {
+    kvz_cu_cost_inter_rd2(state,
+      x, y, depth,
+      cur_pu,
+      lcu,
+      inter_cost,
+      inter_bitcost);
+    kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
+      true, state->encoder_control->chroma_format != KVZ_CSP_400);
+  }
+  else {
+    kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
+      true, state->encoder_control->chroma_format != KVZ_CSP_400);
+  }
 
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {
     assert(fracmv_within_tile(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));

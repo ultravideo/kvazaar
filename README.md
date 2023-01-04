@@ -200,18 +200,22 @@ Compression tools:
       --(no-)signhide        : Sign hiding [disabled]
       --(no-)smp             : Symmetric motion partition [disabled]
       --(no-)amp             : Asymmetric motion partition [disabled]
-      --rd <integer>         : Intra mode search complexity [0]
+      --rd <integer>         : Mode search complexity [0]
                                    - 0: Skip intra if inter is good enough.
                                    - 1: Rough intra mode search with SATD.
-                                   - 2: Refine intra mode search with SSE.
-                                   - 3: Try all intra modes and enable intra
-                                        chroma mode search.
+                                   - 2: Refine mode search with SSE.
+                                   - 3: More SSE candidates for inter and
+                                        chroma mode search for 4x4 intra.
+                                   - 4: Even more SSE candidates for both.
+                                   - 5: Try all intra modes.
       --(no-)mv-rdo          : Rate-distortion optimized motion vector costs
                                [disabled]
       --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero
                                residual improves the RD cost. [enabled]
       --(no-)full-intra-search : Try all intra modes during rough search.
                                [disabled]
+      --(no-)intra-chroma-search : Test non-derived intra chroma modes.
+                                   [disabled]
       --(no-)transform-skip  : Try transform skip [disabled]
       --me <string>          : Integer motion estimation algorithm [hexbs]
                                    - hexbs: Hexagon Based Search
@@ -227,6 +231,7 @@ Compression tools:
                                    - 2: + 1/2-pixel diagonal
                                    - 3: + 1/4-pixel horizontal and vertical
                                    - 4: + 1/4-pixel diagonal
+      --(no-)fast-bipred     : Only perform fast bipred search. [enabled]
       --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]
                                    - 0, 1, 2, 3: from 64x64 to 8x8
                                    - Accepts a list of values separated by ','

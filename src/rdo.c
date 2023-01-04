@@ -172,10 +172,10 @@ int kvz_init_rdcost_outfiles(const char *dir_path)
   // As long as QP is a two-digit number, template and produced string should
   // be equal in length ("%i" -> "22")
   assert(RD_SAMPLING_MAX_LAST_QP <= 99);
-  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
   strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
     pthread_mutex_t *curr = outfile_mutex + qp;
@@ -233,7 +233,7 @@ out:
  *
  * \returns bits needed to code input coefficients
  */
-static INLINE uint32_t get_coeff_cabac_cost(
+static INLINE double get_coeff_cabac_cost(
     const encoder_state_t * const state,
     const coeff_t *coeff,
     int32_t width,
@@ -257,8 +257,7 @@ static INLINE uint32_t get_coeff_cabac_cost(
 
   // Clear bytes and bits and set mode to "count"
   cabac_copy.only_count = 1;
-  int num_buffered_bytes = cabac_copy.num_buffered_bytes;
-  int bits_left = cabac_copy.bits_left;
+  double bits = 0;
 
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
@@ -269,14 +268,15 @@ static INLINE uint32_t get_coeff_cabac_cost(
                        width,
                        type,
                        scan_mode,
-                       0);
+                       0,
+                       &bits);
   if(cabac_copy.update) {
     memcpy((cabac_data_t *)&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
   }
-  return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
+  return bits;
 }
 
-static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
+static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, double ccc)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
@@ -292,14 +292,14 @@ static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t
   pthread_mutex_unlock(mtx);
 }
 
-static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
+static INLINE void save_accuracy(int qp, double ccc, double fast_cost)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
   assert(qp <= RD_SAMPLING_MAX_LAST_QP);
 
   pthread_mutex_lock(mtx);
-  fprintf(fastrd_learning_outfile[qp], "%u %u\n", fast_cost, ccc);
+  fprintf(fastrd_learning_outfile[qp], "%f %f\n", fast_cost, ccc);
   pthread_mutex_unlock(mtx);
 }
 
@@ -312,7 +312,7 @@ static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
  *
  * \returns       number of bits needed to code coefficients
  */
-uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+double kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,
@@ -331,15 +331,15 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
       return UINT32_MAX; // Hush little compiler don't you cry, not really gonna return anything after assert(0)
     } else {
       uint64_t weights = kvz_fast_coeff_get_weights(state);
-      uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
+      double fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

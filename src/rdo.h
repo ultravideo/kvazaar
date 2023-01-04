@@ -54,7 +54,7 @@ void kvz_close_rdcost_outfiles(void);
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
-uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+double kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,

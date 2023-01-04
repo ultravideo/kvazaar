@@ -63,11 +63,12 @@
 void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
                                     uint8_t lastpos_x, uint8_t lastpos_y,
                                     uint8_t width, uint8_t height,
-                                    uint8_t type, uint8_t scan)
+                                    uint8_t type, uint8_t scan, double* bits_out)
 {
   const int index = kvz_math_floor_log2(width) - 2;
   uint8_t ctx_offset = type ? 0 : (index * 3 + (index + 1) / 4);
   uint8_t shift = type ? index : (index + 3) / 4;
+  double bits = 0;
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
@@ -81,37 +82,36 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
 
   // x prefix
   for (int last_x = 0; last_x < group_idx_x; last_x++) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_x[ctx_offset + (last_x >> shift)], 1, bits, "last_sig_coeff_x_prefix");
   }
   if (group_idx_x < g_group_idx[width - 1]) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (group_idx_x >> shift)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_x[ctx_offset + (group_idx_x >> shift)], 0, bits, "last_sig_coeff_x_prefix");
   }
 
   // y prefix
   for (int last_y = 0; last_y < group_idx_y; last_y++) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_y[ctx_offset + (last_y >> shift)], 1, bits, "last_sig_coeff_y_prefix");
   }
   if (group_idx_y < g_group_idx[height - 1]) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (group_idx_y >> shift)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_y[ctx_offset + (group_idx_y >> shift)], 0, bits, "last_sig_coeff_y_prefix");
   }
 
   // last_sig_coeff_x_suffix
   if (group_idx_x > 3) {
     const int suffix = lastpos_x - g_min_in_group[group_idx_x];
-    const int bits = (group_idx_x - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_x_suffix");
+    const int write_bits = (group_idx_x - 2) / 2;
+    CABAC_BINS_EP(cabac, suffix, write_bits, "last_sig_coeff_x_suffix");
+    if (cabac->only_count) bits += write_bits;
   }
 
   // last_sig_coeff_y_suffix
   if (group_idx_y > 3) {
     const int suffix = lastpos_y - g_min_in_group[group_idx_y];
-    const int bits = (group_idx_y - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_y_suffix");
+    const int write_bits = (group_idx_y - 2) / 2;
+    CABAC_BINS_EP(cabac, suffix, write_bits, "last_sig_coeff_y_suffix");
+    if (cabac->only_count) bits += write_bits;
   }
+  if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
 static void encode_transform_unit(encoder_state_t * const state,
@@ -142,7 +142,7 @@ static void encode_transform_unit(encoder_state_t * const state,
                          width,
                          0,
                          scan_idx,
-                         cur_pu->tr_skip);
+                         cur_pu->tr_skip, NULL);
   }
 
   if (depth == MAX_DEPTH + 1) {
@@ -172,11 +172,11 @@ static void encode_transform_unit(encoder_state_t * const state,
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, NULL);
     }
   }
 }

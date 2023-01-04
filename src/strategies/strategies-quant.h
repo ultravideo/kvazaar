@@ -56,7 +56,7 @@ typedef int32_t (quant_residual_func)(encoder_state_t *const state,
   bool early_skip);
 typedef void (dequant_func)(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width,
   int32_t height, int8_t type, int8_t block_type);
-typedef uint32_t (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint64_t weights);
+typedef double (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint64_t weights);
 
 typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
 
