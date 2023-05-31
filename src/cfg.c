@@ -188,6 +188,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->force_inter = 0;
   cfg->intra_chroma_search = 0;
   cfg->fast_bipred = 1;
+
+  cfg->enable_logging_output = 1;
+
   return 1;
 }
 
