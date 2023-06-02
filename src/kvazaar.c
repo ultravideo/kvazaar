@@ -93,7 +93,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   //Initialize strategies
   // TODO: Make strategies non-global
-  if (!kvz_strategyselector_init(cfg->cpuid, KVZ_BIT_DEPTH)) {
+  if (!kvz_strategyselector_init(cfg->cpuid, KVZ_BIT_DEPTH, cfg->enable_logging_output)) {
     fprintf(stderr, "Failed to initialize strategies.\n");
     goto kvazaar_open_failure;
   }

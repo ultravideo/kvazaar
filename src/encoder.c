@@ -216,12 +216,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     // completed.
     encoder->cfg.owf += 2;
 
-    fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
+    if (cfg->enable_logging_output) fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
   }
 
   if (encoder->cfg.threads < 0) {
     encoder->cfg.threads = MIN(max_threads, get_max_parallelism(encoder));
-    fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
+    if (cfg->enable_logging_output) fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
   }
 
   if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
