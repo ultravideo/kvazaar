@@ -15,7 +15,7 @@
 #
 
 # Use Ubuntu 18.04 as a base for now, it's around 88MB
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 MAINTAINER Marko Viitanen <fador@iki.fi>
 
