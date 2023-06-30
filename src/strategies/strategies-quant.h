@@ -44,6 +44,7 @@
 #include "kvazaar.h"
 #include "tables.h"
 
+struct kvz_sh_rates_t;
 // Declare function pointers.
 typedef void (quant_func)(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type);
@@ -60,12 +61,16 @@ typedef double (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint6
 
 typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
 
+typedef void (find_last_scanpos_func)(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
+  uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode);
+
 // Declare function pointers.
 extern quant_func * kvz_quant;
 extern quant_residual_func * kvz_quantize_residual;
 extern dequant_func *kvz_dequant;
 extern coeff_abs_sum_func *kvz_coeff_abs_sum;
 extern fast_coeff_cost_func *kvz_fast_coeff_cost;
+extern find_last_scanpos_func *kvz_find_last_scanpos;
 
 int kvz_strategy_register_quant(void* opaque, uint8_t bitdepth);
 
@@ -76,6 +81,7 @@ int kvz_strategy_register_quant(void* opaque, uint8_t bitdepth);
   {"dequant", (void**) &kvz_dequant}, \
   {"coeff_abs_sum", (void**) &kvz_coeff_abs_sum}, \
   {"fast_coeff_cost", (void**) &kvz_fast_coeff_cost}, \
+  {"find_last_scanpos", (void**) &kvz_find_last_scanpos}, \
 
 
 

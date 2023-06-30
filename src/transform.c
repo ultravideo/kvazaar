@@ -340,7 +340,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   const kvz_pixel *ref = NULL;
   // Pointers to current location in arrays with quantized coefficients.
   coeff_t *coeff = NULL;
-
+  printf("%d %d %d %d ", x, y, mode, color);
   switch (color) {
     case COLOR_Y:
       pred  = &lcu->rec.y[offset];

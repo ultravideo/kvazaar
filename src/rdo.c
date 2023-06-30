@@ -148,19 +148,6 @@ const float kvz_f_entropy_bits[128] =
   0.027313232421875, 5.736968994140625,
 };
 
-
-// This struct is for passing data to kvz_rdoq_sign_hiding
-struct sh_rates_t {
-  // Bit cost of increasing rate by one.
-  int32_t inc[32 * 32];
-  // Bit cost of decreasing rate by one.
-  int32_t dec[32 * 32];
-  // Bit cost of going from zero to one.
-  int32_t sig_coeff_inc[32 * 32];
-  // Coeff minus quantized coeff.
-  int32_t quant_delta[32 * 32];
-};
-
 int kvz_init_rdcost_outfiles(const char *dir_path)
 {
 #define RD_SAMPLING_MAX_FN_LENGTH 4095
@@ -532,7 +519,7 @@ void kvz_rdoq_sign_hiding(
     const encoder_state_t *const state,
     const int32_t qp_scaled,
     const uint32_t *const scan2raster,
-    const struct sh_rates_t *const sh_rates,
+    const struct kvz_sh_rates_t *const sh_rates,
     const int32_t last_pos,
     const coeff_t *const coeffs,
     coeff_t *const quant_coeffs)
@@ -665,30 +652,6 @@ void kvz_rdoq_sign_hiding(
 }
 
 
-void find_last_scanpos(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct sh_rates_t sh_rates, const uint32_t cg_size, uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos) {
-  for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
-    for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--) {
-      int32_t  scanpos        = *cg_scanpos*cg_size + scanpos_in_cg;
-      uint32_t blkpos         = scan[scanpos];
-      int32_t q               = quant_coeff[blkpos];
-      int32_t level_double    = coef[blkpos];
-      level_double            = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
-      uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
-
-      if (max_abs_level > 0) {
-        *last_scanpos    = scanpos;
-        *ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
-        *cg_last_scanpos = *cg_scanpos;
-        sh_rates.sig_coeff_inc[blkpos] = 0;
-        break;
-      }
-      dest_coeff[blkpos] = 0;
-    }
-    if (*last_scanpos != -1) break;
-  }
-}
-
-
 /** RDOQ with CABAC
  * \returns void
  * Rate distortion optimized quantization for entropy
@@ -719,7 +682,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   double cost_sig   [ 32 * 32 ];
   double cost_coeff0[ 32 * 32 ];
 
-  struct sh_rates_t sh_rates;
+  struct kvz_sh_rates_t sh_rates;
 
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
   const uint32_t cg_size = 16;
@@ -768,9 +731,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   //Find last cg and last scanpos
   int32_t cg_scanpos;
-  find_last_scanpos(coef, dest_coeff, type, q_bits, quant_coeff, sh_rates, cg_size, &ctx_set, scan, &cg_last_scanpos,
-                    &last_scanpos, cg_num, &cg_scanpos);
-
+  kvz_find_last_scanpos(coef, dest_coeff, type, q_bits, quant_coeff, &sh_rates, cg_size, &ctx_set, scan, &cg_last_scanpos,
+    &last_scanpos, cg_num, &cg_scanpos, width, scan_mode);
+    
   if (last_scanpos == -1) {
     return;
   }

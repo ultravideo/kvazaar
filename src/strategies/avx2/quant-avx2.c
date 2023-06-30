@@ -862,6 +862,72 @@ static double fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t
   return (double)(temp) / 256.0;
 }
 
+static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
+  uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode) {
+
+  __m256i min_q_bits = _mm256_set1_epi32(MAX_INT - (1 << (q_bits - 1)));
+  __m256i q_bits_v = _mm256_set1_epi32(1 << (q_bits - 1));
+  for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
+    int32_t scan_pos = *cg_scanpos * cg_size;
+    int32_t block_pos = scan[scan_pos];
+    coeff_t q_array[16];
+    memcpy(q_array, &quant_coeff[block_pos], 4 * sizeof(coeff_t));
+    memcpy(q_array + 4, &quant_coeff[block_pos + width], 4 * sizeof(coeff_t));
+    memcpy(q_array + 8, &quant_coeff[block_pos + 2 * width], 4 * sizeof(coeff_t));
+    memcpy(q_array + 12, &quant_coeff[block_pos + 3 * width], 4 * sizeof(coeff_t));
+
+    coeff_t coef_array[16];
+    memcpy(coef_array, &coef[block_pos], 4 * sizeof(coeff_t));
+    memcpy(coef_array + 4, &coef[block_pos + width], 4 * sizeof(coeff_t));
+    memcpy(coef_array + 8, &coef[block_pos + 2 * width], 4 * sizeof(coeff_t));
+    memcpy(coef_array + 12, &coef[block_pos + 3 * width], 4 * sizeof(coeff_t));
+
+    __m256i q = _mm256_loadu_si256((__m256i const*)q_array);
+
+    __m256i level_double = _mm256_loadu_si256((__m256i const*)coef_array);
+
+    __m256i abs_level_double = _mm256_abs_epi16(level_double);
+
+    __m256i levels_mul_q_low = _mm256_mullo_epi16(abs_level_double, q);
+    __m256i levels_mul_q_high = _mm256_mulhi_epi16(abs_level_double, q);
+
+    __m256i levels_mul_0 = _mm256_unpacklo_epi16(levels_mul_q_low, levels_mul_q_high);
+    __m256i levels_mul_1 = _mm256_unpackhi_epi16(levels_mul_q_low, levels_mul_q_high);
+
+    __m256i min_mask = _mm256_cmpgt_epi32(min_q_bits, levels_mul_0);
+    levels_mul_0 = _mm256_blendv_epi8(min_q_bits, levels_mul_0, min_mask);
+    min_mask = _mm256_cmpgt_epi32(min_q_bits, levels_mul_1);
+    levels_mul_1 = _mm256_blendv_epi8(min_q_bits, levels_mul_1, min_mask);
+
+    __m256i max_abs_level_low = _mm256_add_epi32(levels_mul_0, q_bits_v);
+    max_abs_level_low = _mm256_srai_epi32(max_abs_level_low, q_bits);
+    __m256i max_abs_level_high = _mm256_add_epi32(levels_mul_1, q_bits_v);
+    max_abs_level_high = _mm256_srai_epi32(max_abs_level_high, q_bits);
+
+    memset(&dest_coeff[block_pos], 0, sizeof(coeff_t) * 4);
+    memset(&dest_coeff[block_pos + width], 0, sizeof(coeff_t) * 4);
+    memset(&dest_coeff[block_pos + 2 * width], 0, sizeof(coeff_t) * 4);
+    memset(&dest_coeff[block_pos + 3 * width], 0, sizeof(coeff_t) * 4);
+    if (!_mm256_testz_si256(max_abs_level_low, max_abs_level_low) || !_mm256_testz_si256(max_abs_level_high, max_abs_level_high)) {
+      uint32_t max_abs_level[16];
+      _mm256_storeu2_m128i((__m128i*)(max_abs_level + 8), (__m128i*)(max_abs_level), max_abs_level_low);
+      _mm256_storeu2_m128i((__m128i*)(max_abs_level + 12), (__m128i*)(max_abs_level + 4), max_abs_level_high);
+      for (int sp = scan_pos + 15; sp >= scan_pos; sp--) {
+        uint32_t blkpos = kvz_g_sig_last_scan[scan_mode][1][sp - scan_pos];
+        if (max_abs_level[blkpos] > 0) {
+          *last_scanpos = sp;
+          *ctx_set = (sp > 0 && type == 0) ? 2 : 0;
+          *cg_last_scanpos = *cg_scanpos;
+          sh_rates->sig_coeff_inc[scan[sp]] = 0;
+          return;
+        }
+      }
+    }
+  }
+  *last_scanpos = -1;
+}
+
+
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
@@ -878,6 +944,7 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
   success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
+  success &= kvz_strategyselector_register(opaque, "find_last_scanpos", "avx2", 40, &find_last_scanpos_avx2);
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
