@@ -152,7 +152,7 @@ static INLINE __m256i concatenate_2x128i(__m128i lo, __m128i hi)
   return _mm256_inserti128_si256(v, hi, 1);
 }
 
-static INLINE void scanord_read_vector_32(const int32_t  *__restrict quant_coeff,
+static INLINE void scanord_read_vector_32(const coeff_t *__restrict quant_coeff,
                                           const uint32_t *__restrict scan,
                                           int8_t scan_mode,
                                           int32_t subpos,
@@ -190,15 +190,14 @@ static INLINE void scanord_read_vector_32(const int32_t  *__restrict quant_coeff
     _mm256_setr_epi32(2, 6, 0, 4, 3, 7, 1, 5),
   };
 
-  __m128i coeffs[4] = {
-    _mm_loadu_si128((__m128i *)(quant_coeff + row_offsets[0])),
-    _mm_loadu_si128((__m128i *)(quant_coeff + row_offsets[1])),
-    _mm_loadu_si128((__m128i *)(quant_coeff + row_offsets[2])),
-    _mm_loadu_si128((__m128i *)(quant_coeff + row_offsets[3])),
-  };
+  coeff_t coeffs[16];
+  memcpy(coeffs, quant_coeff + row_offsets[0], sizeof(coeff_t) * 4);
+  memcpy(coeffs + 4, quant_coeff + row_offsets[1], sizeof(coeff_t) * 4);
+  memcpy(coeffs + 8, quant_coeff + row_offsets[2], sizeof(coeff_t) * 4);
+  memcpy(coeffs + 12, quant_coeff + row_offsets[3], sizeof(coeff_t) * 4);
 
-  __m256i coeffs_upper = concatenate_2x128i(coeffs[0], coeffs[1]);
-  __m256i coeffs_lower = concatenate_2x128i(coeffs[2], coeffs[3]);
+  __m256i coeffs_upper = _mm256_cvtepi16_epi32(_mm_load_si128((__m128i const *)(coeffs)));
+  __m256i coeffs_lower = _mm256_cvtepi16_epi32(_mm_load_si128((__m128i const*)(coeffs + 8)));
 
   __m256i lower_shuffled = _mm256_permutevar8x32_epi32(coeffs_lower, shufmasks[scan_mode]);
 
@@ -368,7 +367,7 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
+  const coeff_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
@@ -393,8 +392,8 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
     v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
 
     if (state->encoder_control->scaling_list.enable) {
-      __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
-      __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
+      __m256i v_quant_coeff_lo = _mm256_cvtepi16_epi32(_mm_loadu_si128(((__m128i *)(quant_coeff + n)) + 0));
+      __m256i v_quant_coeff_hi = _mm256_cvtepi16_epi32(_mm_loadu_si128(((__m128i *)(quant_coeff + n)) + 1));
 
       low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
                                          v_quant_coeff_hi,
@@ -739,7 +738,7 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
     uint32_t log2_tr_size = kvz_g_convert_to_bit[ width ] + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+    const coeff_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
     shift += 4;
 
     if (shift >qp_scaled / 6) {

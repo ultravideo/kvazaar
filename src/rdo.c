@@ -665,6 +665,30 @@ void kvz_rdoq_sign_hiding(
 }
 
 
+void find_last_scanpos(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct sh_rates_t sh_rates, const uint32_t cg_size, uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos) {
+  for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
+    for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--) {
+      int32_t  scanpos        = *cg_scanpos*cg_size + scanpos_in_cg;
+      uint32_t blkpos         = scan[scanpos];
+      int32_t q               = quant_coeff[blkpos];
+      int32_t level_double    = coef[blkpos];
+      level_double            = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
+      uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
+
+      if (max_abs_level > 0) {
+        *last_scanpos    = scanpos;
+        *ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
+        *cg_last_scanpos = *cg_scanpos;
+        sh_rates.sig_coeff_inc[blkpos] = 0;
+        break;
+      }
+      dest_coeff[blkpos] = 0;
+    }
+    if (*last_scanpos != -1) break;
+  }
+}
+
+
 /** RDOQ with CABAC
  * \returns void
  * Rate distortion optimized quantization for entropy
@@ -686,7 +710,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const coeff_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
   const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
@@ -744,28 +768,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   //Find last cg and last scanpos
   int32_t cg_scanpos;
-  for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
-  {
-    for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
-    {
-      int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
-      uint32_t blkpos         = scan[scanpos];
-      int32_t q               = quant_coeff[blkpos];
-      int32_t level_double    = coef[blkpos];
-      level_double            = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
-      uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
-
-      if (max_abs_level > 0) {
-        last_scanpos    = scanpos;
-        ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
-        cg_last_scanpos = cg_scanpos;
-        sh_rates.sig_coeff_inc[blkpos] = 0;
-        break;
-      }
-      dest_coeff[blkpos] = 0;
-    }
-    if (last_scanpos != -1) break;
-  }
+  find_last_scanpos(coef, dest_coeff, type, q_bits, quant_coeff, sh_rates, cg_size, &ctx_set, scan, &cg_last_scanpos,
+                    &last_scanpos, cg_num, &cg_scanpos);
 
   if (last_scanpos == -1) {
     return;
