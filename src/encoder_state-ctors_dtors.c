@@ -68,6 +68,9 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->rc_beta = -1.367;
   state->frame->icost = 0;
 
+  // Reset max_qp_delta_depth here, was causing problems when headers are requested before input is fed in
+  state->frame->max_qp_delta_depth = 0;
+
   const encoder_control_t * const encoder = state->encoder_control;
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
   state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
