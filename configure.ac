@@ -138,12 +138,12 @@ AS_CASE([$host_os],
         [cygwin*|msys*|mingw*], [
          CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO=1"
          # Fix a bug in mingw gcc where stack doesn't get aligned properly, force all AVX instructions to be unaligned
-         if test x"${CC}" = x"gcc" ; then
+         AS_CASE([$CC], [*gcc],[
              AX_CHECK_COMPILE_FLAG([-Wa,-muse-unaligned-vector-move],
                  [CFLAGS="-Wa,-muse-unaligned-vector-move $CFLAGS"],
                  [AC_MSG_ERROR([-Wa,-muse-unaligned-vector-move not supported, required with mingw+gcc to fix alignment bugs, update the used gcc])]
              )
-         fi
+         ])
          AS_IF(
                [test "x$BITS" = "x32"], [
                 ASFLAGS="$ASFLAGS -fwin32 -DPREFIX -DHAVE_ALIGNED_STACK=0"
