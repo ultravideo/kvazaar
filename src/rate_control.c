@@ -189,7 +189,7 @@ static double gop_allocate_bits(encoder_state_t * const state)
     bits_coded -= state->frame->cur_gop_bits_coded;
   }
 
-  smoothing_window = MAX(MIN_SMOOTHING_WINDOW, smoothing_window - encoder->cfg.gop_len / 2);
+  smoothing_window = MAX(MIN_SMOOTHING_WINDOW, smoothing_window - MAX(encoder->cfg.gop_len / 2, 1));
   double gop_target_bits = -1;
 
   while( gop_target_bits < 0 && smoothing_window < 150) {
@@ -375,7 +375,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
     else {
       alpha = 0.3;
     }
-    return MAX(100, alpha*pow(state->frame->icost * 4 / bits, beta)*bits);
+    return MIN(MAX(100, alpha*pow(state->frame->icost * 4 / bits, beta)*bits), encoder->cfg.gop_len >= 2 ? 0.85 * state->frame->cur_gop_target_bits : state->frame->cur_gop_target_bits);
   }
 
   if (encoder->cfg.gop_len <= 0) {
