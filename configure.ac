@@ -141,7 +141,16 @@ AS_CASE([$host_os],
          AS_CASE([$CC], [*gcc],[
              AX_CHECK_COMPILE_FLAG([-Wa,-muse-unaligned-vector-move],
                  [CFLAGS="-Wa,-muse-unaligned-vector-move $CFLAGS"],
-                 [AC_MSG_ERROR([-Wa,-muse-unaligned-vector-move not supported, required with mingw+gcc to fix alignment bugs, update the used gcc])]
+                 [
+                    AC_MSG_CHECKING([if compiler is gcc])
+                    AS_IF([$CC --version | grep "gcc" >/dev/null 2>&1], [
+                        AS_ECHO(["yes"])
+                        AC_MSG_ERROR([-Wa,-muse-unaligned-vector-move not supported, required with mingw+gcc to fix alignment bugs, update the used gcc])
+                    ],[
+                        AS_ECHO(["no"])
+                        AS_ECHO(["Compiler not gcc, -Wa,-muse-unaligned-vector-move not needed"])
+                    ])
+                ]
              )
          ])
          AS_IF(
