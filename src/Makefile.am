@@ -14,9 +14,6 @@ nodist_pkgconfig_DATA = kvazaar.pc
 include_HEADERS = \
 	kvazaar.h
 
-noinst_HEADERS = \
-	extras/x86inc.asm
-
 noinst_LTLIBRARIES = \
 	libaltivec.la \
 	libavx2.la \
@@ -154,8 +151,6 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-sao.h \
 	strategies/strategies-encode.c \
 	strategies/strategies-encode.h \
-	strategies/x86_asm/picture-x86-asm.c \
-	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
 	strategyselector.h \
 	extras/libmd5.c \
@@ -238,27 +233,6 @@ endif
 if HAVE_SSE2
 libsse2_la_CFLAGS = -msse2
 endif
-
-if ENABLE_ASM
-noinst_LTLIBRARIES += libasm.la
-libkvazaar_la_LIBADD += libasm.la
-libasm_la_SOURCES = \
-	strategies/x86_asm/picture-x86-asm-sad.asm \
-	strategies/x86_asm/picture-x86-asm-sad.h \
-	strategies/x86_asm/picture-x86-asm-satd.asm \
-	strategies/x86_asm/picture-x86-asm-satd.h
-libkvazaar_la_CFLAGS += -DKVZ_COMPILE_ASM
-
-strategies/x86_asm/picture-x86-asm-sad.lo: strategies/x86_asm/picture-x86-asm-sad.asm
-strategies/x86_asm/picture-x86-asm-satd.lo: strategies/x86_asm/picture-x86-asm-satd.asm
-endif #ENABLE_ASM
 endif #HAVE_X86
 
-
-yasm_verbose = $(yasm_verbose_@AM_V@)
-yasm_verbose_ = $(yasm_verbose_@AM_DEFAULT_V@)
-yasm_verbose_0 = @echo "  YASM    " $@;
-
-.asm.lo:
-	$(yasm_verbose)$(LIBTOOL) --mode=compile --tag=CC $(YASM) -I$(srcdir)/extras $(ASFLAGS) $< -o $@ -prefer-non-pic 1>/dev/null
 

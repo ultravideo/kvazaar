@@ -37,7 +37,6 @@
 #include "strategies/generic/picture-generic.h"
 #include "strategies/sse2/picture-sse2.h"
 #include "strategies/sse41/picture-sse41.h"
-#include "strategies/x86_asm/picture-x86-asm.h"
 #include "strategyselector.h"
 
 
@@ -92,9 +91,6 @@ int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   }
   if (kvz_g_hardware_flags.intel_flags.sse41) {
     success &= kvz_strategy_register_picture_sse41(opaque, bitdepth);
-  }
-  if (kvz_g_hardware_flags.intel_flags.avx) {
-    success &= kvz_strategy_register_picture_x86_asm_avx(opaque, bitdepth);
   }
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_picture_avx2(opaque, bitdepth);

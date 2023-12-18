@@ -181,24 +181,9 @@ AS_CASE([$host_os],
 )
 
 
-# YASM checks
-AS_IF([test "x$X86" = "xtrue"], [
-       AC_CHECK_TOOL([YASM], [yasm], [no])
-])
-AS_IF([test "x$YASM" != "xno"], [have_yasm="yes"])
-
-AC_ARG_ENABLE([asm], [AS_HELP_STRING([--disable-asm], [disable assembly [no]])],
-              [], [enable_asm="yes"]
-)
-AS_IF([test "x$enable_asm" != "xno" -a "$have_yasm" != "yes"],
-      [enable_asm="no"]
-)
-
-
 AM_CONDITIONAL([HAVE_X86], [test "x$X86" = "xtrue"])
 AM_CONDITIONAL([HAVE_PPC], [test "x$PPC" = "xtrue"])
 AM_CONDITIONAL([HAVE_ARM], [test "x$ARM" = "xtrue"])
-AM_CONDITIONAL([ENABLE_ASM], [test "x$enable_asm" = "xyes" -a "x$have_yasm" = "xyes" ])
 
 AC_ARG_VAR([ASFLAGS], [ASFLAGS to use for assembler])
 AC_SUBST([ASFLAGS])

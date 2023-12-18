@@ -24,10 +24,6 @@
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
-    <YASM>
-      <Defines>HAVE_ALIGNED_STACK=1</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths)</IncludePaths>
-    </YASM>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

@@ -46,9 +46,6 @@
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-    <Import Project="..\yasm\vsyasm.props" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="..\C_Properties.props" />
   </ImportGroup>
@@ -77,23 +74,14 @@
     <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <YASM />
     <Lib>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
       <AdditionalDependencies>
       </AdditionalDependencies>
     </Lib>
-    <YASM>
-      <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
-    </YASM>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <YASM>
-      <Defines>ARCH_X86_64=0;PREFIX</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
-    </YASM>
     <Lib>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
@@ -106,10 +94,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <YASM>
-      <Defines>ARCH_X86_64=0;PREFIX</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
-    </YASM>
     <Lib>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
@@ -122,10 +106,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <YASM>
-      <Defines>ARCH_X86_64=1;%(Defines)</Defines>
-      <IncludePaths>$(SolutionDir)..\src\extras;%(IncludePaths);$(SolutionDir)..\src\strategies\x86-asm;</IncludePaths>
-    </YASM>
     <Lib>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
@@ -239,7 +219,6 @@
     <ClCompile Include="..\..\src\strategies\strategies-nal.c" />
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
     <ClCompile Include="..\..\src\strategies\strategies-sao.c" />
-    <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c" />
     <ClCompile Include="..\..\src\threadwrapper\src\pthread.cpp">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
@@ -318,9 +297,6 @@
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
     <ClInclude Include="..\..\src\strategies\strategies-sao.h" />
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.h" />
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.h" />
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm.h" />
     <ClInclude Include="..\..\src\strategyselector.h" />
     <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\threadqueue.h" />
@@ -330,18 +306,5 @@
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\videoframe.h" />
   </ItemGroup>
-  <ItemGroup>
-    <YASM Include="..\..\src\extras\x86inc.asm">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </YASM>
-    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.asm" />
-    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.asm" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\yasm\vsyasm.targets" />
-  </ImportGroup>
 </Project>
