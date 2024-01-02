@@ -10,6 +10,14 @@ option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
+
+include(GNUInstallDirs) #Helps to define correct distro specific install directories
+
+set(KVAZAAR_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "kvazaar library install path")
+set(KVAZAAR_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH "kvazaar binary install path")
+set(KVAZAAR_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}" CACHE PATH "kvazaar include install path")
+set(KVAZAAR_INSTALL_MANDIR "${CMAKE_INSTALL_MANDIR}/man1" CACHE PATH "kvazaar manual page file install path")
+
 # https://www.kitware.com/cmake-and-the-default-build-type/
 # Set a default build type if none was specified
 set(KVZ_DEFAULT_BUILD_TYPE "RelWithDebInfo")
@@ -156,6 +164,7 @@ if(MSVC)
   target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
+  set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src)
   list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )

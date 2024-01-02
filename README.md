@@ -446,7 +446,7 @@ It is recommended to use Clang instead of GCC in MinGW environments. GCC also wo
 to build Kvazaar using Clang.
 
 ### CMake
-Depending on the platform, some additional tools are required for compiling Kvazzar with CMake.
+Depending on the platform, some additional tools are required for compiling Kvazaar with CMake.
 For Ubuntu, the required packages are `build-essential cmake`.
 
 
