@@ -1410,6 +1410,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("fast-bipred") {
     cfg->fast_bipred = atobool(value);
   }
+  else if OPT("enable-logging") {
+    cfg->enable_logging_output = atobool(value);
+  }
   else {
     return 0;
   }

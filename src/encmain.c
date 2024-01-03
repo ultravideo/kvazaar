@@ -527,10 +527,12 @@ int main(int argc, char *argv[])
 
   const encoder_control_t *encoder = enc->control;
 
-  fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
-  fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
-         encoder->in.width, encoder->in.height,
-         encoder->in.real_width, encoder->in.real_height);
+  if(opts->config->enable_logging_output) {
+    fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
+    fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
+           encoder->in.width, encoder->in.height,
+           encoder->in.real_width, encoder->in.real_height);
+  }
 
   if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height, opts->config->file_format)) {
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
@@ -687,7 +689,7 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
+        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE && encoder->cfg.enable_logging_output) {
           // Do not compute PSNR for interlaced frames, because img_rec does not contain
           // the deinterlaced frame yet.
           compute_psnr(img_src, img_rec, frame_psnr);
@@ -719,8 +721,10 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr,
-                         calc_avg_qp(qp_sum, frames_done));
+        if (opts->config->enable_logging_output) {
+          print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr,
+                           calc_avg_qp(qp_sum, frames_done));
+        }
       }
 
       api->picture_free(cur_in_img);
@@ -735,19 +739,20 @@ int main(int argc, char *argv[])
 
     // All reconstructed pictures should have been output.
     assert(recon_buffer_size == 0);
-
-    // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits",
-            frames_done,
-            (long long unsigned int)bitstream_length * 8);
-    if (encoder->cfg.calc_psnr && frames_done > 0) {
-      fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
-              psnr_sum[0] / frames_done,
-              psnr_sum[1] / frames_done,
-              psnr_sum[2] / frames_done);
+    if (opts->config->enable_logging_output) {
+      // Print statistics of the coding
+      fprintf(stderr, " Processed %d frames, %10llu bits",
+              frames_done,
+              (long long unsigned int)bitstream_length * 8);
+      if (encoder->cfg.calc_psnr && frames_done > 0) {
+        fprintf(stderr, " AVG PSNR Y %2.4f U %2.4f V %2.4f",
+                psnr_sum[0] / frames_done,
+                psnr_sum[1] / frames_done,
+                psnr_sum[2] / frames_done);
+      }
+      fprintf(stderr, "\n");
+      fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     }
-    fprintf(stderr, "\n");
-    fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
     {
       const double mega = (double)(1 << 20);
@@ -774,14 +779,16 @@ int main(int argc, char *argv[])
         encoding_cpu = 100.0;
       }
 #endif
-      fprintf(stderr, " Encoding time: %.3f s.\n",      encoding_time);
-      fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
+      if (opts->config->enable_logging_output) {
+        fprintf(stderr, " Encoding time: %.3f s.\n",      encoding_time);
+        fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
 
-      fprintf(stderr, " Encoding CPU usage: %.2f%%\n",  encoding_cpu);
-      fprintf(stderr, " FPS: %.2f\n",                   encoding_fps);
+        fprintf(stderr, " Encoding CPU usage: %.2f%%\n",  encoding_cpu);
+        fprintf(stderr, " FPS: %.2f\n",                   encoding_fps);
 
-      fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
-      fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
+        fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
+        fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
+      }
     }
     pthread_join(input_thread, NULL);
   }

@@ -176,6 +176,8 @@ static const struct option long_options[] = {
   { "no-intra-chroma-search",   no_argument, NULL, 0 },
   { "fast-bipred",              no_argument, NULL, 0 },
   { "no-fast-bipred",           no_argument, NULL, 0 },
+  { "enable-logging",           no_argument, NULL, 0 },
+  { "no-enable-logging",        no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -447,6 +449,8 @@ void print_help(void)
     "                                   - md5: 56 bytes\n"
     "      --(no-)psnr            : Calculate PSNR for frames. [enabled]\n"
     "      --(no-)info            : Add encoder info SEI. [enabled]\n"
+    "      --(no-)enable-logging  : Enable logging for regular encoder performance,\n"
+    "                               error messages are always disblayed. [enabled]\n"
     "      --crypto <string>      : Selective encryption. Crypto support must be\n"
     "                               enabled at compile-time. Can be 'on' or 'off' or\n"
     "                               a list of features separated with a '+'. [off]\n"
