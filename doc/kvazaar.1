@@ -1,9 +1,11 @@
-.TH KVAZAAR "1" "January 2023" "kvazaar v2.2.0" "User Commands"
+.TH KVAZAAR "1" "tammikuu 2024" "kvazaar v2.3.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
 \fBkvazaar \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
 .SH DESCRIPTION
+
+.SS "Required:"
 .TP
 \fB\-i\fR, \fB\-\-input <filename>    
 Input file
@@ -84,6 +86,10 @@ Calculate PSNR for frames. [enabled]
 .TP
 \fB\-\-(no\-)info           
 Add encoder info SEI. [enabled]
+.TP
+\fB\-\-(no\-)enable\-logging 
+Enable logging for regular encoder performance,
+error messages are always disblayed. [enabled]
 .TP
 \fB\-\-crypto <string>     
 Selective encryption. Crypto support must be

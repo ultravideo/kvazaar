@@ -51,6 +51,8 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 [comment]: # "BEGIN KVAZAAR HELP MESSAGE"
 ```
+Kvazaar v2.3.0 2024-01-17
+Kvazaar license: 3-clause BSD
 Usage:
 kvazaar -i <input> --input-res <width>x<height> -o <output>
 
@@ -95,6 +97,8 @@ Options:
                                    - md5: 56 bytes
       --(no-)psnr            : Calculate PSNR for frames. [enabled]
       --(no-)info            : Add encoder info SEI. [enabled]
+      --(no-)enable-logging  : Enable logging for regular encoder performance,
+                               error messages are always disblayed. [enabled]
       --crypto <string>      : Selective encryption. Crypto support must be
                                enabled at compile-time. Can be 'on' or 'off' or
                                a list of features separated with a '+'. [off]
