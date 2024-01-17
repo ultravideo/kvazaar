@@ -45,6 +45,19 @@
 #include "search_inter.h"
 
 
+// This struct is for passing data to kvz_rdoq_sign_hiding
+struct kvz_sh_rates_t {
+  // Bit cost of increasing rate by one.
+  int32_t inc[32 * 32];
+  // Bit cost of decreasing rate by one.
+  int32_t dec[32 * 32];
+  // Bit cost of going from zero to one.
+  int32_t sig_coeff_inc[32 * 32];
+  // Coeff minus quantized coeff.
+  int32_t quant_delta[32 * 32];
+};
+
+
 extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 

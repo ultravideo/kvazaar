@@ -179,7 +179,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
       uint32_t ref_matrix_id = UINT32_MAX;
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
-        const int32_t * const pred_list  = (list_id == pred_list_idx) ?
+        const coeff_t* const pred_list  = (list_id == pred_list_idx) ?
                                      kvz_scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 
@@ -200,7 +200,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
         const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[size_id]);
         const uint32_t * const scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
-        const int32_t * const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];
+        const coeff_t* const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];
 
         if (size_id >= SCALING_LIST_16x16) {
           WRITE_SE(stream, encoder->scaling_list.scaling_list_dc[size_id][list_id] - 8, "scaling_list_dc_coef_minus8");

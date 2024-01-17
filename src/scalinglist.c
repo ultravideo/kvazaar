@@ -43,7 +43,7 @@ const uint8_t kvz_g_scaling_list_num[4]    = { 6, 6, 6, 2};
 const uint16_t kvz_g_scaling_list_size[4]  = {   16,  64, 256,1024};
 static const uint8_t g_scaling_list_size_x[4] = { 4, 8,16,32};
 
-static const int32_t g_quant_default_4x4[16] =
+static const coeff_t g_quant_default_4x4[16] =
 {
   16,16,16,16,
   16,16,16,16,
@@ -51,7 +51,7 @@ static const int32_t g_quant_default_4x4[16] =
   16,16,16,16
 };
 
-static const int32_t g_quant_intra_default_8x8[64] =
+static const coeff_t g_quant_intra_default_8x8[64] =
 {
   16,16,16,16,17,18,21,24,
   16,16,16,16,17,19,22,25,
@@ -63,7 +63,7 @@ static const int32_t g_quant_intra_default_8x8[64] =
   24,25,29,36,47,65,88,115
 };
 
-static const int32_t g_quant_inter_default_8x8[64] =
+static const coeff_t g_quant_inter_default_8x8[64] =
 {
   16,16,16,16,17,18,20,24,
   16,16,16,17,18,20,24,25,
@@ -75,8 +75,8 @@ static const int32_t g_quant_inter_default_8x8[64] =
   24,25,28,33,41,54,71,91
 };
 
-const int16_t kvz_g_quant_scales[6]        = { 26214,23302,20560,18396,16384,14564 };
-const int16_t kvz_g_inv_quant_scales[6]    = { 40,45,51,57,64,72 };
+const coeff_t kvz_g_quant_scales[6]        = { 26214,23302,20560,18396,16384,14564 };
+const coeff_t kvz_g_inv_quant_scales[6]    = { 40,45,51,57,64,72 };
 
 
 /**
@@ -91,12 +91,12 @@ void kvz_scalinglist_init(scaling_list_t * const scaling_list)
     for (listId = 0; listId < kvz_g_scaling_list_num[sizeId]; listId++) {
       for (qp = 0; qp < 6; qp++) {
         if (!(sizeId == 3 && listId == 3)) {
-          scaling_list->quant_coeff[sizeId][listId][qp]    = (int32_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
-          scaling_list->de_quant_coeff[sizeId][listId][qp] = (int32_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
+          scaling_list->quant_coeff[sizeId][listId][qp]    = (coeff_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
+          scaling_list->de_quant_coeff[sizeId][listId][qp] = (coeff_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
           scaling_list->error_scale[sizeId][listId][qp]    = (double*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(double));
         }
       }
-      scaling_list->scaling_list_coeff[sizeId][listId] = (int32_t*)calloc(MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[sizeId]), sizeof(int32_t));
+      scaling_list->scaling_list_coeff[sizeId][listId] = (coeff_t*)calloc(MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[sizeId]), sizeof(int32_t));
     }
   }
   // alias, assign pointer to an existing array
@@ -263,9 +263,9 @@ int kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp)
   #undef LINE_BUFSIZE
 }
 
-const int32_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id)
+const coeff_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id)
 {
-  const int32_t *list_ptr = g_quant_intra_default_8x8; // Default to "8x8" intra
+  const coeff_t *list_ptr = g_quant_intra_default_8x8; // Default to "8x8" intra
   switch(size_id) {
     case SCALING_LIST_4x4:
       list_ptr = g_quant_default_4x4;
@@ -286,7 +286,7 @@ const int32_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_
  * \brief get scaling list for decoder
  *
  */
-static void scalinglist_process_dec(const int32_t * const coeff, int32_t *dequantcoeff,
+static void scalinglist_process_dec(const coeff_t * const coeff, coeff_t *dequantcoeff,
                                     int32_t inv_quant_scales, uint32_t height,
                                     uint32_t width, uint32_t ratio,
                                     int32_t size_num, uint32_t dc,
@@ -315,7 +315,7 @@ static void scalinglist_process_dec(const int32_t * const coeff, int32_t *dequan
  * \brief get scaling list for encoder
  *
  */
-void kvz_scalinglist_process_enc(const int32_t * const coeff, int32_t* quantcoeff, const int32_t quant_scales,
+void kvz_scalinglist_process_enc(const coeff_t * const coeff, coeff_t * quantcoeff, const int32_t quant_scales,
                              const uint32_t height, const uint32_t width, const uint32_t ratio, 
                              const int32_t size_num, const uint32_t dc, const uint8_t flat)
 {
@@ -354,7 +354,7 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const s
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - bitdepth - log2_tr_size;  // Represents scaling through forward transform
 
   uint32_t i,max_num_coeff  = kvz_g_scaling_list_size[size];
-  const int32_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
+  const coeff_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
   //This cast is allowed, since error_scale is a malloc'd pointer in kvz_scalinglist_init
   double *err_scale         = (double *) scaling_list->error_scale[size][list][qp];
 
@@ -372,15 +372,15 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const s
  * \brief set scaling lists
  *
  */
-void kvz_scalinglist_set(scaling_list_t * const scaling_list, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
+void kvz_scalinglist_set(scaling_list_t * const scaling_list, const coeff_t* const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
 {
   const uint32_t width  = g_scaling_list_size_x[sizeId];
   const uint32_t height = g_scaling_list_size_x[sizeId];
   const uint32_t ratio  = g_scaling_list_size_x[sizeId] / MIN(8, g_scaling_list_size_x[sizeId]);
   const uint32_t dc = scaling_list->scaling_list_dc[sizeId][listId] != 0 ? scaling_list->scaling_list_dc[sizeId][listId] : 16;
   //These cast are allowed, since these are pointer's to malloc'd area in kvz_scalinglist_init
-  int32_t *quantcoeff   = (int32_t*) scaling_list->quant_coeff[sizeId][listId][qp];
-  int32_t *dequantcoeff = (int32_t*) scaling_list->de_quant_coeff[sizeId][listId][qp];
+  coeff_t*quantcoeff   = (coeff_t*) scaling_list->quant_coeff[sizeId][listId][qp];
+  coeff_t*dequantcoeff = (coeff_t*) scaling_list->de_quant_coeff[sizeId][listId][qp];
 
   // Encoder list
   kvz_scalinglist_process_enc(coeff, quantcoeff, kvz_g_quant_scales[qp]<<4, height, width, ratio,
@@ -410,7 +410,7 @@ void kvz_scalinglist_process(scaling_list_t * const scaling_list, uint8_t bitdep
 
   for (size = 0; size < SCALING_LIST_SIZE_NUM; size++) {
     for (list = 0; list < kvz_g_scaling_list_num[size]; list++) {
-      const int32_t * const list_ptr = scaling_list->use_default_list ?
+      const coeff_t* const list_ptr = scaling_list->use_default_list ?
                                        kvz_scalinglist_get_default(size, list) :
                                        scaling_list->scaling_list_coeff[size][list];
 
