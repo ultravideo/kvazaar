@@ -4,7 +4,7 @@ project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
-VERSION 0.2.3 )
+VERSION 2.3.0 )
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 

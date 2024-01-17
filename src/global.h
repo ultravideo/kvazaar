@@ -220,7 +220,7 @@ typedef int16_t coeff_t;
 #define QUOTE_EXPAND(x) QUOTE(x)
 
 #ifndef KVZ_VERSION
-#define KVZ_VERSION 2.2.0
+#define KVZ_VERSION 2.3.0
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
