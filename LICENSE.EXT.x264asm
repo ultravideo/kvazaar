@@ -1,2 +1,0 @@
-Kvazaar uses x264asm abstraction layer -library (included in src/x86/x86inc.asm)
-licensed under ISC license.

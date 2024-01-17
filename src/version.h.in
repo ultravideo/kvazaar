@@ -1,9 +1,8 @@
-#ifndef _PICTURE_X86_ASM_SATD_H_
-#define _PICTURE_X86_ASM_SATD_H_
+#pragma once
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
+ * This file is part of kvazaar HEVC encoder.
  *
- * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
+ * Copyright (c) 2022, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without modification,
@@ -32,19 +31,9 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-/**
- * \ingroup Optimization
- * \file
- * Optimizations for AVX, utilizing ASM implementations.
- */
-
-#include "global.h" // IWYU pragma: keep
-
-
-unsigned kvz_satd_4x4_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_8x8_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_16x16_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_32x32_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_64x64_avx(const kvz_pixel *org, const kvz_pixel *cur);
-
+#ifndef KVZ_VERSION
+#define KVZ_VERSION @PROJECT_VERSION@
 #endif
+#define KVZ_COMPILER_STRING "@KVZ_COMPILER_STRING@"
+#define KVZ_COMPILE_DATE "@CMAKE_BUILD_DATE@"
+#define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)

@@ -4,7 +4,7 @@ SUBDIRS = src tests
 
 dist_man1_MANS = doc/kvazaar.1
 
-dist_doc_DATA = LICENSE LICENSE.EXT.greatest LICENSE.EXT.x264asm CREDITS README.md
+dist_doc_DATA = LICENSE LICENSE.EXT.greatest CREDITS README.md
 
 EXTRA_DIST = \
 	build \

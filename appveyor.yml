@@ -72,11 +72,6 @@ for:
       - MSYSTEM: MINGW32
       - MSYSTEM: MINGW64
   
-  install:
-    - ps: $url = "http://ultravideo.cs.tut.fi/vsyasm.exe"
-    - ps: $output = "C:\Tools\vsyasm.exe"
-    - ps: "(New-Object System.Net.WebClient).DownloadFile($url, $output)"
-    - ps: '$env:Path += ";$output\.."'
 
   build:
     project: .\build\kvazaar_VS2015.sln

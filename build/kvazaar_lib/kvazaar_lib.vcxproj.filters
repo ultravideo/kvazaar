@@ -34,9 +34,6 @@
     <Filter Include="Optimization\strategies\avx2">
       <UniqueIdentifier>{4ffb5d27-c5bb-44d5-a935-fa93066a259e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Optimization\strategies\x86_asm">
-      <UniqueIdentifier>{d0ce7d00-30c6-4e8a-b96e-51e13cb038ea}</UniqueIdentifier>
-    </Filter>
     <Filter Include="CABAC">
       <UniqueIdentifier>{c696e039-5ba4-48ab-845d-cfe1a5713525}</UniqueIdentifier>
     </Filter>
@@ -80,9 +77,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
       <Filter>Optimization\strategies\avx2</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c">
-      <Filter>Optimization\strategies\x86_asm</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\avx2\dct-avx2.c">
       <Filter>Optimization\strategies\avx2</Filter>
@@ -375,15 +369,6 @@
     <ClInclude Include="..\..\src\strategies\strategies-quant.h">
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm.h">
-      <Filter>Optimization\strategies\x86_asm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.h">
-      <Filter>Optimization\strategies\x86_asm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.h">
-      <Filter>Optimization\strategies\x86_asm</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h">
       <Filter>Optimization\strategies\sse41</Filter>
     </ClInclude>
@@ -477,16 +462,5 @@
     <ClInclude Include="..\..\src\gop.h">
       <Filter>Control</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <YASM Include="..\..\src\extras\x86inc.asm">
-      <Filter>Extras</Filter>
-    </YASM>
-    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.asm">
-      <Filter>Optimization\strategies\x86_asm</Filter>
-    </YASM>
-    <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.asm">
-      <Filter>Optimization\strategies\x86_asm</Filter>
-    </YASM>
   </ItemGroup>
 </Project>

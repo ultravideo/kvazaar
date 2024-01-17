@@ -20,7 +20,7 @@ FROM ubuntu:20.04
 MAINTAINER Marko Viitanen <fador@iki.fi>
 
 # List of needed packages to be able to build kvazaar with autotools
-ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git yasm pkgconf
+ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git pkgconf
 
 COPY . kvazaar
 # Run all the commands in one RUN so we don't have any extra history
