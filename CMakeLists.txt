@@ -6,10 +6,11 @@ HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
 VERSION 2.3.0 )
 
-option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
+option(KVZ_BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
+option(USE_CRYPTO "Use crypto library" OFF)
 
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
 
@@ -117,7 +118,7 @@ list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
 add_definitions(-DKVZ_DLL_EXPORTS)
 
-if(BUILD_SHARED_LIBS)
+if(KVZ_BUILD_SHARED_LIBS)
   add_definitions(-DPIC)
 endif()
 
@@ -127,7 +128,51 @@ if(MSVC)
   add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)
 endif()
 
-if(BUILD_SHARED_LIBS)
+
+if (USE_CRYPTO)
+    if(BUILD_TESTS)
+        message(WARNING "Crypto++ is not compatible with the tests, disabling tests")
+        set(BUILD_TESTS OFF)
+    endif()
+    if (KVZ_BUILD_SHARED_LIBS)
+        message(WARNING "Crypto++ is not compatible with shared libraries, disabling shared libraries")
+        set(KVZ_BUILD_SHARED_LIBS OFF)
+    endif ()
+    include(FetchContent)
+
+    add_definitions(-DKVZ_SEL_ENCRYPTION)
+    list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/crypto.cpp)
+    list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/crypto.cpp)
+
+    if (NOT CRYPTOPP_FOUND)
+        message(STATUS "Fetching and building Crypto++")
+
+        # CMake for Crypto++
+        FetchContent_Declare(
+                cryptopp-cmake
+                GIT_REPOSITORY https://github.com/abdes/cryptopp-cmake.git
+                GIT_TAG        43367a9cef6576b34179427a31a619802205406e
+        )
+
+        set(CRYPTOPP_INSTALL OFF CACHE BOOL "" FORCE) # we don't want to install Crypto++
+        set(CRYPTOPP_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+        FetchContent_MakeAvailable(cryptopp-cmake)
+
+        unset(BUILD_SHARED_LIBS) # unset so it does not affect other projects
+
+        # copy lib binary so it is found later
+        file(GLOB CRYPTOPP_BIN "${cryptopp-cmake_BINARY_DIR}/cryptopp/cryptopp.*")
+        file(COPY ${CRYPTOPP_BIN} DESTINATION ${CMAKE_BINARY_DIR}/lib/)
+        file(GLOB CRYPTOPP_BIN "${cryptopp-cmake_BINARY_DIR}/cryptopp/libcryptopp.*")
+        file(COPY ${CRYPTOPP_BIN} DESTINATION ${CMAKE_BINARY_DIR}/lib/)
+    endif ()
+
+
+endif ()
+
+if(KVZ_BUILD_SHARED_LIBS)
   list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib" "./" "../lib" )  
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(kvazaar SHARED ${LIB_SOURCES})
@@ -182,9 +227,13 @@ else()
   if (HAVE_LIB_M)
       set(EXTRA_LIBS ${EXTRA_LIBS} m)
   endif (HAVE_LIB_M)
+  if (USE_CRYPTO)
+      set(EXTRA_LIBS ${EXTRA_LIBS} ${CMAKE_BINARY_DIR}/lib/libcryptopp.a)
+  endif ()
 
-  target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS})
+  target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
 endif()
+
 
 # Source grouping
 
@@ -235,7 +284,7 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
 install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-if(BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
+if(KVZ_BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
   if(MSVC)
     install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
   endif()
@@ -287,7 +336,7 @@ add_custom_target(distcheck
                   && cd ${PROJECT_NAME}-${PROJECT_VERSION}
                   && mkdir -p build
                   && cd build                  
-                  && cmake -DCMAKE_INSTALL_PREFIX=./ -DBUILD_SHARED_LIBS=OFF -G "Unix Makefiles" .. >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mcmake failed to configure.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && cmake -DCMAKE_INSTALL_PREFIX=./ -DKVZ_BUILD_SHARED_LIBS=OFF -G "Unix Makefiles" .. >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mcmake failed to configure.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mCMake configure ok\\033[m\"
                   && make -j >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mMake ok\\033[m\"
@@ -317,7 +366,7 @@ endif() #Unix
 enable_testing()
 
 if(MSVC OR MINGW OR MSYS)
-  if(BUILD_SHARED_LIBS) 
+  if(KVZ_BUILD_SHARED_LIBS)
     set(BUILD_TESTS OFF)
     message(INFO " Disable test building, fails in MSVC/MINGW/MSYS2 when building shared binaries")
   endif()

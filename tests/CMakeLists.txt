@@ -11,7 +11,7 @@ target_include_directories(kvazaar_tests PUBLIC ${PROJECT_SOURCE_DIR}/src/extras
 
 add_definitions(-DKVZ_DLL_EXPORTS)
 
-if(BUILD_SHARED_LIBS)
+if(KVZ_BUILD_SHARED_LIBS)
   add_definitions(-DPIC)
 endif()
 
