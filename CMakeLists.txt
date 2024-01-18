@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)
 project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
-DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
+DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
 VERSION 2.3.0 )
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
@@ -98,7 +98,7 @@ set(KVZ_COMPILER_STRING "${KVZ_COMPILER_VERSION}")
 add_definitions(-DCMAKE_BUILD)
 
 # Apply dynamic info to the config files
-configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/src/kvazaarCMake.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
 # Add all sources in src/ base
