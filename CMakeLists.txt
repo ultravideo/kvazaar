@@ -173,7 +173,7 @@ if (USE_CRYPTO)
 endif ()
 
 if(KVZ_BUILD_SHARED_LIBS)
-  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" "./" "../lib" )  
+  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" "./" "../lib" )  
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(kvazaar SHARED ${LIB_SOURCES})
 else()
@@ -282,9 +282,9 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 
 # ToDo: make configurable
 
-install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/pkgconfig)
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
+install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 if(KVZ_BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
   if(MSVC)
     install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
