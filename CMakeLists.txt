@@ -231,6 +231,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} ${CMAKE_BINARY_DIR}/lib/libcryptopp.a)
   endif ()
 
+  target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
   target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
 endif()
 
