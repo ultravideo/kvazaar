@@ -291,7 +291,7 @@ if(KVZ_BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
   endif()
 endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
+install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1)
 
 IF(UNIX)
 # DIST
