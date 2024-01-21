@@ -98,6 +98,13 @@ set(KVZ_COMPILER_STRING "${KVZ_COMPILER_VERSION}")
 
 add_definitions(-DCMAKE_BUILD)
 
+# Set correct pkgconfig libdir variable
+if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
+  set(KVAZAAR_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+else()
+  set(KVAZAAR_PC_LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
 # Apply dynamic info to the config files
 configure_file("${PROJECT_SOURCE_DIR}/src/kvazaarCMake.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
