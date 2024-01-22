@@ -101,9 +101,14 @@ add_definitions(-DCMAKE_BUILD)
 # Set correct pkgconfig libdir variable
 if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
   set(KVAZAAR_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
-  set(KVAZAAR_PC_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}")
 else()
   set(KVAZAAR_PC_LIBDIR "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+# Set correct pkgconfig include variable
+if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+  set(KVAZAAR_PC_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+else()
   set(KVAZAAR_PC_INCDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
 
