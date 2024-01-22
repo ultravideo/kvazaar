@@ -292,15 +292,15 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 # ToDo: make configurable
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
-install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_LIBDIR})
 if(KVZ_BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
   if(MSVC)
     install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
   endif()
 endif()
-install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1)
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 IF(UNIX)
 # DIST
