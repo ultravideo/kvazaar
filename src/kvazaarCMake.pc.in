@@ -1,7 +1,7 @@
 prefix=@CMAKE_INSTALL_PREFIX@
 exec_prefix=${prefix}
 libdir=@KVAZAAR_PC_LIBDIR@
-incdir=${prefix}/include
+incdir=@KVAZAAR_PC_INCDIR@
 
 Name: libkvazaar
 Description: @CMAKE_PROJECT_DESCRIPTION@

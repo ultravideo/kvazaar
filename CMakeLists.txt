@@ -101,8 +101,10 @@ add_definitions(-DCMAKE_BUILD)
 # Set correct pkgconfig libdir variable
 if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
   set(KVAZAAR_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+  set(KVAZAAR_PC_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}")
 else()
-  set(KVAZAAR_PC_LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+  set(KVAZAAR_PC_LIBDIR "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+  set(KVAZAAR_PC_INCDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
 
 # Apply dynamic info to the config files
