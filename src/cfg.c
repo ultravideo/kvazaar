@@ -1727,7 +1727,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   }
 
   if (cfg->implicit_rdpcm && !cfg->lossless) {
-    fprintf(stderr, "Input error: --implicit-rdpcm is not suppoted without --lossless\n");
+    fprintf(stderr, "Input error: --implicit-rdpcm is not supported without --lossless\n");
     error = 1;
   }
 
