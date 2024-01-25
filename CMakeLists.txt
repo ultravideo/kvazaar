@@ -98,6 +98,20 @@ set(KVZ_COMPILER_STRING "${KVZ_COMPILER_VERSION}")
 
 add_definitions(-DCMAKE_BUILD)
 
+# Set correct pkgconfig libdir variable
+if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
+  set(KVAZAAR_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+else()
+  set(KVAZAAR_PC_LIBDIR "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+# Set correct pkgconfig include variable
+if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+  set(KVAZAAR_PC_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+else()
+  set(KVAZAAR_PC_INCDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
+
 # Apply dynamic info to the config files
 configure_file("${PROJECT_SOURCE_DIR}/src/kvazaarCMake.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
@@ -173,7 +187,7 @@ if (USE_CRYPTO)
 endif ()
 
 if(KVZ_BUILD_SHARED_LIBS)
-  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib" "./" "../lib" )  
+  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_LIBDIR}" "./" "../lib" )
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(kvazaar SHARED ${LIB_SOURCES})
 else()
@@ -231,6 +245,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} ${CMAKE_BINARY_DIR}/lib/libcryptopp.a)
   endif ()
 
+  target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
   target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
 endif()
 
@@ -281,16 +296,14 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 
 # ToDo: make configurable
 
-install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
-install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-if(KVZ_BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
-  if(MSVC)
-    install(TARGETS kvazaar DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-  endif()
-endif()
-install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS kvazaar
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/doc/kvazaar.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 IF(UNIX)
 # DIST
