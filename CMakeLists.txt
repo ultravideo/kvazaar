@@ -6,7 +6,7 @@ HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
 VERSION 2.3.0 )
 
-option(KVZ_BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
+option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
@@ -132,7 +132,7 @@ list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
 add_definitions(-DKVZ_DLL_EXPORTS)
 
-if(KVZ_BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
   add_definitions(-DPIC)
 endif()
 
@@ -148,9 +148,9 @@ if (USE_CRYPTO)
         message(WARNING "Crypto++ is not compatible with the tests, disabling tests")
         set(BUILD_TESTS OFF)
     endif()
-    if (KVZ_BUILD_SHARED_LIBS)
+    if (BUILD_SHARED_LIBS)
         message(WARNING "Crypto++ is not compatible with shared libraries, disabling shared libraries")
-        set(KVZ_BUILD_SHARED_LIBS OFF)
+        set(BUILD_SHARED_LIBS OFF)
     endif ()
     include(FetchContent)
 
@@ -186,7 +186,7 @@ if (USE_CRYPTO)
 
 endif ()
 
-if(KVZ_BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
   list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_LIBDIR}" "./" "../lib" )
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(kvazaar SHARED ${LIB_SOURCES})
@@ -356,7 +356,7 @@ add_custom_target(distcheck
                   && cd ${PROJECT_NAME}-${PROJECT_VERSION}
                   && mkdir -p build
                   && cd build                  
-                  && cmake -DCMAKE_INSTALL_PREFIX=./ -DKVZ_BUILD_SHARED_LIBS=OFF -G "Unix Makefiles" .. >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mcmake failed to configure.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && cmake -DCMAKE_INSTALL_PREFIX=./ -DBUILD_SHARED_LIBS=OFF -G "Unix Makefiles" .. >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mcmake failed to configure.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mCMake configure ok\\033[m\"
                   && make -j >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mMake ok\\033[m\"
@@ -386,7 +386,7 @@ endif() #Unix
 enable_testing()
 
 if(MSVC OR MINGW OR MSYS)
-  if(KVZ_BUILD_SHARED_LIBS)
+  if(BUILD_SHARED_LIBS)
     set(BUILD_TESTS OFF)
     message(INFO " Disable test building, fails in MSVC/MINGW/MSYS2 when building shared binaries")
   endif()
