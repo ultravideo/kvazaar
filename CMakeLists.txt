@@ -230,6 +230,13 @@ else()
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE41} APPEND PROPERTY COMPILE_FLAGS "-msse4.1" )    
   endif()
+  
+  # Temporary fix for MINGW
+  if(CMAKE_SYSTEM_NAME MATCHES ".*MINGW.*")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-strong -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2 -Wa,-muse-unaligned-vector-move")
+  endif()
+
+  
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
   target_link_libraries(kvazaar PUBLIC Threads::Threads)
