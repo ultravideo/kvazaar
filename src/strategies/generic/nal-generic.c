@@ -157,6 +157,13 @@ static void array_checksum_generic8(const kvz_pixel* data,
   assert(SEI_HASH_MAX_LENGTH >= 4);
 
   for (y = 0; y < height; ++y) {
+    if (y*stride % 8 != 0) {
+      for (x = 0; x < width; ++x) {
+        uint8_t mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
+        checksum += (data[(y * stride) + x] & 0xff) ^ mask;
+      }
+      continue;
+    }
     for (xp = 0; xp < width/8; ++xp) {
       const int x = xp * 8;
       const uint64_t mask = ckmap[(xp&31)+32*(y&255)] ^ ((uint64_t)((x >> 8) ^ (y >> 8)) * 0x101010101010101);
