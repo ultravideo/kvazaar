@@ -40,6 +40,8 @@
 #include <immintrin.h>
 #include <stdlib.h>
 
+#include "strategies/missing-intel-intrinsics.h"
+
 #include "avx2_common_functions.h"
 #include "cu.h"
 #include "encoder.h"
@@ -53,14 +55,6 @@
 #include "tables.h"
 #include "transform.h"
 #include "fast_coeff_cost.h"
-
-// added missing header
-#define _mm256_storeu2_m128i(/* __m128i* */ hiaddr, /* __m128i* */ loaddr, /* __m256i */ a) \
-    do { __m256i _a = (a); \
-        _mm_storeu_si128((__m128i*)(loaddr), _mm256_castsi256_si128(_a)); \
-        _mm_storeu_si128((__m128i*)(hiaddr), _mm256_extractf128_si256(_a, 0x1)); \
-    } while (0)
-
 
 static INLINE int32_t hsum32_8x32i(__m256i src)
 {
