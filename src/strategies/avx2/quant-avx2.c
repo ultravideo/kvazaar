@@ -40,6 +40,8 @@
 #include <immintrin.h>
 #include <stdlib.h>
 
+#include "strategies/missing-intel-intrinsics.h"
+
 #include "avx2_common_functions.h"
 #include "cu.h"
 #include "encoder.h"
