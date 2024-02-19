@@ -1,4 +1,4 @@
-prefix=@CMAKE_INSTALL_PREFIX@
+prefix=@DEFERRED@CMAKE_INSTALL_PREFIX@DEFERRED@
 exec_prefix=${prefix}
 libdir=@KVAZAAR_PC_LIBDIR@
 incdir=@KVAZAAR_PC_INCDIR@

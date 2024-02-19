@@ -13,6 +13,7 @@ option(BUILD_TESTS "Build tests" ON)
 option(USE_CRYPTO "Use crypto library" OFF)
 
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
+set(DEFERRED "@")
 
 set(KVAZAAR_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "kvazaar library install path")
 set(KVAZAAR_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH "kvazaar binary install path")
@@ -113,7 +114,7 @@ else()
 endif()
 
 # Apply dynamic info to the config files
-configure_file("${PROJECT_SOURCE_DIR}/src/kvazaarCMake.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/src/kvazaarCMake.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc.temp" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
 # Add all sources in src/ base
@@ -302,6 +303,7 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 # INSTALL
 
 # ToDo: make configurable
+install(CODE "configure_file(\"${PROJECT_SOURCE_DIR}/src/kvazaar.pc.temp\" \"${PROJECT_SOURCE_DIR}/src/kvazaar.pc\" @ONLY)")
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
