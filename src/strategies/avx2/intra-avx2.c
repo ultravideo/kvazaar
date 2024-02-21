@@ -597,7 +597,7 @@ static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pi
   }
 }
 
-
+__attribute__((no_sanitize("address")))
 static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 32;
@@ -759,6 +759,7 @@ static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pi
 }
 
 
+__attribute__((no_sanitize("address")))
 static void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 32;
