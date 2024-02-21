@@ -304,44 +304,243 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_h
   0x0f, 0x10, 0x0e, 0x0f, 0x0d, 0x0e, 0x0c, 0x0d, 0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a, 0x08, 0x09, 0x07, 0x08, 0x06, 0x07, 0x05, 0x06, 0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02, 0x00, 0x01,
 };
 
- // Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
-//static void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, kvz_pixel* ref, const int16_t* delta_int, const int32_t pred_mode)
-//{
-//  const int16_t* dint = delta_int;
-//  const __m128i v16s = _mm_set1_epi16(16);
-//
-//  const int mode_idx = (pred_mode <= 18 ? (pred_mode - 2) : (35 - pred_mode));
-//  const int weight_table_offset = pred_mode * 32;
-//  int offset_num = 0;
-//
-//  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
-//  const int16_t min_offset =  MIN(dint[0], dint[3]);
-//  dint += 4;
-//  // Load enough reff samples to cover four 4 width lines. Shuffles will put the samples in correct places.
-//  const __m128i vsrc_raw = _mm_loadu_si128((const __m128i*) & ref[min_offset]);
-//  const int offset = weight_table_offset + (offset_num * 16);
-//
-//  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_ver[offset]);
-//  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_ver[offset + 16]);
-//
-//  const __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[weight_table_offset + 0]);
-//  const __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[weight_table_offset + 16]);
-//
-//  __m128i vsrc0 = _mm_shuffle_epi8(vsrc_raw, vshuf0);
-//  __m128i vsrc1 = _mm_shuffle_epi8(vsrc_raw, vshuf1);
-//
-//  __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
-//  __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
-//  res0 = _mm_add_epi16(res0, v16s);
-//  res1 = _mm_add_epi16(res1, v16s);
-//  res0 = _mm_srai_epi16(res0, 5);
-//  res1 = _mm_srai_epi16(res1, 5);
-//
-//  _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));  
-//}
-//
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[] = {
+  0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 3
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 4
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 5
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 6
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 7
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 8
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 9
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 10
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 11
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 12
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,  // Mode 13
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,  // Mode 14
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,  // Mode 15
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,  // Mode 16
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07,  // Mode 17
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07,  // Mode 18
+0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
 
-static void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, kvz_pixel* ref, const int16_t* delta_int, const int pred_mode)
+};
+
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[] = {
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode 2 
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
+   6, 26,  6, 26,  6, 26,  6, 26, 12, 20, 12, 20, 12, 20, 12, 20,  // Mode 3 
+  18, 14, 18, 14, 18, 14, 18, 14, 24,  8, 24,  8, 24,  8, 24,  8,
+  11, 21, 11, 21, 11, 21, 11, 21, 22, 10, 22, 10, 22, 10, 22, 10,  // Mode 4 
+   1, 31,  1, 31,  1, 31,  1, 31, 12, 20, 12, 20, 12, 20, 12, 20,
+  15, 17, 15, 17, 15, 17, 15, 17, 30,  2, 30,  2, 30,  2, 30,  2,  // Mode 5 
+  13, 19, 13, 19, 13, 19, 13, 19, 28,  4, 28,  4, 28,  4, 28,  4,
+  19, 13, 19, 13, 19, 13, 19, 13,  6, 26,  6, 26,  6, 26,  6, 26,  // Mode 6 
+  25,  7, 25,  7, 25,  7, 25,  7, 12, 20, 12, 20, 12, 20, 12, 20,
+  23,  9, 23,  9, 23,  9, 23,  9, 14, 18, 14, 18, 14, 18, 14, 18,  // Mode 7 
+   5, 27,  5, 27,  5, 27,  5, 27, 28,  4, 28,  4, 28,  4, 28,  4,
+  27,  5, 27,  5, 27,  5, 27,  5, 22, 10, 22, 10, 22, 10, 22, 10,  // Mode 8 
+  17, 15, 17, 15, 17, 15, 17, 15, 12, 20, 12, 20, 12, 20, 12, 20,
+  30,  2, 30,  2, 30,  2, 30,  2, 28,  4, 28,  4, 28,  4, 28,  4,  // Mode 9 
+  26,  6, 26,  6, 26,  6, 26,  6, 24,  8, 24,  8, 24,  8, 24,  8,
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode 10 
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
+   2, 30,  2, 30,  2, 30,  2, 30,  4, 28,  4, 28,  4, 28,  4, 28,  // Mode 11 
+   6, 26,  6, 26,  6, 26,  6, 26,  8, 24,  8, 24,  8, 24,  8, 24,
+   5, 27,  5, 27,  5, 27,  5, 27, 10, 22, 10, 22, 10, 22, 10, 22,  // Mode 12 
+  15, 17, 15, 17, 15, 17, 15, 17, 20, 12, 20, 12, 20, 12, 20, 12,
+   9, 23,  9, 23,  9, 23,  9, 23, 18, 14, 18, 14, 18, 14, 18, 14,  // Mode 13 
+  27,  5, 27,  5, 27,  5, 27,  5,  4, 28,  4, 28,  4, 28,  4, 28,
+  13, 19, 13, 19, 13, 19, 13, 19, 26,  6, 26,  6, 26,  6, 26,  6,  // Mode 14 
+   7, 25,  7, 25,  7, 25,  7, 25, 20, 12, 20, 12, 20, 12, 20, 12,
+  17, 15, 17, 15, 17, 15, 17, 15,  2, 30,  2, 30,  2, 30,  2, 30,  // Mode 15 
+  19, 13, 19, 13, 19, 13, 19, 13,  4, 28,  4, 28,  4, 28,  4, 28,
+  21, 11, 21, 11, 21, 11, 21, 11, 10, 22, 10, 22, 10, 22, 10, 22,  // Mode 16 
+  31,  1, 31,  1, 31,  1, 31,  1, 20, 12, 20, 12, 20, 12, 20, 12,
+  26,  6, 26,  6, 26,  6, 26,  6, 20, 12, 20, 12, 20, 12, 20, 12,  // Mode 17 
+  14, 18, 14, 18, 14, 18, 14, 18,  8, 24,  8, 24,  8, 24,  8, 24,
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode 18 
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
+};
+
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
+   6, 26, 12, 20, 18, 14, 24,  8,  6, 26, 12, 20, 18, 14, 24,  8,   // Mode 3
+  11, 21, 22, 10,  1, 31, 12, 20, 11, 21, 22, 10,  1, 31, 12, 20,   // Mode 4
+  15, 17, 30,  2, 13, 19, 28,  4, 15, 17, 30,  2, 13, 19, 28,  4,   // Mode 5
+  19, 13,  6, 26, 25,  7, 12, 20, 19, 13,  6, 26, 25,  7, 12, 20,   // Mode 6
+  23,  9, 14, 18,  5, 27, 28,  4, 23,  9, 14, 18,  5, 27, 28,  4,   // Mode 7
+  27,  5, 22, 10, 17, 15, 12, 20, 27,  5, 22, 10, 17, 15, 12, 20,   // Mode 8
+  30,  2, 28,  4, 26,  6, 24,  8, 30,  2, 28,  4, 26,  6, 24,  8,   // Mode 9
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 10
+   2, 30,  4, 28,  6, 26,  8, 24,  2, 30,  4, 28,  6, 26,  8, 24,   // Mode 11
+   5, 27, 10, 22, 15, 17, 20, 12,  5, 27, 10, 22, 15, 17, 20, 12,   // Mode 12
+   9, 23, 18, 14, 27,  5,  4, 28,  9, 23, 18, 14, 27,  5,  4, 28,   // Mode 13
+  13, 19, 26,  6,  7, 25, 20, 12, 13, 19, 26,  6,  7, 25, 20, 12,   // Mode 14
+  17, 15,  2, 30, 19, 13,  4, 28, 17, 15,  2, 30, 19, 13,  4, 28,   // Mode 15
+  21, 11, 10, 22, 31,  1, 20, 12, 21, 11, 10, 22, 31,  1, 20, 12,   // Mode 16
+  26,  6, 20, 12, 14, 18,  8, 24, 26,  6, 20, 12, 14, 18,  8, 24,   // Mode 17
+  32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
+};
+
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
+  0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
+  0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+  0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+  0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d,
+  0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 3
+  0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
+  0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+  0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d,
+  0x00, 0x01, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03,  // Mode 4
+  0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04,
+  0x08, 0x09, 0x09, 0x0a, 0x09, 0x0a, 0x0a, 0x0b,
+  0x09, 0x0a, 0x0a, 0x0b, 0x0a, 0x0b, 0x0b, 0x0c,
+  0x00, 0x01, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03,  // Mode 5
+  0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04,
+  0x08, 0x09, 0x09, 0x0a, 0x09, 0x0a, 0x0a, 0x0b,
+  0x09, 0x0a, 0x0a, 0x0b, 0x0a, 0x0b, 0x0b, 0x0c,
+  0x00, 0x01, 0x00, 0x01, 0x01, 0x02, 0x01, 0x02,  // Mode 6
+  0x01, 0x02, 0x01, 0x02, 0x02, 0x03, 0x02, 0x03,
+  0x08, 0x09, 0x08, 0x09, 0x09, 0x0a, 0x09, 0x0a,
+  0x09, 0x0a, 0x09, 0x0a, 0x0a, 0x0b, 0x0a, 0x0b,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01, 0x02,  // Mode 7
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x09, 0x0a,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x0a, 0x0b,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,  // Mode 8
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,  // Mode 9
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,  // Mode 10
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,  // Mode 11
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a,
+  0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,  // Mode 12
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+  0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a,
+  0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x00, 0x01,  // Mode 13
+  0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x01, 0x02,
+  0x09, 0x0a, 0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09,
+  0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a,
+  0x01, 0x02, 0x01, 0x02, 0x00, 0x01, 0x00, 0x01,  // Mode 14
+  0x02, 0x03, 0x02, 0x03, 0x01, 0x02, 0x01, 0x02,
+  0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09, 0x08, 0x09,
+  0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a, 0x09, 0x0a,
+  0x02, 0x03, 0x01, 0x02, 0x01, 0x02, 0x00, 0x01,  // Mode 15
+  0x03, 0x04, 0x02, 0x03, 0x02, 0x03, 0x01, 0x02,
+  0x0a, 0x0b, 0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09,
+  0x0b, 0x0c, 0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a,
+  0x02, 0x03, 0x01, 0x02, 0x01, 0x02, 0x00, 0x01,  // Mode 16
+  0x03, 0x04, 0x02, 0x03, 0x02, 0x03, 0x01, 0x02,
+  0x0a, 0x0b, 0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09,
+  0x0b, 0x0c, 0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a,
+  0x03, 0x04, 0x02, 0x03, 0x01, 0x02, 0x00, 0x01,  // Mode 17
+  0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02,
+  0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a, 0x08, 0x09,
+  0x0c, 0x0d, 0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a,
+  0x03, 0x04, 0x02, 0x03, 0x01, 0x02, 0x00, 0x01,  // Mode 18
+  0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02,
+  0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a, 0x08, 0x09,
+  0x0c, 0x0d, 0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a,
+};
+
+
+//  Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
+static void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int32_t pred_mode)
+{
+  const int16_t* dint = delta_int;
+  const __m128i v16s = _mm_set1_epi16(16);
+
+  const int mode_idx = (pred_mode <= 18 ? (pred_mode - 2) : (34 - pred_mode));
+  const int table_offset = mode_idx * 32;
+
+  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
+  const int16_t min_offset =  MIN(dint[0], dint[3]);
+  dint += 4;
+  // Load enough reff samples to cover four 4 width lines. Shuffles will put the samples in correct places.
+  const __m128i vsrc_raw = _mm_loadu_si128((const __m128i*) & ref[min_offset]);
+
+  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_ver[table_offset]);
+  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_ver[table_offset + 16]);
+
+  const __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[table_offset + 0]);
+  const __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[table_offset + 16]);
+
+  __m128i vsrc0 = _mm_shuffle_epi8(vsrc_raw, vshuf0);
+  __m128i vsrc1 = _mm_shuffle_epi8(vsrc_raw, vshuf1);
+
+  __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
+  __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
+  res0 = _mm_add_epi16(res0, v16s);
+  res1 = _mm_add_epi16(res1, v16s);
+  res0 = _mm_srai_epi16(res0, 5);
+  res1 = _mm_srai_epi16(res1, 5);
+
+  _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));  
+}
+
+
+static void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 8;
   const int width = 8;
@@ -381,7 +580,7 @@ static void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, kvz_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, kvz_pixel* ref, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 16;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -417,7 +616,7 @@ static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, kvz_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, kvz_pixel* ref, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 32;
   const __m256i v16s = _mm256_set1_epi16(16);
@@ -459,42 +658,42 @@ static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, kvz_pixel* r
 }
 
 
-//static void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, kvz_pixel* ref, const int mode, const int16_t* delta_int)
-//{
-//  const int16_t* dint = delta_int;
-//  const __m128i v16s = _mm_set1_epi16(16);
-//
-//  const int16_t weigth_offset = mode_to_weight_table_offset_w4_hor[mode];
-//  const int16_t shuf_offset = mode_to_shuffle_vector_table_offset_w4_hor[mode];
-//
-//  __m128i vcoeff = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_hor[weigth_offset]);
-//  __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 0]);
-//  __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 16]);
-//
-//  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
-//  const int16_t min_offset = MIN(dint[0], dint[3]);
-//
-//
-//  // Prepare sources
-//  __m128i vidx = _mm_set_epi64x((long long int)(min_offset + 2), (long long int)(min_offset + 0));
-//  __m128i vsrc_tmp = _mm_i64gather_epi64((const long long*)ref, vidx, 1);
-//  __m128i vsrc0 = _mm_shuffle_epi8(vsrc_tmp, vshuf0);
-//  __m128i vsrc1 = _mm_shuffle_epi8(vsrc_tmp, vshuf1);
-//
-//  __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff);
-//  __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff);
-//  res0 = _mm_add_epi16(res0, v16s);
-//  res1 = _mm_add_epi16(res1, v16s);
-//  res0 = _mm_srai_epi16(res0, 5);
-//  res1 = _mm_srai_epi16(res1, 5);
-//
-//  _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
-//  dst += 16;
-//  
-//}
+static void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+{
+  const int16_t* dint = delta_int;
+  const __m128i v16s = _mm_set1_epi16(16);
+
+  const int16_t weigth_offset = (mode - 2) * 16;
+  const int16_t shuf_offset = (mode - 2) * 32;
+
+  __m128i vcoeff = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w4_hor[weigth_offset]);
+  __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 0]);
+  __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 16]);
+
+  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
+  const int16_t min_offset = MIN(dint[0], dint[3]);
 
 
-static void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, kvz_pixel* ref, const int mode, const int16_t* delta_int)
+  // Prepare sources
+  __m128i vidx = _mm_set_epi64x((long long int)(min_offset + 2), (long long int)(min_offset + 0));
+  __m128i vsrc_tmp = _mm_i64gather_epi64((const long long*)ref, vidx, 1);
+  __m128i vsrc0 = _mm_shuffle_epi8(vsrc_tmp, vshuf0);
+  __m128i vsrc1 = _mm_shuffle_epi8(vsrc_tmp, vshuf1);
+
+  __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff);
+  __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff);
+  res0 = _mm_add_epi16(res0, v16s);
+  res1 = _mm_add_epi16(res1, v16s);
+  res0 = _mm_srai_epi16(res0, 5);
+  res1 = _mm_srai_epi16(res1, 5);
+
+  _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+  dst += 16;
+  
+}
+
+
+static void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 8;
   const int16_t* dint = delta_int;
@@ -529,7 +728,7 @@ static void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, kvz_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, kvz_pixel* ref, const int mode, const int16_t* delta_int)
+static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 16;
   const int16_t* dint = delta_int;
@@ -578,7 +777,7 @@ static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, kvz_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, kvz_pixel* ref, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int height = 32;
   const int16_t* dint = delta_int;
@@ -706,7 +905,7 @@ static void kvz_angular_pred_avx2(
   if (vertical_mode) {
     const int16_t* delta_int = &delta_int_table[(34 - intra_mode) * 32];
     switch (width) {
-    //case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main,  delta_int, intra_mode); break;
+    case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main,  delta_int, intra_mode); break;
     case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main,  delta_int, intra_mode); break;
     case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main,  delta_int, intra_mode); break;
     case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main,  delta_int, intra_mode); break;
@@ -718,7 +917,7 @@ static void kvz_angular_pred_avx2(
     const int16_t* delta_int = &delta_int_table[(intra_mode - 2) * 32];
     const int16_t* delta_fract = &delta_fract_table[(intra_mode - 2) * 32];
     switch (width) {
-    //case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, intra_mode, delta_int); break;
+    case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, intra_mode, delta_int); break;
     case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, intra_mode, delta_int); break;
     case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, intra_mode, delta_int); break;
     case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, intra_mode, delta_int, delta_fract); break;
