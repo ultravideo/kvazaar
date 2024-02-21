@@ -617,7 +617,7 @@ static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pi
     const int16_t* coeff_tmp = (const int16_t*)&intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1)];
     __m256i vcoeff = _mm256_set1_epi16(*coeff_tmp);
 
-    __m128i vsrc[4];
+    ALIGNED(32) __m128i vsrc[4];
     vsrc[0] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0 ]);
     vsrc[1] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 16]); // Flip these two middle sources. They will be later flipped back into place by packus
     vsrc[2] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 8 ]);

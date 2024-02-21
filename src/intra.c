@@ -588,7 +588,7 @@ static void intra_recon_tb_leaf(
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs);
 
-  kvz_pixel pred[32 * 32];
+  ALIGNED(32) kvz_pixel pred[TR_MAX_WIDTH * TR_MAX_WIDTH];
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   kvz_intra_predict(&refs, log2width, intra_mode, color, pred, filter_boundary);
 
