@@ -883,6 +883,52 @@ static void kvz_angular_pred_avx2(
   }
 
 
+  if(sample_disp == 0) {
+    if (vertical_mode) {
+      for (int_fast32_t y = 0; y < width; ++y) {
+        switch (width) {
+        case 4:  memcpy(&dst[y * 4], &ref_main[0], 4 * sizeof(uint8_t)); break;
+        case 8:  memcpy(&dst[y * 8], &ref_main[0], 8 * sizeof(uint8_t)); break;
+        case 16: memcpy(&dst[y * 16], &ref_main[0], 16 * sizeof(uint8_t)); break;
+        case 32: memcpy(&dst[y * 32], &ref_main[0], 32 * sizeof(uint8_t)); break;
+        default:
+          assert(false && "Intra angular predicion: illegal width.\n");
+          break;
+        }
+      }
+    }
+    else {
+      for (int y = 0; y < width; ++y) {
+        switch (width) {
+        case 4:  memset(&dst[y * 4], ref_main[y], 4 * sizeof(uint8_t)); break;
+        case 8:  memset(&dst[y * 8], ref_main[y], 8 * sizeof(uint8_t)); break;
+        case 16: memset(&dst[y * 16], ref_main[y], 16 * sizeof(uint8_t)); break;
+        case 32: memset(&dst[y * 32], ref_main[y], 32 * sizeof(uint8_t)); break;
+        default:
+          assert(false && "Intra angular predicion: illegal width.\n");
+          break;
+        }
+      }
+    }
+    return;
+  }
+
+  if ((abs(sample_disp) & 0x1f )== 0) {
+    int table_offset = vertical_mode ? (34 - intra_mode) * 32 : (intra_mode - 2) * 32;
+    const int16_t* delta_int = &delta_int_table[table_offset];
+    for (int y = 0; y < width; ++y) {
+      uint8_t* dst_row = dst + y * width;
+      const uint8_t* ref_row = ref_main + delta_int[y];
+      switch (width) {
+      case 4: memcpy(dst_row, ref_row, 4 * sizeof(uint8_t)); break;
+      case 8: memcpy(dst_row, ref_row, 8 * sizeof(uint8_t)); break;
+      case 16: memcpy(dst_row, ref_row, 16 * sizeof(uint8_t)); break;
+      case 32: memcpy(dst_row, ref_row, 32 * sizeof(uint8_t)); break;
+      }
+    }
+    return;
+  }
+
   // The mode is not horizontal or vertical, we have to do interpolation.
   if (vertical_mode) {
     const int16_t* delta_int = &delta_int_table[(34 - intra_mode) * 32];
