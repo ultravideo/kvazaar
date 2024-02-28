@@ -489,7 +489,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
 
 
 //  Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
-static void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int32_t pred_mode)
+static INLINE void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int32_t pred_mode)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -523,7 +523,7 @@ static void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pix
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+static INLINE void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 8;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -562,7 +562,7 @@ static void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pix
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+static INLINE void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 16;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -598,7 +598,7 @@ static void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pi
 }
 
 NO_ASAN
-static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+static INLINE void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 32;
   const __m256i v16s = _mm256_set1_epi16(16);
@@ -640,7 +640,7 @@ static void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pi
 }
 
 
-static void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+static INLINE void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -675,7 +675,7 @@ static void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pix
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+static INLINE void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 8;
   const int16_t* dint = delta_int;
@@ -710,7 +710,7 @@ static void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pix
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+static INLINE void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 16;
   const int16_t* dint = delta_int;
@@ -760,7 +760,7 @@ static void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pi
 
 
 NO_ASAN
-static void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+static INLINE void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 32;
   const int16_t* dint = delta_int;
