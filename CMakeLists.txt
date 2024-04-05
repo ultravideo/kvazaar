@@ -232,9 +232,11 @@ else()
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE41} APPEND PROPERTY COMPILE_FLAGS "-msse4.1" )    
   endif()
   
-  # Temporary fix for MINGW
-  if(CMAKE_SYSTEM_NAME MATCHES ".*MINGW.*")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-strong -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2 -Wa,-muse-unaligned-vector-move")
+  # CYGWIN, MSYS, and MINGW seem to be needing this but in some cases 
+  # it might be that the toolset is not properly set, so also use this
+  # in cases where we are not sure that it is not needed
+  if((NOT MSVC AND NOT LINUX AND NOT APPLE) OR (CYGWIN OR MSYS OR MINGW))
+    set(CMAKE_C_FLAGS "-Wa,-muse-unaligned-vector-move ${CMAKE_C_FLAGS}")
   endif()
 
   
