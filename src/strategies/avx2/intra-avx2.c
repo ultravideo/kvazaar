@@ -31,7 +31,6 @@
  ****************************************************************************/
 
 #include "strategies/avx2/intra-avx2.h"
-#define COMPILE_INTEL_AVX2 1
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "kvazaar.h"
 #if KVZ_BIT_DEPTH == 8
