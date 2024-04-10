@@ -51,7 +51,7 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 [comment]: # "BEGIN KVAZAAR HELP MESSAGE"
 ```
-Kvazaar v2.3.0 2024-01-17
+Kvazaar v2.3.1 2024-04-10
 Kvazaar license: 3-clause BSD
 Usage:
 kvazaar -i <input> --input-res <width>x<height> -o <output>
