@@ -4,7 +4,7 @@ project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
-VERSION 2.3.0 )
+VERSION 2.3.1 )
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
@@ -225,7 +225,7 @@ if(MSVC)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src)
-  set_target_properties(kvazaar PROPERTIES SOVERSION "7" VERSION "7.3.0")
+  set_target_properties(kvazaar PROPERTIES SOVERSION "7" VERSION "7.4.0")
   list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
