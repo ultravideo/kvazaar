@@ -4,8 +4,9 @@ lib_LTLIBRARIES = libkvazaar.la
 
 EXTRA_DIST = \
 	extras/getopt.c \
-	extras/getopt.h
-
+	extras/getopt.h \
+	version.h.in \
+	kvazaarCMake.pc.in
 
 pkgconfigdir = $(libdir)/pkgconfig
 nodist_pkgconfig_DATA = kvazaar.pc
