@@ -28,7 +28,8 @@ EXTRA_DIST = \
     test_tools.sh \
     test_weird_shapes.sh \
 	test_pu_depth_constraints.sh \
-    util.sh
+    util.sh \
+    CMakeLists.txt
 
 check_PROGRAMS = kvazaar_tests
 
