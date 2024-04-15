@@ -37,8 +37,12 @@
 
 #ifdef _WIN32
 /* The following two defines must be located before the inclusion of any system header files. */
+#ifndef WINVER
 #define WINVER       0x0500
+#endif
+#ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500
+#endif
 
 #include "global.h" // IWYU pragma: keep
 
