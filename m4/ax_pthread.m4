@@ -261,8 +261,8 @@ if test "x$ax_pthread_clang" = "xyes"; then
         # -pthread does define _REENTRANT, and while the Darwin headers
         # ignore this macro, third-party headers might not.)
 
-        PTHREAD_CFLAGS="-pthread"
-        PTHREAD_LIBS=
+        PTHREAD_CFLAGS=
+        PTHREAD_LIBS="-pthread"
 
         ax_pthread_ok=yes
 
