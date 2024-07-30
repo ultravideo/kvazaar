@@ -27,10 +27,10 @@ typedef void* pthread_rwlock_t;
 typedef void* pthread_t;
 typedef void*(voidp_voidp_func)(void*);
 
-typedef void pthread_attr_t;
-typedef void pthread_condattr_t;
-typedef void pthread_mutexattr_t;
-typedef void pthread_rwlockattr_t;
+typedef void* pthread_attr_t;
+typedef void* pthread_condattr_t;
+typedef void* pthread_mutexattr_t;
+typedef void* pthread_rwlockattr_t;
 
 // Parameter names that have been commented away do nothing,
 // as they are always null when the functions are used in Kvazaar.

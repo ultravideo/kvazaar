@@ -389,7 +389,7 @@ threadqueue_queue_t * kvz_threadqueue_init(int thread_count)
   threadqueue->first              = NULL;
   threadqueue->last               = NULL;
 
-#ifndef _WIN32
+#ifndef _MSC_VER
   pthread_attr_t attr;
   if (pthread_attr_init(&attr) != 0) {
     fprintf(stderr, "pthread_attr_init failed!\n");
@@ -407,7 +407,7 @@ threadqueue_queue_t * kvz_threadqueue_init(int thread_count)
     }
   }
 #else
-  pthread_attr_t* attr;
+  pthread_attr_t attr;
 #endif
 
   // Lock the queue before creating threads, to ensure they all have correct information.
@@ -425,7 +425,7 @@ threadqueue_queue_t * kvz_threadqueue_init(int thread_count)
   return threadqueue;
 
 failed:
-#ifndef _WIN32
+#ifndef _MSC_VER
   if (pthread_attr_destroy(&attr) != 0) {
     fprintf(stderr, "pthread_attr_destroy failed!\n");
   }
