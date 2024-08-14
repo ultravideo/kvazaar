@@ -334,11 +334,9 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   cost_pixel_nxn_func *const satd_func = kvz_pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = kvz_pixels_get_sad_func(width);
 
-  kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+  ALIGNED(SIMD_ALIGNMENT) kvz_pixel pred[32 * 32];
 
-  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+  ALIGNED(SIMD_ALIGNMENT) kvz_pixel orig_block[32 * 32];
 
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
@@ -408,11 +406,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
 
   // Temporary block arrays
-  kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
-  pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
-  
-  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+  ALIGNED(SIMD_ALIGNMENT) kvz_pixel _preds[PARALLEL_BLKS * 32 * 32];
+  pred_buffer preds = (pred_buffer)_preds;
+  ALIGNED(SIMD_ALIGNMENT) kvz_pixel orig_block[32 * 32];
 
   // Store original block for SAD computation
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
