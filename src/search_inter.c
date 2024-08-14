@@ -220,8 +220,9 @@ static bool check_mv_cost(inter_search_info_t *info,
       info->height,
       info->optimized_sad
   );
-
-  if (cost >= *best_cost) return false;
+  // On some platforms comparing two doubles give weird results, so add an offset
+#define KVZ_TEMP_DOUBLE_PRECISION 0.001
+  if (cost + KVZ_TEMP_DOUBLE_PRECISION >= *best_cost) return false;
 
   cost += info->mvd_cost_func(
       info->state,
@@ -233,7 +234,8 @@ static bool check_mv_cost(inter_search_info_t *info,
       &bitcost
   );
 
-  if (cost >= *best_cost) return false;
+  if (cost + KVZ_TEMP_DOUBLE_PRECISION >= *best_cost) return false;
+#undef KVZ_TEMP_DOUBLE_PRECISION
 
   // Set to motion vector in quarter pixel precision.
   best_mv->x = x * 4;
