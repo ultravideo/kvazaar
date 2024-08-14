@@ -67,10 +67,10 @@ static int sao_edge_ddistortion_generic(const kvz_pixel *orig_data,
       uint32_t a_pos = (y + a_ofs.y) * block_width + x + a_ofs.x;
       uint32_t b_pos = (y + b_ofs.y) * block_width + x + b_ofs.x;
 
-      uint8_t   a    =  rec_data[a_pos];
-      uint8_t   b    =  rec_data[b_pos];
-      uint8_t   c    =  rec_data[c_pos];
-      uint8_t   orig = orig_data[c_pos];
+      kvz_pixel a    =  rec_data[a_pos];
+      kvz_pixel b    =  rec_data[b_pos];
+      kvz_pixel c    =  rec_data[c_pos];
+      kvz_pixel orig = orig_data[c_pos];
 
       int32_t eo_cat = sao_calc_eo_cat(a, b, c);
       int32_t offset = offsets[eo_cat];
