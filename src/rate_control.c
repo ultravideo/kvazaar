@@ -716,7 +716,7 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     alpha = -state->frame->c_para[index] * state->frame->k_para[index];
     beta = state->frame->k_para[index] - 1;
   }
-
+  alpha *= (double)(1 << (KVZ_BIT_DEPTH - 8));
   double est_lambda;
   int est_qp;
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
