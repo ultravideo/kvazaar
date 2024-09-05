@@ -472,7 +472,7 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
                              pic_data,
                              pic->stride,
                              ref_data,
-                             ref->stride) >> (KVZ_BIT_DEPTH - 8);
+                             ref->stride);
   } else {
     // Extrapolate pixels from outside the frame.
 
@@ -514,7 +514,7 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
       pic_data,
       pic->stride,
       ext_origin,
-      ext_s) >> (KVZ_BIT_DEPTH - 8);
+      ext_s);
 
     return satd;
   }

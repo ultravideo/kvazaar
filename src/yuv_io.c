@@ -57,24 +57,43 @@ static int read_and_fill_frame_data(FILE *file,
                                     unsigned width, unsigned height, unsigned bytes_per_sample,
                                     unsigned array_width, kvz_pixel *data)
 {
-  kvz_pixel* p = data;
-  kvz_pixel* end = data + array_width * height;
-  kvz_pixel fill_char;
-  unsigned i;
 
-  while (p < end) {
-    // Read the beginning of the line from input.
-    if (width != fread(p, bytes_per_sample, width, file))
-      return 0;
+  unsigned   i;
+  // Handle separately the case where we use KVZ_BIT_DEPTH 10+ but the input is 8-bit.
+  if (bytes_per_sample != sizeof(kvz_pixel)) {
+    uint8_t* p = (uint8_t*)data;
+    uint8_t* end = (uint8_t*)data + array_width * height;
+    uint8_t  fill_char;
+    while (p < end) {
+      // Read the beginning of the line from input.
+      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      // Fill the rest with the last pixel value.
+      // Fill the rest with the last pixel value.
+      fill_char = p[width - 1];
 
-    // Fill the rest with the last pixel value.
-    fill_char = p[width - 1];
+      for (i = width; i < array_width; ++i) {
+        p[i] = fill_char;
+      }
 
-    for (i = width; i < array_width; ++i) {
-      p[i] = fill_char;
+      p += array_width;
     }
+  }
+  else {
+    kvz_pixel* p = data;
+    kvz_pixel* end = data + array_width * height;
+    kvz_pixel  fill_char;
+    while (p < end) {
+      // Read the beginning of the line from input.
+      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      // Fill the rest with the last pixel value.
+      fill_char = p[width - 1];
 
-    p += array_width;
+      for (i = width; i < array_width; ++i) {
+        p[i] = fill_char;
+      }
+
+      p += array_width;
+    }
   }
   return 1;
 }
@@ -313,7 +332,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
 
     // Seek failed. Skip data by reading.
     error = 0;
-    unsigned char* tmp[4096];
+    unsigned char tmp[4096];
     size_t bytes_left = skip_bytes;
     while (bytes_left > 0 && !error) {
       const size_t skip = MIN(4096, bytes_left);
