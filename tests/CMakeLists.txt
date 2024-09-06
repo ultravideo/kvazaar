@@ -25,8 +25,11 @@ else()
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
   endif()
-  find_package(Threads REQUIRED)
-  target_link_libraries(kvazaar_tests PUBLIC Threads::Threads)
+
+  if(NOT ANDROID)
+    find_package(Threads REQUIRED)
+    target_link_libraries(kvazaar_tests PUBLIC Threads::Threads)
+  endif()
 
   include(CheckLibraryExists)
 
