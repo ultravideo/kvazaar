@@ -12,6 +12,8 @@ option(BUILD_TESTS "Build tests" ON)
 
 option(USE_CRYPTO "Use crypto library" OFF)
 
+option(BUILD_KVAZAAR_BINARY "Build kvazaar-bin" ON) # To build only the lib, useful for iOS-builds
+
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
 set(DEFERRED "@")
 
@@ -213,18 +215,22 @@ if(MSVC)
   list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
 endif()
 
-add_executable(kvazaar-bin ${CLI_SOURCES})
+if(BUILD_KVAZAAR_BINARY)
+  add_executable(kvazaar-bin ${CLI_SOURCES})
 
-set_target_properties(kvazaar-bin PROPERTIES OUTPUT_NAME kvazaar)
-set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
+  set_target_properties(kvazaar-bin PROPERTIES OUTPUT_NAME kvazaar)
+  set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
 
-target_link_libraries(kvazaar-bin PUBLIC kvazaar)
+  target_link_libraries(kvazaar-bin PUBLIC kvazaar)
+endif()
 
 if(MSVC)
   target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
-  set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  if(BUILD_KVAZAAR_BINARY)
+    set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  endif()
   set_target_properties(kvazaar PROPERTIES SOVERSION "7" VERSION "7.4.0")
   list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
@@ -256,7 +262,9 @@ else()
   endif ()
 
   target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
-  target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
+  if(BUILD_KVAZAAR_BINARY)
+    target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
+  endif()
 endif()
 
 
@@ -308,7 +316,9 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 install(CODE "configure_file(\"${PROJECT_SOURCE_DIR}/src/kvazaar.pc.temp\" \"${PROJECT_SOURCE_DIR}/src/kvazaar.pc\" @ONLY)")
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/kvazaar.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
-install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(BUILD_KVAZAAR_BINARY)
+  install(TARGETS kvazaar-bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 install(TARGETS kvazaar
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
