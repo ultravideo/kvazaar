@@ -15,13 +15,16 @@ if(BUILD_SHARED_LIBS)
   add_definitions(-DPIC)
 endif()
 
+list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
+
 if(MSVC)
   target_include_directories(kvazaar_tests PUBLIC ../src/threadwrapper/include)
 
-  set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
+  if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
+    set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
+  endif()
   add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)
 else()
-  list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
   endif()
