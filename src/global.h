@@ -365,7 +365,7 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 #  define COMPILE_POWERPC 0
 #endif
 
-#if defined (_M_ARM) || defined(__arm__) || defined(__thumb__)
+#if defined (_M_ARM) || defined(_M_ARM64) || defined(__arm__) || defined(__thumb__)
 #  define COMPILE_ARM 1
 #else
 #  define COMPILE_ARM 0
