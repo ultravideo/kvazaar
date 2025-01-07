@@ -244,11 +244,11 @@ else()
   # CYGWIN, MSYS, and MINGW seem to be needing this but in some cases 
   # it might be that the toolset is not properly set, so also use this
   # in cases where we are not sure that it is not needed
-  if((NOT MSVC AND NOT LINUX AND NOT APPLE AND NOT ANDROID) OR (CYGWIN OR MSYS OR MINGW))
+  if((NOT MSVC AND NOT LINUX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN) OR (CYGWIN OR MSYS OR MINGW))
     set(CMAKE_C_FLAGS "-Wa,-muse-unaligned-vector-move ${CMAKE_C_FLAGS}")
   endif()
 
-  if(NOT ANDROID)
+  if(NOT ANDROID AND NOT EMSCRIPTEN)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
     target_link_libraries(kvazaar PUBLIC Threads::Threads)
