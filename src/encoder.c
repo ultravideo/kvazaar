@@ -153,6 +153,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 
   // Take a copy of the config.
   memcpy(&encoder->cfg, cfg, sizeof(encoder->cfg));
+
+  // Copy the ROI file path
+  if (cfg->roi.file_path) {
+    encoder->cfg.roi.file_path = strdup(cfg->roi.file_path);
+  }
+
   // Set fields that are not copied to NULL.
   encoder->cfg.cqmfile = NULL;
   encoder->cfg.tiles_width_split = NULL;
