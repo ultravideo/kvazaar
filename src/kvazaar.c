@@ -420,5 +420,9 @@ static const kvz_api kvz_8bit_api = {
 
 const kvz_api * kvz_api_get(int bit_depth)
 {
+  if (bit_depth != KVZ_BIT_DEPTH) {
+    return NULL;
+  }
+
   return &kvz_8bit_api;
 }
