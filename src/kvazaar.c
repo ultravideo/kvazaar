@@ -78,7 +78,6 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
-    kvz_free_rc_data();
     // Discard const from the pointer.
     kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
@@ -113,11 +112,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   encoder->out_state_num = 0;
   encoder->frames_started = 0;
   encoder->frames_done = 0;
-
-  // Assure that the rc data allocation was successful
-  if(!kvz_get_rc_data(encoder->control)) {
-    goto kvazaar_open_failure;
-  }
 
   kvz_init_input_frame_buffer(&encoder->input_buffer);
 

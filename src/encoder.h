@@ -44,6 +44,8 @@
 #include "threadqueue.h"
 #include "fast_coeff_cost.h"
 
+struct rc_data;
+
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
 {
@@ -148,6 +150,8 @@ typedef struct encoder_control_t
   int32_t poc_lsb_bits;
 
   fast_coeff_table_t fast_coeff_table;
+
+  struct kvz_rc_data *rc_data;
 
 } encoder_control_t;
 

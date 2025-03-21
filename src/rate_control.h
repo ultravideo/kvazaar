@@ -62,10 +62,17 @@ typedef struct kvz_rc_data {
   pthread_mutex_t ck_frame_lock;
   pthread_mutex_t lambda_lock;
   pthread_mutex_t intra_lock;
+
+  int smoothing_window;
+
+  FILE* dist_file;
+  FILE* bits_file;
+  FILE* qp_file;
+  FILE* lambda_file;
 } kvz_rc_data;
 
 kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder);
-void kvz_free_rc_data();
+void kvz_free_rc_data(kvz_rc_data* data);
 
 void kvz_set_picture_lambda_and_qp(encoder_state_t * const state);
 

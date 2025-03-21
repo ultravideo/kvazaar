@@ -94,7 +94,7 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   pthread_mutex_init(&state->frame->rc_lock, NULL);
 
-  state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
+  state->frame->new_ratecontrol = state->encoder_control->rc_data;
 
   return 1;
 }

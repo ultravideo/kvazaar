@@ -41,6 +41,7 @@
 #include "strategyselector.h"
 #include "kvz_math.h"
 #include "fast_coeff_cost.h"
+#include "rate_control.h"
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
@@ -602,6 +603,15 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     memcpy(encoder->cfg.optional_key, cfg->optional_key, 16);
   }
 
+  if (encoder->cfg.target_bitrate > 0 && cfg->rc_algorithm != KVZ_NO_RC)
+  {
+    encoder->rc_data = kvz_get_rc_data(encoder);
+    if (!encoder->rc_data) {
+      fprintf(stderr, "Failed to initialize rate control.\n");
+      goto init_failed;
+    }
+  }
+
   return encoder;
 
 init_failed:
@@ -644,6 +654,8 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
   if (encoder->roi_file) {
     fclose(encoder->roi_file);
   }
+
+  kvz_free_rc_data(encoder->rc_data);
 
   free(encoder);
 }

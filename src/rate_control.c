@@ -40,17 +40,10 @@
 
 
 static const int MIN_SMOOTHING_WINDOW = 40;
-static int smoothing_window = 40;
 static const double MIN_LAMBDA    = 0.1;
 static const double MAX_LAMBDA    = 10000;
 #define BETA1 1.2517
 
-static kvz_rc_data *data;
-
-static FILE *dist_file;
-static FILE *bits_file;
-static FILE *qp_file;
-static FILE *lambda_file;
 
 /**
  * \brief Clip lambda value to a valid range.
@@ -61,9 +54,7 @@ static double clip_lambda(double lambda) {
 }
 
 kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
-  if (data != NULL || encoder == NULL) return data;
-
-  data = calloc(1, sizeof(kvz_rc_data));
+  kvz_rc_data* data = calloc(1, sizeof(kvz_rc_data));
 
   if (data == NULL) return NULL;
   if (pthread_mutex_init(&data->ck_frame_lock, NULL) != 0) return NULL;
@@ -107,18 +98,21 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
   if(encoder->cfg.stats_file_prefix) {
     char buff[128];
     sprintf(buff, "%sbits.txt", encoder->cfg.stats_file_prefix);
-    bits_file = fopen(buff, "w");
+    data->bits_file = fopen(buff, "w");
     sprintf(buff, "%sdist.txt", encoder->cfg.stats_file_prefix);
-    dist_file = fopen(buff, "w");
+    data->dist_file = fopen(buff, "w");
     sprintf(buff, "%sqp.txt", encoder->cfg.stats_file_prefix);
-    qp_file = fopen(buff, "w");
+    data->qp_file = fopen(buff, "w");
     sprintf(buff, "%slambda.txt", encoder->cfg.stats_file_prefix);
-    lambda_file = fopen(buff, "w");
+    data->lambda_file = fopen(buff, "w");
   }
+
+  data->smoothing_window = MIN_SMOOTHING_WINDOW;
+
   return data;
 }
 
-void kvz_free_rc_data() {
+void kvz_free_rc_data(kvz_rc_data *data) {
   if (data == NULL) return;
 
   pthread_mutex_destroy(&data->ck_frame_lock);
@@ -189,16 +183,16 @@ static double gop_allocate_bits(encoder_state_t * const state)
     bits_coded -= state->frame->cur_gop_bits_coded;
   }
 
-  smoothing_window = MAX(MIN_SMOOTHING_WINDOW, smoothing_window - MAX(encoder->cfg.gop_len / 2, 1));
+  state->frame->new_ratecontrol->smoothing_window = MAX(MIN_SMOOTHING_WINDOW, state->frame->new_ratecontrol->smoothing_window - MAX(encoder->cfg.gop_len / 2, 1));
   double gop_target_bits = -1;
 
-  while( gop_target_bits < 0 && smoothing_window < 150) {
+  while( gop_target_bits < 0 && state->frame->new_ratecontrol->smoothing_window < 150) {
     // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
     gop_target_bits =
-      (encoder->target_avg_bppic * (pictures_coded + smoothing_window) - bits_coded)
-      * MAX(1, encoder->cfg.gop_len) / smoothing_window;
+      (encoder->target_avg_bppic * (pictures_coded + state->frame->new_ratecontrol->smoothing_window) - bits_coded)
+      * MAX(1, encoder->cfg.gop_len) / state->frame->new_ratecontrol->smoothing_window;
     if(gop_target_bits < 0) {
-      smoothing_window += 10;
+      state->frame->new_ratecontrol->smoothing_window += 10;
     }
   }
   // Allocate at least 200 bits for each GOP like HM does.
@@ -924,10 +918,10 @@ void kvz_update_after_picture(encoder_state_t * const state) {
 
   if (encoder->cfg.stats_file_prefix) {
     int poc = calc_poc(state);
-    fprintf(dist_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(bits_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(qp_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
-    fprintf(lambda_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(state->frame->new_ratecontrol->dist_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(state->frame->new_ratecontrol->bits_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(state->frame->new_ratecontrol->qp_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    fprintf(state->frame->new_ratecontrol->lambda_file, "%d %d %d\n", poc, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
   }
 
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
@@ -945,17 +939,17 @@ void kvz_update_after_picture(encoder_state_t * const state) {
       total_distortion += (double)ctu_distortion / ctu->pixels;
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
       if(encoder->cfg.stats_file_prefix) {
-        fprintf(dist_file, "%f ", ctu->distortion);
-        fprintf(bits_file, "%d ", ctu->bits);
-        fprintf(qp_file, "%d ", ctu->adjust_qp ? ctu->adjust_qp : ctu->qp);
-        fprintf(lambda_file, "%f ", ctu->adjust_lambda ? ctu->adjust_lambda : ctu->lambda);
+        fprintf(state->frame->new_ratecontrol->dist_file, "%f ", ctu->distortion);
+        fprintf(state->frame->new_ratecontrol->bits_file, "%d ", ctu->bits);
+        fprintf(state->frame->new_ratecontrol->qp_file, "%d ", ctu->adjust_qp ? ctu->adjust_qp : ctu->qp);
+        fprintf(state->frame->new_ratecontrol->lambda_file, "%f ", ctu->adjust_lambda ? ctu->adjust_lambda : ctu->lambda);
       }
     }
     if (encoder->cfg.stats_file_prefix) {
-      fprintf(dist_file, "\n");
-      fprintf(bits_file, "\n");
-      fprintf(qp_file, "\n");
-      fprintf(lambda_file, "\n");
+      fprintf(state->frame->new_ratecontrol->dist_file, "\n");
+      fprintf(state->frame->new_ratecontrol->bits_file, "\n");
+      fprintf(state->frame->new_ratecontrol->qp_file, "\n");
+      fprintf(state->frame->new_ratecontrol->lambda_file, "\n");
     }
   }
 
