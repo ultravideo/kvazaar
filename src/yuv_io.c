@@ -220,23 +220,22 @@ static int yuv_io_read_plane(
 
 
 static int read_frame_header(FILE* input) {
-  char buffer[256];
-  bool frame_start = false;
+  int c;
+  int count = 0;
+  const int max_scan = 4096; // prevent infinite loops
 
-  while (!frame_start) {
-    for (int i = 0; i < 256; i++) {
-      buffer[i] = getc(input);
-      if (buffer[i] == EOF) return 0;
-      // ToDo: frame headers can have some information structured same as start headers
-      // This info is just skipped for now, since it's not clear what it could be.
-      if (buffer[i] == 0x0A) {
-        frame_start = true;
-        break;
-      }
+  while ((c = getc(input)) != EOF && count < max_scan) {
+    count++;
+    // ToDo: frame headers can have some information structured same as start headers
+    // This info is just skipped for now, since it's not clear what it could be.
+    if (c == 0x0A) {
+      return 1; // Found frame start
     }
   }
-  return 1;
+
+  return 0; // EOF or scan limit reached
 }
+
 
 /**
  * \brief Read a single frame from a file.
