@@ -218,7 +218,21 @@ endif()
 if(BUILD_KVAZAAR_BINARY)
   add_executable(kvazaar-bin ${CLI_SOURCES})
 
-  set_target_properties(kvazaar-bin PROPERTIES OUTPUT_NAME kvazaar)
+  if(MSVC AND BUILD_SHARED_LIBS)
+    set_target_properties(kvazaar PROPERTIES
+      OUTPUT_NAME kvazaar
+      PDB_NAME kvazaar-lib
+    )
+
+    set_target_properties(kvazaar-bin PROPERTIES
+      OUTPUT_NAME kvazaar
+      PDB_NAME kvazaar-bin
+    )
+  else()
+    set_target_properties(kvazaar-bin PROPERTIES
+      OUTPUT_NAME kvazaar
+    )
+  endif()
   set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_NAME kvazaar)
 
   target_link_libraries(kvazaar-bin PUBLIC kvazaar)
