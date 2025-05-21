@@ -554,7 +554,7 @@ void kvz_tz_pattern_search(inter_search_info_t *info,
       //[ ][ ][6][ ][ ][ ][3][ ][ ]
       {
         { iDist / 2, iDist }, { iDist, 0 }, { iDist / 2, -iDist }, { -iDist, 0 },
-        { iDist / 2, iDist }, { -iDist / 2, -iDist }, { 0, 0 }, { 0, 0 }
+        { -iDist / 2, iDist }, { -iDist / 2, -iDist }, { 0, 0 }, { 0, 0 }
       }
   };
 
