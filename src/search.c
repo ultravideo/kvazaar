@@ -864,6 +864,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           inter_bitcost += cur_cu->merge_idx;        
         }
       }
+      else if (!state->encoder_control->cfg.early_skip)
+      {
+        int tr_depth = depth;
+        kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+        kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);        
+      }
       lcu_fill_inter(lcu, x_local, y_local, cu_width);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
