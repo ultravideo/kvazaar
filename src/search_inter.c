@@ -2145,7 +2145,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   *inter_cost += (bits)* state->lambda;
   *inter_bitcost = bits;
 
-  if(no_cbf_cost < *inter_cost) {
+  if(no_cbf_cost < *inter_cost && !state->encoder_control->cfg.lossless) {
     cur_cu->cbf = 0;
     if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
       cur_cu->skipped = 1;
