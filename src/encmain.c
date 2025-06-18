@@ -345,9 +345,11 @@ static bool read_header(FILE* input, kvz_config* config) {
       buffer[i] = getc(input);
       // Start code of frame data
       if (buffer[i] == 0x0A) {
-        for (; i > 0; i--) {
-          ungetc(buffer[i], input);
-        }
+        // There should not be any reason to ungetc the last parameter, but this was there for
+        // some reason in the original code. Leave as a comment for now, in case it is needed later.
+        //for (; i > 0; i--) {
+        //  ungetc(buffer[i], input);
+        //}
         end_of_header = true;
         break;
       }
