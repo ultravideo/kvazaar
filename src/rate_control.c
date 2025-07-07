@@ -369,7 +369,11 @@ static double pic_allocate_bits(encoder_state_t * const state)
     else {
       alpha = 0.3;
     }
-    return MIN(MAX(100, alpha*pow(state->frame->icost * 4 / bits, beta)*bits), encoder->cfg.gop_len >= 2 ? 0.85 * state->frame->cur_gop_target_bits : state->frame->cur_gop_target_bits);
+
+    double low_limit = 1.2 * pow(state->encoder_control->cfg.framerate, -0.873) * state->encoder_control->cfg.target_bitrate;
+    double high_limit = 2.25 * pow(state->encoder_control->cfg.framerate, -0.61) * state->encoder_control->cfg.target_bitrate;
+    double original_bits = alpha * pow(state->frame->icost * 4 / bits, beta) * bits;
+    return MIN(MAX(low_limit, original_bits), high_limit);
   }
 
   if (encoder->cfg.gop_len <= 0) {
