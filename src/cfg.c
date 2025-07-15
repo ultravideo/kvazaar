@@ -793,10 +793,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if (sscanf(value, "%d/%d", &fps_num, &fps_denom) == 2) {
       cfg->framerate_num = fps_num;
       cfg->framerate_denom = fps_denom;
+      cfg->framerate = (double)fps_num / fps_denom;
     } else {
       // Accept decimal notation, making sure not to round 0 to 1.
       cfg->framerate_num = (int)(atof(value) * 1000 + 0.49);
       cfg->framerate_denom = 1000;
+      cfg->framerate = atof(value);
     }
   }
   else if OPT("qp")

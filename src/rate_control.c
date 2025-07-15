@@ -370,10 +370,11 @@ static double pic_allocate_bits(encoder_state_t * const state)
       alpha = 0.3;
     }
 
-    double low_limit = 1.2 * pow(state->encoder_control->cfg.framerate, -0.873) * state->encoder_control->cfg.target_bitrate;
-    double high_limit = 2.25 * pow(state->encoder_control->cfg.framerate, -0.61) * state->encoder_control->cfg.target_bitrate;
+    double low_limit = (encoder->cfg.rc_algorithm == KVZ_LAMBDA && encoder->cfg.rdo < 2 ? 1.0 : 1.2) * pow(state->encoder_control->cfg.framerate, -0.873) * state->encoder_control->cfg.target_bitrate;
+    double high_limit = (encoder->cfg.rdo < 2 ? (encoder->cfg.rc_algorithm == KVZ_LAMBDA ? 1.1 : 3.5) : 2.25) * pow(state->encoder_control->cfg.framerate, -0.61) * state->encoder_control->cfg.target_bitrate;
     double original_bits = alpha * pow(state->frame->icost * 4 / bits, beta) * bits;
-    return MIN(MAX(low_limit, original_bits), high_limit);
+    double limited = MIN(MAX(low_limit, original_bits), high_limit);
+    return limited;
   }
 
   if (encoder->cfg.gop_len <= 0) {
@@ -385,7 +386,8 @@ static double pic_allocate_bits(encoder_state_t * const state)
   const double pic_target_bits =
     state->frame->cur_gop_target_bits * pic_weight - pic_header_bits(state);
   // Allocate at least 100 bits for each picture like HM does.
-  return MAX(100, pic_target_bits);
+  const double intra_bits = state->frame->is_irap ? (encoder->cfg.rdo < 2 ? 4 : 6) * state->encoder_control->target_avg_bppic : pic_target_bits;
+  return MAX(MAX(100, pic_target_bits), intra_bits);
 }
 
 static int8_t lambda_to_qp(const double lambda)
