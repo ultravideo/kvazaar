@@ -47,7 +47,8 @@
  * \param dir_offsets
  * \param is_chroma  0 for luma, 1 for chroma. Indicates
  */
-static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
+static void calc_sao_edge_dir_generic(const encoder_control_t* const encoder, 
+                                      const kvz_pixel *orig_data,
                                       const kvz_pixel *rec_data,
                                       int eo_class,
                                       int block_width,
@@ -62,7 +63,7 @@ static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
 
-  
+  const int offset = encoder->bitdepth != 8 ? 1 << (encoder->bitdepth - 9) : 0;
 
   for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
@@ -73,7 +74,7 @@ static void calc_sao_edge_dir_generic(const kvz_pixel *orig_data,
 
       int eo_cat = sao_calc_eo_cat(a, b, c);
 
-      cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
+      cat_sum_cnt[0][eo_cat] += (orig_data[y * block_width + x] - c + offset) >> (encoder->bitdepth - 8);
       cat_sum_cnt[1][eo_cat] += 1;
     }
   }

@@ -284,7 +284,8 @@ static INLINE __m256i FIX_W32 do_one_edge_ymm(const __m256i a,
   return calc_diff_off_delta(diff_lo, diff_hi, offset, orig);
 }
 
-static int32_t sao_edge_ddistortion_avx2(const uint8_t *orig_data,
+static int32_t sao_edge_ddistortion_avx2(const encoder_control_t* const encoder, 
+                                         const uint8_t *orig_data,
                                          const uint8_t *rec_data,
                                                int32_t  block_width,
                                                int32_t  block_height,
@@ -316,7 +317,8 @@ static int32_t sao_edge_ddistortion_avx2(const uint8_t *orig_data,
   assert(NUM_SAO_EDGE_CATEGORIES == 5);
 
   if (offsets_ok != 0xffff) {
-    return sao_edge_ddistortion_generic(orig_data,
+    return sao_edge_ddistortion_generic(encoder, 
+                                        orig_data,
                                         rec_data,
                                         block_width,
                                         block_height,
@@ -420,7 +422,8 @@ static void FIX_W32 calc_edge_dir_one_ymm(const __m256i  a,
   }
 }
 
-static void calc_sao_edge_dir_avx2(const uint8_t *orig_data,
+static void calc_sao_edge_dir_avx2(const encoder_control_t* const encoder, 
+                                   const uint8_t *orig_data,
                                    const uint8_t *rec_data,
                                          int32_t  eo_class,
                                          int32_t  block_width,

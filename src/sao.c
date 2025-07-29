@@ -385,7 +385,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
       FILL(cat_sum_cnt, 0);
-      kvz_calc_sao_edge_dir(data[i], recdata[i], edge_class,
+      kvz_calc_sao_edge_dir(state->encoder_control, data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
     
 
@@ -514,7 +514,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-      ddistortion += kvz_sao_edge_ddistortion(data[buf_i], recdata[buf_i], 
+      ddistortion += kvz_sao_edge_ddistortion(state->encoder_control, data[buf_i], recdata[buf_i], 
                                           block_width, block_height,
                                           edge_sao.eo_class, &edge_sao.offsets[5 * buf_i]);
     }
@@ -577,7 +577,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
         switch (merge_cand->type) {
           case SAO_TYPE_EDGE:
                 for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-                  ddistortion += kvz_sao_edge_ddistortion(data[buf_i], recdata[buf_i],
+                  ddistortion += kvz_sao_edge_ddistortion(state->encoder_control, data[buf_i], recdata[buf_i],
                     block_width, block_height,
                     merge_cand->eo_class, &merge_cand->offsets[5 * buf_i]);
                 }
