@@ -30,7 +30,8 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "encoderstate.h"
+#define _CRT_SECURE_NO_WARNINGS
+ #include "encoderstate.h"
 
  // This define is required for M_PI on Windows.
 #define _USE_MATH_DEFINES
@@ -51,7 +52,6 @@
 #include "search.h"
 #include "tables.h"
 #include "threadqueue.h"
-
 #define SAO_BUF_WIDTH (LCU_WIDTH + SAO_DELAY_PX + 2)
 #define SAO_BUF_WIDTH_C (SAO_BUF_WIDTH >> SHIFT)
 #include "strategies/strategies-picture.h"
@@ -285,11 +285,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   // sides. We add two extra pixels to the buffers because the AVX2 SAO
   // reconstruction reads up to two extra bytes when using edge SAO in the
   // horizontal direction.
-#define SAO_BUF_WIDTH   (1 + SAO_DELAY_PX + LCU_WIDTH)
-#define SAO_BUF_WIDTH_C ((1 + SAO_DELAY_PX + LCU_WIDTH)>>SHIFT)
-  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
-  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
-  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
+
 
   // Pointers to the top-left pixel of the LCU in the buffers.
   kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
@@ -750,7 +746,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   state->cabac.update = 0;
 
   pthread_mutex_lock(&state->frame->rc_lock);
-  const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  const uint32_t bits = (uint32_t)(kvz_bitstream_tell(&state->stream) - existing_bits);
   state->frame->cur_frame_bits_coded += bits;
   // This variable is used differently by intra and inter frames and shouldn't
   // be touched in intra frames here
@@ -807,7 +803,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
 
-    for (int i = 0; i < state->lcu_order_count; ++i) {
+    for (uint32_t i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
     }
   } else {
@@ -840,7 +836,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       ref_state = state->previous_encoder_state;
     }
 
-    for (int i = 0; i < state->lcu_order_count; ++i) {
+    for (uint32_t i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
@@ -1083,7 +1079,7 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
   int num_positive = 0;
 
   // Add positive references to L1 list
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = i;
       state->frame->ref_LX_size[1] += 1;
@@ -1097,7 +1093,7 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
     (cfg->bipred && (cfg->gop_len == 0 || cfg->gop_lowdelay));
 
   // Add negative references to L0 and L1 lists.
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] < state->frame->poc) {
       state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = i;
       state->frame->ref_LX_size[0] += 1;
@@ -1110,10 +1106,10 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
   }
 
   // Fill the rest with -1.
-  for (int i = state->frame->ref_LX_size[0]; i < 16; i++) {
+  for (uint32_t i = state->frame->ref_LX_size[0]; i < 16; i++) {
     state->frame->ref_LX[0][i] = 0xff;
   }
-  for (int i = state->frame->ref_LX_size[1]; i < 16; i++) {
+  for (uint32_t i = state->frame->ref_LX_size[1]; i < 16; i++) {
     state->frame->ref_LX[1][i] = 0xff;
   }
 
@@ -1328,7 +1324,7 @@ static void init_erp_aqp_roi(const encoder_control_t *encoder, kvz_picture *fram
     // Normalize.
     lcu_weight = (lcu_weight * frame_height) / (total_weight * lcu_height);
 
-    int8_t qp_delta = round(-ERP_AQP_STRENGTH * log2(lcu_weight));
+    int8_t qp_delta = (int8_t)(round(-ERP_AQP_STRENGTH * log2(lcu_weight)));
 
     if (orig_roi) {
       // If a ROI array already exists, we copy the existing values to the
@@ -1406,7 +1402,7 @@ static void next_roi_frame_from_file(kvz_picture *frame, FILE *file, enum kvz_ro
   frame->roi.roi_array = dqp_array;
 
   if (format == KVZ_ROI_TXT) {
-    for (int i = 0; i < size; ++i) {
+    for (uint32_t i = 0; i < size; ++i) {
       int number; // Need a pointer to int for fscanf
       if (fscanf(file, "%d", &number) != 1) {
         fprintf(stderr, "Reading ROI file failed.\n");
@@ -1471,8 +1467,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     unsigned y_lim = state->tile->frame->height_in_lcu;
     
     unsigned id = 0;
-    for (int y = 0; y < y_lim; ++y) {
-      for (int x = 0; x < x_lim; ++x) {
+    for (uint32_t y = 0; y < y_lim; ++y) {
+      for (uint32_t x = 0; x < x_lim; ++x) {
         kvz_pixel tmp[LCU_LUMA_SIZE];
         int pxl_x = x * LCU_WIDTH;
         int pxl_y = y * LCU_WIDTH;
@@ -1504,8 +1500,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         if (has_chroma) {
           // Add chroma variance if not monochrome
           int32_t c_stride = state->tile->frame->source->stride >> 1;
-          kvz_pixel chromau_tmp[LCU_CHROMA_SIZE];
-          kvz_pixel chromav_tmp[LCU_CHROMA_SIZE];
+          kvz_pixel chromau_tmp[LCU_LUMA_SIZE];
+          kvz_pixel chromav_tmp[LCU_LUMA_SIZE];
           int lcu_chroma_width = LCU_WIDTH >> 1;
           int c_pxl_x = x * lcu_chroma_width;
           int c_pxl_y = y * lcu_chroma_width;

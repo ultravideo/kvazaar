@@ -295,7 +295,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   // be useful information)
   int32_t scan_cg_last = -1;
 
-  for (int32_t i = 0; i < num_blocks; i++) {
+  for (uint32_t i = 0; i < num_blocks; i++) {
     const uint32_t cg_id = scan_cg[i];
     const uint32_t n_xbits = log2_block_size - 2; // How many lowest bits of scan_cg represent X coord
     const uint32_t cg_x = cg_id & ((1 << n_xbits) - 1);

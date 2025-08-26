@@ -126,10 +126,10 @@ void kvz_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_dept
 {
   const int x_local = SUB_SCU(x_px);
   const int y_local = SUB_SCU(y_px);
-  const int width = LCU_WIDTH >> depth;
+  const uint32_t width = LCU_WIDTH >> depth;
 
-  for (unsigned y = 0; y < width; y += SCU_WIDTH) {
-    for (unsigned x = 0; x < width; x += SCU_WIDTH) {
+  for (uint32_t y = 0; y < width; y += SCU_WIDTH) {
+    for (uint32_t x = 0; x < width; x += SCU_WIDTH) {
       LCU_GET_CU_AT_PX(lcu, x_local + x, y_local + y)->tr_depth = tr_depth;
     }
   }
@@ -176,7 +176,7 @@ static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
   }
 }
 
-static void lcu_fill_cbf(lcu_t *lcu, int x_local, int y_local, int width, cu_info_t *cur_cu)
+static void lcu_fill_cbf(lcu_t *lcu, uint32_t x_local, uint32_t y_local, uint32_t width, cu_info_t *cur_cu)
 {
   const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
   const uint32_t mask = ~((width >> tr_split)-1);
@@ -663,10 +663,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     int32_t max;
   } pu_depth_inter, pu_depth_intra;
 
-  lcu_t *const lcu = &work_tree[depth];
-
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
+  
+  uint32_t x_local = SUB_SCU(x);
+  uint32_t y_local = SUB_SCU(y);
 
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame->width || y >= frame->height) {
@@ -908,7 +907,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu);
     }
     else {
-      // Intra 4×4 PUs
+      // Intra 4x4 PUs
       if (state->frame->slicetype != KVZ_SLICE_I) {
         cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
         CABAC_FBITS_UPDATE(cabac, ctx, 1, bits, "pred_mode_flag");

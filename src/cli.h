@@ -1,5 +1,4 @@
-#ifndef CLI_H_
-#define CLI_H_
+#pragma once
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -72,5 +71,3 @@ void print_frame_info(const kvz_frame_info *const info,
                       const uint32_t bytes,
                       const bool print_psnr,
                       const double avg_qp);
-
-#endif

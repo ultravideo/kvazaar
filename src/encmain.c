@@ -36,6 +36,7 @@
  */
 
 #ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 /* The following two defines must be located before the inclusion of any system header files. */
 #ifndef WINVER
 #define WINVER       0x0500
