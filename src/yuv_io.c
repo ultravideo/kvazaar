@@ -274,14 +274,14 @@ int yuv_io_read(FILE* file,
       img_out->y);
   if (!ok) return 0;
 
-  kvz_chroma_shift_w = img_out->chroma_format == 0 || img_out->chroma_format == 3 ? 0 : 1;
-  kvz_chroma_shift_h = img_out->chroma_format == 1 ? 1 : 0;
+  const uint8_t chroma_shift_w = img_out->chroma_format == 0 || img_out->chroma_format == 3 ? 0 : 1;
+  const uint8_t chroma_shift_h = img_out->chroma_format == 1 ? 1 : 0;
 
   if (img_out->chroma_format != KVZ_CSP_400) {
-    unsigned uv_width_in = in_width >> SHIFT_W;
-    unsigned uv_height_in = in_height >> SHIFT_H;
-    unsigned uv_width_out = img_out->width >> SHIFT_W;
-    unsigned uv_height_out = img_out->height >> SHIFT_H;
+    unsigned uv_width_in = in_width >> chroma_shift_w;
+    unsigned uv_height_in = in_height >> chroma_shift_h;
+    unsigned uv_width_out = img_out->width >> chroma_shift_w;
+    unsigned uv_height_out = img_out->height >> chroma_shift_h;
 
     ok = yuv_io_read_plane(
         file,
@@ -367,11 +367,13 @@ int yuv_io_write(FILE* file,
   }
 
   if (img->chroma_format != KVZ_CSP_400) {
-    for (int y = 0; y < (output_height >> SHIFT_H); ++y) {
-      fwrite(&img->u[y * (width >> SHIFT_W)], sizeof(*img->u), output_width >> SHIFT_W, file);
+    const uint8_t chroma_shift_w = img->chroma_format == 0 || img->chroma_format == 3 ? 0 : 1;
+    const uint8_t chroma_shift_h = img->chroma_format == 1 ? 1 : 0;
+    for (int y = 0; y < (output_height >> chroma_shift_h); ++y) {
+      fwrite(&img->u[y * (width >> chroma_shift_w)], sizeof(*img->u), output_width >> chroma_shift_w, file);
     }
-    for (int y = 0; y < (output_height >> SHIFT_H); ++y) {
-      fwrite(&img->v[y * (width >> SHIFT_W)], sizeof(*img->v), output_width >> SHIFT_W, file);
+    for (int y = 0; y < (output_height >> chroma_shift_h); ++y) {
+      fwrite(&img->v[y * (width >> chroma_shift_w)], sizeof(*img->v), output_width >> chroma_shift_w, file);
     }
   }
 

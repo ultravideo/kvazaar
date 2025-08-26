@@ -218,17 +218,20 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
     memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width);
   }
 
+  const uint8_t chroma_shift_w = field_out->chroma_format == 0 || field_out->chroma_format == 3 ? 0 : 1;
+  const uint8_t chroma_shift_h = field_out->chroma_format == 1 ? 1 : 0;
+
   //Chroma
-  for (int i = 0; i < field_out->height >> SHIFT_H; ++i){
-    kvz_pixel *row_in = frame_in->u + MIN((frame_in->height >> SHIFT_H) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT_W);
-    kvz_pixel *row_out = field_out->u + i * (field_out->stride >> SHIFT_W);
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT_W));
+  for (int i = 0; i < field_out->height >> chroma_shift_h; ++i){
+    kvz_pixel *row_in = frame_in->u + MIN((frame_in->height >> chroma_shift_h) - 1, 2 * i + offset) * (frame_in->stride >> chroma_shift_w);
+    kvz_pixel *row_out = field_out->u + i * (field_out->stride >> chroma_shift_w);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> chroma_shift_w));
   }
 
-  for (int i = 0; i < field_out->height >> SHIFT_H; ++i){
-    kvz_pixel *row_in = frame_in->v + MIN((frame_in->height >> SHIFT_H) - 1, 2 * i + offset) * (frame_in->stride >> SHIFT_W);
-    kvz_pixel *row_out = field_out->v + i * (field_out->stride >> SHIFT_W);
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> SHIFT_W));
+  for (int i = 0; i < field_out->height >> chroma_shift_h; ++i){
+    kvz_pixel *row_in = frame_in->v + MIN((frame_in->height >> chroma_shift_h) - 1, 2 * i + offset) * (frame_in->stride >> chroma_shift_w);
+    kvz_pixel *row_out = field_out->v + i * (field_out->stride >> chroma_shift_w);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * (frame_in->width >> chroma_shift_w));
   }
 
   return 1;
@@ -265,10 +268,11 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   if (frame) {
     assert(state->frame->num == enc->frames_started);
+    kvz_config* cfg = (kvz_config*)(&state->encoder_control->cfg);
 
     // We have a picture, set the project-global var to correct value
-    kvz_chroma_shift_w = frame->chroma_format == 0 || frame->chroma_format == 3 ? 0 : 1;
-    kvz_chroma_shift_h = frame->chroma_format == 1 ? 1 : 0;
+    cfg->chroma_shift = cfg->chroma_shift_w = frame->chroma_format == 0 || frame->chroma_format == 3 ? 0 : 1;
+    cfg->chroma_shift_h = frame->chroma_format == 1 ? 1 : 0;
 
     // Start encoding.
     kvz_encode_one_frame(state, frame);

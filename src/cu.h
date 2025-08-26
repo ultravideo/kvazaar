@@ -368,9 +368,9 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
  */
 static INLINE void copy_coeffs(const coeff_t *__restrict src,
                                coeff_t *__restrict dest,
-                               size_t width)
+                               size_t width, size_t height)
 {
-  memcpy(dest, src, width * width * sizeof(coeff_t));
+  memcpy(dest, src, width * height * sizeof(coeff_t));
 }
 
 

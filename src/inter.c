@@ -554,7 +554,7 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   kvz_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
                      pu_x, pu_y, pu_w, pu_h,
                      im_flags_L0, im_flags_L1,
-                     predict_luma, predict_chroma);
+                     predict_luma, predict_chroma, state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
 }
 
 

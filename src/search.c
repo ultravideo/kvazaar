@@ -73,28 +73,33 @@ static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from
 static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = (x_local >> SHIFT_W) + (y_local >> SHIFT_H) * (LCU_WIDTH_C);
+  
 
   kvz_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
                   width, width, LCU_WIDTH, LCU_WIDTH);
   if (from->rec.chroma_format != KVZ_CSP_400) {
+    const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 1 : 0;
+    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const int chroma_index = (x_local >> chroma_shift_w) + (y_local >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w);
     kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
-                    width >> SHIFT_W, width >> SHIFT_H, LCU_WIDTH_C, LCU_WIDTH_C);
+                    width >> chroma_shift_w, width >> chroma_shift_h, LCU_WIDTH >> chroma_shift_w, LCU_WIDTH >> chroma_shift_w);
     kvz_pixels_blit(&from->rec.v[chroma_index], &to->rec.v[chroma_index],
-                    width >> SHIFT_W, width >> SHIFT_H, LCU_WIDTH_C, LCU_WIDTH_C);
+                    width >> chroma_shift_w, width >> chroma_shift_h, LCU_WIDTH >> chroma_shift_w, LCU_WIDTH >> chroma_shift_w);
   }
 }
 
 static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
   const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
-  copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
+  copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width, width);
 
   if (from->rec.chroma_format != KVZ_CSP_400) {
-    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> SHIFT_W, y_local >> SHIFT_H);
+    const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 1 : 0;
+    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const int chroma_index = (x_local >> chroma_shift_w) + (y_local >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w);
     // 422: whyyyyyy
-    copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> SHIFT);
-    copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> SHIFT);
+    copy_coeffs(&from->coeff.u[chroma_index], &to->coeff.u[chroma_index], width >> chroma_shift_w, width >> chroma_shift_h);
+    copy_coeffs(&from->coeff.v[chroma_index], &to->coeff.v[chroma_index], width >> chroma_shift_w, width >> chroma_shift_h);
   }
 }
 
@@ -1248,7 +1253,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
 
   // Copy coeffs to encoder state.
-  copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);
-  copy_coeffs(work_tree[0].coeff.u, state->coeff->u, LCU_WIDTH_C);
-  copy_coeffs(work_tree[0].coeff.v, state->coeff->v, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH, LCU_WIDTH);
+  copy_coeffs(work_tree[0].coeff.u, state->coeff->u, LCU_WIDTH >> state->encoder_control->cfg.chroma_shift_w, LCU_WIDTH >> state->encoder_control->cfg.chroma_shift_h);
+  copy_coeffs(work_tree[0].coeff.v, state->coeff->v, LCU_WIDTH >> state->encoder_control->cfg.chroma_shift_w, LCU_WIDTH >> state->encoder_control->cfg.chroma_shift_h);
 }

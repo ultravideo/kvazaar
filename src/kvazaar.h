@@ -494,6 +494,13 @@ typedef struct kvz_config
   uint8_t fast_bipred;
 
   uint8_t enable_logging_output; //!< \brief May be used to disable the logging output to stderr. Default: on.
+
+  //! vars to define chroma ratio to luma
+  //! chroma_size = luma_size >> chroma_shift
+  //! but use as chroma_size = luma_size >> SHIFT;
+  uint8_t chroma_shift_w;
+  uint8_t chroma_shift_h;
+  uint8_t chroma_shift;
 } kvz_config;
 
 /**

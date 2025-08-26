@@ -156,17 +156,10 @@ unsigned n;
 #include <inttypes.h>
 #include <stdio.h>
 
-//! global var to define chroma ratio to luma
-//!   chroma_size = luma_size >> chroma_shift
-//!   but use as chroma_size = luma_size >> SHIFT;
-unsigned kvz_chroma_shift_w;
-unsigned kvz_chroma_shift_h;
-unsigned kvz_chroma_shift;
-
-#define SHIFT kvz_chroma_shift_w
+#define SHIFT state->encoder_control->cfg.chroma_shift_w
 //! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
-#define SHIFT_W kvz_chroma_shift_w
-#define SHIFT_H kvz_chroma_shift_h
+#define SHIFT_W state->encoder_control->cfg.chroma_shift_w
+#define SHIFT_H state->encoder_control->cfg.chroma_shift_h
 //! minimum luma width & height for chroma to exist for that size
 #define MIN_C_W 4 << SHIFT_W
 #define MIN_C_H 4 << SHIFT_H

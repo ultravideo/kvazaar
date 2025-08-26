@@ -281,7 +281,7 @@ int kvz_quantize_residual_trskip(
     // we can skip this.
     kvz_pixels_blit(best->rec, rec_out, width, width, 4, out_stride);
   }
-  copy_coeffs(best->coeff, coeff_out, width);
+  copy_coeffs(best->coeff, coeff_out, width, width);
 
   return best->has_coeffs;
 }

@@ -1209,7 +1209,7 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t *const encoder
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
   ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
-  int16_t hor_stride = LCU_WIDTH_C;
+  int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
   kvz_ipol_4tap_ver_im_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
@@ -1237,7 +1237,7 @@ static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
   ALIGNED(64) int16_t hor_intermediate[KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
-  int16_t hor_stride = LCU_WIDTH_C;
+  int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   kvz_ipol_4tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
   kvz_ipol_4tap_ver_im_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);

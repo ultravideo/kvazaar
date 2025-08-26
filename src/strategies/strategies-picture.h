@@ -145,7 +145,9 @@ typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
   const unsigned im_flags_L0,
   const unsigned im_flags_L1,
   const bool predict_luma,
-  const bool predict_chroma);
+  const bool predict_chroma,
+  const uint8_t chroma_shift_w,
+  const uint8_t chroma_shift_h);
 
 typedef double (pixel_var_func)(const kvz_pixel *buf, const uint32_t len);
 

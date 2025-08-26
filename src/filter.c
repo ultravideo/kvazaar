@@ -263,12 +263,12 @@ static bool is_pu_boundary(const encoder_state_t *const state,
  * \param dir   direction of the edge
  * \return      true, if the edge is aligned on a 8x8 grid, otherwise false
  */
-static bool is_on_8x8_grid(int x, int y, edge_dir dir)
+static bool is_on_8x8_grid(const encoder_state_t* state, int x, int y, edge_dir dir)
 {
   if (dir == EDGE_HOR) {
-    return (y & (3 << SHIFT_H) + SHIFT_H) == 0;
+    return (y & ((3 << SHIFT_H) + SHIFT_H)) == 0;
   } else {
-    return (x & (3 << SHIFT_W) + SHIFT_H) == 0;
+    return (x & ((3 << SHIFT_W) + SHIFT_H)) == 0;
   }
 }
 
@@ -670,7 +670,7 @@ static void filter_deblock_unit(encoder_state_t * const state,
 
   filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
   // TODO: speedup necessary?
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x >> SHIFT_W, y >> SHIFT_H, dir)) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(state, x >> SHIFT_W, y >> SHIFT_H, dir)) {
     filter_deblock_edge_chroma(state, x >> SHIFT_W, y >> SHIFT_H, length >> SHIFT_W, dir, tu_boundary);
   }
 }

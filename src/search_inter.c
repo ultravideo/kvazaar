@@ -93,6 +93,7 @@ typedef struct {
  */
 static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, int y)
 {
+  const encoder_state_t *state = info->state;
   const encoder_control_t *ctrl = info->state->encoder_control;
 
   const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;

@@ -184,8 +184,10 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
 
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   if (orig_image->chroma_format != KVZ_CSP_400) {
-    im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> SHIFT_W) + (y_offset >> SHIFT_H) * (orig_image->stride >> SHIFT_W)];
-    im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> SHIFT_W) + (y_offset >> SHIFT_H) * (orig_image->stride >> SHIFT_W)];
+    const uint32_t chroma_shift_w = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 1 : 0;
+    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 0 : 0;
+    im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> chroma_shift_w) + (y_offset >> chroma_shift_h) * (orig_image->stride >> chroma_shift_w)];
+    im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> chroma_shift_w) + (y_offset >> chroma_shift_h) * (orig_image->stride >> chroma_shift_w)];
   }
 
   im->pts = 0;

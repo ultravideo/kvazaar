@@ -30,6 +30,7 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
+ #define _CRT_SECURE_NO_WARNINGS
 #include "cfg.h"
 #include "gop.h"
 
