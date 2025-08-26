@@ -783,12 +783,14 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     const vector2d_t luma_px = { x_px, y_px };
 
     kvz_intra_references refs_u;
-    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u);
+    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u,
+                              state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
 
     kvz_intra_references refs_v;
-    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v);
+    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v,
+                              state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
 
-    vector2d_t lcu_cpx = { lcu_px.x >> SHIFT_W, lcu_px.y >> SHIFT_H };
+    vector2d_t lcu_cpx = { lcu_px.x >> state->encoder_control->cfg.chroma_shift_w, lcu_px.y >> state->encoder_control->cfg.chroma_shift_h };
     kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
     kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
 
@@ -841,7 +843,8 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   if (depth > 0) {
     const vector2d_t luma_px = { x_px, y_px };
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, 
+                              state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
   }
 
   int8_t modes[35];

@@ -152,7 +152,6 @@ typedef int16_t coeff_t;
 /* END OF CONFIG VARIABLES */
 
 //DEBUG VARS; INCLUDES AND OTHER STUFF
-unsigned n;
 #include <inttypes.h>
 #include <stdio.h>
 

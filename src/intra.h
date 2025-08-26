@@ -110,7 +110,8 @@ void kvz_intra_build_reference(
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs);
+  kvz_intra_references *const refs,
+  uint8_t shift_w, uint8_t shift_h);
 
 /**
  * \brief Generate intra predictions.

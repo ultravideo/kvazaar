@@ -456,7 +456,6 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
-    const int lcu_pu_index_c = (int_mv.y >> SHIFT_H) * (LCU_WIDTH_C) + (int_mv.x >> SHIFT_W);
     const vector2d_t int_mv_in_frame_c = { int_mv_in_frame.x >> SHIFT_W, int_mv_in_frame.y >> SHIFT_H };
 
     if (int_mv_outside_frame) {
