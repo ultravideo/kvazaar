@@ -221,9 +221,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
                        intra_mode, chroma_mode,
                        pred_cu, lcu);
 
-    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, pred_cu, lcu);
     if (reconstruct_chroma) {
-      nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, pred_cu, lcu);
     }
 
     // Early stop codition for the recursive search.
@@ -727,7 +727,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                          -1, chroma.mode, // skip luma
                          NULL, lcu);
       double bits = 0;
-      chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
+      chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
       bits += mode_bits;
