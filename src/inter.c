@@ -438,7 +438,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     return fractional_luma;
   }
 
-  const unsigned out_stride_c = out_stride_luma / 2;
+  const unsigned out_stride_c = out_stride_luma >> SHIFT_W;
 
   // Generate prediction for chroma.
   if (fractional_luma || fractional_chroma) {

@@ -96,10 +96,10 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
   if (from->rec.chroma_format != KVZ_CSP_400) {
     const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 1 : 0;
     const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 0 : 0;
-    const int chroma_index = (x_local >> chroma_shift_w) + (y_local >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w);
-    // 422: whyyyyyy
-    copy_coeffs(&from->coeff.u[chroma_index], &to->coeff.u[chroma_index], width >> chroma_shift_w, width >> chroma_shift_h);
-    copy_coeffs(&from->coeff.v[chroma_index], &to->coeff.v[chroma_index], width >> chroma_shift_w, width >> chroma_shift_h);
+
+    const int chroma_z = xy_to_zorder(LCU_WIDTH >> chroma_shift_w, x_local >> chroma_shift_w, y_local >> chroma_shift_h);
+    copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> chroma_shift_w, width >> chroma_shift_h);
+    copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> chroma_shift_w, width >> chroma_shift_h);
   }
 }
 
@@ -378,7 +378,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   int v_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
   // See luma for why the second condition
   if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
-    // 444: depth - 1 modified to depth - SHIFT. 
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
@@ -816,7 +815,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, lcu);
-      // 444: ? orig 8's
+
       if (x % (MIN_C_W) == 0 && y % (MIN_C_H) == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma

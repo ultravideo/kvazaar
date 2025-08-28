@@ -289,9 +289,6 @@ typedef struct {
 
  \endverbatim
  */
-
-// NOTE: u & v were originally sized with LCU_CHROMA_SIZE, so memory waste is made if chroma is 
-// subsampled.
 typedef ALIGNED(8) struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_LUMA_SIZE];
