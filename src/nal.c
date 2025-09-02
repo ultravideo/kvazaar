@@ -81,7 +81,7 @@ void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_
   /* The number of chroma pixels is half or twice that of luma. */
   if (im->chroma_format != KVZ_CSP_400) {
     const uint32_t chroma_shift_w = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 1 : 0;
-    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : 0;
     kvz_array_checksum(im->u, im->height >> chroma_shift_h, im->width >> chroma_shift_w, im->width >> chroma_shift_w, checksum_out[1], bitdepth);
     kvz_array_checksum(im->v, im->height >> chroma_shift_h, im->width >> chroma_shift_w, im->width >> chroma_shift_w, checksum_out[2], bitdepth);
   }
@@ -100,7 +100,7 @@ void kvz_image_md5(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_
   /* The number of chroma pixels is half or twice that of luma. */
   if (im->chroma_format != KVZ_CSP_400) {
     const uint32_t chroma_shift_w = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 1 : 0;
-    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : 0;
     kvz_array_md5(im->u, im->height >> chroma_shift_h, im->width >> chroma_shift_w, im->width >> chroma_shift_w, checksum_out[1], bitdepth);
     kvz_array_md5(im->v, im->height >> chroma_shift_h, im->width >> chroma_shift_w, im->width >> chroma_shift_w, checksum_out[2], bitdepth);
   }

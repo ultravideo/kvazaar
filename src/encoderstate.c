@@ -289,8 +289,8 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
 
   // Pointers to the top-left pixel of the LCU in the buffers.
   kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
-  kvz_pixel *const sao_buf_u = &sao_buf_u_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
-  kvz_pixel *const sao_buf_v = &sao_buf_v_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
+  kvz_pixel *const sao_buf_u = &sao_buf_u_array[((SAO_DELAY_PX>>SHIFT) + 1) * ((SAO_BUF_WIDTH>>SHIFT) + 1)];
+  kvz_pixel *const sao_buf_v = &sao_buf_v_array[((SAO_DELAY_PX>>SHIFT) + 1) * ((SAO_BUF_WIDTH>>SHIFT) + 1)];
 
   const int x_offsets[3] = {
     // If there is an lcu to the left, we need to filter its rightmost

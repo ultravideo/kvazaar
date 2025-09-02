@@ -185,7 +185,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   if (orig_image->chroma_format != KVZ_CSP_400) {
     const uint32_t chroma_shift_w = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 1 : 0;
-    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : (im->chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const uint32_t chroma_shift_h = (im->chroma_format == KVZ_CSP_420) ? 1 : 0;
     im->u = im->data[COLOR_U] = &orig_image->u[(x_offset >> chroma_shift_w) + (y_offset >> chroma_shift_h) * (orig_image->stride >> chroma_shift_w)];
     im->v = im->data[COLOR_V] = &orig_image->v[(x_offset >> chroma_shift_w) + (y_offset >> chroma_shift_h) * (orig_image->stride >> chroma_shift_w)];
   }
@@ -525,27 +525,27 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
 
 
 
-
+/**
+ * \brief BLock Image Transfer from one buffer to another.
+ *
+ * It's a stupidly simple loop that copies pixels.
+ *
+ * \param orig  Start of the originating buffer.
+ * \param dst  Start of the destination buffer.
+ * \param width  Width of the copied region.
+ * \param height  Height of the copied region.
+ * \param orig_stride  Width of a row in the originating buffer.
+ * \param dst_stride  Width of a row in the destination buffer.
+ *
+ * This should be inlined, but it's defined here for now to see if Visual
+ * Studios LTCG will inline it.
+ */
 #define BLIT_PIXELS_CASE(n) case n:\
   for (y = 0; y < n; ++y) {\
     memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(kvz_pixel));\
   }\
   break;
-/**
-* \brief BLock Image Transfer from one buffer to another.
-*
-* It's a stupidly simple loop that copies pixels.
-*
-* \param orig  Start of the originating buffer.
-* \param dst  Start of the destination buffer.
-* \param width  Width of the copied region.
-* \param height  Height of the copied region.
-* \param orig_stride  Width of a row in the originating buffer.
-* \param dst_stride  Width of a row in the destination buffer.
-*
-* This should be inlined, but it's defined here for now to see if Visual
-* Studios LTCG will inline it.
-*/
+
 void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)

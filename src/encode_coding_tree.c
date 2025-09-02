@@ -151,21 +151,16 @@ static void encode_transform_unit(encoder_state_t * const state,
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
     // the last transform unit.
-    // TODO: in case of 444, the 4x4 chroma blocks are coded right after corresponding 4x4 luma block
-    // Based on the pics in ref they're supposed to go "on top", which is impossible to do as is, 
-    // so my best guess is to do them right after
-    if (state->tile->frame->source->chroma_format != KVZ_CSP_444) {
     if (x % 8 == 0 || y % 8 == 0) {
       // Not the last luma transform block so there is nothing more to do.
       return;
-    }
-    // Time to to code the chroma transform blocks. Move to the top-left
-    // corner of the block.
-    x -= 4;
-    y -= 4;
-  }
+    } else {
+      // Time to to code the chroma transform blocks. Move to the top-left
+      // corner of the block.
+      x -= 4;
+      y -= 4;
       cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
-    
+    }
   }
 
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
@@ -254,7 +249,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if ((depth + SHIFT) <= MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || parent_coeff_u) {
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");

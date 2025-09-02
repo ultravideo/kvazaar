@@ -252,6 +252,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (src_out) *src_out = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
+
   if (!state->frame->prepared) {
     kvz_encoder_prepare(state);
   }
@@ -265,7 +266,6 @@ static int kvazaar_encode(kvz_encoder *enc,
     &enc->input_buffer, state, pic_in,
     enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
   );
-
   if (frame) {
     assert(state->frame->num == enc->frames_started);
     kvz_config* cfg = (kvz_config*)(&state->encoder_control->cfg);

@@ -470,7 +470,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
                                pu_w >> SHIFT_W, pu_h >> SHIFT_H,
                                &int_mv_in_frame_c);
     } else {
-      const int frame_mv_index = int_mv_in_frame_c.y * LCU_WIDTH_C + int_mv_in_frame_c.x;
+      const int frame_mv_index = int_mv_in_frame_c.y * (ref->width >> SHIFT_W) + int_mv_in_frame_c.x;
 
       kvz_pixels_blit(&ref->u[frame_mv_index],
                       yuv_px->u,
@@ -518,29 +518,31 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   ALIGNED(64) kvz_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_LUMA_SIZE];
   ALIGNED(64) kvz_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_LUMA_SIZE];
 
+#define LCU_CHROMA_SIZE_TEMP (LCU_LUMA_SIZE>>(state->encoder_control->cfg.chroma_shift_h + state->encoder_control->cfg.chroma_shift_w))
   yuv_t px_L0;
   px_L0.size = pu_w * pu_h;
   px_L0.y = &px_buf_L0[0];
   px_L0.u = &px_buf_L0[LCU_LUMA_SIZE];
-  px_L0.v = &px_buf_L0[LCU_LUMA_SIZE + LCU_LUMA_SIZE];
+  px_L0.v = &px_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE_TEMP];
 
   yuv_t px_L1;
   px_L1.size = pu_w * pu_h;
   px_L1.y = &px_buf_L1[0];
   px_L1.u = &px_buf_L1[LCU_LUMA_SIZE];
-  px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_LUMA_SIZE];
+  px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE_TEMP];
 
   yuv_im_t im_L0;
   im_L0.size = pu_w * pu_h;
   im_L0.y = &im_buf_L0[0];
   im_L0.u = &im_buf_L0[LCU_LUMA_SIZE];
-  im_L0.v = &im_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
+  im_L0.v = &im_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE_TEMP];
 
   yuv_im_t im_L1;
   im_L1.size = pu_w * pu_h;
   im_L1.y = &im_buf_L1[0];
   im_L1.u = &im_buf_L1[LCU_LUMA_SIZE];
-  im_L1.v = &im_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
+  im_L1.v = &im_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE_TEMP];
+#undef LCU_CHROMA_SIZE_TEMP
 
   // Sample blocks from both reference picture lists.
   // Flags state if the outputs were written to high-precision / interpolated sample buffers.

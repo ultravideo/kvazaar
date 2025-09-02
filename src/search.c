@@ -79,7 +79,7 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
                   width, width, LCU_WIDTH, LCU_WIDTH);
   if (from->rec.chroma_format != KVZ_CSP_400) {
     const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 1 : 0;
-    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : 0;
     const int chroma_index = (x_local >> chroma_shift_w) + (y_local >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w);
     kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
                     width >> chroma_shift_w, width >> chroma_shift_h, LCU_WIDTH >> chroma_shift_w, LCU_WIDTH >> chroma_shift_w);
@@ -95,7 +95,7 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 
   if (from->rec.chroma_format != KVZ_CSP_400) {
     const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 1 : 0;
-    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : (from->rec.chroma_format == KVZ_CSP_422) ? 0 : 0;
+    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : 0;
 
     const int chroma_z = xy_to_zorder(LCU_WIDTH >> chroma_shift_w, x_local >> chroma_shift_w, y_local >> chroma_shift_h);
     copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> chroma_shift_w, width >> chroma_shift_h);
@@ -364,11 +364,11 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
+
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
-  // Tad bit better to go lower
-  if ((SHIFT_W && x_px % 8 != 0) || (SHIFT_H && y_px % 8 != 0)) {
+  if (x_px % 8 != 0 || y_px % 8 != 0) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
     return 0;
@@ -849,7 +849,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
           //Calculate cost for zero coeffs
           inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
-
 
         }
 
