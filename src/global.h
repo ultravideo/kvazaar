@@ -59,10 +59,6 @@
 #include <stdint.h> // IWYU pragma: export
 #include <stddef.h> // IWYU pragma: export
 
-// DEBUG: should not be in version control
-#include <stdio.h>
-#define PRINTD(string, arg) fprintf(stdout, string, arg)
-
 // The stdlib.h and string.h headers are needed because of MALLOC and FILL
 // macros defined here, as IWYU will remove them from files that use only
 // those macros.
@@ -151,10 +147,6 @@ typedef int16_t coeff_t;
 
 /* END OF CONFIG VARIABLES */
 
-//DEBUG VARS; INCLUDES AND OTHER STUFF
-#include <inttypes.h>
-#include <stdio.h>
-
 #define SHIFT state->encoder_control->cfg.chroma_shift_w
 //! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
 #define SHIFT_W state->encoder_control->cfg.chroma_shift_w
@@ -169,8 +161,6 @@ typedef int16_t coeff_t;
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
 #define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
-#define LCU_HEIGHT_C (LCU_WIDTH >> SHIFT_H)
-// TODO: if 422 is wanted, should make LCU_HEIGTH_C
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5
@@ -184,19 +174,6 @@ typedef int16_t coeff_t;
 #endif
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
-// LCU_CHROMA_SIZE is not used anywhere as it can't be used to allocate arrays.
-// TODO: remove
-#define LCU_CHROMA_SIZE ((LCU_WIDTH_C) * (LCU_WIDTH_C)) 
-
-//! Size of luma filter used in inter searches 
-#define FILTER_SIZE 8
-//! SIze of chroma filter used in inter searches
-#define FILTER_SIZE_C (FILTER_SIZE >> SHIFT)
-//! Luma filter offset in inter searches
-#define FILTER_OFFSET 3
-//! Chroma filter offset in inter searches
-#define FILTER_OFFSET_C (FILTER_OFFSET >> SHIFT)
-
 
 /**
  * \brief Number of pixels to delay deblocking.

@@ -791,11 +791,11 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
 
     vector2d_t lcu_cpx = { lcu_px.x >> state->encoder_control->cfg.chroma_shift_w, lcu_px.y >> state->encoder_control->cfg.chroma_shift_h };
-    kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
-    kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH_C)];
+    kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH >> SHIFT_W)];
+    kvz_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * (LCU_WIDTH >> SHIFT_W)];
 
     search_intra_chroma_rough(state, x_px, y_px, depth,
-                              ref_u, ref_v, LCU_WIDTH_C,
+                              ref_u, ref_v, LCU_WIDTH >> SHIFT_W,
                               &refs_u, &refs_v,
                               intra_mode, modes, costs);
   }

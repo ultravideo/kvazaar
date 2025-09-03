@@ -650,6 +650,7 @@ static void filter_deblock_unit(encoder_state_t * const state,
 
   // Length of luma and chroma edges.
   int32_t length;
+  int32_t length_c;
 
   if (dir == EDGE_HOR) {
     const videoframe_t * const frame = state->tile->frame;
@@ -660,18 +661,20 @@ static void filter_deblock_unit(encoder_state_t * const state,
     if (rightmost_4px_of_lcu && !rightmost_4px_of_frame) {
       // The last 4 pixels will be deblocked when processing the next LCU.
       length   = width - 4;
+      length_c = (width >> SHIFT_W) - 4;
 
     } else {
       length   = width;
+      length_c = width >> SHIFT_W;
     }
   } else {
     length   = height;
+    length_c = height >> SHIFT_H;
   }
 
   filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
-  // TODO: speedup necessary?
   if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(state, x >> SHIFT_W, y >> SHIFT_H, dir)) {
-    filter_deblock_edge_chroma(state, x >> SHIFT_W, y >> SHIFT_H, length >> SHIFT_W, dir, tu_boundary);
+    filter_deblock_edge_chroma(state, x >> SHIFT_W, y >> SHIFT_H, length_c, dir, tu_boundary);
   }
 }
 
@@ -735,7 +738,7 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
     const int x_px_c = x_px >> SHIFT_W;
     const int y_px_c = y_px >> SHIFT_H;
     const int x_c = x_px_c - 4;
-    const int end_c = MIN(y_px_c + (LCU_WIDTH_C), state->tile->frame->height >> SHIFT_H);
+    const int end_c = MIN(y_px_c + (LCU_WIDTH >> SHIFT_W), state->tile->frame->height >> SHIFT_H);
     for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
       // The top edge of the whole frame is not filtered.
       bool tu_boundary = is_tu_boundary(state, x_c << SHIFT_W, y_c << SHIFT_H, EDGE_HOR);

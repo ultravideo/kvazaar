@@ -613,11 +613,11 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
   color_t color_i;
 
   // Check for right and bottom boundaries.
-  if (x_ctb * (LCU_WIDTH_C) + (LCU_WIDTH_C) >= (unsigned)frame->width >> SHIFT_W) {
+  if (x_ctb * (LCU_WIDTH >> SHIFT_H) + (LCU_WIDTH >> SHIFT_W) >= (unsigned)frame->width >> SHIFT_W) {
     block_width = (frame->width - x_ctb * LCU_WIDTH) >> SHIFT_W;
   }
   // 422: ??
-  if (y_ctb * (LCU_HEIGHT_C) + (LCU_HEIGHT_C) >= (unsigned)frame->height >> SHIFT_H) {
+  if (y_ctb * (LCU_WIDTH >> SHIFT_H) + (LCU_WIDTH >> SHIFT_W) >= (unsigned)frame->height >> SHIFT_H) {
     block_height = (frame->height - y_ctb * LCU_WIDTH) >> SHIFT;
   }
 

@@ -166,8 +166,8 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    int x_local = (x >> SHIFT_W) % (LCU_WIDTH_C);
-    int y_local = (y >> SHIFT_H) % (LCU_WIDTH_C);
+    int x_local = (x >> SHIFT_W) % (LCU_WIDTH >> SHIFT_W);
+    int y_local = (y >> SHIFT_H) % (LCU_WIDTH >> SHIFT_H);
     scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
     const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
@@ -907,8 +907,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     // PCM sample
     pixel *base_y = &cur_pic->y_data[x            + y * encoder->in.width];
-    pixel *base_u = &cur_pic->u_data[(x >> SHIFT) + (y >> SHIFT) * (encoder->in.width >> SHIFT)];
-    pixel *base_v = &cur_pic->v_data[(x >> SHIFT) + (y >> SHIFT) * (encoder->in.width >> SHIFT)];
+    pixel *base_u = &cur_pic->u_data[(x >> SHIFT_W) + (y >> SHIFT_H) * (encoder->in.width >> SHIFTW)];
+    pixel *base_v = &cur_pic->v_data[(x >> SHIFT_W) + (y >> SHIFT_H) * (encoder->in.width >> SHIFT_W)];
 
     // Luma
     for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
@@ -919,14 +919,14 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     // Chroma
     if (encoder->in.video_format != FORMAT_400) {
-      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + SHIFT); y_px++) {
-        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + SHIFT); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> SHIFT)], 8);
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + SHIFT_H); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + SHIFT_W); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> SHIFT_W)], 8);
         }
       }
-      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + SHIFT); y_px++) {
-        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + SHIFT); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> SHIFT)], 8);
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + SHIFT_H); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + SHIFT_W); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> SHIFT_W)], 8);
         }
       }
     }

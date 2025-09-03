@@ -52,8 +52,7 @@
 #include "search.h"
 #include "tables.h"
 #include "threadqueue.h"
-#define SAO_BUF_WIDTH (LCU_WIDTH + SAO_DELAY_PX + 2)
-#define SAO_BUF_WIDTH_C (SAO_BUF_WIDTH >> SHIFT)
+
 #include "strategies/strategies-picture.h"
 
 /**
@@ -129,7 +128,7 @@ static void encoder_state_recdata_before_sao_to_bufs(
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const unsigned from_index_c = (pos.x >> SHIFT_W) + (pos.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W);
-      const unsigned to_index_c = (pos.x >> SHIFT_W) + (lcu->position.y * frame->width >> SHIFT_W);
+      const unsigned to_index_c = (pos.x >> SHIFT_W) + (lcu->position.y * (frame->width >> SHIFT_W));
 
       kvz_pixels_blit(&frame->rec->u[from_index_c],
                       &hor_buf->u[to_index_c],
@@ -213,7 +212,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       unsigned from_index_c = (bottom.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W) + (bottom.x >> SHIFT_W);
-      unsigned to_index_c = (lcu->position_px.x >> SHIFT_W) + (lcu_row * frame->width >> SHIFT_W);
+      unsigned to_index_c = (lcu->position_px.x >> SHIFT_W) + (lcu_row * (frame->width >> SHIFT_W));
 
       kvz_pixels_blit(&frame->rec->u[from_index_c],
                       &hor_buf->u[to_index_c],
@@ -239,7 +238,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       unsigned from_index = (left.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W) + (left.x >> SHIFT_W);
-      unsigned to_index = (lcu->position_px.y >> SHIFT_H) + (lcu_col * frame->height >> SHIFT_H);
+      unsigned to_index = (lcu->position_px.y >> SHIFT_H) + (lcu_col * (frame->height >> SHIFT_H));
 
       kvz_pixels_blit(&frame->rec->u[from_index],
                       &ver_buf->u[to_index],
@@ -273,11 +272,6 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
 {
   videoframe_t *const frame = state->tile->frame;
 
-  // Temporary buffers for SAO input pixels.
-  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
-  // Allocate "too big" arrays: depending on the chroma subsampling format, only some of the space is in use.
-  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
-  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
 
   // Temporary buffers for SAO input pixels. The buffers cover the pixels
   // inside the LCU (LCU_WIDTH x LCU_WIDTH), SAO_DELAY_PX wide bands to the
@@ -285,12 +279,17 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   // sides. We add two extra pixels to the buffers because the AVX2 SAO
   // reconstruction reads up to two extra bytes when using edge SAO in the
   // horizontal direction.
+#define SAO_BUF_WIDTH   (1 + SAO_DELAY_PX   + LCU_WIDTH)
+#define SAO_BUF_WIDTH_C (1 + (SAO_DELAY_PX >> SHIFT_W) + (LCU_WIDTH >> SHIFT_W))
+  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
+  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
+  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH + 2];
 
 
   // Pointers to the top-left pixel of the LCU in the buffers.
   kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
-  kvz_pixel *const sao_buf_u = &sao_buf_u_array[((SAO_DELAY_PX>>SHIFT) + 1) * ((SAO_BUF_WIDTH>>SHIFT) + 1)];
-  kvz_pixel *const sao_buf_v = &sao_buf_v_array[((SAO_DELAY_PX>>SHIFT) + 1) * ((SAO_BUF_WIDTH>>SHIFT) + 1)];
+  kvz_pixel *const sao_buf_u = &sao_buf_u_array[((SAO_DELAY_PX >> SHIFT_W) + 1) * (SAO_BUF_WIDTH_C + 1)];
+  kvz_pixel *const sao_buf_v = &sao_buf_v_array[((SAO_DELAY_PX >> SHIFT_W) + 1) * (SAO_BUF_WIDTH_C + 1)];
 
   const int x_offsets[3] = {
     // If there is an lcu to the left, we need to filter its rightmost
@@ -322,7 +321,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   const int border_index = (x_offsets[0] - border_left) +
                            (y_offsets[0] - border_above) * SAO_BUF_WIDTH;
   const int border_index_c = ((x_offsets[0] >> SHIFT_W) - border_left) +
-                             ((y_offsets[0] >> SHIFT_H) - border_above) * (SAO_BUF_WIDTH_C);
+                             ((y_offsets[0] >> SHIFT_H) - border_above) * SAO_BUF_WIDTH_C;
   // Width and height of the whole area to filter.
   const int width  = x_offsets[2] - x_offsets[0];
   const int height = y_offsets[2] - y_offsets[0];
@@ -338,8 +337,8 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                     frame->width,
                     SAO_BUF_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      const int from_index_c = (((lcu->position_px.x + x_offsets[0]) >> SHIFT_W) -
-                                border_left) + (lcu->position.y - 1) * (frame->width >> SHIFT_W);
+      const int from_index_c = (((lcu->position_px.x + x_offsets[0]) >> SHIFT_W) - border_left) +
+                               (lcu->position.y - 1) * (frame->width >> SHIFT_W);
       kvz_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
                       &sao_buf_u[border_index_c],
                       (width >> SHIFT_W) + border_left + border_right,
@@ -393,8 +392,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                   SAO_BUF_WIDTH);
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
     const int from_index_c = ((lcu->position_px.x + x_offsets[0]) >> SHIFT_W) +
-                             ((lcu->position_px.y + y_offsets[0]) >> SHIFT_H) *
-                             (frame->rec->stride >> SHIFT_W);
+                             ((lcu->position_px.y + y_offsets[0]) >> SHIFT_H) * (frame->rec->stride >> SHIFT_W);
     const int to_index_c = (x_offsets[0] >> SHIFT_W) + (y_offsets[0] >> SHIFT_H) * (SAO_BUF_WIDTH_C);
     kvz_pixels_blit(&frame->rec->u[from_index_c],
                     &sao_buf_u[to_index_c],
@@ -691,10 +689,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Encode SAO
   state->cabac.update = 1;
   if (encoder->cfg.sao_type) {
-    encode_sao(state, lcu->position.x,
-      lcu->position.y,
-      &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x],
- &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
+    encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 
   //Encode coding tree
@@ -1499,14 +1494,14 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
         if (has_chroma) {
           // Add chroma variance if not monochrome
-          int32_t c_stride = state->tile->frame->source->stride >> 1;
+          int32_t c_stride = state->tile->frame->source->stride >> SHIFT_W;
           kvz_pixel chromau_tmp[LCU_LUMA_SIZE];
           kvz_pixel chromav_tmp[LCU_LUMA_SIZE];
-          int lcu_chroma_width = LCU_WIDTH >> 1;
+          int lcu_chroma_width = LCU_WIDTH >> SHIFT_W;
           int c_pxl_x = x * lcu_chroma_width;
           int c_pxl_y = y * lcu_chroma_width;
-          int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width >> 1) - c_pxl_x;
-          int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height >> 1) - c_pxl_y;
+          int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width >> SHIFT_W) - c_pxl_x;
+          int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height >> SHIFT_H) - c_pxl_y;
 
           if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
             kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
@@ -1515,15 +1510,15 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           else {
             for (int y = 0; y < lcu_chroma_width; y++) {
               for (int x = 0; x < lcu_chroma_width; x++) {
-                int src_y = CLIP(0, (frame->height >> 1) - 1, c_pxl_y + y);
-                int src_x = CLIP(0, (frame->width >> 1) - 1, c_pxl_x + x);
+                int src_y = CLIP(0, (frame->height >> SHIFT_H) - 1, c_pxl_y + y);
+                int src_x = CLIP(0, (frame->width >> SHIFT_W) - 1, c_pxl_x + x);
                 chromau_tmp[y * lcu_chroma_width + x] = state->tile->frame->source->u[src_y * c_stride + src_x];
                 chromav_tmp[y * lcu_chroma_width + x] = state->tile->frame->source->v[src_y * c_stride + src_x];
               }
             }
           }
-          lcu_var += kvz_pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
-          lcu_var += kvz_pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
+          lcu_var += kvz_pixel_var(chromau_tmp, LCU_LUMA_SIZE >> (SHIFT_W + SHIFT_H));
+          lcu_var += kvz_pixel_var(chromav_tmp, LCU_LUMA_SIZE >> (SHIFT_W + SHIFT_H));
         }
                 
         state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
