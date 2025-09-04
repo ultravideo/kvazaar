@@ -218,8 +218,8 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
     memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width);
   }
 
-  const uint8_t chroma_shift_w = field_out->chroma_format == 0 || field_out->chroma_format == 3 ? 0 : 1;
-  const uint8_t chroma_shift_h = field_out->chroma_format == 1 ? 1 : 0;
+  const uint8_t chroma_shift_w = (field_out->chroma_format == 0 || field_out->chroma_format == 3) ? 0 : 1;
+  const uint8_t chroma_shift_h = (field_out->chroma_format == 1) ? 1 : 0;
 
   //Chroma
   for (int i = 0; i < field_out->height >> chroma_shift_h; ++i){
@@ -271,7 +271,7 @@ static int kvazaar_encode(kvz_encoder *enc,
     kvz_config* cfg = (kvz_config*)(&state->encoder_control->cfg);
 
     // We have a picture, set the project-global var to correct value
-    cfg->chroma_shift = cfg->chroma_shift_w = frame->chroma_format == 0 || frame->chroma_format == 3 ? 0 : 1;
+    cfg->chroma_shift = cfg->chroma_shift_w = (frame->chroma_format == 0 || frame->chroma_format == 3) ? 0 : 1;
     cfg->chroma_shift_h = frame->chroma_format == 1 ? 1 : 0;
 
     // Start encoding.

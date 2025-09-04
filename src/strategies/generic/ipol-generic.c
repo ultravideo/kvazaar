@@ -703,8 +703,8 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
   // Select filters according to the fractional part of the x and y mv components
   int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
-  
-  int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA][LCU_WIDTH];
+
+  int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   // Filter horizontally
@@ -737,7 +737,7 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
   int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
 
-  int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA][LCU_WIDTH];
+  int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   // Filter horizontally

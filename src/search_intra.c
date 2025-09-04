@@ -843,8 +843,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   if (depth > 0) {
     const vector2d_t luma_px = { x_px, y_px };
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, 
-                              state->encoder_control->cfg.chroma_shift_w, state->encoder_control->cfg.chroma_shift_h);
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, 0, 0);
   }
 
   int8_t modes[35];

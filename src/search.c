@@ -391,7 +391,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   if (tr_cu->tr_depth > depth) {
-    int offset = width >> 1;
+    int offset = LCU_WIDTH >> (depth + 1);
     double sum = 0;
 
     sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, tr_cu, lcu);

@@ -160,7 +160,7 @@ typedef int16_t coeff_t;
 //! spec: CtbSizeY
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
-#define LCU_WIDTH_C (LCU_WIDTH >> SHIFT)
+#define LCU_WIDTH_C (LCU_WIDTH / 2)
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5
@@ -174,6 +174,7 @@ typedef int16_t coeff_t;
 #endif
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
+#define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
 /**
  * \brief Number of pixels to delay deblocking.

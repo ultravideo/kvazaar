@@ -396,7 +396,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
   // With 420, odd coordinates need interpolation.
   // 444: ?
   const int8_t fractional_luma = ((mv_param[0] & 3) || (mv_param[1] & 3)); 
-  const int8_t fractional_chroma = SHIFT ? (int_mv.x & 1) || (int_mv.y & 1) : fractional_luma;
+  const int8_t fractional_chroma = SHIFT_W ? (int_mv.x & 1) || (int_mv.y & 1) : fractional_luma;
 
   // Generate prediction for luma.
   if (predict_luma) {
