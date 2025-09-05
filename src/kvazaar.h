@@ -501,6 +501,9 @@ typedef struct kvz_config
   uint8_t chroma_shift_w;
   uint8_t chroma_shift_h;
   uint8_t chroma_shift;
+
+  enum kvz_chroma_format chroma_format; //!< \brief Chroma subsampling format used for encoding.
+
 } kvz_config;
 
 /**

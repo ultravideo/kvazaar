@@ -192,6 +192,11 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->enable_logging_output = 1;
 
+  // Default to 4:2:0
+  cfg->chroma_format = KVZ_CSP_420;
+  cfg->chroma_shift = cfg->chroma_shift_w = 1;
+  cfg->chroma_shift_h = 1;
+
   return 1;
 }
 
