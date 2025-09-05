@@ -532,7 +532,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   unsigned chroma_ssd = 0;
   if(state->encoder_control->chroma_format != KVZ_CSP_400 && x_px % 8 == 0 && y_px % 8 == 0) {
-    const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
+    const vector2d_t lcu_px = { x_px >> SHIFT_W, y_px >> SHIFT_H };
     const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
     if (!state->encoder_control->cfg.lossless) {
       int index = lcu_px.y * (LCU_WIDTH >> SHIFT_W) + lcu_px.x;
@@ -1087,8 +1087,8 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
   FILL(*lcu, 0);
   
-  lcu->rec.chroma_format = state->encoder_control->chroma_format;
-  lcu->ref.chroma_format = state->encoder_control->chroma_format;
+  lcu->rec.chroma_format = state->encoder_control->cfg.chroma_format;
+  lcu->ref.chroma_format = state->encoder_control->cfg.chroma_format;
 
   // Copy reference cu_info structs from neighbouring LCUs.
 
