@@ -704,22 +704,22 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
   int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
 
-  int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
-  int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
+  int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
+  const int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   // Filter horizontally
   for (y = 0; y < height + KVZ_EXT_PADDING_CHROMA; ++y) {
     for (x = 0; x < width; ++x) {
       int ypos = y - KVZ_CHROMA_FILTER_OFFSET;
       int xpos = x - KVZ_CHROMA_FILTER_OFFSET;
-      hor_filtered[y][x] = kvz_four_tap_filter_hor_generic(hor_filter, &src[src_stride * ypos + xpos]) >> shift1;
+      hor_filtered[y * hor_stride + x] = kvz_four_tap_filter_hor_generic(hor_filter, &src[src_stride * ypos + xpos]) >> shift1;
     }
   }
 
   // Filter vertically
   for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
-      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(((kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y][x], hor_stride) >> shift2) + wp_offset1) >> wp_shift1);
+      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(((kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y * hor_stride + x], hor_stride) >> shift2) + wp_offset1) >> wp_shift1);
     }
   }
 }
@@ -737,22 +737,22 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
   int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
   int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
 
-  int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
-  int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
+  int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA*LCU_WIDTH];
+  const int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
 
   // Filter horizontally
   for (y = 0; y < height + KVZ_EXT_PADDING_CHROMA; ++y) {
     for (x = 0; x < width; ++x) {
       int ypos = y - KVZ_CHROMA_FILTER_OFFSET;
       int xpos = x - KVZ_CHROMA_FILTER_OFFSET;
-      hor_filtered[y][x] = kvz_four_tap_filter_hor_generic(hor_filter, &src[src_stride * ypos + xpos]) >> shift1;
+      hor_filtered[y * hor_stride + x] = kvz_four_tap_filter_hor_generic(hor_filter, &src[src_stride * ypos + xpos]) >> shift1;
     }
   }
 
   // Filter vertically
   for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
-      dst[y * dst_stride + x] = kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y][x], hor_stride) >> shift2;
+      dst[y * dst_stride + x] = kvz_four_tap_filter_ver_16bit_generic(ver_filter, &hor_filtered[y * hor_stride + x], hor_stride) >> shift2;
     }
   }
 }

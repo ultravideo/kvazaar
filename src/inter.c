@@ -644,7 +644,7 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
           pu->inter.mv_ref[mv_idx]]];
 
     const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
-    const unsigned offset_chroma = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+    const unsigned offset_chroma = (SUB_SCU(pu_y) >> SHIFT_H) * (LCU_WIDTH >> SHIFT_W) + (SUB_SCU(pu_x) >> SHIFT_W);
     yuv_t lcu_adapter;
     lcu_adapter.size = pu_w * pu_h;
     lcu_adapter.y = lcu->rec.y + offset_luma,

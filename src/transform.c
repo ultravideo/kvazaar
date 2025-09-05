@@ -323,8 +323,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
     tr_width = LCU_WIDTH >> depth;
   } else {
     // 444: from depth - 1 to this: think through if correct?
-    const int chroma_depth = (depth == MAX_PU_DEPTH ? (depth - SHIFT_W) : depth);
-    tr_width = LCU_WIDTH_C >> chroma_depth;
+    const int chroma_depth = (depth == MAX_PU_DEPTH ? (depth - 1) : depth);
+    tr_width = LCU_WIDTH >> (chroma_depth + SHIFT_W);
   }
   const int32_t lcu_width = LCU_WIDTH >> shift;
   const int8_t mode =

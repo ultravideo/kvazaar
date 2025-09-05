@@ -170,8 +170,8 @@ static void encode_transform_unit(encoder_state_t * const state,
     int y_local = (y >> SHIFT_H) % (LCU_WIDTH >> SHIFT_H);
     scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
-    const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-    const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
+    const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
       kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
@@ -907,7 +907,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     // PCM sample
     pixel *base_y = &cur_pic->y_data[x            + y * encoder->in.width];
-    pixel *base_u = &cur_pic->u_data[(x >> SHIFT_W) + (y >> SHIFT_H) * (encoder->in.width >> SHIFTW)];
+    pixel *base_u = &cur_pic->u_data[(x >> SHIFT_W) + (y >> SHIFT_H) * (encoder->in.width >> SHIFT_W)];
     pixel *base_v = &cur_pic->v_data[(x >> SHIFT_W) + (y >> SHIFT_H) * (encoder->in.width >> SHIFT_W)];
 
     // Luma

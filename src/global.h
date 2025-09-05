@@ -160,7 +160,7 @@ typedef int16_t coeff_t;
 //! spec: CtbSizeY
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
-#define LCU_WIDTH_C (LCU_WIDTH / 2)
+//#define LCU_WIDTH_C (LCU_WIDTH / 2) // Not constant anymore if 4:2:2 or 4:4:4
 
 //! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
 #define TR_MAX_LOG2_SIZE 5

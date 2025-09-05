@@ -237,8 +237,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     kvz_pixels_blit(lcu->rec.y, nosplit_pixels.y, width, width, LCU_WIDTH, width);
     if (reconstruct_chroma) {
-      kvz_pixels_blit(lcu->rec.u, nosplit_pixels.u, width_c, width_c, LCU_WIDTH_C, width_c);
-      kvz_pixels_blit(lcu->rec.v, nosplit_pixels.v, width_c, width_c, LCU_WIDTH_C, width_c);
+      kvz_pixels_blit(lcu->rec.u, nosplit_pixels.u, width_c, width_c, LCU_WIDTH >> SHIFT_W, width_c);
+      kvz_pixels_blit(lcu->rec.v, nosplit_pixels.v, width_c, width_c, LCU_WIDTH >> SHIFT_W, width_c);
     }
   }
 
@@ -306,8 +306,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // The only thing we really need are the border pixels.kvz_intra_get_dir_luma_predictor
     kvz_pixels_blit(nosplit_pixels.y, lcu->rec.y, width, width, width, LCU_WIDTH);
     if (reconstruct_chroma) {
-      kvz_pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH_C);
-      kvz_pixels_blit(nosplit_pixels.v, lcu->rec.v, width_c, width_c, width_c, LCU_WIDTH_C);
+      kvz_pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH >> SHIFT_W);
+      kvz_pixels_blit(nosplit_pixels.v, lcu->rec.v, width_c, width_c, width_c, LCU_WIDTH >> SHIFT_W);
     }
 
     return nosplit_cost;
@@ -324,7 +324,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
 {
   assert(!(x_px & 4 || y_px & 4));
 
-  const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+  const unsigned width = MAX(LCU_WIDTH >> (depth + SHIFT_W), TR_MIN_WIDTH);
   // NOTE: see 766
   const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + SHIFT_W), 1 << SHIFT_W);
 

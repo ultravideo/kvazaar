@@ -535,19 +535,19 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
     const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
     if (!state->encoder_control->cfg.lossless) {
-      int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+      int index = lcu_px.y * (LCU_WIDTH >> SHIFT_W) + lcu_px.x;
       unsigned ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
+        (LCU_WIDTH >> SHIFT_W), (LCU_WIDTH >> SHIFT_W),
         chroma_width);
       unsigned ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
+        (LCU_WIDTH >> SHIFT_W), (LCU_WIDTH >> SHIFT_W),
         chroma_width);
       chroma_ssd = ssd_u + ssd_v;
     }
 
     if (!skip_residual_coding) {
       int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-      const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+      const unsigned index = xy_to_zorder((LCU_WIDTH >> SHIFT_W), lcu_px.x, lcu_px.y);
 
       if(cb_flag_u)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order);
       if (cb_flag_v)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], chroma_width, 2, scan_order);

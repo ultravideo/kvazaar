@@ -2110,13 +2110,13 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
                                    LCU_WIDTH, LCU_WIDTH,
                                    width) * KVZ_LUMA_MULT;
   if (reconstruct_chroma) {
-    int index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
+    int index = (y_px >> SHIFT_H) * (LCU_WIDTH >> SHIFT_W) + (x_px >> SHIFT_W);
     double ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-                                       LCU_WIDTH_C, LCU_WIDTH_C,
-                                       width / 2);
+                                       (LCU_WIDTH >> SHIFT_W), (LCU_WIDTH >> SHIFT_W),
+                                       width >> SHIFT_W);
     double ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-                                       LCU_WIDTH_C, LCU_WIDTH_C,
-                                       width / 2);
+                                       (LCU_WIDTH >> SHIFT_W), (LCU_WIDTH >> SHIFT_W),
+                                       width >> SHIFT_W);
     ssd += (ssd_u + ssd_v) * KVZ_CHROMA_MULT;
   }
   double no_cbf_bits;
@@ -2385,9 +2385,9 @@ void kvz_search_cu_smp(encoder_state_t* const state,
     cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
     *cur_pu = *best_inter_pu;
 
-    for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
-      for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
-        cu_info_t* scu = LCU_GET_CU_AT_PX(lcu, x, y);
+    for (int yy = y_pu; yy < y_pu + height_pu; yy += SCU_WIDTH) {
+      for (int xx = x_pu; xx < x_pu + width_pu; xx += SCU_WIDTH) {
+        cu_info_t* scu = LCU_GET_CU_AT_PX(lcu, xx, yy);
         scu->type = CU_INTER;
         scu->inter = cur_pu->inter;
       }
