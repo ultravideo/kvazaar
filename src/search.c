@@ -218,7 +218,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
     &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
-  if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+  if (x % (4<<SHIFT_W) == 0 && y % (4<<SHIFT_H) == 0 && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
     ssd += KVZ_CHROMA_MULT * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       LCU_WIDTH >> SHIFT_W, LCU_WIDTH >> SHIFT_W, cu_width >> SHIFT_W
@@ -531,7 +531,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && x_px % 8 == 0 && y_px % 8 == 0) {
+  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && x_px % (4<<SHIFT_W) == 0 && y_px % (4<<SHIFT_H) == 0) {
     const vector2d_t lcu_px = { x_px >> SHIFT_W, y_px >> SHIFT_H };
     const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
     if (!state->encoder_control->cfg.lossless) {

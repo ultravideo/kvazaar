@@ -147,7 +147,7 @@ static void encode_transform_unit(encoder_state_t * const state,
                          cur_pu->tr_skip, NULL);
   }
 
-  if (depth == MAX_DEPTH + 1) {
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_444 && depth == MAX_DEPTH + 1) {
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
     // the last transform unit.
@@ -249,7 +249,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (depth < MAX_PU_DEPTH && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+  if ((depth < MAX_PU_DEPTH && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) ||
+     state->encoder_control->cfg.chroma_format == KVZ_CSP_444) {
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || parent_coeff_u) {
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
@@ -643,12 +644,17 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
      *   intra_chroma_pred_mode[][] = 0, bypass, bypass
      */
     cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
-    if (pred_mode == 4) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.chroma_pred_model[0]), 0, *bits_out,"intra_chroma_pred_mode");
-    } else {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.chroma_pred_model[0]), 1, *bits_out,"intra_chroma_pred_mode");
-      CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
-      if (cabac->only_count) *bits_out += 2;
+
+    // For 4:4:4 we signal the chroma pred mode for each PU.
+    for (int j = 0; j < (state->encoder_control->cfg.chroma_format == KVZ_CSP_444 ? num_pred_units : 1); ++j) {
+
+      if (pred_mode == 4) {
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.chroma_pred_model[0]), 0, *bits_out, "intra_chroma_pred_mode");
+      } else {
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.chroma_pred_model[0]), 1, *bits_out, "intra_chroma_pred_mode");
+        CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
+        if (cabac->only_count) *bits_out += 2;
+      }
     }
   }
 
