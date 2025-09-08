@@ -128,7 +128,8 @@ void kvz_intra_predict(
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary);
+  bool filter_boundary,
+  bool chroma_444);
 
 void kvz_intra_recon_cu(
   encoder_state_t *const state,

@@ -255,12 +255,12 @@ void kvz_intra_predict(
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary)
+  bool filter_boundary, bool chroma_444)
 {
   const int_fast8_t width = 1 << log2_width;
 
   const kvz_intra_ref *used_ref = &refs->ref;
-  if (color != COLOR_Y || mode == 1 || width == 4) {
+  if ((color != COLOR_Y && !chroma_444) || mode == 1 || width == 4) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
@@ -593,7 +593,7 @@ static void intra_recon_tb_leaf(
 
   ALIGNED(32) kvz_pixel pred[TR_MAX_WIDTH * TR_MAX_WIDTH];
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  kvz_intra_predict(&refs, log2width, intra_mode, color, pred, filter_boundary);
+  kvz_intra_predict(&refs, log2width, intra_mode, color, pred, filter_boundary, cfg->chroma_format == KVZ_CSP_444);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;

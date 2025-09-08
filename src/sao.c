@@ -679,7 +679,7 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
   int32_t merge_cost_chroma[3] = { INT32_MAX };
   sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
   sao_info_t *sao_chroma = NULL;
-  int enable_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  int enable_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
   if (enable_chroma) {
     sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
   }

@@ -673,7 +673,7 @@ static void filter_deblock_unit(encoder_state_t * const state,
   }
 
   filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(state, x >> SHIFT_W, y >> SHIFT_H, dir)) {
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && is_on_8x8_grid(state, x >> SHIFT_W, y >> SHIFT_H, dir)) {
     filter_deblock_edge_chroma(state, x >> SHIFT_W, y >> SHIFT_H, length_c, dir, tu_boundary);
   }
 }
@@ -734,7 +734,7 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
   }
 
   // Chroma
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
     const int x_px_c = x_px >> SHIFT_W;
     const int y_px_c = y_px >> SHIFT_H;
     const int x_c = x_px_c - 4;

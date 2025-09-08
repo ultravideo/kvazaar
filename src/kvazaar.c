@@ -335,11 +335,11 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   } first = { 0, 0 }, second = { 0, 0 };
 
   if (pic_in != NULL) {
-    first_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
+    first_field = kvz_image_alloc(state->encoder_control->cfg.chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (first_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
-    second_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
+    second_field = kvz_image_alloc(state->encoder_control->cfg.chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (second_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }

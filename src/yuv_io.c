@@ -274,7 +274,7 @@ int yuv_io_read(FILE* file,
       img_out->y);
   if (!ok) return 0;
 
-  const uint8_t chroma_shift_w = img_out->chroma_format == 0 || img_out->chroma_format == 3 ? 0 : 1;
+  const uint8_t chroma_shift_w = (img_out->chroma_format == 0 || img_out->chroma_format == 3) ? 0 : 1;
   const uint8_t chroma_shift_h = img_out->chroma_format == 1 ? 1 : 0;
 
   if (img_out->chroma_format != KVZ_CSP_400) {
@@ -316,6 +316,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height,
                 unsigned file_format)
 {
+    // ToDo: allow other chroma subsamplings
     const size_t frame_bytes = input_width * input_height * 3 / 2;
 
     if (file_format == KVZ_FORMAT_Y4M) {

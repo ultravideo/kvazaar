@@ -1744,7 +1744,7 @@ static void search_pu_inter(encoder_state_t * const state,
   int num_rdo_cands = MIN(1, merge->size);
     
   // Early Skip Mode Decision
-  bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
   if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
       if(cfg->rdo >= 3 && merge->unit[merge->keys[merge_key]].skipped) {
@@ -2102,7 +2102,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   *cur_pu = *cur_cu;
 
-  const bool reconstruct_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
   kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
 
   int index = y_px * LCU_WIDTH + x_px;
@@ -2277,11 +2277,11 @@ void kvz_search_cu_inter(encoder_state_t * const state,
       inter_cost,
       inter_bitcost);
     kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
-      true, state->encoder_control->chroma_format != KVZ_CSP_400);
+      true, state->encoder_control->cfg.chroma_format != KVZ_CSP_400);
   }
   else {
     kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
-      true, state->encoder_control->chroma_format != KVZ_CSP_400);
+      true, state->encoder_control->cfg.chroma_format != KVZ_CSP_400);
   }
 
   if (*inter_cost < MAX_DOUBLE && cur_pu->inter.mv_dir & 1) {

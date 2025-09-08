@@ -375,10 +375,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   encoder_state_write_bitstream_PTL(stream, state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
+  WRITE_UE(stream, encoder->cfg.chroma_format, "chroma_format_idc");
 
   // TODO: 444 also possible as not separate color planes??? english
-  if (encoder->chroma_format == KVZ_CSP_444) {
+  if (encoder->cfg.chroma_format == KVZ_CSP_444) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
@@ -840,7 +840,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
 
   if (encoder->cfg.sao_type) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
-    if (encoder->chroma_format != KVZ_CSP_400) {
+    if (encoder->cfg.chroma_format != KVZ_CSP_400) {
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
     }
   }
@@ -970,7 +970,7 @@ static void add_checksum(encoder_state_t * const state)
 
   sei_write_payload_type(stream, SEI_PAYLOAD_TYPE_DECODED_PICTURE_HASH);
 
-  int num_colors = (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : 3);
+  int num_colors = (state->encoder_control->cfg.chroma_format == KVZ_CSP_400 ? 1 : 3);
 
   switch (state->encoder_control->cfg.hash)
   {

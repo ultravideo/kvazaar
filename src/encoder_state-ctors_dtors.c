@@ -116,7 +116,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control_t * const encoder = state->encoder_control;
-  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format);
+  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->cfg.chroma_format);
   
   state->tile->frame->rec = NULL;
   
@@ -140,8 +140,8 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   unsigned luma_size = LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   unsigned chroma_sizes_hor[] = { 0, luma_size / 2, luma_size / 2, luma_size };
   unsigned chroma_sizes_ver[] = { 0, luma_size / 2, luma_size, luma_size };
-  unsigned chroma_size_hor = chroma_sizes_hor[state->encoder_control->chroma_format];
-  unsigned chroma_size_ver = chroma_sizes_ver[state->encoder_control->chroma_format];
+  unsigned chroma_size_hor = chroma_sizes_hor[state->encoder_control->cfg.chroma_format];
+  unsigned chroma_size_ver = chroma_sizes_ver[state->encoder_control->cfg.chroma_format];
 
   state->tile->hor_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
   state->tile->ver_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_ver);

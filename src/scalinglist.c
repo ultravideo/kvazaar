@@ -39,7 +39,7 @@
 #include "tables.h"
 
 
-const uint8_t kvz_g_scaling_list_num[4]    = { 6, 6, 6, 2};
+const uint8_t kvz_g_scaling_list_num[4]    = { 6, 6, 6, 6};
 const uint16_t kvz_g_scaling_list_size[4]  = {   16,  64, 256,1024};
 static const uint8_t g_scaling_list_size_x[4] = { 4, 8,16,32};
 

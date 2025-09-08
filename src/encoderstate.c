@@ -126,7 +126,7 @@ static void encoder_state_recdata_before_sao_to_bufs(
                     frame->rec->stride,
                     frame->width);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       const unsigned from_index_c = (pos.x >> SHIFT_W) + (pos.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W);
       const unsigned to_index_c = (pos.x >> SHIFT_W) + (lcu->position.y * (frame->width >> SHIFT_W));
 
@@ -174,7 +174,7 @@ static void encoder_state_recdata_before_sao_to_bufs(
                     1, length,
                     frame->rec->stride, 1);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       const unsigned from_index_c = (pos.x >> SHIFT_W) + (pos.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W);
       const unsigned to_index_c = lcu->position.x * (frame->height >> SHIFT_H) + (pos.y >> SHIFT_H);
 
@@ -210,7 +210,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
                     lcu->size.x, 1,
                     frame->rec->stride, frame->width);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       unsigned from_index_c = (bottom.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W) + (bottom.x >> SHIFT_W);
       unsigned to_index_c = (lcu->position_px.x >> SHIFT_W) + (lcu_row * (frame->width >> SHIFT_W));
 
@@ -236,7 +236,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
                     1, lcu->size.y,
                     frame->rec->stride, 1);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       unsigned from_index = (left.y >> SHIFT_H) * (frame->rec->stride >> SHIFT_W) + (left.x >> SHIFT_W);
       unsigned to_index = (lcu->position_px.y >> SHIFT_H) + (lcu_col * (frame->height >> SHIFT_H));
 
@@ -336,7 +336,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                     1,
                     frame->width,
                     SAO_BUF_WIDTH);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       const int from_index_c = (((lcu->position_px.x + x_offsets[0]) >> SHIFT_W) - border_left) +
                                (lcu->position.y - 1) * (frame->width >> SHIFT_W);
       kvz_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
@@ -362,7 +362,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                     height + border_above + border_below,
                     1,
                     SAO_BUF_WIDTH);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       const int from_index_c = (lcu->position.x - 1) * (frame->height >> SHIFT_H) +
                                (((lcu->position_px.y + y_offsets[0]) >> SHIFT_H) - border_above);
       kvz_pixels_blit(&state->tile->ver_buf_before_sao->u[from_index_c],
@@ -390,7 +390,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                   height + border_below,
                   frame->rec->stride,
                   SAO_BUF_WIDTH);
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
     const int from_index_c = ((lcu->position_px.x + x_offsets[0]) >> SHIFT_W) +
                              ((lcu->position_px.y + y_offsets[0]) >> SHIFT_H) * (frame->rec->stride >> SHIFT_W);
     const int to_index_c = (x_offsets[0] >> SHIFT_W) + (y_offsets[0] >> SHIFT_H) * (SAO_BUF_WIDTH_C);
@@ -438,7 +438,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                           sao_luma,
                           COLOR_Y);
 
-      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
         // Coordinates in chroma pixels.
         int x_c = x >> SHIFT_W;
         int y_c = y >> SHIFT_H;
@@ -546,7 +546,7 @@ static void encode_sao(encoder_state_t * const state,
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
     encode_sao_color(state, sao_luma, COLOR_Y);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
       encode_sao_color(state, sao_chroma, COLOR_U);
       encode_sao_color(state, sao_chroma, COLOR_V);
     }
@@ -1203,7 +1203,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
     // In lossless mode, the reconstruction is equal to the source frame.
     state->tile->frame->rec = kvz_image_copy_ref(frame);
   } else {
-    state->tile->frame->rec = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->rec = kvz_image_alloc(state->encoder_control->cfg.chroma_format, frame->width, frame->height);
     state->tile->frame->rec->dts = frame->dts;
     state->tile->frame->rec->pts = frame->pts;
   }
@@ -1444,12 +1444,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Variance adaptive quantization
   if (cfg->vaq) {
-    const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+    const bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
     double d = cfg->vaq * 0.1; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
-    uint32_t c_len = len / 4;
+    uint32_t c_len = len >> (SHIFT_W + SHIFT_H);
     double frame_var = kvz_pixel_var(state->tile->frame->source->y, len);
     if (has_chroma) {
       frame_var += kvz_pixel_var(state->tile->frame->source->u, c_len);

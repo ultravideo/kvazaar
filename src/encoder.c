@@ -247,8 +247,6 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
 
   encoder->bitdepth = KVZ_BIT_DEPTH;
 
-  encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
-
   // Interlacing
   encoder->in.source_scan_type = (int8_t)encoder->cfg.source_scan_type;
   encoder->vui.field_seq_flag = encoder->cfg.source_scan_type != 0;
