@@ -1203,8 +1203,8 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t *const encoder
     kvz_sample_octpel_chroma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
     return;
   }
-  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t *hor_fir = kvz_g_chroma_filter[(mv[0] & (encoder->cfg.chroma_shift_w ? 7 : 3))<< (1 - encoder->cfg.chroma_shift_w)];
+  int8_t *ver_fir = kvz_g_chroma_filter[(mv[1] & (encoder->cfg.chroma_shift_h ? 7 : 3))<< (1 - encoder->cfg.chroma_shift_h)];
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
@@ -1231,8 +1231,8 @@ static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
     kvz_sample_octpel_chroma_hi_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
     return;
   }
-  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t* hor_fir = kvz_g_chroma_filter[(mv[0] & (encoder->cfg.chroma_shift_w ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_w)];
+  int8_t* ver_fir = kvz_g_chroma_filter[(mv[1] & (encoder->cfg.chroma_shift_h ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_h)];
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.

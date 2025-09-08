@@ -174,8 +174,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   yuv_t *out,
   const unsigned out_stride)
 {
-  int mv_frac_x = (mv_param[0] & 7);
-  int mv_frac_y = (mv_param[1] & 7);
+  int mv_frac_x = (mv_param[0] & (SHIFT_W?7:3));
+  int mv_frac_y = (mv_param[1] & (SHIFT_H?7:3));
 
   // Take into account chroma subsampling
   unsigned pb_w = pu_w >> SHIFT_W;
@@ -195,8 +195,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .src_w = ref->width >> SHIFT_W,
     .src_h = ref->height >> SHIFT_H,
     .src_s = ref->stride >> SHIFT_W,
-    .blk_x = ((state->tile->offset_x + pu_x) >> SHIFT_W) + (mv_param[0] >> 3),
-    .blk_y = ((state->tile->offset_y + pu_y) >> SHIFT_H) + (mv_param[1] >> 3),
+    .blk_x = ((state->tile->offset_x + pu_x) >> SHIFT_W) + (mv_param[0] >> (SHIFT_W?3:2)),
+    .blk_y = ((state->tile->offset_y + pu_y) >> SHIFT_H) + (mv_param[1] >> (SHIFT_H?3:2)),
     .blk_w = pb_w,
     .blk_h = pb_h,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,  
@@ -250,8 +250,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   yuv_im_t *out,
   const unsigned out_stride)
 {
-  int mv_frac_x = (mv_param[0] & 7);
-  int mv_frac_y = (mv_param[1] & 7);
+  int mv_frac_x = (mv_param[0] & (SHIFT_W?7:3));
+  int mv_frac_y = (mv_param[1] & (SHIFT_H?7:3));
 
   // Take into account chroma subsampling
   unsigned pb_w = pu_w >> SHIFT_W;
@@ -271,8 +271,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
     .src_w = ref->width >> SHIFT_W,
     .src_h = ref->height >> SHIFT_H,
     .src_s = ref->stride >> SHIFT_W,
-    .blk_x = ((state->tile->offset_x + pu_x) >> SHIFT_W) + (mv_param[0] >> 3),
-    .blk_y = ((state->tile->offset_y + pu_y) >> SHIFT_H) + (mv_param[1] >> 3),
+    .blk_x = ((state->tile->offset_x + pu_x) >> SHIFT_W) + (mv_param[0] >> (SHIFT_W?3:2)),
+    .blk_y = ((state->tile->offset_y + pu_y) >> SHIFT_H) + (mv_param[1] >> (SHIFT_H?3:2)),
     .blk_w = pb_w,
     .blk_h = pb_h,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,

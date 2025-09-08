@@ -701,8 +701,8 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t* hor_filter = kvz_g_chroma_filter[(mv[0] & (encoder->cfg.chroma_shift_w ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_w)];
+  int8_t* ver_filter = kvz_g_chroma_filter[(mv[1] & (encoder->cfg.chroma_shift_h ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_h)];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
   const int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
@@ -734,8 +734,8 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
   int32_t shift2 = 6;
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t* hor_filter = kvz_g_chroma_filter[(mv[0] & (encoder->cfg.chroma_shift_w ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_w)];
+  int8_t* ver_filter = kvz_g_chroma_filter[(mv[1] & (encoder->cfg.chroma_shift_h ? 7 : 3)) << (1 - encoder->cfg.chroma_shift_h)];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA*LCU_WIDTH];
   const int16_t hor_stride = LCU_WIDTH >> encoder->cfg.chroma_shift_w;
