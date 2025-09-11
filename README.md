@@ -383,7 +383,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 
 |                      | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p   |
 | -------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 2     | 2     | 2     |
+| rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 2     | 3     | 3     |
 | pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 1-4   |
 | pu-depth-inter       | 1-2   | 1-2   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    |
@@ -400,7 +400,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | mv-rdo               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | full-intra-search    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | smp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
-| amp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
+| amp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
