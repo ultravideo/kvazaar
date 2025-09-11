@@ -2085,7 +2085,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   const int width = LCU_WIDTH >> depth;
   cabac_data_t cabac_copy;
   memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
-  cabac_copy.update = 1;
+  state->search_cabac.update = 1;
 
   cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   *cur_pu = *cur_cu;
@@ -2111,12 +2111,16 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   double bits = 0;
   const int skip_context = kvz_get_skip_context(x, y, lcu, NULL);
   if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
-    no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
-    bits += kvz_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
+    no_cbf_bits = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
+    bits += kvz_mock_encode_coding_unit(state, &state->search_cabac, x, y, depth, lcu, cur_cu);
   }
   else {
-    no_cbf_bits = kvz_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
-    bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 1);
+    no_cbf_bits = kvz_mock_encode_coding_unit(state, &state->search_cabac, x, y, depth, lcu, cur_cu);
+    bits += no_cbf_bits;
+    if (!cur_cu->merged || cur_cu->part_size != SIZE_2Nx2N) {
+      bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_qt_root_cbf_model, 1);
+      no_cbf_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_qt_root_cbf_model, 0);
+    }
   }
   double no_cbf_cost = ssd + no_cbf_bits * state->lambda;
 
@@ -2126,12 +2130,23 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
                             lcu,
                             false);
 
+
+  if (tr_depth == depth)
+  {
+    cbf_copy(&cur_pu->cbf, cur_cu->cbf, COLOR_Y);
+    if (reconstruct_chroma)
+    {      
+     cbf_copy(&cur_pu->cbf, cur_cu->cbf, COLOR_U);
+     cbf_copy(&cur_pu->cbf, cur_cu->cbf, COLOR_V);
+    }
+  }
+
   int cbf = cbf_is_set_any(cur_cu->cbf, depth);
   
   if(cbf) {
-    *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu);
+    *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, cur_cu, lcu);
     if (reconstruct_chroma) {
-      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
+      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, cur_cu, lcu);
     }
   }
   else {
@@ -2139,6 +2154,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     *inter_cost = no_cbf_cost;
     cur_cu->cbf = 0;
     *inter_bitcost = no_cbf_bits;
+    memcpy(&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
     return;
   }
   
@@ -2154,6 +2170,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
     *inter_bitcost = no_cbf_bits;
     
   }
+  memcpy(&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
 }
 
 

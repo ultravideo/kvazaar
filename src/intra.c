@@ -632,8 +632,9 @@ void kvz_intra_recon_cu(
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   const int8_t width = LCU_WIDTH >> depth;
+  cu_info_t* cur_tu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   if (cur_cu == NULL) {
-    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+    cur_cu = cur_tu;
   }
 
   // Reset CBFs because CBFs might have been set
@@ -684,5 +685,14 @@ void kvz_intra_recon_cu(
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
+    if (cur_cu != cur_tu)
+    {
+      if (has_luma) cbf_copy(&cur_tu->cbf, cur_cu->cbf, COLOR_Y);
+      if (has_chroma)
+      {
+        cbf_copy(&cur_tu->cbf, cur_cu->cbf, COLOR_U);
+        cbf_copy(&cur_tu->cbf, cur_cu->cbf, COLOR_V);
+      }
+    }
   }
 }

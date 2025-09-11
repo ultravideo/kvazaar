@@ -233,6 +233,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 * Calculate RD cost for a Coding Unit.
 * \return Cost of block
 * \param ref_cu  CU used for prediction parameters.
+* \param parent_tu
 *
 * Calculates the RDO cost of a single CU that will not be split further.
 * Takes into account SSD of reconstruction and the cost of encoding whatever
@@ -241,10 +242,10 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                            const int x_px, const int y_px, const int depth,
                            const cu_info_t *const pred_cu,
-                           lcu_t *const lcu)
+                           const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
   const int width = LCU_WIDTH >> depth;
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
 
   // cur_cu is used for TU parameters.
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
@@ -283,10 +284,10 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int offset = width / 2;
     double sum = 0;
 
-    sum += kvz_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += kvz_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
 
     return sum + tr_tree_bits * state->lambda;
   }
@@ -302,8 +303,8 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       cabac_ctx_t* cr_ctx = &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]);
       cabac->cur_ctx = cr_ctx;
-      int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-      int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
+      int u_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_U);
+      int v_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
       CABAC_FBITS_UPDATE(cabac, cr_ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
       CABAC_FBITS_UPDATE(cabac, cr_ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
     }
@@ -311,7 +312,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
-  int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
+  int is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_Y);
   if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
@@ -348,12 +349,12 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const int x_px, const int y_px, const int depth,
                              const cu_info_t *const pred_cu,
-                             lcu_t *const lcu)
+                             const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
   const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -367,18 +368,18 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     return 0;
   }
 
-  int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-  int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
+  int u_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_U);
+  int v_is_set = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
   // See luma for why the second condition
   if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     cabac->cur_ctx = ctx;
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+    if (tr_depth == 0 || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
     }
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+    if (tr_depth == 0 || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_V)) {
       CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
     }
   }
@@ -387,10 +388,10 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     int offset = LCU_WIDTH >> (depth + 1);
     double sum = 0;
 
-    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
+    sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
 
     return sum + tr_tree_bits * state->lambda;
   }
@@ -424,10 +425,10 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
                                            const int x_px, const int y_px, const int depth,
                                            const cu_info_t* const pred_cu,
-                                           lcu_t* const lcu) {
+                                           const cu_info_t* const parent_tu, lcu_t* const lcu) {
   const int width = LCU_WIDTH >> depth;
 
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
   // cur_cu is used for TU parameters.
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
@@ -445,7 +446,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
 
-  {
+  if (depth == pred_cu->depth){
     int cbf = cbf_is_set_any(pred_cu->cbf, depth);
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
@@ -474,10 +475,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   if(state->encoder_control->chroma_format != KVZ_CSP_400 && !skip_residual_coding) {
-    if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+    if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_u, tr_tree_bits, "cbf_cb");
     } 
-    if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+    if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_V)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_v, tr_tree_bits, "cbf_cr");
     } 
   }
@@ -486,10 +487,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     int offset = LCU_WIDTH >> (depth + 1);
     double sum = 0;
 
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, tr_cu, lcu);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, tr_cu, lcu);
     return sum + tr_tree_bits * state->lambda;
   }
   const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) ;
@@ -515,7 +516,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       width);
   }
 
-  {
+  if(!skip_residual_coding) {
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
@@ -538,7 +539,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       chroma_ssd = ssd_u + ssd_v;
     }
 
-     {
+    if (!skip_residual_coding) {
       int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
       const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
@@ -869,7 +870,20 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         int tr_depth = depth;
         kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
         const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-        kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);        
+        kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
+        for (int i = 0; i < cu_width; i += (cu_width >> (depth == 0)))
+        {
+          for (int j = 0; j < cu_width; j += (cu_width >> (depth == 0)))
+          {
+            cu_info_t* tmp_cu = LCU_GET_CU_AT_PX(lcu, x_local + i, y_local + j);
+            cbf_clear(&tmp_cu->cbf, depth, COLOR_Y);
+            if (has_chroma)
+            {              
+             cbf_clear(&tmp_cu->cbf, depth, COLOR_U);
+             cbf_clear(&tmp_cu->cbf, depth, COLOR_V);
+            }
+          }
+        }
       }
       lcu_fill_inter(lcu, x_local, y_local, cu_width);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
@@ -900,7 +914,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     
     cost = bits * state->lambda;
 
-    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu);
+    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, cur_cu, lcu);
     
     if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
       cost = inter_zero_coeff_cost;
@@ -1022,7 +1036,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y) + bits;
         cost += mode_bits * state->lambda;
 
-        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu);
+        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, cur_cu, lcu);
 
         memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
