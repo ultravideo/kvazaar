@@ -146,11 +146,13 @@ extern const float kvz_f_entropy_bits[128];
 
 
 #ifdef VERBOSE
+extern uint32_t kvz_cabac_bins_count;
   #define CABAC_BIN(data, value, name) { \
-    uint32_t prev_state = (data)->cur_ctx->uc_state; \
+    uint32_t prev_state = CTX_STATE(data->cur_ctx); \
+    if(!(data)->only_count) {printf("%d %d %s = %u, range = %u state = %u -> ", \
+           kvz_cabac_bins_count++, (data)->range, (name), (uint32_t)(value), (data)->range, prev_state); }\
     kvz_cabac_encode_bin((data), (value)); \
-    if(!(data)->only_count)  printf("%s = %u, state = %u -> %u MPS = %u\n", \
-           (name), (uint32_t)(value), prev_state, (data)->cur_ctx->uc_state, CTX_MPS((data)->cur_ctx)); }
+    if(!(data)->only_count) printf("%u\n", CTX_STATE((data)->cur_ctx)); }
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
