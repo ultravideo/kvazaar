@@ -133,7 +133,7 @@ static INLINE __m256i kvz_context_get_sig_ctx_inc_16x16b(int32_t pattern_sig_ctx
     if (scan_idx == SCAN_DIAG)
       offset = 9;
     else
-      offset = 15;
+      offset = 9 + ((texture_type == 0) ? 6 : 0);
   else
     if (texture_type == 0)
       offset = 21;
