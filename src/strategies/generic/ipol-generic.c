@@ -800,6 +800,10 @@ void kvz_get_extended_block_generic(kvz_epol_args *args) {
       kvz_pixel *dst = args->buf + (y + args->pad_t + y_simd) * (*args->ext_s);
       FILL_ARRAY(dst, 0, *args->ext_s);
     }
+    // Set the last element to zero because the avx2 code reads it,
+    // though it does not use it, this is purely to prevent a false positive in
+    // address sanitizer.
+    args->buf[(args->blk_h + args->pad_b + args->pad_t + args->pad_b_simd - 1) * *args->ext_s + args->pad_l + args->blk_w + args->pad_r] = 0;
 
   } else {
 

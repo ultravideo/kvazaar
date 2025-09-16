@@ -1047,6 +1047,11 @@ static void search_frac(inter_search_info_t *info,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
+  // In case the half of the fractional positions are legal
+  // and the other half illegal, the extension will be performed
+  // for pixels that might be uninitialized.
+  // Nevertheless, in that case the search will not use those pixels,
+  // but the thread/address sanitizer will not know that.
   kvz_get_extended_block(&epol_args);
 
   kvz_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
@@ -1880,6 +1885,12 @@ static void search_pu_inter(encoder_state_t * const state,
         double     frac_cost = MAX_DOUBLE;
         double   frac_bits = MAX_INT;
         vector2d_t frac_mv = { unipred_pu->inter.mv[list][0], unipred_pu->inter.mv[list][1] };
+
+        // Check that at least one quarter-pel step is possible
+        if (!fracmv_within_tile(info, frac_mv.x + 3, frac_mv.y + 3) &&
+            !fracmv_within_tile(info, frac_mv.x - 3, frac_mv.y - 3)) {
+          continue;
+        }
 
         search_frac(info, &frac_cost, &frac_bits, &frac_mv);
 

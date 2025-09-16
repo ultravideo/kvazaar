@@ -63,10 +63,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->sao_type        = 3;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
-  cfg->signhide_enable = true;
+  cfg->signhide_enable = false;
   cfg->smp_enable      = false;
   cfg->amp_enable      = false;
-  cfg->rdo             = 1;
+  cfg->rdo             = 0;
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
@@ -86,9 +86,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->fast_coeff_table_fn = NULL;
-  cfg->ref_frames      = 1;
-  cfg->gop_len         = 4;
-  cfg->gop_lowdelay    = true;
+  cfg->ref_frames      = 4;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
   cfg->hash            = KVZ_HASH_CHECKSUM;
@@ -118,10 +116,10 @@ int kvz_config_init(kvz_config *cfg)
   memset( cfg->pu_depth_inter.max, -1, sizeof( cfg->pu_depth_inter.max ) );
   memset( cfg->pu_depth_intra.min, -1, sizeof( cfg->pu_depth_intra.min ) );
   memset( cfg->pu_depth_intra.max, -1, sizeof( cfg->pu_depth_intra.max ) );
-  *cfg->pu_depth_inter.min = 2; // 0-3
+  *cfg->pu_depth_inter.min = 0; // 0-3
   *cfg->pu_depth_inter.max = 3; // 0-3
-  *cfg->pu_depth_intra.min = 2; // 0-4
-  *cfg->pu_depth_intra.max = 3; // 0-4
+  *cfg->pu_depth_intra.min = 1; // 0-4
+  *cfg->pu_depth_intra.max = 4; // 0-4
 
   cfg->add_encoder_info = true;
   cfg->calc_psnr = true;
@@ -135,9 +133,11 @@ int kvz_config_init(kvz_config *cfg)
   cfg->input_format = KVZ_FORMAT_P420;
   cfg->input_bitdepth = 8;
 
-  cfg->gop_lp_definition.d = 3;
-  cfg->gop_lp_definition.t = 1;
+  cfg->gop_lowdelay = 0;
+  cfg->gop_len = sizeof(kvz_gop_ra16) / sizeof(kvz_gop_ra16[0]);
+  memcpy(cfg->gop, kvz_gop_ra16, sizeof(kvz_gop_ra16));
   cfg->open_gop = true;
+  
 
   cfg->roi.file_path = NULL;
   cfg->roi.format = KVZ_ROI_TXT;
@@ -725,7 +725,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "mv-rdo", "0",
         "full-intra-search", "0",
         "smp", "1",
-        "amp", "0",
+        "amp", "1",
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
