@@ -478,7 +478,7 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
 
     // Space for extrapolated pixels and the part from the picture
     // The extrapolation function will set the pointers and stride.
-    kvz_pixel ext_buffer[LCU_LUMA_SIZE];
+    kvz_pixel ext_buffer[LCU_LUMA_SIZE + 1];
     kvz_pixel *ext = NULL;
     kvz_pixel *ext_origin = NULL;
     int ext_s = 0;
