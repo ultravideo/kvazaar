@@ -490,4 +490,8 @@ if(NOT DEFINED MSVC)
   if(NOT "test_rate_control.sh" IN_LIST XFAIL)
     add_test( NAME test_rate_control COMMAND ${PROJECT_SOURCE_DIR}/tests/test_rate_control.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()
+  
+  if(NOT "test_chroma_subsampling.sh" IN_LIST XFAIL)
+    add_test( NAME test_chroma_subsampling COMMAND ${PROJECT_SOURCE_DIR}/tests/test_chroma_subsampling.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
 endif()
