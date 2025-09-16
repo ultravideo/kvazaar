@@ -669,7 +669,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->cfg.chroma_format == KVZ_CSP_420);
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 

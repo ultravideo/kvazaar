@@ -366,7 +366,7 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t * const  __restrict scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->cfg.chroma_format == KVZ_CSP_420);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
   const coeff_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
@@ -731,7 +731,7 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (kvz_g_convert_to_bit[ width ] + 2);
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6, encoder->cfg.chroma_format == KVZ_CSP_420);
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 

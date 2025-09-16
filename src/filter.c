@@ -586,7 +586,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     int8_t strength = 2;
 
     const int32_t luma_qp  = get_qp_y_pred(state, x << SHIFT_W, y << SHIFT_H, dir);
-    int32_t QP             = kvz_g_chroma_scale[luma_qp];
+    int32_t QP             = kvz_g_chroma_scale[encoder->cfg.chroma_format == KVZ_CSP_420?0:1][luma_qp];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = kvz_g_tc_table_8x8[TC_index]*bitdepth_scale;
