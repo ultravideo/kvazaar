@@ -48,7 +48,7 @@
  // Extra vertical padding is added to prevent segfaults.
  // Needs one extra byte for input buffer to prevent ASAN
  // error because AVX2 reads one extra byte in the end.
-#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD   ((KVZ_EXT_BLOCK_W_LUMA   + 1) * KVZ_EXT_BLOCK_W_LUMA   + 1)
+#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD   ((KVZ_EXT_BLOCK_W_LUMA   + 3) * KVZ_EXT_BLOCK_W_LUMA   + 3)
 #define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA + 1)
 #define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD      ((KVZ_EXT_BLOCK_W_LUMA   + 1) * LCU_WIDTH + 1)
 #define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD    ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
@@ -57,7 +57,7 @@
 // column and row for ME (left and up). Adding the
 // extra row happens to satisfy AVX2 requirements for
 // row count. No other extra rows are needed.
-#define KVZ_FME_MAX_INPUT_SIZE_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * (KVZ_EXT_BLOCK_W_LUMA + 1) + 1)
+#define KVZ_FME_MAX_INPUT_SIZE_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 3) * (KVZ_EXT_BLOCK_W_LUMA + 3))
 
 typedef struct { kvz_pixel *buffer; kvz_pixel *orig_topleft; unsigned stride; unsigned malloc_used; } kvz_extended_block;
 
