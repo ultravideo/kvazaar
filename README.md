@@ -51,7 +51,7 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 [comment]: # "BEGIN KVAZAAR HELP MESSAGE"
 ```
-Kvazaar v2.3.1 2024-04-10
+Kvazaar v2.3.2 2025-09-16
 Kvazaar license: 3-clause BSD
 Usage:
 kvazaar -i <input> --input-res <width>x<height> -o <output>
@@ -126,7 +126,7 @@ Video structure:
                                    - 0: Only send VPS with the first frame.
                                    - N: Send VPS with every Nth intra frame.
   -r, --ref <integer>        : Number of reference frames, in range 1..15 [4]
-      --gop <string>         : GOP structure [lp-g4d3t1]
+      --gop <string>         : GOP structure [16]
                                    -  0: Disabled
                                    -  8: B-frame pyramid of length 8
                                    - 16: B-frame pyramid of length 16
@@ -262,7 +262,7 @@ Compression tools:
                                guaranteed to produce sensible bitstream or
                                work at all. [disabled]
       --tr-depth-intra <int> : Transform split depth for intra blocks [0]
-      --(no-)bipred          : Bi-prediction [disabled]
+      --(no-)bipred          : Bi-prediction [enabled]
       --cu-split-termination <string> : CU split search termination [zero]
                                    - off: Don't terminate early.
                                    - zero: Terminate when residual is zero.
@@ -491,7 +491,7 @@ Optional font file `arial.ttf` is to be placed in the working directory, if bloc
 
 Please cite [this paper](https://dl.acm.org/citation.cfm?doid=2964284.2973796) for Kvazaar:
 
-```M. Viitanen, A. Koivula, A. Lemmetti, A. Ylä-Outinen, J. Vanne, and T. D. Hämäläinen, “Kvazaar: open-source HEVC/H.265 encoder,” in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
+```M. Viitanen, A. Koivula, A. Lemmetti, A. Ylï¿½-Outinen, J. Vanne, and T. D. Hï¿½mï¿½lï¿½inen, ï¿½Kvazaar: open-source HEVC/H.265 encoder,ï¿½ in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
 
 Or in BibTex:
 
