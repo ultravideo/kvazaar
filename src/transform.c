@@ -328,7 +328,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   cbf_clear(&cur_pu->cbf, depth, color);
 
   int32_t tr_width;
-  if (color == COLOR_Y) {
+  if (color == COLOR_Y || cfg->chroma_format == KVZ_CSP_444) {
     tr_width = LCU_WIDTH >> depth;
   } else {
     // 444: from depth - 1 to this: think through if correct?
