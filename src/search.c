@@ -368,7 +368,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
-  if (x_px % 8 != 0 || y_px % 8 != 0) {
+  if (x_px % MIN_C_W != 0 || y_px % MIN_C_H != 0) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
     return 0;
@@ -482,10 +482,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && !skip_residual_coding) {
     if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_U)) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_u, tr_tree_bits, "cbf_cb");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_u, tr_tree_bits, "cbf_cb_search");
     } 
     if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_V)) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_v, tr_tree_bits, "cbf_cr");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_v, tr_tree_bits, "cbf_cr_search");
     } 
   }
 
@@ -531,9 +531,9 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && x_px % (4<<SHIFT_W) == 0 && y_px % (4<<SHIFT_H) == 0) {
+  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && x_px % (MIN_C_W) == 0 && y_px % (MIN_C_H) == 0) {
     const vector2d_t lcu_px = { x_px >> SHIFT_W, y_px >> SHIFT_H };
-    const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+    const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + SHIFT_W) : LCU_WIDTH >> depth;
     if (!state->encoder_control->cfg.lossless) {
       int index = lcu_px.y * (LCU_WIDTH >> SHIFT_W) + lcu_px.x;
       unsigned ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],

@@ -207,8 +207,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
   // Round coordinates down to a multiple of 8 to get the location of the
   // containing CU.
-  const int x_cu = 8 * (x / 8);
-  const int y_cu = 8 * (y / 8);
+  const int x_cu = MIN_C_W * (x / MIN_C_W);
+  const int y_cu = MIN_C_H * (y / MIN_C_H);
   const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.

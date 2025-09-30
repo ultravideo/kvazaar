@@ -152,8 +152,8 @@ typedef int16_t coeff_t;
 #define SHIFT_W state->encoder_control->cfg.chroma_shift_w
 #define SHIFT_H state->encoder_control->cfg.chroma_shift_h
 //! minimum luma width & height for chroma to exist for that size
-#define MIN_C_W 4 << SHIFT_W
-#define MIN_C_H 4 << SHIFT_H
+#define MIN_C_W (4 << SHIFT_W)
+#define MIN_C_H (4 << SHIFT_H)
 
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)

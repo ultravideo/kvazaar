@@ -317,7 +317,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
   // left PU because the coordinates are correct.
   bool handled_elsewhere = color != COLOR_Y &&
                            depth > MAX_DEPTH &&
-                           (lcu_px.x % 4 != 0 || lcu_px.y % 4 != 0);
+                           (lcu_px.x % 4 != 0 || lcu_px.y % 4 != 0) &&
+                           cfg->chroma_format != KVZ_CSP_444;
   if (handled_elsewhere) {
     return;
   }
@@ -330,8 +331,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   int32_t tr_width;
   if (color == COLOR_Y || cfg->chroma_format == KVZ_CSP_444) {
     tr_width = LCU_WIDTH >> depth;
-  } else {
-    // 444: from depth - 1 to this: think through if correct?
+  } else {    
     const int chroma_depth = (depth == MAX_PU_DEPTH ? (depth - 1) : depth);
     tr_width = LCU_WIDTH >> (chroma_depth + SHIFT_W);
   }
