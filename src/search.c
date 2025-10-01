@@ -916,6 +916,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cabac_ctx_t* ctx = &(cabac->ctx.cu_pred_mode_model);
         CABAC_FBITS_UPDATE(cabac, ctx, 1, bits, "pred_mode_flag");
       }
+      if (cbf_is_set(cur_cu->cbf, 4, COLOR_U)) {
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local & (0xff << 3), y_local & (0xff << 3))->cbf, 3, COLOR_U);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 4), y_local& (0xff << 4))->cbf, 2, COLOR_U);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 5), y_local& (0xff << 5))->cbf, 1, COLOR_U);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 6), y_local& (0xff << 6))->cbf, 0, COLOR_U);
+      }
+      if (cbf_is_set(cur_cu->cbf, 4, COLOR_V)) {
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 3), y_local& (0xff << 3))->cbf, 3, COLOR_V);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 4), y_local& (0xff << 4))->cbf, 2, COLOR_V);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 5), y_local& (0xff << 5))->cbf, 1, COLOR_V);
+        cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 6), y_local& (0xff << 6))->cbf, 0, COLOR_V);
+      }
       bits += calc_mode_bits(state, lcu, cur_cu, x, y);
     }
     
