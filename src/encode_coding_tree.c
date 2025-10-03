@@ -170,29 +170,31 @@ static void encode_transform_unit(encoder_state_t * const state,
     }
   }
 
-  int x_local = (x >> SHIFT_W) % (LCU_WIDTH >> SHIFT_W);
-  int y_local = (y >> SHIFT_H) % (LCU_WIDTH >> SHIFT_H);
-  scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+    int x_local = (x >> SHIFT_W) % (LCU_WIDTH >> SHIFT_W);
+    int y_local = (y >> SHIFT_H) % (LCU_WIDTH >> SHIFT_H);
+    scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
-  bool cross_component_prediction = cbf_y && state->encoder_control->cfg.enable_cross_component_prediction &&
-                                    (cur_pu->type == CU_INTER || cur_pu->intra.mode_chroma == cur_pu->intra.mode);
+    bool cross_component_prediction = cbf_y && state->encoder_control->cfg.enable_cross_component_prediction &&
+      (cur_pu->type == CU_INTER || cur_pu->intra.mode_chroma == cur_pu->intra.mode);
 
-  if (cross_component_prediction) {
-    encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_U);
-  }
+    if (cross_component_prediction) {
+      encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_U);
+    }
 
-  if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-    const coeff_t* coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
-  }
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+      const coeff_t* coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
+    }
 
-  if (cross_component_prediction) {
-    encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_V);
-  }
+    if (cross_component_prediction) {
+      encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_V);
+    }
 
-  if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-    const coeff_t* coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, NULL);
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+      const coeff_t* coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, NULL);
+    }
   }
   
 }
