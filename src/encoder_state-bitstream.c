@@ -358,6 +358,36 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
   }
 }
 
+static void encoder_state_write_bitstream_PPS_extension(bitstream_t* stream,
+                                                        encoder_state_t* const state)
+{
+  const kvz_config* cfg = &state->encoder_control->cfg;
+  bool need_pps_extension = cfg->chroma_format == KVZ_CSP_444;
+  WRITE_U(stream, need_pps_extension, 1, "pps_extension_present_flag");
+  if (need_pps_extension) {
+    WRITE_U(stream, 1, 1, "pps_range_extension_flag");
+    WRITE_U(stream, 0, 1, "pps_multilayer_extension_flag");
+    WRITE_U(stream, 0, 1, "pps_3d_extension_flag");
+    WRITE_U(stream, 0, 1, "pps_scc_extension_flag");
+    WRITE_U(stream, 0, 4, "pps_extension_4bits");
+
+    // pps_range_extension_flag
+    if(cfg->trskip_enable) WRITE_UE(stream, 0, "log2_max_transform_skip_block_size_minus2");
+    WRITE_U(stream, cfg->enable_cross_component_prediction, 1, "cross_component_prediction_enabled_flag");
+    WRITE_U(stream, 0, 1, "chroma_qp_offset_list_enabled_flag");
+    //IF chroma_qp_offset_list_enabled_flag
+      //WRITE_UE(stream, 0, "diff_cu_chroma_qp_offset_depth");
+      //WRITE_UE(stream, 0, "chroma_qp_offset_list_len_minus1");
+      //for (i = 0; i <= chroma_qp_offset_list_len_minus1; i++)
+        //WRITE_SE(stream, 0, "cb_qp_offset_list[i]");
+        //WRITE_SE(stream, 0, "cr_qp_offset_list[i]");
+      //end for
+    //ENDIF
+    WRITE_UE(stream, 0, "log2_sao_offset_scale_luma");
+    WRITE_UE(stream, 0, "log2_sao_offset_scale_chroma");
+  }
+}
+
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -569,7 +599,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
-  WRITE_U(stream, 0, 1, "pps_extension_flag");
+
+  encoder_state_write_bitstream_PPS_extension(stream, state);
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }

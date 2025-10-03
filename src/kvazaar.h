@@ -504,6 +504,8 @@ typedef struct kvz_config
 
   enum kvz_chroma_format chroma_format; //!< \brief Chroma subsampling format used for encoding.
 
+  uint8_t enable_cross_component_prediction; //!< \brief Enable cross-component prediction (4:4:4).
+
 } kvz_config;
 
 /**

@@ -47,6 +47,13 @@
 #include "tables.h"
 #include "videoframe.h"
 
+
+static void encode_cross_component_prediction(const cu_info_t* cur_pu, cabac_data_t* const cabac, color_t channel)
+{
+  cabac->cur_ctx = &(cabac->ctx.cross_component_prediction[channel == COLOR_V ? 5 : 1]);
+  CABAC_BIN(cabac, /*cur_pu->alpha[channel == COLOR_V ? 1 : 0] != 0*/0, "cross_component_prediction_flag");
+}
+
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
  *
@@ -174,10 +181,16 @@ static void encode_transform_unit(encoder_state_t * const state,
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+      if (cbf_y && state->encoder_control->cfg.enable_cross_component_prediction && (cur_pu->type == CU_INTER || cur_pu->intra.mode_chroma == cur_pu->intra.mode)) {
+        encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_U);
+      }
       kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+      if (cbf_y && state->encoder_control->cfg.enable_cross_component_prediction && (cur_pu->type == CU_INTER || cur_pu->intra.mode_chroma == cur_pu->intra.mode)) {
+        encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_V);
+      }
       kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, NULL);
     }
   }

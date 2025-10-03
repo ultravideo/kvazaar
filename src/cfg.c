@@ -197,6 +197,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->chroma_shift = cfg->chroma_shift_w = 1;
   cfg->chroma_shift_h = 1;
 
+  cfg->enable_cross_component_prediction = 1;
+
   return 1;
 }
 
