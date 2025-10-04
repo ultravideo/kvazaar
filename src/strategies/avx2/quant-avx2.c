@@ -625,6 +625,77 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
   }
 }
 
+
+static void calc_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t stride)
+{
+  uint32_t ss_xy = 0;
+  uint32_t ss_xx = 0;
+  for (int32_t j = 0; j < tr_width; j++) {
+    for (int32_t i = 0; i < tr_width; i++) {
+      ss_xy += luma_residual[i + j * stride] * chroma_residual[i + j * stride];
+      ss_xx += luma_residual[i + j * stride] * luma_residual[i + j * stride];
+    }
+  }
+
+  int8_t alpha = 0;
+  if (ss_xx != 0) {
+    double falpha = (double)ss_xy / (double)ss_xx;
+    alpha = (int8_t)(CLIP(-16, 16, (int)(falpha * 16)));
+    int8_t sign = alpha < 0 ? 1 : 0;
+    alpha = alpha < 0 ? -alpha : alpha;
+    // Original quantization tables from HM
+    //const uint8_t alpha_quant[17] = {0, 1, 1, 2, 2, 2, 4, 4, 4, 4, 4, 4, 8, 8, 8, 8, 8};
+    //const uint8_t log2_abs_alpha_minus1[8] = { 0, 1, 1, 2, 2, 2, 3, 3 };
+    const uint8_t combined_alpha_quant[17] = { 0,0,0,1,1,1,2,2,2,2,2,2,3,3,3,3,3, };
+
+    alpha = combined_alpha_quant[alpha];
+
+    if (alpha != 0) {
+      int32_t reversed_alpha = sign ? -(1 << alpha) : (1 << alpha);
+      // reconstruct the prediction
+      for (int32_t j = 0; j < tr_width; j++) {
+        for (int32_t i = 0; i < tr_width; i++) {
+          int32_t pred_val = luma_residual[i + j * stride];
+          int32_t res_val = chroma_residual[i + j * stride] - ((reversed_alpha*pred_val) >> 3);
+          chroma_residual[i + j * stride] = res_val;
+        }
+      }
+    }
+    else {
+      alpha = 0;
+    }
+    if (color == COLOR_V) {
+      cur_cu->alpha_v = alpha;
+      cur_cu->alpha_v_s = sign;
+    }
+    else {
+      cur_cu->alpha_u = alpha;
+      cur_cu->alpha_u_s = sign;
+    }
+  }
+}
+
+static void recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t stride)
+{
+  int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
+  uint8_t sign = (color == COLOR_V) ? cur_cu->alpha_v_s : cur_cu->alpha_u_s;
+  if (alpha != 0) {
+    int32_t reversed_alpha = sign ? -(1 << alpha) : (1 << alpha);
+    // reconstruct the prediction
+    for (int32_t j = 0; j < tr_width; j++) {
+      for (int32_t i = 0; i < tr_width; i++) {
+        int32_t pred_val = luma_residual[i + j * stride];
+        int32_t res_val = CLIP(-32768, 32767, chroma_residual[i + j * stride] + ((reversed_alpha*pred_val) >> 3));
+        chroma_residual[i + j * stride] = res_val;
+      }
+    }
+  }
+}
+
+
+
 /**
 * \brief Quantize residual and get both the reconstruction and coeffs.
 *
@@ -647,7 +718,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
   uint8_t *rec_out, coeff_t *coeff_out,
-  bool early_skip)
+  bool early_skip, int16_t* luma_residual_cross_comp)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -661,6 +732,11 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   // Get residual. (ref_in - pred_in -> residual)
   get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
 
+  if (state->encoder_control->cfg.enable_cross_component_prediction) {
+    if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
+      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, coeff, width, width);
+    }
+  }
   // Transform residual. (residual -> coeff)
   if (use_trskip) {
     kvz_transformskip(state->encoder_control, residual, coeff, width);
@@ -695,11 +771,18 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
     kvz_dequant(state, coeff_out, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
+
     if (use_trskip) {
       kvz_itransformskip(state->encoder_control, residual, coeff, width);
     }
     else {
       kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu->type);
+    }
+    if (state->encoder_control->cfg.enable_cross_component_prediction) {
+      if (color == COLOR_Y)  memcpy(luma_residual_cross_comp, residual, TR_MAX_WIDTH * TR_MAX_WIDTH * sizeof(int16_t));
+      else {
+        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, width);        
+      }
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
