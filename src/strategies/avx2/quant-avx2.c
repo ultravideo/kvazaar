@@ -627,14 +627,14 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
 
 
 static void calc_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
-  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t stride)
+  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   uint32_t ss_xy = 0;
   uint32_t ss_xx = 0;
   for (int32_t j = 0; j < tr_width; j++) {
     for (int32_t i = 0; i < tr_width; i++) {
-      ss_xy += luma_residual[i + j * stride] * chroma_residual[i + j * stride];
-      ss_xx += luma_residual[i + j * stride] * luma_residual[i + j * stride];
+      ss_xy += luma_residual[i + j * luma_stride] * chroma_residual[i + j * chroma_stride];
+      ss_xx += luma_residual[i + j * luma_stride] * luma_residual[i + j * luma_stride];
     }
   }
 
@@ -656,9 +656,9 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
       // reconstruct the prediction
       for (int32_t j = 0; j < tr_width; j++) {
         for (int32_t i = 0; i < tr_width; i++) {
-          int32_t pred_val = luma_residual[i + j * stride];
-          int32_t res_val = chroma_residual[i + j * stride] - ((reversed_alpha*pred_val) >> 3);
-          chroma_residual[i + j * stride] = res_val;
+          int32_t pred_val = luma_residual[i + j * luma_stride];
+          int32_t res_val = chroma_residual[i + j * chroma_stride] - ((reversed_alpha*pred_val) >> 3);
+          chroma_residual[i + j * chroma_stride] = res_val;
         }
       }
     }
@@ -677,7 +677,7 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
 }
 
 static void recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
-  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t stride)
+  int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
   uint8_t sign = (color == COLOR_V) ? cur_cu->alpha_v_s : cur_cu->alpha_u_s;
@@ -686,9 +686,9 @@ static void recon_cross_component_prediction(encoder_state_t* const state, cu_in
     // reconstruct the prediction
     for (int32_t j = 0; j < tr_width; j++) {
       for (int32_t i = 0; i < tr_width; i++) {
-        int32_t pred_val = luma_residual[i + j * stride];
-        int32_t res_val = CLIP(-32768, 32767, chroma_residual[i + j * stride] + ((reversed_alpha*pred_val) >> 3));
-        chroma_residual[i + j * stride] = res_val;
+        int32_t pred_val = luma_residual[i + j * luma_stride];
+        int32_t res_val = CLIP(-32768, 32767, chroma_residual[i + j * chroma_stride] + ((reversed_alpha*pred_val) >> 3));
+        chroma_residual[i + j * chroma_stride] = res_val;
       }
     }
   }
@@ -713,7 +713,7 @@ static void recon_cross_component_prediction(encoder_state_t* const state, cu_in
 * \returns  Whether coeff_out contains any non-zero coefficients.
 */
 int kvz_quantize_residual_avx2(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
@@ -731,10 +731,10 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
   // Get residual. (ref_in - pred_in -> residual)
   get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
-
-  if (state->encoder_control->cfg.enable_cross_component_prediction) {
+  
+  if (state->encoder_control->cfg.enable_cross_component_prediction) {    
     if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, coeff, width, width);
+      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
     }
   }
   // Transform residual. (residual -> coeff)
@@ -779,9 +779,12 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
       kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu->type);
     }
     if (state->encoder_control->cfg.enable_cross_component_prediction) {
-      if (color == COLOR_Y)  memcpy(luma_residual_cross_comp, residual, TR_MAX_WIDTH * TR_MAX_WIDTH * sizeof(int16_t));
-      else {
-        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, width);        
+      if (color == COLOR_Y) {
+        for (int yy = 0; yy < width; yy++) { // Store luma residual for cross-component prediction of chroma to the frame level buffer
+          memcpy(&luma_residual_cross_comp[yy*state->tile->frame->width], &residual[yy*width], width * sizeof(int16_t));
+        }
+      } else if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {        
+        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
       }
     }
 

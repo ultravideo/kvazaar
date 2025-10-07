@@ -196,12 +196,12 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 * \returns  Whether coeff_out contains any non-zero coefficients.
 */
 int kvz_quantize_residual_generic(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip)
+  bool early_skip, int16_t* luma_residual_cross_comp)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];

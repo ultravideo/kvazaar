@@ -197,7 +197,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->chroma_shift = cfg->chroma_shift_w = 1;
   cfg->chroma_shift_h = 1;
 
-  cfg->enable_cross_component_prediction = 1;
+  cfg->enable_cross_component_prediction = 0;
 
   return 1;
 }
@@ -1255,7 +1255,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       case 0: cfg->chroma_format = KVZ_CSP_400; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; break;
       case 1: cfg->chroma_format = KVZ_CSP_420; cfg->chroma_shift_w = 1; cfg->chroma_shift_h = 1; break;
       case 2: cfg->chroma_format = KVZ_CSP_422; cfg->chroma_shift_w = 1; cfg->chroma_shift_h = 0; break;
-      case 3: cfg->chroma_format = KVZ_CSP_444; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; break;
+      case 3: cfg->chroma_format = KVZ_CSP_444; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; cfg->enable_cross_component_prediction = 1;  break;
       default:
         fprintf(stderr, "Internal error setting chroma format.\n");
         return 0;

@@ -250,7 +250,7 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
  */
 int kvz_quantize_residual_trskip(
     encoder_state_t *const state,
-    const cu_info_t *const cur_cu, const int width, const color_t color,
+    cu_info_t *const cur_cu, const int width, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
@@ -510,9 +510,9 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     }
 
   } else {
-    int16_t luma_residual_cross_comp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    int16_t *luma_residual_cross_comp = &state->tile->frame->luma_residual[y * state->tile->frame->width + x];
     // Process a leaf TU.
-    if (luma || (chroma && state->encoder_control->cfg.enable_cross_component_prediction)) {
+    if (luma) {
       quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp);
     }
     if (chroma) {

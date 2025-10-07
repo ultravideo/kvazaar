@@ -60,6 +60,9 @@ typedef struct videoframe
   struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
+
+  int16_t* luma_residual; //!< \brief Luma residual used in cross component prediction
+
 } videoframe_t;
 
 
