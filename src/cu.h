@@ -138,8 +138,8 @@ typedef struct
   uint8_t tr_skip    : 1; //!< \brief transform skip flag
   uint8_t alpha_u_s  : 1; // !< \brief cross-component prediction sign flag for U channel
   uint8_t alpha_v_s  : 1; // !< \brief cross-component prediction sign flag for V channel
-  uint8_t alpha_u    : 3; // !< \brief cross-component prediction value for U channel
-  uint8_t alpha_v    : 3; // !< \brief cross-component prediction value for V channel
+  uint8_t alpha_u    : 2; // !< \brief cross-component prediction value for U channel
+  uint8_t alpha_v    : 2; // !< \brief cross-component prediction value for V channel
 
   uint16_t cbf;
 
