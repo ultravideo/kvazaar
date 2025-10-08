@@ -662,9 +662,7 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
         }
       }
     }
-    else {
-      alpha = 0;
-    }
+
     if (color == COLOR_V) {
       cur_cu->alpha_v = alpha;
       cur_cu->alpha_v_s = sign;
@@ -676,7 +674,7 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
   }
 }
 
-static void recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
@@ -692,6 +690,8 @@ static void recon_cross_component_prediction(encoder_state_t* const state, cu_in
       }
     }
   }
+
+  return alpha;
 }
 
 
@@ -791,18 +791,29 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
     get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
   }
-  else if (rec_out != pred_in) {
-    // With no coeffs and rec_out == pred_int we skip copying the coefficients
-    // because the reconstruction is just the prediction.
-    int y, x;
-
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
-        rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
+  else {
+    bool recon_done = false;
+    if (state->encoder_control->cfg.enable_cross_component_prediction) {
+      if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
+        memset(residual, 0, width * width * sizeof(int16_t));
+        if (recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
+          // Get quantized reconstruction. (residual + pred_in -> rec_out)
+          get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
+          recon_done = true;
+        }
+      }
+    }
+    if (!recon_done && rec_out != pred_in) {
+      // With no coeffs and rec_out == pred_int we skip copying the coefficients
+      // because the reconstruction is just the prediction.
+      int y, x;
+      for (y = 0; y < width; ++y) {
+        for (x = 0; x < width; ++x) {
+          rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
+        }
       }
     }
   }
-
   return has_coeffs;
 }
 
