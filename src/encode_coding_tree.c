@@ -57,12 +57,13 @@ static void encode_cross_component_prediction(const cu_info_t* cur_pu, cabac_dat
   int8_t alpha = (channel == COLOR_V ? cur_pu->alpha_v : cur_pu->alpha_u);
   int8_t alpha_sign = (channel == COLOR_V ? cur_pu->alpha_v_s : cur_pu->alpha_u_s);
   
-  CABAC_BIN(cabac, alpha != 0, "cross_component_prediction_flag");
+  CABAC_BIN(cabac, (alpha != 0)? 1: 0, "cross_component_prediction_flag");
 
   if(alpha != 0) {
+    alpha--;
     cabac->cur_ctx = &ctx[1];
-    CABAC_BIN(cabac, alpha > 1, "cross_component_prediction_alpha");
-    if(alpha > 1) {
+    CABAC_BIN(cabac, (alpha > 0)? 1: 0, "cross_component_prediction_alpha");
+    if(alpha > 0) {
       kvz_cabac_write_unary_max_symbol(cabac, &ctx[2], alpha - 1, 1, 2, NULL);      
     }
     cabac->cur_ctx = &ctx[4];

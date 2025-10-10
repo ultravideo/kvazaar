@@ -639,38 +639,38 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
   }
 
   int8_t alpha = 0;
+  int8_t sign = 0;
   if (ss_xx != 0) {
     double falpha = (double)ss_xy / (double)ss_xx;
     alpha = (int8_t)(CLIP(-16, 16, (int)(falpha * 16)));
-    int8_t sign = alpha < 0 ? 1 : 0;
+    sign = alpha < 0 ? 1 : 0;
     alpha = alpha < 0 ? -alpha : alpha;
     // Original quantization tables from HM
     //const uint8_t alpha_quant[17] = {0, 1, 1, 2, 2, 2, 4, 4, 4, 4, 4, 4, 8, 8, 8, 8, 8};
     //const uint8_t log2_abs_alpha_minus1[8] = { 0, 1, 1, 2, 2, 2, 3, 3 };
-    const uint8_t combined_alpha_quant[17] = { 0,0,0,1,1,1,2,2,2,2,2,2,3,3,3,3,3, };
+    const uint8_t combined_alpha_quant[17] = { 0,1,1,2,2,2,3,3,3,3,3,3,4,4,4,4,4, };
 
     alpha = combined_alpha_quant[alpha];
 
     if (alpha != 0) {
-      int32_t reversed_alpha = sign ? -(1 << alpha) : (1 << alpha);
+      int32_t reversed_alpha = sign ? -(1 << (alpha-1)) : (1 << (alpha-1));
       // reconstruct the prediction
       for (int32_t j = 0; j < tr_width; j++) {
         for (int32_t i = 0; i < tr_width; i++) {
           int32_t pred_val = luma_residual[i + j * luma_stride];
-          int32_t res_val = chroma_residual[i + j * chroma_stride] - ((reversed_alpha*pred_val) >> 3);
-          chroma_residual[i + j * chroma_stride] = res_val;
+          chroma_residual[i + j * chroma_stride] -= ((reversed_alpha*pred_val) >> 3);
         }
       }
     }
 
-    if (color == COLOR_V) {
-      cur_cu->alpha_v = alpha;
-      cur_cu->alpha_v_s = sign;
-    }
-    else {
-      cur_cu->alpha_u = alpha;
-      cur_cu->alpha_u_s = sign;
-    }
+  }
+  if (color == COLOR_V) {
+    cur_cu->alpha_v = alpha;
+    cur_cu->alpha_v_s = sign;
+  }
+  else {
+    cur_cu->alpha_u = alpha;
+    cur_cu->alpha_u_s = sign;
   }
 }
 
@@ -680,7 +680,7 @@ static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_
   int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
   uint8_t sign = (color == COLOR_V) ? cur_cu->alpha_v_s : cur_cu->alpha_u_s;
   if (alpha != 0) {
-    int32_t reversed_alpha = sign ? -(1 << alpha) : (1 << alpha);
+    int32_t reversed_alpha = sign ? -(1 << (alpha-1)) : (1 << (alpha-1));
     // reconstruct the prediction
     for (int32_t j = 0; j < tr_width; j++) {
       for (int32_t i = 0; i < tr_width; i++) {
