@@ -626,16 +626,40 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
 }
 
 
-static void calc_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+static void calc_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   uint32_t ss_xy = 0;
   uint32_t ss_xx = 0;
-  for (int32_t j = 0; j < tr_width; j++) {
-    for (int32_t i = 0; i < tr_width; i++) {
-      ss_xy += luma_residual[i + j * luma_stride] * chroma_residual[i + j * chroma_stride];
-      ss_xx += luma_residual[i + j * luma_stride] * luma_residual[i + j * luma_stride];
+
+  __m256i v_ss_xx = _mm256_setzero_si256();
+  __m256i v_ss_xy = _mm256_setzero_si256();
+
+  if (1 || tr_width < 16) {
+    for (int32_t j = 0; j < tr_width; j++) {
+      for (int32_t i = 0; i < tr_width; i++) {
+        int16_t luma_val = luma_residual[i + j * luma_stride];
+        int16_t chroma_val = chroma_residual[i + j * chroma_stride];
+        ss_xx += luma_val * luma_val;
+        ss_xy += luma_val * chroma_val;
+      }
     }
+  } else {
+    for (int32_t j = 0; j < tr_width; j++) {
+      for (int32_t i = 0; i < tr_width; i += 16) {
+        __m256i luma_res_v = _mm256_loadu_si256((__m256i const*)(luma_residual + i + j * luma_stride));
+        __m256i chroma_res_v = _mm256_loadu_si256((__m256i const*)(chroma_residual + i + j * chroma_stride));
+
+        __m256i mul_xx = _mm256_madd_epi16(luma_res_v, luma_res_v);
+        v_ss_xx = _mm256_add_epi32(v_ss_xx, mul_xx);
+
+        __m256i mul_xy = _mm256_madd_epi16(luma_res_v, chroma_res_v);
+        v_ss_xy = _mm256_add_epi32(v_ss_xy, mul_xy);
+      }
+    }
+    
+    ss_xx += hsum32_8x32i(v_ss_xx);
+    ss_xy += hsum32_8x32i(v_ss_xy);
   }
 
   int8_t alpha = 0;
@@ -674,7 +698,7 @@ static void calc_cross_component_prediction(encoder_state_t* const state, cu_inf
   }
 }
 
-static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+static int8_t recon_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
@@ -682,11 +706,76 @@ static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_
   if (alpha != 0) {
     int32_t reversed_alpha = sign ? -(1 << (alpha-1)) : (1 << (alpha-1));
     // reconstruct the prediction
-    for (int32_t j = 0; j < tr_width; j++) {
-      for (int32_t i = 0; i < tr_width; i++) {
-        int32_t pred_val = luma_residual[i + j * luma_stride];
-        int32_t res_val = CLIP(-32768, 32767, chroma_residual[i + j * chroma_stride] + ((reversed_alpha*pred_val) >> 3));
-        chroma_residual[i + j * chroma_stride] = res_val;
+    if (tr_width < 16) {
+      for (int32_t j = 0; j < tr_width; j++) {
+        for (int32_t i = 0; i < tr_width; i++) {
+          int32_t pred_val = luma_residual[i + j * luma_stride];
+          int32_t res_val = CLIP(-32768, 32767, chroma_residual[i + j * chroma_stride] + ((reversed_alpha*pred_val) >> 3));
+          chroma_residual[i + j * chroma_stride] = res_val;
+        }
+      }
+    } else {
+      // Broadcast the 'reversed_alpha' value into a 256-bit vector,
+    // holding eight 32-bit integer copies of it. This is done once
+    // outside the loops for efficiency.
+      const __m256i v_alpha = _mm256_set1_epi32(reversed_alpha);
+
+      // Iterate over each row of the transform block.
+      for (int32_t j = 0; j < tr_width; j++) {
+        // Calculate starting pointers for the current row.
+        const int16_t* luma_row = luma_residual + j * luma_stride;
+        int16_t* chroma_row = chroma_residual + j * chroma_stride;
+
+        // Process the row in chunks of 16 elements (since __m256i holds 16 int16_t values).
+        for (int32_t i = 0; i < tr_width; i += 16) {
+          // 1. --- LOAD ---
+          // Load 16 int16_t values from luma and chroma residuals into 256-bit registers.
+          // Using 'loadu' for unaligned memory access, which is safer.
+          const __m256i v_luma16 = _mm256_loadu_si256((__m256i const*)(luma_row + i));
+          const __m256i v_chroma16 = _mm256_loadu_si256((__m256i const*)(chroma_row + i));
+
+          // 2. --- UNPACK (WIDEN) ---
+          // The multiplication will produce 32-bit results, so we need to promote
+          // the 16-bit inputs to 32-bit integers. A 256-bit register holds 16
+          // shorts but only 8 integers, so we process the data in two halves.
+
+          // Process the lower 8 elements of the loaded vectors.
+          const __m128i v_luma16_low = _mm256_castsi256_si128(v_luma16);
+          const __m256i v_luma32_low = _mm256_cvtepi16_epi32(v_luma16_low);
+          const __m128i v_chroma16_low = _mm256_castsi256_si128(v_chroma16);
+          const __m256i v_chroma32_low = _mm256_cvtepi16_epi32(v_chroma16_low);
+
+          // Process the upper 8 elements of the loaded vectors.
+          const __m128i v_luma16_high = _mm256_extracti128_si256(v_luma16, 1);
+          const __m256i v_luma32_high = _mm256_cvtepi16_epi32(v_luma16_high);
+          const __m128i v_chroma16_high = _mm256_extracti128_si256(v_chroma16, 1);
+          const __m256i v_chroma32_high = _mm256_cvtepi16_epi32(v_chroma16_high);
+
+          // 3. --- CALCULATE: (reversed_alpha * pred_val) >> 3 ---
+          // Multiply the 32-bit luma values by the broadcasted alpha value.
+          __m256i v_pred_low = _mm256_mullo_epi32(v_luma32_low, v_alpha);
+          __m256i v_pred_high = _mm256_mullo_epi32(v_luma32_high, v_alpha);
+
+          // Perform an arithmetic right shift by 3.
+          v_pred_low = _mm256_srai_epi32(v_pred_low, 3);
+          v_pred_high = _mm256_srai_epi32(v_pred_high, 3);
+
+          // 4. --- CALCULATE: chroma_residual + prediction ---
+          // Add the result to the original 32-bit chroma values.
+          __m256i v_res32_low = _mm256_add_epi32(v_chroma32_low, v_pred_low);
+          __m256i v_res32_high = _mm256_add_epi32(v_chroma32_high, v_pred_high);
+
+          // 5. --- PACK and SATURATE (CLIP) ---
+          // Pack the two 256-bit vectors of 32-bit integers back into one 256-bit
+          // vector of 16-bit integers. _mm256_packs_epi32 performs signed saturation,
+          // which is equivalent to the CLIP(-32768, 32767) operation.
+          const __m256i v_final_res16 = _mm256_packs_epi32(v_res32_low, v_res32_high);
+
+          // 6. --- STORE ---          
+          // Fix the lane ordering issue
+          const __m256i v_final_res16_fixed = _mm256_permute4x64_epi64(v_final_res16, 0xD8); // 0xD8 = 0b11011000
+          _mm256_storeu_si256((__m256i*)(chroma_row + i), v_final_res16_fixed);
+        }
       }
     }
   }
@@ -734,7 +823,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   
   if (state->encoder_control->cfg.enable_cross_component_prediction) {    
     if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+      calc_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
     }
   }
   // Transform residual. (residual -> coeff)
@@ -784,7 +873,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
           memcpy(&luma_residual_cross_comp[yy*state->tile->frame->width], &residual[yy*width], width * sizeof(int16_t));
         }
       } else if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {        
-        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+        recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
       }
     }
 
@@ -796,7 +885,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     if (state->encoder_control->cfg.enable_cross_component_prediction) {
       if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
         memset(residual, 0, width * width * sizeof(int16_t));
-        if (recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
+        if (recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
           // Get quantized reconstruction. (residual + pred_in -> rec_out)
           get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
           recon_done = true;
