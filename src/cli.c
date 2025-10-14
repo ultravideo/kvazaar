@@ -178,6 +178,8 @@ static const struct option long_options[] = {
   { "no-fast-bipred",           no_argument, NULL, 0 },
   { "enable-logging",           no_argument, NULL, 0 },
   { "no-enable-logging",        no_argument, NULL, 0 },
+  { "cross-comp-pred",          no_argument, NULL, 0 },
+  { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

@@ -1255,7 +1255,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       case 0: cfg->chroma_format = KVZ_CSP_400; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; break;
       case 1: cfg->chroma_format = KVZ_CSP_420; cfg->chroma_shift_w = 1; cfg->chroma_shift_h = 1; break;
       case 2: cfg->chroma_format = KVZ_CSP_422; cfg->chroma_shift_w = 1; cfg->chroma_shift_h = 0; break;
-      case 3: cfg->chroma_format = KVZ_CSP_444; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; cfg->enable_cross_component_prediction = 1;  break;
+      case 3: cfg->chroma_format = KVZ_CSP_444; cfg->chroma_shift_w = 0; cfg->chroma_shift_h = 0; break;
       default:
         fprintf(stderr, "Internal error setting chroma format.\n");
         return 0;
@@ -1443,6 +1443,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("enable-logging") {
     cfg->enable_logging_output = atobool(value);
+  }
+  else if OPT("cross-comp-pred") {
+    cfg->enable_cross_component_prediction = atobool(value);
   }
   else {
     return 0;
@@ -1784,6 +1787,11 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
+    error = 1;
+  }
+
+  if (cfg->enable_cross_component_prediction && cfg->chroma_format != KVZ_CSP_444) {
+    fprintf(stderr, "Cross-component prediction is only supported in 4:4:4 chroma format.\n");
     error = 1;
   }
 
