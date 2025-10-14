@@ -626,7 +626,7 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
 }
 
 
-static void calc_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
+static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
   uint32_t ss_xy = 0;
@@ -635,7 +635,7 @@ static void calc_cross_component_prediction_avx2(encoder_state_t* const state, c
   __m256i v_ss_xx = _mm256_setzero_si256();
   __m256i v_ss_xy = _mm256_setzero_si256();
 
-  if (1 || tr_width < 16) {
+  if (tr_width < 16) {
     for (int32_t j = 0; j < tr_width; j++) {
       for (int32_t i = 0; i < tr_width; i++) {
         int16_t luma_val = luma_residual[i + j * luma_stride];
@@ -696,6 +696,8 @@ static void calc_cross_component_prediction_avx2(encoder_state_t* const state, c
     cur_cu->alpha_u = alpha;
     cur_cu->alpha_u_s = sign;
   }
+
+  return alpha;
 }
 
 static int8_t recon_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
@@ -825,7 +827,65 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
   if (allow_cross_component_prediction) {
     if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-      calc_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+      int16_t residual_backup[TR_MAX_WIDTH * TR_MAX_WIDTH];
+      memcpy(residual_backup, residual, width * width * sizeof(int16_t));
+      int8_t calculated_alpha = calc_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+        
+      if(calculated_alpha) {
+        // Check if the corss component prediction is worth using
+        coeff_t test_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+        int16_t* test_residual[2] = { residual_backup, residual };
+        int32_t cost[2] = { 0, 0 };
+        cabac_data_t cabac_copy;
+        memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
+
+        // Clear bytes and bits and set mode to "count"
+        cabac_copy.only_count = 1;
+
+        for(int i = 0; i < 2; i++) {
+          // Transform residual. (residual -> coeff)
+          if (use_trskip) {
+            kvz_transformskip(state->encoder_control, test_residual[i], test_coeff, width);
+          }
+          else {
+            kvz_transform2d(state->encoder_control, test_residual[i], test_coeff, width, color, cur_cu->type);
+          }
+
+          // Quantize coeffs. (coeff -> coeff_out)
+          if (state->encoder_control->cfg.rdoq_enable && (width > 4 || !state->encoder_control->cfg.rdoq_skip))
+          {        
+            kvz_rdoq(state, test_coeff, coeff, width, width, 2, scan_order, cur_cu->type, 0);
+          } else {
+            kvz_quant(state, test_coeff, coeff, width, width, 2, scan_order, cur_cu->type);
+          }
+
+          double bits = 0;
+          bool coeffs = false;
+          for(int j = 0; j < width * width; j ++) {            
+            coeffs = coeff[j]?true:false;
+            if(coeffs) break;
+          }
+
+          // Execute the coding function.
+          // It is safe to drop the const modifier since state won't be modified
+          // when cabac.only_count is set.
+          if(coeffs) kvz_encode_coeff_nxn((encoder_state_t*)state, &cabac_copy, coeff, width, 2, scan_order, use_trskip, &bits);
+          cost[i] = (int)(bits * state->lambda_sqrt);
+        }
+        // Add cross-component prediction signal cost
+        cost[1] += state->lambda*((calculated_alpha) ? 1 + (calculated_alpha*1):0);
+
+        // If the cost is not reduced, revert the cross-component prediction
+        if (cost[1] >= cost[0]) {
+          memcpy(residual, residual_backup, width * width * sizeof(int16_t));
+          if (color == COLOR_U) {
+            cur_cu->alpha_u = 0;            
+          } else {
+            cur_cu->alpha_v = 0;            
+          }
+        }
+      }
     }
   }
   // Transform residual. (residual -> coeff)
