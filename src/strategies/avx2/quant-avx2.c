@@ -820,8 +820,10 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
   // Get residual. (ref_in - pred_in -> residual)
   get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
-  
-  if (state->encoder_control->cfg.enable_cross_component_prediction) {    
+
+  bool allow_cross_component_prediction = state->encoder_control->cfg.enable_cross_component_prediction && (cur_cu->tr_depth == cur_cu->depth);
+
+  if (allow_cross_component_prediction) {
     if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
       calc_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
     }
@@ -867,7 +869,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     else {
       kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu->type);
     }
-    if (state->encoder_control->cfg.enable_cross_component_prediction) {
+    if (allow_cross_component_prediction) {
       if (color == COLOR_Y) {
         for (int yy = 0; yy < width; yy++) { // Store luma residual for cross-component prediction of chroma to the frame level buffer
           memcpy(&luma_residual_cross_comp[yy*state->tile->frame->width], &residual[yy*width], width * sizeof(int16_t));
@@ -882,7 +884,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   }
   else {
     bool recon_done = false;
-    if (state->encoder_control->cfg.enable_cross_component_prediction) {
+    if (allow_cross_component_prediction) {
       if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
         memset(residual, 0, width * width * sizeof(int16_t));
         if (recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
