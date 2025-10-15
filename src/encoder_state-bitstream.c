@@ -76,7 +76,16 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, (state->encoder_control->bitdepth == 8) ? 1 : 2, 5, "general_profile_idc");
+  int8_t profile = 1;
+  if (state->encoder_control->cfg.chroma_format == KVZ_CSP_444 || state->encoder_control->cfg.chroma_format == KVZ_CSP_422 ||
+      state->encoder_control->bitdepth > 10) {
+    profile = 4; // 4:2:2 and 4:4:4 range extension profiles
+  } else if (state->encoder_control->bitdepth == 10) {
+    profile = 2; // Main 10 profile
+  } else {
+    profile = 1; // Main profile
+  }
+  WRITE_U(stream, profile, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
