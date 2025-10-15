@@ -836,11 +836,10 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
         coeff_t test_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
         int16_t* test_residual[2] = { residual_backup, residual };
-        int32_t cost[2] = { 0, 0 };
+        double cost[2] = { 0, 0 };
         cabac_data_t cabac_copy;
         memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
 
-        // Clear bytes and bits and set mode to "count"
         cabac_copy.only_count = 1;
 
         for(int i = 0; i < 2; i++) {
@@ -862,7 +861,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
           double bits = 0;
           bool coeffs = false;
-          for(int j = 0; j < width * width; j ++) {            
+          for(int j = 0; j < width * width; j ++) {
             coeffs = coeff[j]?true:false;
             if(coeffs) break;
           }
@@ -871,10 +870,33 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
           // It is safe to drop the const modifier since state won't be modified
           // when cabac.only_count is set.
           if(coeffs) kvz_encode_coeff_nxn((encoder_state_t*)state, &cabac_copy, coeff, width, 2, scan_order, use_trskip, &bits);
-          cost[i] = (int)(bits * state->lambda_sqrt);
+          cost[i] = bits;
         }
-        // Add cross-component prediction signal cost
-        cost[1] += state->lambda*((calculated_alpha) ? 1 + (calculated_alpha*1):0);
+        {
+          double bits = 0;
+          double bits_noalpha = 0;
+          int8_t alpha = calculated_alpha;
+          int8_t alpha_sign = alpha < 0 ? 1 : 0;
+          alpha = alpha < 0 ? -alpha : alpha;
+          // Add cross-component prediction signal cost
+          cabac_ctx_t* ctx = &(cabac_copy.ctx.cross_component_prediction[color == COLOR_V ? 5 : 0]);
+          CABAC_FBITS_UPDATE(&cabac_copy, ctx, 1, bits, "cross_component_prediction_flag");
+          if(alpha != 0) {
+            alpha--;
+            CABAC_FBITS_UPDATE(&cabac_copy, &ctx[1], (alpha > 0)? 1: 0, bits, "cross_component_prediction_alpha");
+            if(alpha > 0) {
+              kvz_cabac_write_unary_max_symbol(&cabac_copy, &ctx[2], alpha - 1, 1, 2, &bits);      
+            }
+            CABAC_FBITS_UPDATE(&cabac_copy, &ctx[4], alpha_sign, bits, "cross_component_prediction_sign");
+          }
+
+          cost[1] += bits;
+
+          // Add cross-component prediction signal cost for no alpha
+          CABAC_FBITS_UPDATE(&cabac_copy, ctx, 0, bits_noalpha, "cross_component_prediction_flag");
+          
+          cost[0] += bits_noalpha;
+        }
 
         // If the cost is not reduced, revert the cross-component prediction
         if (cost[1] >= cost[0]) {

@@ -371,7 +371,7 @@ static void encoder_state_write_bitstream_PPS_extension(bitstream_t* stream,
                                                         encoder_state_t* const state)
 {
   const kvz_config* cfg = &state->encoder_control->cfg;
-  bool need_pps_extension = cfg->chroma_format == KVZ_CSP_444;
+  bool need_pps_extension = cfg->enable_cross_component_prediction;
   WRITE_U(stream, need_pps_extension, 1, "pps_extension_present_flag");
   if (need_pps_extension) {
     WRITE_U(stream, 1, 1, "pps_range_extension_flag");
