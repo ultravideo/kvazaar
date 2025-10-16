@@ -853,7 +853,7 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
           // Get quantized residual. (coeff_out -> coeff -> residual)
           kvz_dequant(state, coeff_out, test_coeff, width, width, (color == COLOR_U ? 2 : 3), cur_cu->type);
           int16_t recon_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-          int8_t rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+          kvz_pixel rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
           if (use_trskip) {
             kvz_itransformskip(state->encoder_control, recon_residual, test_coeff, width);

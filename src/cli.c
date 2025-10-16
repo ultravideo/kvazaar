@@ -655,6 +655,7 @@ void print_help(void)
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
+    "      --(no-)cross-comp-pred : Cross-component prediction for 4:4:4 [disabled]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Parallel processing:\n"

@@ -1795,6 +1795,11 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if (cfg->chroma_format == KVZ_CSP_422) {
+    fprintf(stderr, "4:2:2 chroma format is not supported yet.\n");
+    error = 1;
+  }
+
   return !error;
 }
 

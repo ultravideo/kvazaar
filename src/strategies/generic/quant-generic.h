@@ -56,6 +56,6 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip, int16_t* luma_residual_cross_comp);
+  bool early_skip, int16_t* luma_residual_cross_comp[2]);
 
 #endif //STRATEGIES_QUANT_GENERIC_H_

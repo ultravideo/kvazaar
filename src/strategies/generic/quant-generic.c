@@ -255,10 +255,10 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
   cu_info_t* const cur_cu, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
-  const uint8_t* const pred_in, uint8_t* const rec_out,
+  const kvz_pixel* const pred_in, kvz_pixel* const rec_out,
   int16_t* const luma_residual_cross_comp[2], int16_t* const residual,
   coeff_t* const coeff_out, const bool allow_cross_component_prediction,
-  const int width, const uint8_t* const ref_in)
+  const int width, const kvz_pixel* const ref_in)
 {
   if (!allow_cross_component_prediction) {
     return false;
@@ -318,7 +318,7 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
           // Get quantized residual. (coeff_out -> coeff -> residual)
           kvz_dequant(state, coeff_out, test_coeff, width, width, (color == COLOR_U ? 2 : 3), cur_cu->type);
           int16_t recon_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-          int8_t rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+          kvz_pixel rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
           if (use_trskip) {
             kvz_itransformskip(state->encoder_control, recon_residual, test_coeff, width);
