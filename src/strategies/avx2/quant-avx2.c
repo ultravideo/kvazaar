@@ -792,8 +792,8 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uint8_t *const pred_in, uint8_t *const rec_out,
   int16_t *const luma_residual_cross_comp, int16_t *const residual,
-  coeff_t *const coeff_out,
-  const bool allow_cross_component_prediction, const int width)
+  coeff_t *const coeff_out, const bool allow_cross_component_prediction,
+  const int width, const uint8_t* const ref_in)
 {
   if (!allow_cross_component_prediction) {
     return false;
@@ -850,8 +850,30 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
         // when cabac.only_count is set.
         if (coeffs) {
           kvz_encode_coeff_nxn((encoder_state_t *)state, &cabac_copy, coeff_out, width, 2, scan_order, use_trskip, &bits);
+          // Get quantized residual. (coeff_out -> coeff -> residual)
+          kvz_dequant(state, coeff_out, test_coeff, width, width, (color == COLOR_U ? 2 : 3), cur_cu->type);
+          int16_t recon_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+          int8_t rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+          if (use_trskip) {
+            kvz_itransformskip(state->encoder_control, recon_residual, test_coeff, width);
+          }
+          else {
+            kvz_itransform2d(state->encoder_control, recon_residual, test_coeff, width, color, cur_cu->type);
+          }
+          if (i == 1) {
+              recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, recon_residual,
+                width, state->tile->frame->width, width);            
+          }
+
+          // Get quantized reconstruction. (residual + pred_in -> rec_out)
+          get_quantized_recon_avx2(recon_residual, pred_in, in_stride, rec_out_temp, width, width);
+
+          // Calculate SATD against original block
+          cost[i] = (double)kvz_satd_any_size(width, width, ref_in, width, rec_out_temp, width);
+
         }
-        cost[i] = bits;
+        cost[i] += bits * state->lambda;
       }
       {
         double bits = 0;
@@ -871,12 +893,12 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
           CABAC_FBITS_UPDATE(&cabac_copy, &ctx[4], alpha_sign, bits, "cross_component_prediction_sign");
         }
 
-        cost[1] += bits;
+        cost[1] += bits * state->lambda;
 
         // Add cross-component prediction signal cost for no alpha
         CABAC_FBITS_UPDATE(&cabac_copy, ctx, 0, bits_noalpha, "cross_component_prediction_flag");
 
-        cost[0] += bits_noalpha;
+        cost[0] += bits_noalpha * state->lambda;
       }
 
       // If the cost is not reduced, revert the cross-component prediction
@@ -937,7 +959,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
   if (!cross_component_prediction_rdo_avx2(state, cur_cu, color, scan_order, use_trskip,
     in_stride, out_stride, pred_in, rec_out, luma_residual_cross_comp, residual,
-    coeff_out, allow_cross_component_prediction, width)) {
+    coeff_out, allow_cross_component_prediction, width, ref_in)) {
     // No cross-component prediction RDO done so we continue as usual, otherwise tr-quant already done
 
     // Transform residual. (residual -> coeff)
