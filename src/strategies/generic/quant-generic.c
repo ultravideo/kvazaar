@@ -265,16 +265,16 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
   }
 
   if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-    int16_t residual_backup[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    ALIGNED(64) int16_t residual_backup[TR_MAX_WIDTH * TR_MAX_WIDTH];
     memcpy(residual_backup, residual, width * width * sizeof(int16_t));
     int8_t calculated_alpha = calc_cross_component_prediction(state, cur_cu, color,
       luma_residual_cross_comp[0], residual, width, state->tile->frame->width, width);
 
     if (calculated_alpha) {
       // Check if the cross component prediction is worth using via simple RDO
-      coeff_t test_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+      ALIGNED(64) coeff_t test_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
-      coeff_t coeff_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+      ALIGNED(64) coeff_t coeff_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
       int16_t* test_residual[2] = { residual_backup, residual };
       double cost[2] = { 0, 0 };
@@ -317,7 +317,7 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
           kvz_encode_coeff_nxn((encoder_state_t*)state, &cabac_copy, coeff_out, width, 2, scan_order, use_trskip, &bits);
           // Get quantized residual. (coeff_out -> coeff -> residual)
           kvz_dequant(state, coeff_out, test_coeff, width, width, (color == COLOR_U ? 2 : 3), cur_cu->type);
-          int16_t recon_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+          ALIGNED(64) int16_t recon_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
           kvz_pixel rec_out_temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
           if (use_trskip) {

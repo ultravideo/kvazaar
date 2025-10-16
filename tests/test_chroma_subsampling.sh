@@ -7,7 +7,7 @@ set -eu
 
 common_args='--preset=veryslow -p0 --threads=2 --wpp'
 valgrind_test_444 264x130 10 $common_args --gop=8 -p0 --owf=1
-valgrind_test_444 264x130 10 $common_args --gop=16 -p0 --owf=1
+valgrind_test_444 264x130 10 $common_args --gop=16 -p0 --owf=1 --cross-comp-pred
 
 # Do more extensive tests in a private gitlab CI runner
 if [ ! -z ${GITLAB_CI+x} ];then valgrind_test_444 264x130 40 $common_args --gop=8 -p32 --owf=4 --no-open-gop; fi

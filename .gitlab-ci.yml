@@ -63,3 +63,8 @@ test-10bit:
   <<: *test-template
   variables:
     CFLAGS: '-DKVZ_BIT_DEPTH=10'
+    
+test-12bit:
+  <<: *test-template
+  variables:
+    CFLAGS: '-DKVZ_BIT_DEPTH=12'
