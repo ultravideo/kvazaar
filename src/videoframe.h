@@ -62,6 +62,7 @@ typedef struct videoframe
   int32_t poc;           //!< \brief Picture order count
 
   int16_t* luma_residual; //!< \brief Luma residual used in cross component prediction
+  int16_t* luma_residual_prequant; //!< \brief Luma residual used in cross component prediction search
 
 } videoframe_t;
 

@@ -254,7 +254,7 @@ int kvz_quantize_residual_trskip(
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
-    kvz_pixel *rec_out, coeff_t *coeff_out, int16_t* luma_residual_cross_comp)
+    kvz_pixel *rec_out, coeff_t *coeff_out, int16_t* luma_residual_cross_comp[2])
 {
   struct {
     kvz_pixel rec[4*4];
@@ -308,7 +308,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                  cu_info_t *cur_pu,
                                  lcu_t* lcu,
                                  bool early_skip,
-                                 int16_t* luma_residual_cross_comp)
+                                 int16_t* luma_residual_cross_comp[2])
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : SHIFT;
@@ -510,7 +510,10 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     }
 
   } else {
-    int16_t *luma_residual_cross_comp = &state->tile->frame->luma_residual[y * state->tile->frame->width + x];
+    int16_t *luma_residual_cross_comp[2] = {
+      &state->tile->frame->luma_residual_prequant[y * state->tile->frame->width + x],
+      &state->tile->frame->luma_residual[y * state->tile->frame->width + x]
+    };
     // Process a leaf TU.
     if (luma) {
       quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp);

@@ -791,7 +791,7 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uint8_t *const pred_in, uint8_t *const rec_out,
-  int16_t *const luma_residual_cross_comp, int16_t *const residual,
+  int16_t *const luma_residual_cross_comp[2], int16_t* const residual,
   coeff_t *const coeff_out, const bool allow_cross_component_prediction,
   const int width, const uint8_t* const ref_in)
 {
@@ -803,7 +803,7 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
     int16_t residual_backup[TR_MAX_WIDTH * TR_MAX_WIDTH];
     memcpy(residual_backup, residual, width * width * sizeof(int16_t));
     int8_t calculated_alpha = calc_cross_component_prediction_avx2(state, cur_cu, color,
-      luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+      luma_residual_cross_comp[0], residual, width, state->tile->frame->width, width);
 
     if (calculated_alpha) {
       // Check if the cross component prediction is worth using via simple RDO
@@ -862,7 +862,7 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
             kvz_itransform2d(state->encoder_control, recon_residual, test_coeff, width, color, cur_cu->type);
           }
           if (i == 1) {
-              recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, recon_residual,
+              recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp[1], recon_residual,
                 width, state->tile->frame->width, width);            
           }
 
@@ -870,7 +870,7 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
           get_quantized_recon_avx2(recon_residual, pred_in, in_stride, rec_out_temp, width, width);
 
           // Calculate SATD against original block
-          cost[i] = (double)kvz_satd_any_size(width, width, ref_in, width, rec_out_temp, width);
+          cost[i] = (double)(kvz_satd_any_size(width, width, ref_in, width, rec_out_temp, width));
 
         }
         cost[i] += bits * state->lambda;
@@ -941,7 +941,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
   uint8_t *rec_out, coeff_t *coeff_out,
-  bool early_skip, int16_t* luma_residual_cross_comp)
+  bool early_skip, int16_t* luma_residual_cross_comp[2])
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -956,6 +956,15 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
 
   bool allow_cross_component_prediction = state->encoder_control->cfg.enable_cross_component_prediction && (cur_cu->tr_depth == cur_cu->depth);
+
+  if (allow_cross_component_prediction) {
+    // Store original residual
+    if (color == COLOR_Y) {
+      for (int yy = 0; yy < width; yy++) { // Store luma residual for cross-component prediction of chroma to the frame level buffer
+        memcpy(&luma_residual_cross_comp[0][yy * state->tile->frame->width], &residual[yy * width], width * sizeof(int16_t));
+      }
+    }
+  }
 
   if (!cross_component_prediction_rdo_avx2(state, cur_cu, color, scan_order, use_trskip,
     in_stride, out_stride, pred_in, rec_out, luma_residual_cross_comp, residual,
@@ -1008,10 +1017,10 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     if (allow_cross_component_prediction) {
       if (color == COLOR_Y) {
         for (int yy = 0; yy < width; yy++) { // Store luma residual for cross-component prediction of chroma to the frame level buffer
-          memcpy(&luma_residual_cross_comp[yy*state->tile->frame->width], &residual[yy*width], width * sizeof(int16_t));
+          memcpy(&luma_residual_cross_comp[1][yy*state->tile->frame->width], &residual[yy*width], width * sizeof(int16_t));
         }
       } else if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {        
-        recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+        recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp[1], residual, width, state->tile->frame->width, width);
       }
     }
 
@@ -1023,7 +1032,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     if (allow_cross_component_prediction) {
       if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
         memset(residual, 0, width * width * sizeof(int16_t));
-        if (recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
+        if (recon_cross_component_prediction_avx2(state, cur_cu, color, luma_residual_cross_comp[1], residual, width, state->tile->frame->width, width) != 0) {
           // Get quantized reconstruction. (residual + pred_in -> rec_out)
           get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
           recon_done = true;

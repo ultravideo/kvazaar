@@ -269,7 +269,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip, int16_t* luma_residual_cross_comp)
+  bool early_skip, int16_t* luma_residual_cross_comp[2])
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -293,7 +293,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   }
   if (allow_cross_component_prediction) {
     if (color != COLOR_Y && cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+      calc_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp[0], residual, width, state->tile->frame->width, width);
     }
   }
 
@@ -345,11 +345,11 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     if (allow_cross_component_prediction) {
       if (color == COLOR_Y) {
         for (int yy = 0; yy < width; yy++) { // Store luma residual for cross-component prediction of chroma to the frame level buffer
-          memcpy(&luma_residual_cross_comp[yy * state->tile->frame->width], &residual[yy * width], width * sizeof(int16_t));
+          memcpy(&luma_residual_cross_comp[1][yy * state->tile->frame->width], &residual[yy * width], width * sizeof(int16_t));
         }
       }
       else if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
-        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width);
+        recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp[1], residual, width, state->tile->frame->width, width);
       }
     }
 
@@ -366,7 +366,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     if (allow_cross_component_prediction) {
       if (cbf_is_set(cur_cu->cbf, cur_cu->depth, COLOR_Y)) {
         memset(residual, 0, width * width * sizeof(int16_t));
-        if (recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp, residual, width, state->tile->frame->width, width) != 0) {
+        if (recon_cross_component_prediction(state, cur_cu, color, luma_residual_cross_comp[1], residual, width, state->tile->frame->width, width) != 0) {
           // Get quantized reconstruction. (residual + pred_in -> rec_out)
           for (int y = 0; y < width; ++y) {
             for (int x = 0; x < width; ++x) {
