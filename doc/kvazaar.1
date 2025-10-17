@@ -44,7 +44,7 @@ Source scan type [progressive]
     \- bff: Bottom field first
 .TP
 \fB\-\-input\-format <string>
-P420 or P400 [P420]
+P420, P444 or P400 [P420]
 .TP
 \fB\-\-input\-bitdepth <int>
 8\-16 [8]
@@ -403,6 +403,9 @@ with lossless coding. [disabled]
 .TP
 \fB\-\-(no\-)tmvp           
 Temporal motion vector prediction [enabled]
+.TP
+\fB\-\-(no\-)cross\-comp\-pred
+Cross\-component prediction for 4:4:4 [disabled]
 
 .SS "Parallel processing:"
 .TP

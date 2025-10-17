@@ -97,6 +97,7 @@ typedef struct
     cabac_ctx_t cu_qt_root_cbf_model;
     cabac_ctx_t transform_skip_model_luma;
     cabac_ctx_t transform_skip_model_chroma;
+    cabac_ctx_t cross_component_prediction[10];
   } ctx;
 } cabac_data_t;
 

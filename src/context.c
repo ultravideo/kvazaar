@@ -193,7 +193,12 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
   { 139,  139},
 };
 
-
+static const uint8_t INIT_CROSS_COMPONENT_PREDICTION[3][10] =
+{
+  { 154, 154, 154, 154, 154, 154, 154, 154, 154, 154 },
+  { 154, 154, 154, 154, 154, 154, 154, 154, 154, 154 },
+  { 154, 154, 154, 154, 154, 154, 154, 154, 154, 154 },
+};
 
 
 /**
@@ -283,6 +288,12 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 8; i++) {
     kvz_ctx_init(&cabac->ctx.cu_one_model_chroma[i], QP, INIT_ONE_FLAG[slice][i+16]);
+  }
+
+  if (state->encoder_control->cfg.chroma_format == KVZ_CSP_444) {
+    for (i = 0; i < 10; i++) {
+      kvz_ctx_init(&cabac->ctx.cross_component_prediction[i], QP, INIT_CROSS_COMPONENT_PREDICTION[slice][i]);
+    }
   }
 
   for (i = 0; i < 15; i++) {

@@ -49,12 +49,12 @@ struct kvz_sh_rates_t;
 typedef void (quant_func)(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type);
 typedef int32_t (quant_residual_func)(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip);
+  bool early_skip, int16_t* luma_residual_cross_comp[2]);
 typedef void (dequant_func)(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width,
   int32_t height, int8_t type, int8_t block_type);
 typedef double (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint64_t weights);

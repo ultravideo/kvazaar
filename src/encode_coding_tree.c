@@ -47,6 +47,30 @@
 #include "tables.h"
 #include "videoframe.h"
 
+/*
+* \brief Encode cross component prediction for U or V channel
+*/
+static void encode_cross_component_prediction(const cu_info_t* cur_pu, cabac_data_t* const cabac, color_t channel)
+{
+  cabac_ctx_t* ctx = &(cabac->ctx.cross_component_prediction[channel == COLOR_V ? 5 : 0]);
+  cabac->cur_ctx = ctx;
+  int8_t alpha = (channel == COLOR_V ? cur_pu->alpha_v : cur_pu->alpha_u);
+  int8_t alpha_sign = (channel == COLOR_V ? cur_pu->alpha_v_s : cur_pu->alpha_u_s);
+  
+  CABAC_BIN(cabac, (alpha != 0)? 1: 0, "cross_component_prediction_flag");
+
+  if(alpha != 0) {
+    alpha--;
+    cabac->cur_ctx = &ctx[1];
+    CABAC_BIN(cabac, (alpha > 0)? 1: 0, "cross_component_prediction_alpha");
+    if(alpha > 0) {
+      kvz_cabac_write_unary_max_symbol(cabac, &ctx[2], alpha - 1, 1, 2, NULL);      
+    }
+    cabac->cur_ctx = &ctx[4];
+    CABAC_BIN(cabac, alpha_sign, "cross_component_prediction_sign");
+  }
+}
+
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
  *
@@ -163,24 +187,33 @@ static void encode_transform_unit(encoder_state_t * const state,
     }
   }
 
-  bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
-                        cbf_is_set(cur_pu->cbf, depth, COLOR_V);
-  if (chroma_cbf_set) {
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
     int x_local = (x >> SHIFT_W) % (LCU_WIDTH >> SHIFT_W);
     int y_local = (y >> SHIFT_H) % (LCU_WIDTH >> SHIFT_H);
     scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
-    const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
-    const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
+    bool cross_component_prediction = cbf_y && state->encoder_control->cfg.enable_cross_component_prediction &&
+      (cur_pu->type == CU_INTER || cur_pu->intra.mode_chroma == cur_pu->intra.mode);
+
+    if (cross_component_prediction) {
+      encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_U);
+    }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+      const coeff_t* coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
       kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0, NULL);
     }
 
+    if (cross_component_prediction) {
+      encode_cross_component_prediction(cur_pu, &state->cabac, COLOR_V);
+    }
+
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+      const coeff_t* coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH >> SHIFT_W, x_local, y_local)];
       kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, NULL);
     }
   }
+  
 }
 
 /**

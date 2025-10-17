@@ -77,7 +77,7 @@ Input:
                                    - progressive: Progressive scan
                                    - tff: Top field first
                                    - bff: Bottom field first
-      --input-format <string> : P420 or P400 [P420]
+      --input-format <string> : P420, P444 or P400 [P420]
       --input-bitdepth <int> : 8-16 [8]
       --loop-input           : Re-read input file forever.
       --input-file-format <string> : Input file format [auto]
@@ -293,6 +293,7 @@ Compression tools:
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
+      --(no-)cross-comp-pred : Cross-component prediction for 4:4:4 [disabled]
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]

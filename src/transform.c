@@ -250,11 +250,11 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
  */
 int kvz_quantize_residual_trskip(
     encoder_state_t *const state,
-    const cu_info_t *const cur_cu, const int width, const color_t color,
+    cu_info_t *const cur_cu, const int width, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
-    kvz_pixel *rec_out, coeff_t *coeff_out)
+    kvz_pixel *rec_out, coeff_t *coeff_out, int16_t* luma_residual_cross_comp[2])
 {
   struct {
     kvz_pixel rec[4*4];
@@ -266,14 +266,14 @@ int kvz_quantize_residual_trskip(
   noskip.has_coeffs = kvz_quantize_residual(
       state, cur_cu, width, color, scan_order,
       0, in_stride, 4,
-      ref_in, pred_in, noskip.rec, noskip.coeff, false);
+      ref_in, pred_in, noskip.rec, noskip.coeff, false, luma_residual_cross_comp);
   noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
   noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * state->lambda;
 
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, 4,
-    ref_in, pred_in, skip.rec, skip.coeff, false);
+    ref_in, pred_in, skip.rec, skip.coeff, false, luma_residual_cross_comp);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
   skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * state->lambda;
 
@@ -307,7 +307,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                  const uint8_t depth,
                                  cu_info_t *cur_pu,
                                  lcu_t* lcu,
-                                 bool early_skip)
+                                 bool early_skip,
+                                 int16_t* luma_residual_cross_comp[2])
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : SHIFT;
@@ -406,7 +407,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                               ref,
                                               pred,
                                               pred,
-                                              coeff);
+                                              coeff,
+                                              luma_residual_cross_comp);
     cur_pu->tr_skip = tr_skip;
   } else {
     has_coeffs = kvz_quantize_residual(state,
@@ -421,7 +423,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        pred,
                                        pred,
                                        coeff,
-                                       early_skip);
+                                       early_skip,
+                                       luma_residual_cross_comp);
   }
 
   if (has_coeffs) {
@@ -507,13 +510,17 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     }
 
   } else {
+    int16_t *luma_residual_cross_comp[2] = {
+      &state->tile->frame->luma_residual_prequant[y * state->tile->frame->width + x],
+      &state->tile->frame->luma_residual[y * state->tile->frame->width + x]
+    };
     // Process a leaf TU.
     if (luma) {
-      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp);
     }
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp);
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp);
     }
   }
 }

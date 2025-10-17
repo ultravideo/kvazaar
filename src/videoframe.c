@@ -58,7 +58,12 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
   frame->sao_luma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   if (chroma_format != KVZ_CSP_400) {
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
-  }
+
+    if (chroma_format == KVZ_CSP_444) {
+      frame->luma_residual = MALLOC(int16_t, width * height);
+      frame->luma_residual_prequant = MALLOC(int16_t, width * height);
+    }
+  }  
 
   return frame;
 }
@@ -79,6 +84,9 @@ int kvz_videoframe_free(videoframe_t * const frame)
 
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
+
+  FREE_POINTER(frame->luma_residual);
+  FREE_POINTER(frame->luma_residual_prequant);
 
   free(frame);
 
