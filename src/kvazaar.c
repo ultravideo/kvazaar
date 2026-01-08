@@ -416,9 +416,18 @@ static const kvz_api kvz_8bit_api = {
   .picture_alloc_csp = kvz_image_alloc,
 };
 
+#ifdef KVZ_MULTILIB_10BIT
+extern const kvz_api * kvz_10bit_api_get(int bit_depth);
+#endif
+
 
 const kvz_api * kvz_api_get(int bit_depth)
 {
+#ifdef KVZ_MULTILIB_10BIT
+  if (bit_depth == 10) {
+    return kvz_10bit_api_get(10);
+  }
+#endif
   return &kvz_8bit_api;
 }
 

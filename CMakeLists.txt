@@ -16,6 +16,8 @@ option(BUILD_TESTS "Build tests" ON)
 
 option(USE_CRYPTO "Use crypto library" OFF)
 
+option(COMPILE_10BIT "Compile kvazaar with 10-bit support" ON)
+
 option(BUILD_KVAZAAR_BINARY "Build kvazaar-bin" ON) # To build only the lib, useful for iOS-builds
 
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
@@ -249,6 +251,27 @@ if(BUILD_KVAZAAR_BINARY)
 endif()
 
 list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
+
+if(COMPILE_10BIT)
+  add_library(kvazaar_10bit STATIC ${LIB_SOURCES})
+  target_include_directories(kvazaar_10bit PUBLIC src)
+  target_include_directories(kvazaar_10bit PUBLIC src/extras)
+  target_include_directories(kvazaar_10bit PUBLIC src/strategies)
+  target_include_directories(kvazaar_10bit PUBLIC src/threadwrapper/include)
+
+  target_compile_definitions(kvazaar_10bit PRIVATE KVZ_BIT_DEPTH=10 KVZ_RENAME_EXPORTS=10bit_)
+  target_compile_definitions(kvazaar PRIVATE KVZ_MULTILIB_10BIT)
+  if(MSVC)
+    # Fix a linking problem with visual studio when the library is the same name as the binary
+    set_target_properties(kvazaar_10bit PROPERTIES OUTPUT_NAME libkvazaar_10bit)
+
+    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/build/Debug/libkvazaar_10bit.lib>)
+    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/build/Release/libkvazaar_10bit.lib>)
+    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:RelWithDebInfo>:${CMAKE_CURRENT_SOURCE_DIR}/build/Release/libkvazaar_10bit.lib>)
+  else()    
+    target_link_libraries(kvazaar PUBLIC kvazaar_10bit)  
+  endif()
+endif()
 
 if(MSVC)
   target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
