@@ -33,7 +33,7 @@
 #include "ml_intra_cu_depth_pred.h"
 
 
-static int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 140.3129)
 		{
@@ -162,7 +162,7 @@ static int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter,
 
 
 
-static int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 119.4611)
 		{
@@ -271,7 +271,7 @@ static int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter,
 
 
 
-static int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->merge_variance <= 80.1487)
 		{
@@ -348,7 +348,7 @@ static int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter,
 
 
 
-static int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->neigh_variance_C <= 240.2773)
 		{
@@ -421,7 +421,7 @@ static int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter,
 
 
 
-static int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 12754.7856)
 		{
@@ -527,7 +527,7 @@ static int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter,
 }
 
 
-static int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 1138.9473)
 		{
@@ -617,7 +617,7 @@ static int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter,
 }
 
 
-static int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 2597.4529)
 		{
@@ -712,7 +712,7 @@ static int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter,
 
 
 
-static int tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
+static int kvz_tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad)
 {
 		if (p_features->var_of_sub_var <= 818.5173)
 		{
@@ -1415,17 +1415,17 @@ static void ml_os_qt_gen(uint8_t* arr_depthMap, features_s* arr_features_cur, fe
 	
 
 		tree_predict predict_func_merge[4] = {
-				tree_predict_merge_depth_1,
-				tree_predict_merge_depth_2,
-				tree_predict_merge_depth_3,
-				tree_predict_merge_depth_4
+				kvz_tree_predict_merge_depth_1,
+				kvz_tree_predict_merge_depth_2,
+				kvz_tree_predict_merge_depth_3,
+				kvz_tree_predict_merge_depth_4
 		};
 
 		tree_predict predict_func_split[4] = {
-				tree_predict_split_depth_0,
-				tree_predict_split_depth_1,
-				tree_predict_split_depth_2,
-				tree_predict_split_depth_3
+				kvz_tree_predict_split_depth_0,
+				kvz_tree_predict_split_depth_1,
+				kvz_tree_predict_split_depth_2,
+				kvz_tree_predict_split_depth_3
 		};
 	
 	tree_predict prediction_function_merge = predict_func_merge[i_depth - 1];

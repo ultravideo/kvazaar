@@ -36,15 +36,15 @@
 #include "ml_intra_cu_depth_pred.h"
 
 
-int tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_merge_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_merge_depth_4(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
 
 
-int tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
-int tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_split_depth_0(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_split_depth_1(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_split_depth_2(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
+int kvz_tree_predict_split_depth_3(features_s* p_features, double* p_nb_iter, double* p_nb_bad);
 
 #endif

@@ -138,6 +138,8 @@ file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/str
 
 list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 
+set(LIB_SOURCES_MULTILIB ${LIB_SOURCES})
+
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
@@ -252,26 +254,31 @@ endif()
 
 list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
 
+# --- MULTILIB LOGIC START ---
 if(COMPILE_10BIT)
-  add_library(kvazaar_10bit STATIC ${LIB_SOURCES})
+  # Use OBJECT library to ensure code is merged
+  add_library(kvazaar_10bit OBJECT ${LIB_SOURCES_MULTILIB})
+  
+  # Ensure PIC matches the main library (crucial if main library is SHARED)
+  set_target_properties(kvazaar_10bit PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
   target_include_directories(kvazaar_10bit PUBLIC src)
   target_include_directories(kvazaar_10bit PUBLIC src/extras)
   target_include_directories(kvazaar_10bit PUBLIC src/strategies)
-  target_include_directories(kvazaar_10bit PUBLIC src/threadwrapper/include)
+  if(MSVC)
+    target_include_directories(kvazaar_10bit PUBLIC src/threadwrapper/include)
+  endif()
 
   target_compile_definitions(kvazaar_10bit PRIVATE KVZ_BIT_DEPTH=10 KVZ_RENAME_EXPORTS=10bit_)
   target_compile_definitions(kvazaar PRIVATE KVZ_MULTILIB_10BIT)
-  if(MSVC)
-    # Fix a linking problem with visual studio when the library is the same name as the binary
-    set_target_properties(kvazaar_10bit PROPERTIES OUTPUT_NAME libkvazaar_10bit)
-
-    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/build/Debug/libkvazaar_10bit.lib>)
-    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/build/Release/libkvazaar_10bit.lib>)
-    target_link_libraries(kvazaar PUBLIC $<$<CONFIG:RelWithDebInfo>:${CMAKE_CURRENT_SOURCE_DIR}/build/Release/libkvazaar_10bit.lib>)
-  else()    
-    target_link_libraries(kvazaar PUBLIC kvazaar_10bit)  
+  if(BUILD_KVAZAAR_BINARY)
+    target_compile_definitions(kvazaar-bin PRIVATE KVZ_MULTILIB_10BIT)
   endif()
+
+  # Inject the 10-bit object files directly into the main kvazaar target
+  target_sources(kvazaar PRIVATE $<TARGET_OBJECTS:kvazaar_10bit>)
 endif()
+# --- MULTILIB LOGIC END ---
 
 if(MSVC)
   target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
