@@ -436,6 +436,12 @@ int kvz_get_version_minor()
 }
 
 
+int kvz_get_version_revision()
+{
+    return KVZ_VERSION_REVISION;
+}
+
+
 const char* kvz_get_compiler_string()
 {
     return KVZ_COMPILER_STRING;

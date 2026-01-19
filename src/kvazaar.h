@@ -851,6 +851,12 @@ KVZ_PUBLIC int kvz_get_version_minor();
 
 
 /**
+ * \brief Return revision version number
+ */
+KVZ_PUBLIC int kvz_get_version_revision();
+
+
+/**
  * \brief Return compiler name string
  *
  */
