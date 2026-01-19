@@ -418,7 +418,7 @@ const kvz_api * kvz_api_get(int bit_depth)
 }
 
 
-const char* kvz_get_version_string()
+const char * kvz_get_version_string()
 {
     return VERSION_STRING;
 }
@@ -442,13 +442,13 @@ int kvz_get_version_revision()
 }
 
 
-const char* kvz_get_compiler_string()
+const char * kvz_get_compiler_string()
 {
     return KVZ_COMPILER_STRING;
 }
 
 
-const char* kvz_get_compile_date_string()
+const char * kvz_get_compile_date_string()
 {
     return KVZ_COMPILE_DATE;
 }
