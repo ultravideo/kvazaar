@@ -832,7 +832,7 @@ KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 /**
  * \brief Return version string
  *
- * Returns version string on format MAJOR.MINOR.REVISION
+ * Returns version string in format MAJOR.MINOR.REVISION
  *
  */
 KVZ_PUBLIC const char * kvz_get_version_string();
