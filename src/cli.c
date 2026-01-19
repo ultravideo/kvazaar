@@ -395,11 +395,12 @@ void print_version(void)
 {
   fprintf(stdout,
 #ifdef CMAKE_BUILD
-    "kvazaar " VERSION_STRING " [" KVZ_COMPILER_STRING "] " KVZ_COMPILE_DATE "\n");
+    "kvazaar %s [%s] %s\n", kvz_get_version_string(), kvz_get_compiler_string(), kvz_get_compile_date_string()
 #else
-  "Kvazaar " VERSION_STRING "\n"
-    "Kvazaar license: 3-clause BSD\n");
+    "Kvazaar " VERSION_STRING "\n"
+    "Kvazaar license: 3-clause BSD\n"
 #endif
+    );
 }
 
 

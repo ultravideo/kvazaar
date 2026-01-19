@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.25)
 
+set(KVAZAAR_VERSION_MAJOR 2)
+set(KVAZAAR_VERSION_MINOR 3)
+set(KVAZAAR_VERSION_REVISION 2)
+
 project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
-VERSION 2.3.2 )
+VERSION ${KVAZAAR_VERSION_MAJOR}.${KVAZAAR_VERSION_MINOR}.${KVAZAAR_VERSION_REVISION})
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
@@ -202,6 +206,10 @@ else()
   endif()
   
 endif()
+
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR})
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR})
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
 
 target_include_directories(kvazaar PUBLIC src)
 target_include_directories(kvazaar PUBLIC src/extras)
