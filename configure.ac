@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=7
-ver_minor=5
+ver_minor=6
 ver_release=0
 
 kvz_pjt_ver_major=2
