@@ -828,6 +828,48 @@ typedef struct kvz_api {
 
 KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 
+
+/**
+ * \brief Return version string
+ *
+ * Returns version string in format MAJOR.MINOR.REVISION
+ *
+ */
+KVZ_PUBLIC const char * kvz_get_version_string();
+
+
+/**
+ * \brief Return major version number
+ */
+KVZ_PUBLIC int kvz_get_version_major();
+
+
+/**
+ * \brief Return minor version number
+ */
+KVZ_PUBLIC int kvz_get_version_minor();
+
+
+/**
+ * \brief Return revision version number
+ */
+KVZ_PUBLIC int kvz_get_version_revision();
+
+
+/**
+ * \brief Return compiler name string
+ *
+ */
+KVZ_PUBLIC const char * kvz_get_compiler_string();
+
+
+/**
+ * \brief Return compile date string
+ *
+ */
+KVZ_PUBLIC const char * kvz_get_compile_date_string();
+
+
 #ifdef __cplusplus
 }
 #endif

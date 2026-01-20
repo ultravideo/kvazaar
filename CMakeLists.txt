@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.25)
 
+set(KVAZAAR_VERSION_MAJOR 2)
+set(KVAZAAR_VERSION_MINOR 3)
+set(KVAZAAR_VERSION_REVISION 2)
+
 project(kvazaar
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/kvazaar
 DESCRIPTION "An open-source HEVC encoder licensed under 3-clause BSD"
-VERSION 2.3.2 )
+VERSION ${KVAZAAR_VERSION_MAJOR}.${KVAZAAR_VERSION_MINOR}.${KVAZAAR_VERSION_REVISION})
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
@@ -91,8 +95,10 @@ if(MSVC)
         set(KVZ_COMPILER_VERSION "VS2017")
     elseif(MSVC_VERSION LESS 1930)
         set(KVZ_COMPILER_VERSION "VS2019")
-    else()
+    elseif(MSVC_VERSION LESS 1950)
         set(KVZ_COMPILER_VERSION "VS2022")
+    else()
+        set(KVZ_COMPILER_VERSION "VS2026")
     endif()
 endif()
 
@@ -201,6 +207,10 @@ else()
   
 endif()
 
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR})
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR})
+target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
+
 target_include_directories(kvazaar PUBLIC src)
 target_include_directories(kvazaar PUBLIC src/extras)
 target_include_directories(kvazaar PUBLIC src/strategies)
@@ -249,7 +259,7 @@ else()
   if(BUILD_KVAZAAR_BINARY)
     set_target_properties(kvazaar-bin PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src)
   endif()
-  set_target_properties(kvazaar PROPERTIES SOVERSION "7" VERSION "7.4.0")
+  set_target_properties(kvazaar PROPERTIES SOVERSION "7" VERSION "7.6.0")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE41} APPEND PROPERTY COMPILE_FLAGS "-msse4.1" )    

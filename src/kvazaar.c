@@ -416,3 +416,39 @@ const kvz_api * kvz_api_get(int bit_depth)
 {
   return &kvz_8bit_api;
 }
+
+
+const char * kvz_get_version_string()
+{
+    return VERSION_STRING;
+}
+
+
+int kvz_get_version_major()
+{
+    return KVZ_VERSION_MAJOR;
+}
+
+
+int kvz_get_version_minor()
+{
+    return KVZ_VERSION_MINOR;
+}
+
+
+int kvz_get_version_revision()
+{
+    return KVZ_VERSION_REVISION;
+}
+
+
+const char * kvz_get_compiler_string()
+{
+    return KVZ_COMPILER_STRING;
+}
+
+
+const char * kvz_get_compile_date_string()
+{
+    return KVZ_COMPILE_DATE;
+}

@@ -23,8 +23,12 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=7
-ver_minor=5
+ver_minor=6
 ver_release=0
+
+kvz_pjt_ver_major=2
+kvz_pjt_ver_minor=3
+kvz_pjt_ver_revision=2
 
 # Prevents configure from adding a lot of defines to the CFLAGS
 AC_CONFIG_HEADERS([config.h])
@@ -75,6 +79,8 @@ AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
 KVZ_CFLAGS="-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
+CFLAGS="-DKVZ_VERSION_MAJOR=$kvz_pjt_ver_major -DKVZ_VERSION_MINOR=$kvz_pjt_ver_minor -DKVZ_VERSION_REVISION=$kvz_pjt_ver_revision $CFLAGS"
+
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
@@ -103,7 +109,6 @@ LIBS="$LIBS $cryptopp_LIBS"
 
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
 
-
 # We need to force AX_PTHREAD to check -pthread -lpthread since otherwise
 # it only outputs -pthread for GCC. Without -lpthread GCC does not link the
 # shared library against the pthread library (even though it does link the
@@ -117,6 +122,14 @@ AX_PTHREAD([],[AC_MSG_ERROR([POSIX threads not found])])
 CFLAGS="$PTHREAD_CFLAGS $CFLAGS"
 LIBS="$PTHREAD_LIBS $LIBS"
 CC="$PTHREAD_CC"
+
+compiler_name=`basename $CC`
+escaped_compiler_name='\"'$compiler_name'\"'
+CFLAGS="-DKVZ_COMPILER_STRING=$escaped_compiler_name $CFLAGS"
+
+compile_date=`date -u +"%Y-%m-%d"`
+escaped_compile_date='\"'$compile_date'\"'
+CFLAGS="-DKVZ_COMPILE_DATE=$escaped_compile_date $CFLAGS"
 
 # --enable-werror
 AC_ARG_ENABLE([werror], [AS_HELP_STRING([--enable-werror], [treat warnings as errors [no]])],
