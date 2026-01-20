@@ -94,6 +94,7 @@
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
+      <PreprocessorDefinitions>KVZ_VERSION_MAJOR=2;KVZ_VERSION_MINOR=3;KVZ_VERSION_REVISION=2;KVZ_COMPILER_STRING="VS2015";KVZ_COMPILE_DATE="2026-01-20";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -106,6 +107,7 @@
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
+      <PreprocessorDefinitions>KVZ_VERSION_MAJOR=2;KVZ_VERSION_MINOR=3;KVZ_VERSION_REVISION=2;KVZ_COMPILER_STRING="VS2015";KVZ_COMPILE_DATE="2026-01-20";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
