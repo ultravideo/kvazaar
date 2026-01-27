@@ -649,7 +649,10 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
   kvz_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
 
-  kvz_close_rdcost_outfiles();
+  if(encoder->cfg.fastrd_sampling_on || encoder->cfg.fastrd_accuracy_check_on)
+  {
+    kvz_close_rdcost_outfiles();
+  }
 
   if (encoder->roi_file) {
     fclose(encoder->roi_file);
