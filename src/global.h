@@ -310,7 +310,13 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 
 
 // Hardware data (abstraction of defines). Extend for other compilers
-#if defined(_M_IX86) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
+#if defined(KVZ_TARGET_RISCV) || defined(__riscv)
+#  define COMPILE_RISCV 1
+#else
+#  define COMPILE_RISCV 0
+#endif
+
+#if !COMPILE_RISCV && (defined(_M_IX86) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__))
 #  define COMPILE_INTEL 1
 #else
 #  define COMPILE_INTEL 0

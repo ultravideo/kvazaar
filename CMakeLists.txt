@@ -105,6 +105,12 @@ endif()
 # Set compiler info to print at runtime
 set(KVZ_COMPILER_STRING "${KVZ_COMPILER_VERSION}")
 
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" KVZ_SYSTEM_PROCESSOR_LOWER)
+if(KVZ_SYSTEM_PROCESSOR_LOWER MATCHES "^riscv")
+  add_definitions(-DKVZ_TARGET_RISCV=1)
+  message(STATUS "Configuring Kvazaar for a RISC-V target processor: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 add_definitions(-DCMAKE_BUILD)
 
 # Set correct pkgconfig libdir variable
@@ -268,7 +274,7 @@ else()
   # CYGWIN, MSYS, and MINGW seem to be needing this but in some cases 
   # it might be that the toolset is not properly set, so also use this
   # in cases where we are not sure that it is not needed
-  if((NOT MSVC AND NOT LINUX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN AND NOT BSD) OR (CYGWIN OR MSYS OR MINGW))
+  if((NOT KVZ_SYSTEM_PROCESSOR_LOWER MATCHES "^riscv") AND ((NOT MSVC AND NOT LINUX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN AND NOT BSD) OR (CYGWIN OR MSYS OR MINGW)))
     set(CMAKE_C_FLAGS "-Wa,-muse-unaligned-vector-move ${CMAKE_C_FLAGS}")
   endif()
 

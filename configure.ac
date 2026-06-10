@@ -141,7 +141,10 @@ AC_ARG_ENABLE([werror], [AS_HELP_STRING([--enable-werror], [treat warnings as er
 AS_CASE([$host_cpu],
         [i?86], [BITS="32" ASFLAGS="$ASFLAGS -DARCH_X86_64=0" X86="true"],
         [x86_64], [BITS="64" ASFLAGS="$ASFLAGS -DARCH_X86_64=1 -m amd64" X86="true"],
-        [powerpc*], [PPC="true"]
+        [powerpc*], [PPC="true"],
+        [riscv32*], [BITS="32" RISCV="true" CFLAGS="-DKVZ_TARGET_RISCV=1 $CFLAGS"],
+        [riscv64*], [BITS="64" RISCV="true" CFLAGS="-DKVZ_TARGET_RISCV=1 $CFLAGS"],
+        [riscv*], [RISCV="true" CFLAGS="-DKVZ_TARGET_RISCV=1 $CFLAGS"]
 )
 
 AS_CASE([$host_os],
@@ -197,6 +200,7 @@ AS_CASE([$host_os],
 AM_CONDITIONAL([HAVE_X86], [test "x$X86" = "xtrue"])
 AM_CONDITIONAL([HAVE_PPC], [test "x$PPC" = "xtrue"])
 AM_CONDITIONAL([HAVE_ARM], [test "x$ARM" = "xtrue"])
+AM_CONDITIONAL([HAVE_RISCV], [test "x$RISCV" = "xtrue"])
 
 AC_ARG_VAR([ASFLAGS], [ASFLAGS to use for assembler])
 AC_SUBST([ASFLAGS])
