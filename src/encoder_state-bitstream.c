@@ -79,8 +79,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   int8_t profile = 1;
   uint32_t compat_flags = 0;
   if (KVZ_IS_444(state->encoder_control->cfg.chroma_format) || KVZ_IS_422(state->encoder_control->cfg.chroma_format) ||
-      state->encoder_control->bitdepth > 10) {
-    profile = 4; // 4:2:2 and 4:4:4 range extension profiles
+      state->encoder_control->cfg.chroma_format == KVZ_CSP_400 || state->encoder_control->bitdepth > 10) {
+    profile = 4; // 4:2:2 and 4:4:4 range extension profiles (plus the monochrome profile)
     compat_flags = (1 << (31 - 4));
   } else if (state->encoder_control->bitdepth == 10) {
     profile = 2; // Main 10 profile
