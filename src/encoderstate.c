@@ -1521,6 +1521,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     const int shift_w = SHIFT_W;
     const int shift_h = SHIFT_H;
     const int lcu_w_c = LCU_WIDTH >> shift_w;
+    const int lcu_h_c = LCU_WIDTH >> shift_h;
     double d = cfg->vaq * 0.1; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
@@ -1573,18 +1574,20 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           int32_t c_stride = state->tile->frame->source->stride_c;
           kvz_pixel chromau_tmp[LCU_LUMA_SIZE];
           kvz_pixel chromav_tmp[LCU_LUMA_SIZE];
+          // The chroma block of an LCU is not square with 4:2:2.
           int lcu_chroma_width = lcu_w_c;
+          int lcu_chroma_height = lcu_h_c;
           int c_pxl_x = x * lcu_chroma_width;
-          int c_pxl_y = y * lcu_chroma_width;
+          int c_pxl_y = y * lcu_chroma_height;
           int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width_c) - c_pxl_x;
-          int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height_c) - c_pxl_y;
+          int c_y_max = MIN(c_pxl_y + lcu_chroma_height, frame->height_c) - c_pxl_y;
 
           if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
             kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
             kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
           }
           else {
-            for (int y = 0; y < lcu_chroma_width; y++) {
+            for (int y = 0; y < lcu_chroma_height; y++) {
               for (int x = 0; x < lcu_chroma_width; x++) {
                 int src_y = CLIP(0, (frame->height_c) - 1, c_pxl_y + y);
                 int src_x = CLIP(0, (frame->width_c) - 1, c_pxl_x + x);

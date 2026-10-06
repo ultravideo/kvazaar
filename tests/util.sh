@@ -32,7 +32,7 @@ valgrind_test_422() {
     frames="$1"
     shift
 
-    prepare_444 "${dimensions}" "${frames}"
+    prepare_422 "${dimensions}" "${frames}"
 
     # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
     # valgrind. Otherwise, run without valgrind.
