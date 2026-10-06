@@ -79,6 +79,7 @@ ver_sad_func *kvz_ver_sad = 0;
 hor_sad_func *kvz_hor_sad = 0;
 
 pixel_var_func *kvz_pixel_var = 0;
+bilinear_ssd_func *kvz_bilinear_ssd = 0;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {

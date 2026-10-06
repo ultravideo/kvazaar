@@ -533,6 +533,25 @@ SAD_DUAL_NXN(16, kvz_pixel)
 SAD_DUAL_NXN(32, kvz_pixel)
 SAD_DUAL_NXN(64, kvz_pixel)
 
+static unsigned bilinear_ssd_generic(const kvz_pixel *org, int org_stride,
+                                     const kvz_pixel *ref, int ref_stride,
+                                     int size, int fx, int fy)
+{
+  const int w00 = (4 - fx) * (4 - fy), w10 = fx * (4 - fy), w01 = (4 - fx) * fy, w11 = fx * fy;
+  unsigned ssd = 0;
+  for (int y = 0; y < size; y++) {
+    const kvz_pixel *r0 = &ref[y * ref_stride];
+    const kvz_pixel *r1 = r0 + ref_stride;
+    const kvz_pixel *o = &org[y * org_stride];
+    for (int x = 0; x < size; x++) {
+      const int pred = (w00 * r0[x] + w10 * r0[x + 1] + w01 * r1[x] + w11 * r1[x + 1] + 8) >> 4;
+      const int diff = o[x] - pred;
+      ssd += diff * diff;
+    }
+  }
+  return ssd;
+}
+
 static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
@@ -819,6 +838,7 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
 
   success &= kvz_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
+  success &= kvz_strategyselector_register(opaque, "bilinear_ssd", "generic", 0, &bilinear_ssd_generic);
 
   return success;
 }

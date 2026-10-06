@@ -1768,6 +1768,62 @@ static double pixel_var_avx2(const uint8_t *buf, const uint32_t len)
 
 #endif // !INACCURATE_VARIANCE_CALCULATION
 
+static unsigned bilinear_ssd_avx2(const kvz_pixel *org, int org_stride,
+                                  const kvz_pixel *ref, int ref_stride,
+                                  int size, int fx, int fy)
+{
+  const __m256i w00 = _mm256_set1_epi16((int16_t)((4 - fx) * (4 - fy)));
+  const __m256i w10 = _mm256_set1_epi16((int16_t)(fx * (4 - fy)));
+  const __m256i w01 = _mm256_set1_epi16((int16_t)((4 - fx) * fy));
+  const __m256i w11 = _mm256_set1_epi16((int16_t)(fx * fy));
+  const __m256i rnd = _mm256_set1_epi16(8);
+  __m256i acc = _mm256_setzero_si256();
+
+  if (size == 16) {
+    for (int y = 0; y < 16; y++) {
+      const kvz_pixel *r0 = &ref[y * ref_stride];
+      const kvz_pixel *r1 = r0 + ref_stride;
+      __m256i a = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)r0));
+      __m256i b = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)(r0 + 1)));
+      __m256i c = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)r1));
+      __m256i d = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)(r1 + 1)));
+      __m256i o = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)&org[y * org_stride]));
+      __m256i p = _mm256_add_epi16(_mm256_mullo_epi16(a, w00), _mm256_mullo_epi16(b, w10));
+      p = _mm256_add_epi16(p, _mm256_mullo_epi16(c, w01));
+      p = _mm256_add_epi16(p, _mm256_mullo_epi16(d, w11));
+      p = _mm256_srli_epi16(_mm256_add_epi16(p, rnd), 4);
+      __m256i diff = _mm256_sub_epi16(o, p);
+      acc = _mm256_add_epi32(acc, _mm256_madd_epi16(diff, diff));
+    }
+  } else {
+    // 8x8: two rows per iteration.
+    for (int y = 0; y < size; y += 2) {
+      const kvz_pixel *r0 = &ref[y * ref_stride];
+      const kvz_pixel *r1 = r0 + ref_stride;
+      const kvz_pixel *r2 = r1 + ref_stride;
+      const kvz_pixel *o0 = &org[y * org_stride];
+#define LOAD2(p, q) _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)(p)), \
+                                                              _mm_loadl_epi64((const __m128i *)(q))))
+      __m256i a = LOAD2(r0, r1);
+      __m256i b = LOAD2(r0 + 1, r1 + 1);
+      __m256i c = LOAD2(r1, r2);
+      __m256i d = LOAD2(r1 + 1, r2 + 1);
+      __m256i o = LOAD2(o0, o0 + org_stride);
+#undef LOAD2
+      __m256i p = _mm256_add_epi16(_mm256_mullo_epi16(a, w00), _mm256_mullo_epi16(b, w10));
+      p = _mm256_add_epi16(p, _mm256_mullo_epi16(c, w01));
+      p = _mm256_add_epi16(p, _mm256_mullo_epi16(d, w11));
+      p = _mm256_srli_epi16(_mm256_add_epi16(p, rnd), 4);
+      __m256i diff = _mm256_sub_epi16(o, p);
+      acc = _mm256_add_epi32(acc, _mm256_madd_epi16(diff, diff));
+    }
+  }
+  __m128i s = _mm_add_epi32(_mm256_castsi256_si128(acc), _mm256_extracti128_si256(acc, 1));
+  s = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(1, 0, 3, 2)));
+  s = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(2, 3, 0, 1)));
+  return (unsigned)_mm_cvtsi128_si32(s);
+}
+
 #endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
@@ -1809,6 +1865,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "hor_sad", "avx2", 40, &hor_sad_avx2);
 
     success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
+    success &= kvz_strategyselector_register(opaque, "bilinear_ssd", "avx2", 40, &bilinear_ssd_avx2);
 
   }
 #endif // KVZ_BIT_DEPTH == 8

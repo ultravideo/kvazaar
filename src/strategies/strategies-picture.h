@@ -151,6 +151,17 @@ typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
 
 typedef double (pixel_var_func)(const kvz_pixel *buf, const uint32_t len);
 
+/**
+ * \brief SSD between an 8x8 or 16x16 block and a quarter-pel bilinear
+ *        interpolation of the reference (used by the temporal filter).
+ *
+ * The prediction is ((4-fx)(4-fy)r00 + fx(4-fy)r10 + (4-fx)fy r01 + fx fy r11 + 8) >> 4.
+ * The reference must have one readable column and row beyond the block.
+ */
+typedef unsigned (bilinear_ssd_func)(const kvz_pixel *org, int org_stride,
+                                     const kvz_pixel *ref, int ref_stride,
+                                     int size, int fx, int fy);
+
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;
 
@@ -190,6 +201,7 @@ extern ver_sad_func *kvz_ver_sad;
 extern hor_sad_func *kvz_hor_sad;
 
 extern pixel_var_func *kvz_pixel_var;
+extern bilinear_ssd_func *kvz_bilinear_ssd;
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
@@ -227,6 +239,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"ver_sad", (void**) &kvz_ver_sad}, \
   {"hor_sad", (void**) &kvz_hor_sad}, \
   {"pixel_var", (void**) &kvz_pixel_var}, \
+  {"bilinear_ssd", (void**) &kvz_bilinear_ssd}, \
 
 
 

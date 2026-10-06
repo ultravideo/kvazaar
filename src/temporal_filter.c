@@ -145,6 +145,16 @@ static uint64_t block_error(const tf_plane *org, const tf_plane *ref, int bx, in
     // Integer positions of the coarse search use the SIMD SAD.
     return kvz_reg_sad(o, r, w, h, os, rs);
   }
+  if (w == bs && h == bs && (bs == 8 || bs == 16)) {
+    // Full blocks use the SIMD SSD, quarter-pel positions the SIMD
+    // bilinear interpolation + SSD.
+    if (!fx && !fy) {
+      return kvz_pixels_calc_ssd(o, r, os, rs, bs);
+    }
+    if (f == 4) {
+      return kvz_bilinear_ssd(o, os, r, rs, bs, fx, fy);
+    }
+  }
   if (!fx && !fy) {
     for (int y = 0; y < h; y++) {
       for (int x = 0; x < w; x++) {
@@ -383,23 +393,43 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
       // Motion vector in units of 1 / (4 << shift) pixels of this plane.
       const int fx_den = 4 << (c ? shift_w : 0);
       const int fy_den = 4 << (c ? shift_h : 0);
-      for (int y = 0; y < ph; y++) {
-        for (int x = 0; x < pw; x++) {
-          const int lx = c ? x << shift_w : x;
-          const int ly = c ? y << shift_h : y;
+      // Each 8x8 luma block covers (8 >> shift) chroma pixels.
+      const int bw_c = TF_BLOCK >> (c ? shift_w : 0);
+      const int bh_c = TF_BLOCK >> (c ? shift_h : 0);
+      const int sh_x = c ? 2 + shift_w : 2;  // log2(fx_den)
+      const int sh_y = c ? 2 + shift_h : 2;
+      for (int by = 0; by < ph; by += bh_c) {
+        for (int bx = 0; bx < pw; bx += bw_c) {
+          const int lx = c ? bx << shift_w : bx;
+          const int ly = c ? by << shift_h : by;
           const tf_mv *mv = &mvs[(ly / TF_BLOCK) * wbf + lx / TF_BLOCK];
-          const int ix = mv->x >= 0 ? mv->x / fx_den : -((-mv->x + fx_den - 1) / fx_den);
-          const int iy = mv->y >= 0 ? mv->y / fy_den : -((-mv->y + fy_den - 1) / fy_den);
+          const int ix = mv->x >> sh_x;  // floor
+          const int iy = mv->y >> sh_y;
           const int fx = mv->x - ix * fx_den;
           const int fy = mv->y - iy * fy_den;
-          // Bilinear with separate horizontal and vertical denominators.
-          const int xx = CLIP(-TF_PAD + 1, rp.w + TF_PAD - 2, x + ix);
-          const int yy = CLIP(-TF_PAD + 1, rp.h + TF_PAD - 2, y + iy);
-          const kvz_pixel *p = &rp.p[yy * rp.stride + xx];
-          const int a = p[0], b = p[1], cc = p[rp.stride], d = p[rp.stride + 1];
-          const int den = fx_den * fy_den;
-          pred[r][c][y * pw + x] = (kvz_pixel)(((fx_den - fx) * (fy_den - fy) * a + fx * (fy_den - fy) * b +
-                                                (fx_den - fx) * fy * cc + fx * fy * d + den / 2) / den);
+          const int w00 = (fx_den - fx) * (fy_den - fy), w10 = fx * (fy_den - fy);
+          const int w01 = (fx_den - fx) * fy, w11 = fx * fy;
+          const int shift = sh_x + sh_y;
+          const int round = 1 << (shift - 1);
+          const int x_end = MIN(pw, bx + bw_c);
+          const int y_end = MIN(ph, by + bh_c);
+          for (int y = by; y < y_end; y++) {
+            const int yy = CLIP(-TF_PAD + 1, rp.h + TF_PAD - 2, y + iy);
+            const kvz_pixel *r0 = &rp.p[yy * rp.stride];
+            const kvz_pixel *r1 = r0 + rp.stride;
+            kvz_pixel *dst = &pred[r][c][y * pw];
+            if (bx + ix > -TF_PAD + 1 && x_end + ix < rp.w + TF_PAD - 2) {
+              for (int x = bx; x < x_end; x++) {
+                const int xx = x + ix;
+                dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
+              }
+            } else {
+              for (int x = bx; x < x_end; x++) {
+                const int xx = CLIP(-TF_PAD + 1, rp.w + TF_PAD - 2, x + ix);
+                dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
+              }
+            }
+          }
         }
       }
       if (c) plane_free(&rp);
