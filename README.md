@@ -506,7 +506,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 | pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 1-4   |
 | pu-depth-inter       | 1-2   | 1-2   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    |
-| gop                  | 8     | 8     | 8     | 8     | 8     | 16    | 16    | 16    | 16    | 16    |
+| gop                  | 16    | 16    | 16    | 16    | 16    | 16    | 16    | 16    | 16    | 16    |
 | ref                  | 1     | 1     | 1     | 1     | 2     | 4     | 4     | 4     | 4     | 4     |
 | bipred               | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
 | deblock              | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
