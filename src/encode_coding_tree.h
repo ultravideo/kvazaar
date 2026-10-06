@@ -76,4 +76,10 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
                                     uint8_t width, uint8_t height,
                                     uint8_t type, uint8_t scan, double* bits_out);
 
+/**
+ * \brief Whether the CU has transform units with residual in the bitstream
+ *        (i.e. cu_qp_delta is coded for it).
+ */
+bool kvz_cu_has_coded_residual(const encoder_state_t * const state, int x, int y, int depth);
+
 #endif // ENCODE_CODING_TREE_H_

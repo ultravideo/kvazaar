@@ -615,7 +615,12 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   } else {
     bool cbf_found = *prev_qp >= 0;
 
-    if (cu->tr_depth > depth) {
+    if (KVZ_IS_422(state->encoder_control->cfg.chroma_format)) {
+      // The 4:2:2 chroma CBFs in the CU array do not tell reliably whether
+      // a residual (and thus cu_qp_delta) is coded, use the same derivation
+      // as the bitstream writer.
+      cbf_found = cbf_found || kvz_cu_has_coded_residual(state, x, y, depth);
+    } else if (cu->tr_depth > depth) {
       // The CU is split into smaller transform units. Check whether coded
       // block flag is set for any of the TUs.
       const int tu_width = LCU_WIDTH >> cu->tr_depth;
