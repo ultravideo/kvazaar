@@ -471,9 +471,13 @@ BasketballDrillText splice with two scene cuts, 2 threads:
 
 With `--preset veryslow` (64 frames of the same sequences) `--lookahead
 20` gives -2.7 % and `--lookahead 20 --mctf` -3.6 % (-4.5 % YUV). The
-temporal filter adds about 120 ms per filtered 832x480 picture (one in
-eight pictures), 6 % of the veryslow encoding time but 3x the ultrafast
-time.
+temporal filter (AVX2 motion search) adds about 80 ms of CPU time per
+filtered 832x480 picture (one in eight pictures), about 4 % of the
+veryslow encoding time but 1.8x the ultrafast time.
+
+`--cutree-qg32` (CU-tree offsets per 32x32 quantization group instead of
+per CTU) is experimental and off by default: -3.4 % at ultrafast like the
+per-CTU offsets, and less gain than per-CTU offsets at veryslow.
 
 The scene cut gain comes from the splice (-7.5 %), the other sequences
 have no cuts. The mean absolute bitrate error of the ABR mode on these
