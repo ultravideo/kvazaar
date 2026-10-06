@@ -536,6 +536,9 @@ typedef struct kvz_config
   /** \brief Motion compensated temporal pre-filter of the key pictures. */
   int8_t mctf;
 
+  /** \brief CU-tree QP offsets for 32x32 quantization groups (experimental). -1: auto (off). */
+  int8_t cutree_qg32;
+
 } kvz_config;
 
 /**

@@ -1604,7 +1604,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
   // Variance adaptive quantization - END
 
-  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq || cfg->cutree > 0) {
+  if (cfg->cutree_qg32 && !frame->roi.roi_array) {
+    state->frame->max_qp_delta_depth = 1;
+  } else if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq || cfg->cutree > 0) {
     state->frame->max_qp_delta_depth = 0;
   } else {
     state->frame->max_qp_delta_depth = -1;
@@ -1720,6 +1722,31 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     if (state->frame->la && state->frame->la->ctu_offsets && is_ref) {
       for (int i = 0; i < num_lcus; i++) {
         state->frame->aq_offsets[i] += state->frame->la->ctu_offsets[i];
+      }
+    }
+    if (cfg->cutree_qg32) {
+      // 32x32 offsets: the variance AQ of the LCU plus the CU-tree offset of
+      // the block.
+      const int w32 = CEILDIV(state->encoder_control->in.width, 32);
+      const int h32 = CEILDIV(state->encoder_control->in.height, 32);
+      const int w_lcu = state->encoder_control->in.width_in_lcu;
+      const double *qg = (state->frame->la && is_ref) ? state->frame->la->qg_offsets : NULL;
+      for (int y = 0; y < h32; y++) {
+        for (int x = 0; x < w32; x++) {
+          const int lcu = (x >> 1) + (y >> 1) * w_lcu;
+          double off = 0.0;
+          if (cfg->vaq) {
+            off = state->frame->aq_offsets[lcu] - (qg && state->frame->la->ctu_offsets ? state->frame->la->ctu_offsets[lcu] : 0.0);
+          }
+          double q = qg ? qg[x + y * w32] : 0.0;
+          if (qg && state->frame->la->ctu_offsets) {
+            // Halfway between the CTU and the 32x32 offset, the plain 32x32
+            // offsets were too noisy.
+            const double ctu = state->frame->la->ctu_offsets[lcu];
+            q = ctu + 0.5 * (q - ctu);
+          }
+          state->frame->aq_offsets32[x + y * w32] = off + q;
+        }
       }
     }
   }

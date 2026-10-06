@@ -190,6 +190,8 @@ static const struct option long_options[] = {
   { "vbv-bufsize",        required_argument, NULL, 0 },
   { "vbv-init",           required_argument, NULL, 0 },
   { "mctf",                     no_argument, NULL, 0 },
+  { "cutree-qg32",              no_argument, NULL, 0 },
+  { "no-cutree-qg32",           no_argument, NULL, 0 },
   { "no-mctf",                  no_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
@@ -578,6 +580,8 @@ void print_help(void)
     "                               [enabled with lookahead]\n"
     "      --cutree-strength <float>: CU-tree QP offset strength.\n"
     "                               [3.75 * (1 - qcomp)]\n"
+    "      --(no-)cutree-qg32     : CU-tree QP for 32x32 blocks instead of\n"
+    "                               64x64 (experimental). [disabled]\n"
     "      --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.\n"
     "                               Inserts an IDR picture at scene changes.\n"
     "                               [40 with lookahead]\n"

@@ -265,6 +265,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       c->cutree = 0;
       c->scenecut = 0;
       c->mctf = 0;
+      c->cutree_qg32 = 0;
     } else {
       if (c->mctf && c->lookahead < 3) {
         // The temporal filter needs the two following pictures.
@@ -273,6 +274,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       if (c->cutree < 0) c->cutree = 1;
       if (c->scenecut < 0) c->scenecut = 40;
       if (c->cutree_strength < 0) c->cutree_strength = 3.75 * (1.0 - c->qcomp);
+      if (c->cutree_qg32 < 0) c->cutree_qg32 = 0;
+      if (c->cutree <= 0) c->cutree_qg32 = 0;
     }
   }
 

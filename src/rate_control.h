@@ -98,4 +98,12 @@ void kvz_update_after_picture(encoder_state_t * const state);
 void kvz_estimate_pic_lambda(encoder_state_t * const state);
 void kvz_set_picture_qp_abr(encoder_state_t * const state);
 
+/**
+ * \brief Set the QP and lambda of a 32x32 quantization group.
+ *
+ * Used with --cutree-qg32 when the search enters a 32x32 CU.
+ * \param x, y  position of the block in pixels relative to the tile
+ */
+void kvz_set_qg_qp_lambda(encoder_state_t * const state, int x, int y);
+
 #endif // RATE_CONTROL_H_

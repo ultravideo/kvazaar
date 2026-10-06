@@ -68,6 +68,7 @@ typedef struct kvz_la_result {
   double blurred_cost;      //!< cost blurred over neighbouring frames
   double crf_qp;            //!< base QP chosen by the CRF model (if CRF)
   double *ctu_offsets;      //!< CU-tree QP offset per CTU, NULL if not used
+  double *qg_offsets;       //!< CU-tree QP offset per 32x32 block, NULL if not used
   kvz_picture *orig;        //!< original picture if pic is temporally filtered
   struct kvz_la_result *next;
 } kvz_la_result;

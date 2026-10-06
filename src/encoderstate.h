@@ -204,6 +204,12 @@ typedef struct encoder_state_config_frame_t {
   */
   double *aq_offsets;
 
+  /**
+  * \brief Adaptive QP offset for each 32x32 block (CU-tree with 32x32
+  *        quantization groups).
+  */
+  double *aq_offsets32;
+
   int8_t max_qp_delta_depth;
 
   /**
@@ -343,6 +349,8 @@ typedef struct encoder_state_t {
   double lambda_sqrt;
   //! \brief Quantization parameter for the current LCU
   int8_t qp;
+  //! \brief QP of the current LCU before the adaptive QP offsets
+  int8_t qp_base;
 
   /**
    * \brief Whether a QP delta value must be coded for the current LCU.

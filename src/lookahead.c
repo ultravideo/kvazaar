@@ -882,11 +882,16 @@ static void cutree_propagate(kvz_lookahead *la, int window)
 }
 
 
-static double *cutree_ctu_offsets(const kvz_lookahead *la, const la_frame *f)
+/**
+ * \brief CU-tree QP offsets of the frame for blocks of 64 >> shift pixels.
+ */
+static double *cutree_offsets(const kvz_lookahead *la, const la_frame *f, int shift)
 {
   const encoder_control_t *encoder = la->encoder;
-  const int w_lcu = encoder->in.width_in_lcu;
-  const int h_lcu = encoder->in.height_in_lcu;
+  const int size = LCU_WIDTH >> shift;
+  const int w_lcu = CEILDIV(encoder->in.width, size);
+  const int h_lcu = CEILDIV(encoder->in.height, size);
+  const int blk_shift = LA_CTU_SHIFT - shift;
   double *offsets = calloc(w_lcu * h_lcu, sizeof(double));
   if (!offsets) return NULL;
 
@@ -894,8 +899,8 @@ static double *cutree_ctu_offsets(const kvz_lookahead *la, const la_frame *f)
     for (int cx = 0; cx < w_lcu; cx++) {
       double sum = 0.0;
       int n = 0;
-      for (int by = cy << LA_CTU_SHIFT; by < MIN(la->bh, (cy + 1) << LA_CTU_SHIFT); by++) {
-        for (int bx = cx << LA_CTU_SHIFT; bx < MIN(la->bw, (cx + 1) << LA_CTU_SHIFT); bx++) {
+      for (int by = cy << blk_shift; by < MIN(la->bh, (cy + 1) << blk_shift); by++) {
+        for (int bx = cx << blk_shift; bx < MIN(la->bw, (cx + 1) << blk_shift); bx++) {
           const int b = bx + by * la->bw;
           const double intra = f->intra[b];
           sum += log2((intra + f->prop[b]) / intra);
@@ -974,7 +979,10 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
 
   if (la->cutree) {
     cutree_propagate(la, window);
-    res->ctu_offsets = cutree_ctu_offsets(la, f);
+    res->ctu_offsets = cutree_offsets(la, f, 0);
+    if (la->encoder->cfg.cutree_qg32) {
+      res->qg_offsets = cutree_offsets(la, f, 1);
+    }
   }
 
   res->blurred_cost = MAX(1.0, blurred_cost(la, f, window));
@@ -1041,6 +1049,7 @@ void kvz_lookahead_free_result(kvz_la_result *res)
 {
   if (!res) return;
   kvz_image_free(res->orig);
+  free(res->qg_offsets);
   free(res->ctu_offsets);
   free(res);
 }

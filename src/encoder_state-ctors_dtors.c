@@ -85,6 +85,10 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
   state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
   state->frame->aq_offsets = MALLOC(double, num_lcus);
+  state->frame->aq_offsets32 = calloc(CEILDIV(encoder->in.width, 32) * CEILDIV(encoder->in.height, 32), sizeof(double));
+  if (encoder->cfg.cutree_qg32) {
+    state->frame->max_qp_delta_depth = 1;
+  }
 
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {
@@ -119,6 +123,7 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
+  FREE_POINTER(state->frame->aq_offsets32);
   kvz_lookahead_free_result(state->frame->la);
   state->frame->la = NULL;
 }

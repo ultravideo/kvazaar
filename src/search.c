@@ -31,6 +31,7 @@
  ****************************************************************************/
 
 #include "search.h"
+#include "rate_control.h"
 
 #include <limits.h>
 #include <string.h>
@@ -732,7 +733,30 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
+static double search_cu_body(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree);
+
+/**
+ * \brief Search a CU. With 32x32 quantization groups the QP and lambda of
+ *        the group are used for the 32x32 CUs and their sub-CUs.
+ */
 static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+{
+  if (depth != 1 || state->frame->max_qp_delta_depth != 1 || !state->encoder_control->cfg.cutree_qg32) {
+    return search_cu_body(state, x, y, depth, work_tree);
+  }
+  const int8_t qp = state->qp;
+  const double lambda = state->lambda;
+  const double lambda_sqrt = state->lambda_sqrt;
+  kvz_set_qg_qp_lambda(state, x, y);
+  const double cost = search_cu_body(state, x, y, depth, work_tree);
+  state->qp = qp;
+  state->lambda = lambda;
+  state->lambda_sqrt = lambda_sqrt;
+  return cost;
+}
+
+
+static double search_cu_body(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;

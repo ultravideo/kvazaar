@@ -209,6 +209,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vbv_bufsize = 0;
   cfg->vbv_init = 0.9;
   cfg->mctf = 0;
+  cfg->cutree_qg32 = -1;
 
   return 1;
 }
@@ -1489,6 +1490,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("mctf") {
     cfg->mctf = (int8_t)atobool(value);
+  }
+  else if OPT("cutree-qg32") {
+    cfg->cutree_qg32 = (int8_t)atobool(value);
   }
   else if OPT("cross-comp-pred") {
     cfg->enable_cross_component_prediction = atobool(value);

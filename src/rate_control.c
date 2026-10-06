@@ -1332,6 +1332,24 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
 }
 
 
+void kvz_set_qg_qp_lambda(encoder_state_t * const state, int x, int y)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  if (!ctrl->cfg.cutree_qg32 || state->frame->max_qp_delta_depth < 1 ||
+      state->tile->frame->source->roi.roi_array) {
+    return;
+  }
+  const int w32 = CEILDIV(ctrl->in.width, 32);
+  const int bx = (x + state->tile->offset_x) / 32;
+  const int by = (y + state->tile->offset_y) / 32;
+  int qp = state->qp_base + (int)round(state->frame->aq_offsets32[bx + by * w32]);
+  qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, qp);
+  state->qp = CLIP_TO_QP(qp);
+  state->lambda = qp_to_lambda(state, state->qp);
+  state->lambda_sqrt = sqrt(state->lambda);
+}
+
+
 void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
@@ -1486,6 +1504,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 
   lcu->lambda = state->lambda;
   lcu->qp = state->qp;
+  state->qp_base = state->qp;
 
   // Apply variance adaptive quantization
   if (ctrl->cfg.vaq || ctrl->cfg.cutree > 0) {
