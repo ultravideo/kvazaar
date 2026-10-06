@@ -60,6 +60,10 @@
 /** \brief Distance of the neighbours used by the temporal filter. */
 #define LA_MCTF_RANGE 2
 
+/** \brief Number of motion fields passed to the motion search in each
+ *         direction (the maximum followed reference distance). */
+#define LA_MV_DIST 16
+
 /** \brief Maximum absolute CU-tree QP offset of a CTU. */
 #define LA_CUTREE_MAX_OFFSET 4.0
 
@@ -133,6 +137,11 @@ struct kvz_lookahead {
   bool hist_key[LA_HIST];
 
   kvz_la_result *results;
+
+  /** \brief Motion fields (full resolution) of the latest released
+   *         pictures indexed by display index % LA_MV_DIST. */
+  int16_t *mv_hist[LA_MV_DIST];
+  int64_t mv_hist_index[LA_MV_DIST];
 
   // Temporal filter
   bool mctf;
@@ -282,6 +291,14 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   for (int i = 0; i < 2 * LA_MCTF_RANGE + 1; i++) la->ring_index[i] = -1;
   pthread_mutex_init(&la->lock, NULL);
   pthread_cond_init(&la->cond, NULL);
+  for (int i = 0; i < LA_MV_DIST; i++) {
+    la->mv_hist_index[i] = -1;
+    la->mv_hist[i] = MALLOC(int16_t, la->nblocks * 2);
+    if (!la->mv_hist[i]) {
+      kvz_lookahead_free(la);
+      return NULL;
+    }
+  }
   if (cfg->threads > 0) {
     if (pthread_create(&la->thread, NULL, analysis_thread, la) != 0) {
       fprintf(stderr, "Lookahead: failed to create the analysis thread.\n");
@@ -315,6 +332,7 @@ void kvz_lookahead_free(kvz_lookahead *la)
   }
   free_frame(la->retired);
   free(la->queue);
+  for (int i = 0; i < LA_MV_DIST; i++) free(la->mv_hist[i]);
   while (la->results) {
     kvz_la_result *next = la->results->next;
     kvz_lookahead_free_result(la->results);
@@ -957,15 +975,65 @@ static double blurred_cost(const kvz_lookahead *la, const la_frame *f, int windo
 }
 
 
-/** \brief Copy of the motion field of a frame in full resolution pixels. */
-static int16_t *copy_motion(const kvz_lookahead *la, const la_frame *f)
+/** \brief Copy the motion field of a frame in full resolution pixels. */
+static void copy_motion(const kvz_lookahead *la, const la_frame *f, int16_t *dst)
 {
-  int16_t *mvs = malloc(la->nblocks * 2 * sizeof(int16_t));
-  if (!mvs) return NULL;
   for (int i = 0; i < la->nblocks * 2; i++) {
-    mvs[i] = (int16_t)(f->mv[i] * 2);
+    dst[i] = (int16_t)(f->mv[i] * 2);
   }
-  return mvs;
+}
+
+
+/**
+ * \brief Collect the motion fields of the previous and following pictures
+ *        of the scene for the motion search of the encoder.
+ */
+static void collect_motion(kvz_lookahead *la, const la_frame *f, int window, kvz_la_result *res)
+{
+  const int n = la->nblocks * 2;
+  res->mv_bw = la->bw;
+  res->mv_bh = la->bh;
+
+  // Keep the field of this picture for the following ones.
+  const int slot = (int)(f->index % LA_MV_DIST);
+  if (f->has_prev) {
+    copy_motion(la, f, la->mv_hist[slot]);
+    la->mv_hist_index[slot] = f->index;
+  } else {
+    la->mv_hist_index[slot] = -1;
+  }
+
+  int num_past = 0;
+  while (num_past < LA_MV_DIST &&
+         la->mv_hist_index[(f->index - num_past) % LA_MV_DIST] == f->index - num_past &&
+         f->index - num_past >= 0) {
+    num_past++;
+  }
+  int num_future = 0;
+  while (num_future < LA_MV_DIST && num_future + 1 < window &&
+         la->queue[num_future + 1]->has_prev && !la->queue[num_future + 1]->scenecut) {
+    num_future++;
+  }
+
+  if (num_past > 0) {
+    res->past_mvs = MALLOC(int16_t, (size_t)n * num_past);
+    if (res->past_mvs) {
+      res->num_past_mvs = num_past;
+      for (int k = 0; k < num_past; k++) {
+        memcpy(res->past_mvs + (size_t)k * n, la->mv_hist[(f->index - k) % LA_MV_DIST],
+               n * sizeof(int16_t));
+      }
+    }
+  }
+  if (num_future > 0) {
+    res->future_mvs = MALLOC(int16_t, (size_t)n * num_future);
+    if (res->future_mvs) {
+      res->num_future_mvs = num_future;
+      for (int k = 0; k < num_future; k++) {
+        copy_motion(la, la->queue[k + 1], res->future_mvs + (size_t)k * n);
+      }
+    }
+  }
 }
 
 
@@ -1000,14 +1068,7 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   res->blurred_cost = MAX(1.0, blurred_cost(la, f, window));
 
   // Motion fields for the motion search of the encoder.
-  res->mv_bw = la->bw;
-  res->mv_bh = la->bh;
-  if (f->has_prev) {
-    res->mvs = copy_motion(la, f);
-  }
-  if (window > 1 && la->queue[1]->has_prev && !la->queue[1]->scenecut) {
-    res->next_mvs = copy_motion(la, la->queue[1]);
-  }
+  collect_motion(la, f, window, res);
   if (la->crf) {
     // qscale ~ complexity^(1 - qcomp), QP = 6 * log2(qscale) + const
     res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(res->blurred_cost / la->crf_base_cost);
@@ -1070,8 +1131,8 @@ kvz_la_result *kvz_lookahead_take_result(kvz_lookahead *la, const kvz_picture *p
 void kvz_lookahead_free_result(kvz_la_result *res)
 {
   if (!res) return;
-  free(res->mvs);
-  free(res->next_mvs);
+  free(res->past_mvs);
+  free(res->future_mvs);
   kvz_image_free(res->orig);
   free(res->qg_offsets);
   free(res->ctu_offsets);

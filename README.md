@@ -451,12 +451,12 @@ and motion search on 8x8 low resolution blocks. The analysis is used by:
   original pictures are still used for the PSNR output.
 
 - **Motion search starting point**: the low resolution motion of each
-  16x16 block (to the previous picture, and of the next picture to this
-  one) is scaled to the distance of each reference picture and checked as
-  an extra starting point of the integer motion search. This helps the
+  16x16 block is followed picture by picture (up to 16 pictures in each
+  direction within the scene) to each reference picture and checked as an
+  extra starting point of the integer motion search. This helps the
   hexagon / diamond searches of the fast presets to find large motion
-  (-3.5 % ultrafast, -2.5 % medium, -0.4 % veryslow on top of the other
-  lookahead tools, no extra time).
+  (-4.1 % ultrafast, -2.8 % medium, -0.6 % veryslow on top of the other
+  lookahead tools, up to 5 % more time).
 
 The lookahead analysis runs in its own thread when threads are enabled.
 The results do not depend on the number of threads. With `--lookahead 0`

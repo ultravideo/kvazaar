@@ -1392,15 +1392,34 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   if (la) {
     const int32_t dist = info->state->frame->poc -
       info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]];
-    const int16_t *field = dist > 0 ? la->mvs : la->next_mvs;
-    if (field && dist != 0) {
-      const int bx = MIN(mid_x >> 4, la->mv_bw - 1);
-      const int by = MIN(mid_y >> 4, la->mv_bh - 1);
-      const int b = bx + by * la->mv_bw;
-      // mvs point to the previous picture, next_mvs from the next picture
-      // to this one, so both are scaled by the signed distance.
-      info->la_mv.x = field[2 * b] * dist;
-      info->la_mv.y = field[2 * b + 1] * dist;
+    const int16_t *fields = dist > 0 ? la->past_mvs : la->future_mvs;
+    const int num = dist > 0 ? la->num_past_mvs : la->num_future_mvs;
+    if (fields && dist != 0) {
+      // Follow the motion of the block picture by picture. Past fields
+      // point from picture (this - k) to (this - k - 1), future fields from
+      // picture (this + k + 1) to (this + k), so the latter are subtracted.
+      const int steps = abs(dist);
+      const int sign = dist > 0 ? 1 : -1;
+      const int n = la->mv_bw * la->mv_bh * 2;
+      int sx = 0, sy = 0;
+      int last_x = 0, last_y = 0;
+      for (int k = 0; k < steps; k++) {
+        if (k >= num) {
+          // Beyond the available fields: continue with the last motion.
+          sx += last_x * (steps - k);
+          sy += last_y * (steps - k);
+          break;
+        }
+        const int bx = CLIP(0, la->mv_bw - 1, (mid_x + sx) >> 4);
+        const int by = CLIP(0, la->mv_bh - 1, (mid_y + sy) >> 4);
+        const int16_t *mv = &fields[(size_t)k * n + 2 * (bx + by * la->mv_bw)];
+        last_x = sign * mv[0];
+        last_y = sign * mv[1];
+        sx += last_x;
+        sy += last_y;
+      }
+      info->la_mv.x = sx;
+      info->la_mv.y = sy;
       info->la_mv_valid = true;
     }
   }
