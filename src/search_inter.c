@@ -42,6 +42,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "kvazaar.h"
+#include "lookahead.h"
 #include "rdo.h"
 #include "search.h"
 #include "strategies/strategies-ipol.h"
@@ -84,6 +85,12 @@ typedef struct {
    *        NULL for arbitrary-width blocks
    */
   optimized_sad_func_ptr_t optimized_sad;
+
+  /**
+   * \brief Starting point from the lookahead motion (integer pixels)
+   */
+  vector2d_t la_mv;
+  bool la_mv_valid;
 
 } inter_search_info_t;
 
@@ -341,6 +348,13 @@ static void select_starting_point(inter_search_info_t *info,
   // Check mv_in if it's not one of the merge candidates.
   if ((extra_mv.x != 0 || extra_mv.y != 0) && !mv_in_merge(info, extra_mv)) {
     check_mv_cost(info, extra_mv.x, extra_mv.y, best_cost, best_bits, best_mv);
+  }
+
+  // Check the motion found by the lookahead.
+  if (info->la_mv_valid && (info->la_mv.x != 0 || info->la_mv.y != 0) &&
+      (info->la_mv.x != extra_mv.x || info->la_mv.y != extra_mv.y) &&
+      !mv_in_merge(info, info->la_mv)) {
+    check_mv_cost(info, info->la_mv.x, info->la_mv.y, best_cost, best_bits, best_mv);
   }
 
   // Go through candidates
@@ -1368,6 +1382,26 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       info->state->frame->ref_LX[ref_list][LX_idx]))
     {
       best_mv = mv_previous;
+    }
+  }
+
+  // Starting point from the lookahead: the low resolution motion of the
+  // block scaled to the distance of the reference picture.
+  info->la_mv_valid = false;
+  const kvz_la_result *la = info->state->frame->la;
+  if (la) {
+    const int32_t dist = info->state->frame->poc -
+      info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]];
+    const int16_t *field = dist > 0 ? la->mvs : la->next_mvs;
+    if (field && dist != 0) {
+      const int bx = MIN(mid_x >> 4, la->mv_bw - 1);
+      const int by = MIN(mid_y >> 4, la->mv_bh - 1);
+      const int b = bx + by * la->mv_bw;
+      // mvs point to the previous picture, next_mvs from the next picture
+      // to this one, so both are scaled by the signed distance.
+      info->la_mv.x = field[2 * b] * dist;
+      info->la_mv.y = field[2 * b + 1] * dist;
+      info->la_mv_valid = true;
     }
   }
 

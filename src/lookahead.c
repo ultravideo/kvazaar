@@ -957,6 +957,18 @@ static double blurred_cost(const kvz_lookahead *la, const la_frame *f, int windo
 }
 
 
+/** \brief Copy of the motion field of a frame in full resolution pixels. */
+static int16_t *copy_motion(const kvz_lookahead *la, const la_frame *f)
+{
+  int16_t *mvs = malloc(la->nblocks * 2 * sizeof(int16_t));
+  if (!mvs) return NULL;
+  for (int i = 0; i < la->nblocks * 2; i++) {
+    mvs[i] = (int16_t)(f->mv[i] * 2);
+  }
+  return mvs;
+}
+
+
 kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
 {
   if (la->count == 0) return NULL;
@@ -986,6 +998,16 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   }
 
   res->blurred_cost = MAX(1.0, blurred_cost(la, f, window));
+
+  // Motion fields for the motion search of the encoder.
+  res->mv_bw = la->bw;
+  res->mv_bh = la->bh;
+  if (f->has_prev) {
+    res->mvs = copy_motion(la, f);
+  }
+  if (window > 1 && la->queue[1]->has_prev && !la->queue[1]->scenecut) {
+    res->next_mvs = copy_motion(la, la->queue[1]);
+  }
   if (la->crf) {
     // qscale ~ complexity^(1 - qcomp), QP = 6 * log2(qscale) + const
     res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(res->blurred_cost / la->crf_base_cost);
@@ -1048,6 +1070,8 @@ kvz_la_result *kvz_lookahead_take_result(kvz_lookahead *la, const kvz_picture *p
 void kvz_lookahead_free_result(kvz_la_result *res)
 {
   if (!res) return;
+  free(res->mvs);
+  free(res->next_mvs);
   kvz_image_free(res->orig);
   free(res->qg_offsets);
   free(res->ctu_offsets);

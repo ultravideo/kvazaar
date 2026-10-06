@@ -70,6 +70,15 @@ typedef struct kvz_la_result {
   double *ctu_offsets;      //!< CU-tree QP offset per CTU, NULL if not used
   double *qg_offsets;       //!< CU-tree QP offset per 32x32 block, NULL if not used
   kvz_picture *orig;        //!< original picture if pic is temporally filtered
+  /**
+   * \brief Low resolution motion of each 16x16 block (x, y in full
+   *        resolution pixels per picture). mvs: motion to the previous
+   *        picture, next_mvs: motion of the next picture to this one.
+   *        NULL if not available.
+   */
+  int16_t *mvs;
+  int16_t *next_mvs;
+  int mv_bw, mv_bh;         //!< size of the motion fields in blocks
   struct kvz_la_result *next;
 } kvz_la_result;
 
