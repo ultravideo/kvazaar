@@ -629,7 +629,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     memcpy(encoder->cfg.optional_key, cfg->optional_key, 16);
   }
 
-  if (encoder->cfg.target_bitrate > 0 && cfg->rc_algorithm != KVZ_NO_RC)
+  if ((encoder->cfg.target_bitrate > 0 && cfg->rc_algorithm != KVZ_NO_RC) ||
+      encoder->cfg.vbv_maxrate > 0)
   {
     encoder->rc_data = kvz_get_rc_data(encoder);
     if (!encoder->rc_data) {

@@ -75,6 +75,9 @@ typedef struct kvz_rc_data {
   double abr_rate_factor; //!< rate factor of the current GOP
   double abr_inflight_bits;   //!< expected bits of the frames being coded
   int64_t abr_inflight_frames; //!< number of frames being coded
+  double vbv_fill;        //!< VBV buffer fullness after the accounted frames
+  bool vbv_init_done;
+  double vbv_qp_increase; //!< QP increase applied by the VBV to the previous frame
 
   FILE* dist_file;
   FILE* bits_file;

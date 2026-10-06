@@ -205,6 +205,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->cutree = -1;
   cfg->cutree_strength = -1.0;
   cfg->scenecut = -1;
+  cfg->vbv_maxrate = 0;
+  cfg->vbv_bufsize = 0;
+  cfg->vbv_init = 0.9;
 
   return 1;
 }
@@ -1474,6 +1477,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("scenecut") {
     cfg->scenecut = atoi(value);
   }
+  else if OPT("vbv-maxrate") {
+    cfg->vbv_maxrate = atoi(value);
+  }
+  else if OPT("vbv-bufsize") {
+    cfg->vbv_bufsize = atoi(value);
+  }
+  else if OPT("vbv-init") {
+    cfg->vbv_init = atof(value);
+  }
   else if OPT("cross-comp-pred") {
     cfg->enable_cross_component_prediction = atobool(value);
   }
@@ -1837,6 +1849,21 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if (cfg->qcomp < 0.0 || cfg->qcomp > 1.0) {
     fprintf(stderr, "Input error: --qcomp must be in range 0.0..1.0\n");
+    error = 1;
+  }
+
+  if ((cfg->vbv_maxrate > 0) != (cfg->vbv_bufsize > 0) || cfg->vbv_maxrate < 0 || cfg->vbv_bufsize < 0) {
+    fprintf(stderr, "Input error: --vbv-maxrate and --vbv-bufsize must be given together\n");
+    error = 1;
+  }
+
+  if (cfg->vbv_maxrate > 0 && cfg->crf < 0 && !(cfg->target_bitrate > 0 && cfg->rc_algorithm == KVZ_ABR)) {
+    fprintf(stderr, "Input error: VBV requires --crf or --rc-algorithm abr\n");
+    error = 1;
+  }
+
+  if (cfg->vbv_init <= 0.0 || cfg->vbv_init > 1.0) {
+    fprintf(stderr, "Input error: --vbv-init must be in range (0.0, 1.0]\n");
     error = 1;
   }
 

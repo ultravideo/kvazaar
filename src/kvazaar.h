@@ -526,6 +526,13 @@ typedef struct kvz_config
   /** \brief Scene cut detection threshold 0..100. 0 disables, -1: auto. */
   int32_t scenecut;
 
+  /** \brief VBV maximum rate in bits per second, 0 disables VBV. */
+  int32_t vbv_maxrate;
+  /** \brief VBV buffer size in bits. */
+  int32_t vbv_bufsize;
+  /** \brief Initial VBV buffer fullness as a fraction of the buffer size. */
+  double vbv_init;
+
 } kvz_config;
 
 /**

@@ -212,6 +212,10 @@ Video structure:
       --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.
                                Inserts an IDR picture at scene changes.
                                [40 with lookahead]
+      --vbv-maxrate <integer>: VBV maximum bitrate in bits per second for
+                               --crf and --rc-algorithm abr. [disabled]
+      --vbv-bufsize <integer>: VBV buffer size in bits. [disabled]
+      --vbv-init <float>     : Initial VBV buffer fullness. [0.9]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -426,7 +430,16 @@ and motion search on 8x8 low resolution blocks. The analysis is used by:
   correcting the error so far (including the pictures still being coded).
   The base QP changes at most 2 per GOP.
 
-With `--lookahead 0` (the default) the encoder output is unchanged.
+- **VBV** (`--vbv-maxrate`, `--vbv-bufsize`, `--vbv-init`, with CRF or
+  ABR): before a picture is coded the buffer is simulated over the
+  pictures being coded and the lookahead with the bits model, and the base
+  QP is raised (by at most 20) until the buffer stays above 20 % of its
+  size. The increase is released by at most 1 QP per picture. No HRD
+  parameters are written to the bitstream.
+
+The lookahead analysis runs in its own thread when threads are enabled.
+The results do not depend on the number of threads. With `--lookahead 0`
+(the default) the encoder output is unchanged.
 
 Measured BD-rate (Y-PSNR) against constant QP with the same preset,
 QP 22..37 (bitrate targets taken from the constant QP runs), 96 frames of
@@ -445,9 +458,9 @@ BasketballDrillText splice with two scene cuts, 2 threads:
 The scene cut gain comes from the splice (-7.5 %), the other sequences
 have no cuts. The mean absolute bitrate error of the ABR mode on these
 short sequences is 3.3 % (ultrafast) / 7.5 % (medium) compared to 7.1 % /
-8.1 % with the lambda rate control. The lookahead analysis runs in the
-calling thread and costs about 15 % of the encoding time with ultrafast
-at 2560x1600 on two threads.
+8.1 % with the lambda rate control. The lookahead analysis takes about
+11 ms per 2560x1600 picture, about 10 % of the encoding time with
+ultrafast on two cores.
 
 ## Presets
 The names of the presets are the same as with x264: ultrafast,

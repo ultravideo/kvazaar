@@ -186,6 +186,9 @@ static const struct option long_options[] = {
   { "cutree-strength",    required_argument, NULL, 0 },
   { "scenecut",           required_argument, NULL, 0 },
   { "no-scenecut",              no_argument, NULL, 0 },
+  { "vbv-maxrate",        required_argument, NULL, 0 },
+  { "vbv-bufsize",        required_argument, NULL, 0 },
+  { "vbv-init",           required_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
@@ -576,6 +579,10 @@ void print_help(void)
     "      --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.\n"
     "                               Inserts an IDR picture at scene changes.\n"
     "                               [40 with lookahead]\n"
+    "      --vbv-maxrate <integer>: VBV maximum bitrate in bits per second for\n"
+    "                               --crf and --rc-algorithm abr. [disabled]\n"
+    "      --vbv-bufsize <integer>: VBV buffer size in bits. [disabled]\n"
+    "      --vbv-init <float>     : Initial VBV buffer fullness. [0.9]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

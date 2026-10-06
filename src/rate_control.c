@@ -1086,6 +1086,162 @@ static double abr_class_k(const encoder_control_t *const ctrl, const kvz_rc_data
  * the bitrate error accumulated so far. The GOP QP offsets are applied on
  * top of the base QP like in the CQP mode.
  */
+static double abr_class_k(const encoder_control_t *const ctrl, const kvz_rc_data *rc, int cls);
+
+
+static INLINE double get_framerate(const encoder_control_t *const ctrl)
+{
+  return ctrl->cfg.framerate_num != 0 ?
+    ctrl->cfg.framerate_num / (double)ctrl->cfg.framerate_denom : ctrl->cfg.framerate;
+}
+
+
+/**
+ * \brief Update the bits model with the frame previously coded by the
+ * encoder state. Its bitstream has been written since the state is being
+ * reused, and the states are reused in coding order.
+ */
+static void abr_account_previous(encoder_state_t * const state)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  kvz_rc_data *rc = state->frame->new_ratecontrol;
+
+  if (ctrl->cfg.vbv_maxrate > 0 && !rc->vbv_init_done) {
+    rc->vbv_fill = ctrl->cfg.vbv_init * ctrl->cfg.vbv_bufsize;
+    rc->vbv_init_done = true;
+  }
+
+  if (!state->frame->abr_pending) return;
+
+  const double bits = (double)state->stats_bitstream_length * 8;
+  const int cls = state->frame->abr_class;
+  const double k = bits * pow(state->frame->abr_qscale, ABR_GAMMA) / state->frame->abr_cost;
+  if (rc->abr_k_count[cls] == 0) {
+    rc->abr_k[cls] = k;
+  } else {
+    rc->abr_k[cls] += ABR_K_ALPHA * (k - rc->abr_k[cls]);
+  }
+  rc->abr_k_count[cls]++;
+  rc->abr_total_bits += bits;
+  rc->abr_frames++;
+  rc->abr_inflight_bits -= state->frame->abr_expected_bits;
+  rc->abr_inflight_frames--;
+  state->frame->abr_pending = false;
+
+  if (ctrl->cfg.vbv_maxrate > 0) {
+    rc->vbv_fill -= bits;
+    if (rc->vbv_fill < 0 && ctrl->cfg.enable_logging_output) {
+      fprintf(stderr, "VBV underflow by %.0f bits (frame %d)\n", -rc->vbv_fill, state->frame->num);
+    }
+    rc->vbv_fill = MIN((double)ctrl->cfg.vbv_bufsize,
+                       rc->vbv_fill + ctrl->cfg.vbv_maxrate / get_framerate(ctrl));
+  }
+}
+
+
+/** \brief Store the bits model information of the frame being started. */
+static void abr_register_frame(encoder_state_t * const state, double base_qp)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  kvz_rc_data *rc = state->frame->new_ratecontrol;
+  const kvz_la_result *la = state->frame->la;
+  const int intra_class = KVZ_MAX_GOP_LENGTH;
+
+  state->frame->abr_pending = true;
+  state->frame->abr_qscale = qp_to_qscale(base_qp);
+  state->frame->abr_class = state->frame->is_irap ? intra_class :
+                            (ctrl->cfg.gop_len > 0 ? state->frame->gop_offset : 0);
+  if (la) {
+    state->frame->abr_cost = state->frame->is_irap ? MAX(1.0, la->intra_cost) : MAX(1.0, la->cost);
+  } else {
+    state->frame->abr_cost = 1.0;
+  }
+  state->frame->abr_expected_bits = abr_class_k(ctrl, rc, state->frame->abr_class) *
+                                    state->frame->abr_cost /
+                                    pow(state->frame->abr_qscale, ABR_GAMMA);
+  rc->abr_inflight_bits += state->frame->abr_expected_bits;
+  rc->abr_inflight_frames++;
+}
+
+
+/** \brief Lowest allowed VBV buffer fullness in the simulation. */
+#define VBV_MIN_FILL 0.2
+/** \brief Maximum QP increase by the VBV. */
+#define VBV_MAX_QP_INCREASE 20.0
+/** \brief Maximum decrease of the VBV QP increase from one frame to the next. */
+#define VBV_MAX_RELEASE 1.0
+
+
+/**
+ * \brief Increase the base quantizer scale of the frame until the VBV
+ * buffer simulated over the lookahead does not underflow.
+ *
+ * The bits of the frame, the frames being coded and the frames in the
+ * lookahead are predicted with the bits model. The future frames are
+ * assumed to use the same rate factor as the current frame.
+ */
+static double vbv_limit_qscale(encoder_state_t * const state, double qscale)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  kvz_rc_data *rc = state->frame->new_ratecontrol;
+  const kvz_la_result *la = state->frame->la;
+  const int intra_class = KVZ_MAX_GOP_LENGTH;
+  const double qcomp = ctrl->cfg.qcomp;
+  const double bufsize = ctrl->cfg.vbv_bufsize;
+  const double refill = ctrl->cfg.vbv_maxrate / get_framerate(ctrl);
+  if (!la) return qscale;
+
+  const int cls = state->frame->is_irap ? intra_class :
+                  (ctrl->cfg.gop_len > 0 ? state->frame->gop_offset : 0);
+  // Be conservative while the bits model has few observations.
+#define VBV_UNCERTAINTY(n) (1.0 + 1.0 / (1.0 + (n)))
+  const double k_cur = abr_class_k(ctrl, rc, cls) * VBV_UNCERTAINTY(rc->abr_k_count[cls]);
+  const double c_cur = state->frame->is_irap ? MAX(1.0, la->intra_cost) : MAX(1.0, la->cost);
+  const double r_cur = MAX(1.0, la->blurred_cost);
+  double k_avg = 0.0;
+  {
+    const int classes = MAX(1, ctrl->cfg.gop_len);
+    int n = INT32_MAX;
+    for (int i = 0; i < classes; i++) {
+      k_avg += abr_class_k(ctrl, rc, i);
+      n = MIN(n, rc->abr_k_count[i]);
+    }
+    k_avg = k_avg / classes * VBV_UNCERTAINTY(n);
+  }
+  const double k_intra = abr_class_k(ctrl, rc, intra_class) * VBV_UNCERTAINTY(rc->abr_k_count[intra_class]);
+
+  // Buffer fullness after the frames being coded.
+  double fill_start = rc->vbv_fill - rc->abr_inflight_bits * VBV_UNCERTAINTY(rc->abr_frames / MAX(1, ctrl->cfg.gop_len));
+  fill_start = MIN(bufsize, fill_start + rc->abr_inflight_frames * refill);
+
+  const int64_t last = kvz_lookahead_newest(ctrl->lookahead);
+  // The increase is released gradually since the bits model is less
+  // accurate far from the recently used quantizers.
+  const double step = pow(2.0, 0.5 / 6.0);
+  double mult = pow(2.0, MAX(0.0, rc->vbv_qp_increase - VBV_MAX_RELEASE) / 6.0);
+  for (; mult < pow(2.0, VBV_MAX_QP_INCREASE / 6.0); mult *= step) {
+    const double qs = qscale * mult;
+    double fill = fill_start - k_cur * c_cur / pow(qs, ABR_GAMMA);
+    bool ok = fill >= VBV_MIN_FILL * bufsize;
+    fill = MIN(bufsize, fill + refill);
+    for (int64_t i = la->index + 1; ok && i <= last; i++) {
+      double cost, intra;
+      bool key;
+      if (!kvz_lookahead_frame_info(ctrl->lookahead, i, &cost, &intra, &key)) continue;
+      const double qs_i = qs * pow(cost / r_cur, 1.0 - qcomp);
+      const double bits = key ? k_intra * intra / pow(qs_i, ABR_GAMMA) :
+                                k_avg * cost / pow(qs_i, ABR_GAMMA);
+      fill -= bits;
+      if (fill < VBV_MIN_FILL * bufsize) ok = false;
+      fill = MIN(bufsize, fill + refill);
+    }
+    if (ok) break;
+  }
+  rc->vbv_qp_increase = 6.0 * log2(mult);
+  return qscale * mult;
+}
+
+
 void kvz_set_picture_qp_abr(encoder_state_t * const state)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
@@ -1093,24 +1249,7 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
   const int intra_class = KVZ_MAX_GOP_LENGTH;
   const double qcomp = ctrl->cfg.qcomp;
 
-  // Account the frame previously coded by this encoder state. Its bitstream
-  // has been written since the state is being reused.
-  if (state->frame->abr_pending) {
-    const double bits = (double)state->stats_bitstream_length * 8;
-    const int cls = state->frame->abr_class;
-    const double k = bits * pow(state->frame->abr_qscale, ABR_GAMMA) / state->frame->abr_cost;
-    if (rc->abr_k_count[cls] == 0) {
-      rc->abr_k[cls] = k;
-    } else {
-      rc->abr_k[cls] += ABR_K_ALPHA * (k - rc->abr_k[cls]);
-    }
-    rc->abr_k_count[cls]++;
-    rc->abr_total_bits += bits;
-    rc->abr_frames++;
-    rc->abr_inflight_bits -= state->frame->abr_expected_bits;
-    rc->abr_inflight_frames--;
-    state->frame->abr_pending = false;
-  }
+  abr_account_previous(state);
 
   const kvz_la_result *la = state->frame->la;
   const double framerate = ctrl->cfg.framerate_num != 0 ?
@@ -1180,22 +1319,13 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
     qscale = qp_to_qscale(ctrl->cfg.qp);
   }
 
+  if (ctrl->cfg.vbv_maxrate > 0) {
+    qscale = vbv_limit_qscale(state, qscale);
+  }
+
   const double base_qp = CLIP(0.0, 51.0, qscale_to_qp(qscale));
 
-  state->frame->abr_pending = true;
-  state->frame->abr_qscale = qp_to_qscale(base_qp);
-  state->frame->abr_class = state->frame->is_irap ? intra_class :
-                            (ctrl->cfg.gop_len > 0 ? state->frame->gop_offset : 0);
-  if (la) {
-    state->frame->abr_cost = state->frame->is_irap ? MAX(1.0, la->intra_cost) : MAX(1.0, la->cost);
-  } else {
-    state->frame->abr_cost = 1.0;
-  }
-  state->frame->abr_expected_bits = abr_class_k(ctrl, rc, state->frame->abr_class) *
-                                    state->frame->abr_cost /
-                                    pow(state->frame->abr_qscale, ABR_GAMMA);
-  rc->abr_inflight_bits += state->frame->abr_expected_bits;
-  rc->abr_inflight_frames++;
+  abr_register_frame(state, base_qp);
 
   state->frame->QP = gop_frame_qp(state, base_qp);
   state->frame->lambda = qp_to_lambda(state, state->frame->QP);
@@ -1237,6 +1367,11 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     const bool crf = ctrl->cfg.crf >= 0 && state->frame->la;
     if (crf) {
       base_qp = CLIP(0.0, 51.0, state->frame->la->crf_qp);
+      if (ctrl->cfg.vbv_maxrate > 0) {
+        abr_account_previous(state);
+        base_qp = CLIP(0.0, 51.0, qscale_to_qp(vbv_limit_qscale(state, qp_to_qscale(base_qp))));
+        abr_register_frame(state, base_qp);
+      }
     }
 
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
