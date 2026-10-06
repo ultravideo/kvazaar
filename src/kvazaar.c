@@ -313,7 +313,13 @@ static int encode_internal(kvz_encoder *enc,
     if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
     if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
     if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
-    if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+    if (src_out) {
+      // With the temporal filter the original picture is output instead of
+      // the filtered one that was coded.
+      const kvz_la_result *la = output_state->frame->la;
+      kvz_picture *src = (la && la->orig) ? la->orig : output_state->tile->frame->source;
+      *src_out = kvz_image_copy_ref(src);
+    }
     if (info_out) set_frame_info(info_out, output_state);
 
     output_state->frame->done = 1;

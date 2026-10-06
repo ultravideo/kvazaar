@@ -216,6 +216,10 @@ Video structure:
                                --crf and --rc-algorithm abr. [disabled]
       --vbv-bufsize <integer>: VBV buffer size in bits. [disabled]
       --vbv-init <float>     : Initial VBV buffer fullness. [0.9]
+      --(no-)mctf            : Motion compensated temporal filtering of
+                               the GOP key pictures before coding (random
+                               access GOP). Enables the lookahead.
+                               [disabled]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -437,6 +441,15 @@ and motion search on 8x8 low resolution blocks. The analysis is used by:
   size. The increase is released by at most 1 QP per picture. No HRD
   parameters are written to the bitstream.
 
+- **Temporal filter** (`--mctf`, random access GOP of 8 or 16): every
+  8th picture (counted from the start of the scene) is replaced before
+  coding by a motion compensated, bilateral weighted average of itself and
+  the two previous and two following pictures of the same scene, like the
+  GOP based temporal filter of HM / VTM (8x8 hierarchical motion search,
+  block error and noise based weights). These pictures are the references
+  of the rest of the GOP, so removing their noise helps the whole GOP. The
+  original pictures are still used for the PSNR output.
+
 The lookahead analysis runs in its own thread when threads are enabled.
 The results do not depend on the number of threads. With `--lookahead 0`
 (the default) the encoder output is unchanged.
@@ -454,6 +467,13 @@ BasketballDrillText splice with two scene cuts, 2 threads:
 | `--bitrate N` (lambda)                   | +17.7 %   | +22.5 % |
 | `--bitrate N --lookahead 20` (lambda)    | +13.4 %   |         |
 | `--bitrate N --rc-algorithm abr`         | +2.2 %    | +2.9 %  |
+| `--lookahead 20 --mctf`                  | -6.2 %    |         |
+
+With `--preset veryslow` (64 frames of the same sequences) `--lookahead
+20` gives -2.7 % and `--lookahead 20 --mctf` -3.6 % (-4.5 % YUV). The
+temporal filter adds about 120 ms per filtered 832x480 picture (one in
+eight pictures), 6 % of the veryslow encoding time but 3x the ultrafast
+time.
 
 The scene cut gain comes from the splice (-7.5 %), the other sequences
 have no cuts. The mean absolute bitrate error of the ABR mode on these

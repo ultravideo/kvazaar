@@ -189,6 +189,8 @@ static const struct option long_options[] = {
   { "vbv-maxrate",        required_argument, NULL, 0 },
   { "vbv-bufsize",        required_argument, NULL, 0 },
   { "vbv-init",           required_argument, NULL, 0 },
+  { "mctf",                     no_argument, NULL, 0 },
+  { "no-mctf",                  no_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
@@ -583,6 +585,10 @@ void print_help(void)
     "                               --crf and --rc-algorithm abr. [disabled]\n"
     "      --vbv-bufsize <integer>: VBV buffer size in bits. [disabled]\n"
     "      --vbv-init <float>     : Initial VBV buffer fullness. [0.9]\n"
+    "      --(no-)mctf            : Motion compensated temporal filtering of\n"
+    "                               the GOP key pictures before coding (random\n"
+    "                               access GOP). Enables the lookahead.\n"
+    "                               [disabled]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

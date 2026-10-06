@@ -41,6 +41,7 @@
 #include "image.h"
 #include "threads.h"
 #include "strategies/strategies-picture.h"
+#include "temporal_filter.h"
 
 /** \brief Low resolution analysis block size in low resolution pixels. */
 #define LA_BLOCK 8
@@ -56,6 +57,9 @@
 #define LA_BLUR 8
 /** \brief Lagrange multiplier for the motion vector cost in the low-res search. */
 #define LA_MV_LAMBDA 4
+/** \brief Distance of the neighbours used by the temporal filter. */
+#define LA_MCTF_RANGE 2
+
 /** \brief Maximum absolute CU-tree QP offset of a CTU. */
 #define LA_CUTREE_MAX_OFFSET 4.0
 
@@ -76,6 +80,10 @@ typedef struct la_frame {
 
   bool has_prev;      //!< inter costs were computed against the previous frame
   bool scenecut;
+  int64_t segment_start; //!< display index of the first picture of the scene
+
+  bool mctf_done;          //!< temporal filtering has been considered
+  kvz_picture *filtered;   //!< temporally filtered picture or NULL
 } la_frame;
 
 struct kvz_lookahead {
@@ -126,6 +134,16 @@ struct kvz_lookahead {
 
   kvz_la_result *results;
 
+  // Temporal filter
+  bool mctf;
+  int mctf_qp;
+  /** \brief Recently analysed original pictures, [0] is the newest. Used
+   *         only by the analysis (or by kvz_lookahead_pop once everything
+   *         has been analysed). */
+  kvz_picture *ring_pics[2 * LA_MCTF_RANGE + 1];
+  int64_t ring_index[2 * LA_MCTF_RANGE + 1];
+  int64_t ring_segment[2 * LA_MCTF_RANGE + 1];
+
   // Analysis thread. The pictures are analysed in display order by a
   // dedicated thread, or in kvz_lookahead_push when threads are disabled.
   bool threaded;
@@ -168,6 +186,7 @@ static void free_frame(la_frame *f)
 {
   if (!f) return;
   kvz_image_free(f->pic);
+  kvz_image_free(f->filtered);
   free(f->buf);
   free(f->intra);
   free(f->inter);
@@ -251,6 +270,16 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   la->crf_base_cost = (cfg->gop_len > 0 && !cfg->gop_lowdelay) ? 260.0 : 185.0;
 
   la->window_last = -1;
+
+  la->mctf = cfg->mctf > 0;
+  if (cfg->crf >= 0) {
+    la->mctf_qp = (int)(cfg->crf + 0.5);
+  } else if (cfg->target_bitrate > 0) {
+    la->mctf_qp = 32;
+  } else {
+    la->mctf_qp = cfg->qp;
+  }
+  for (int i = 0; i < 2 * LA_MCTF_RANGE + 1; i++) la->ring_index[i] = -1;
   pthread_mutex_init(&la->lock, NULL);
   pthread_cond_init(&la->cond, NULL);
   if (cfg->threads > 0) {
@@ -280,6 +309,9 @@ void kvz_lookahead_free(kvz_lookahead *la)
   pthread_cond_destroy(&la->cond);
   for (int i = 0; i < la->count; i++) {
     free_frame(la->queue[i]);
+  }
+  for (int i = 0; i < 2 * LA_MCTF_RANGE + 1; i++) {
+    kvz_image_free(la->ring_pics[i]);
   }
   free_frame(la->retired);
   free(la->queue);
@@ -616,12 +648,79 @@ static void decide_scenecut(kvz_lookahead *la, la_frame *f)
     la->last_key = f->index;
   }
   la->hist_key[hist_slot(f->index)] = la->last_key == f->index;
+  f->segment_start = la->segment_start;
 }
 
 
 /**
  * \brief Analyse a queued picture. Pictures are analysed in display order.
  */
+static INLINE bool is_mctf_target(const la_frame *f)
+{
+  return (f->index - f->segment_start) % 8 == 0;
+}
+
+
+/**
+ * \brief Temporally filter a key picture with its neighbours in the ring of
+ *        recently analysed pictures.
+ */
+static void mctf_filter(kvz_lookahead *la, la_frame *f)
+{
+  f->mctf_done = true;
+  const kvz_picture *refs[2 * LA_MCTF_RANGE];
+  int offsets[2 * LA_MCTF_RANGE];
+  int n = 0;
+  for (int d = -LA_MCTF_RANGE; d <= LA_MCTF_RANGE; d++) {
+    if (d == 0) continue;
+    for (int i = 0; i < 2 * LA_MCTF_RANGE + 1; i++) {
+      if (la->ring_pics[i] && la->ring_index[i] == f->index + d &&
+          la->ring_segment[i] == f->segment_start) {
+        refs[n] = la->ring_pics[i];
+        offsets[n++] = d;
+        break;
+      }
+    }
+  }
+  const double strength = (f->index - f->segment_start) % 16 == 0 ? 1.5 : 0.95;
+  f->filtered = kvz_temporal_filter(f->pic, refs, offsets, n, LA_MCTF_RANGE, strength, la->mctf_qp);
+}
+
+
+/**
+ * \brief Temporal filtering after picture k has been analysed.
+ *
+ * A key picture t is filtered as soon as its future neighbours are known:
+ * when t + range has been analysed or when picture k starts a new scene.
+ */
+static void mctf_after_analysis(kvz_lookahead *la, la_frame *k)
+{
+  kvz_image_free(la->ring_pics[2 * LA_MCTF_RANGE]);
+  for (int i = 2 * LA_MCTF_RANGE; i > 0; i--) {
+    la->ring_pics[i] = la->ring_pics[i - 1];
+    la->ring_index[i] = la->ring_index[i - 1];
+    la->ring_segment[i] = la->ring_segment[i - 1];
+  }
+  la->ring_pics[0] = kvz_image_copy_ref(k->pic);
+  la->ring_index[0] = k->index;
+  la->ring_segment[0] = k->segment_start;
+
+  for (int64_t t = k->index - LA_MCTF_RANGE; t <= k->index; t++) {
+    if (t < 0) continue;
+    la_frame *f = NULL;
+    pthread_mutex_lock(&la->lock);
+    if (la->count > 0 && t >= la->queue[0]->index && t < la->queue[0]->index + la->count) {
+      f = la->queue[t - la->queue[0]->index];
+    }
+    pthread_mutex_unlock(&la->lock);
+    if (!f || f->mctf_done || !is_mctf_target(f)) continue;
+    if (t == k->index - LA_MCTF_RANGE || (k->scenecut && t < k->index)) {
+      mctf_filter(la, f);
+    }
+  }
+}
+
+
 static void analyse_picture(kvz_lookahead *la, la_frame *f)
 {
   // The previous picture is either queued or the latest released one. It
@@ -643,6 +742,10 @@ static void analyse_picture(kvz_lookahead *la, la_frame *f)
   la->hist_cost[slot] = (double)f->inter_sum / la->nblocks;
   la->hist_intra[slot] = (double)f->intra_sum / la->nblocks;
   la->hist_cut[slot] = f->scenecut || f->index == 0;
+
+  if (la->mctf) {
+    mctf_after_analysis(la, f);
+  }
 
   pthread_mutex_lock(&la->lock);
   la->analysed = f->index + 1;
@@ -880,6 +983,22 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
     res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(res->blurred_cost / la->crf_base_cost);
   }
 
+  if (la->mctf && !f->mctf_done && is_mctf_target(f)) {
+    // The end of the sequence was reached before the future neighbours.
+    // Everything has been analysed, so the ring is not used by the thread.
+    mctf_filter(la, f);
+  }
+  kvz_picture *filtered = f->filtered;
+  f->filtered = NULL;
+
+  if (filtered) {
+    // The encoder codes the filtered picture, the original one is kept for
+    // the output (e.g. PSNR computation).
+    res->orig = f->pic;
+    res->pic = filtered;
+    f->pic = filtered;
+  }
+
   res->next = la->results;
   la->results = res;
 
@@ -921,6 +1040,7 @@ kvz_la_result *kvz_lookahead_take_result(kvz_lookahead *la, const kvz_picture *p
 void kvz_lookahead_free_result(kvz_la_result *res)
 {
   if (!res) return;
+  kvz_image_free(res->orig);
   free(res->ctu_offsets);
   free(res);
 }

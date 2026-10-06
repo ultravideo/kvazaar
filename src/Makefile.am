@@ -113,6 +113,8 @@ libkvazaar_la_SOURCES = \
 	sei.h \
 	tables.c \
 	tables.h \
+	temporal_filter.c \
+	temporal_filter.h \
 	threadqueue.c \
 	threadqueue.h \
 	threads.h \

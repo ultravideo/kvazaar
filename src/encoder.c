@@ -243,7 +243,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   // Resolve the lookahead related automatic settings.
   {
     kvz_config *const c = &encoder->cfg;
-    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0 ||
+    if (c->mctf && (c->gop_len < 8 || c->gop_lowdelay || c->intra_period == 1)) {
+      fprintf(stderr, "--mctf requires a random access GOP of length 8 or 16, disabling it.\n");
+      c->mctf = 0;
+    }
+    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0 || c->mctf ||
                                 (c->target_bitrate > 0 && c->rc_algorithm == KVZ_ABR);
     if (c->lookahead == 0 && explicit_tools) {
       c->lookahead = 20;
@@ -260,7 +264,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       }
       c->cutree = 0;
       c->scenecut = 0;
+      c->mctf = 0;
     } else {
+      if (c->mctf && c->lookahead < 3) {
+        // The temporal filter needs the two following pictures.
+        c->lookahead = 3;
+      }
       if (c->cutree < 0) c->cutree = 1;
       if (c->scenecut < 0) c->scenecut = 40;
       if (c->cutree_strength < 0) c->cutree_strength = 3.75 * (1.0 - c->qcomp);

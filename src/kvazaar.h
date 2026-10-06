@@ -533,6 +533,9 @@ typedef struct kvz_config
   /** \brief Initial VBV buffer fullness as a fraction of the buffer size. */
   double vbv_init;
 
+  /** \brief Motion compensated temporal pre-filter of the key pictures. */
+  int8_t mctf;
+
 } kvz_config;
 
 /**
