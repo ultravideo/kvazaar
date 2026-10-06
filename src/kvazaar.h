@@ -506,6 +506,25 @@ typedef struct kvz_config
 
   uint8_t enable_cross_component_prediction; //!< \brief Enable cross-component prediction (4:4:4).
 
+  /** \brief Number of frames analysed ahead of the encoding. 0 disables the lookahead. */
+  int32_t lookahead;
+
+  /** \brief Constant rate factor. Negative value disables CRF. */
+  double crf;
+
+  /** \brief Quantizer curve compression factor for CRF and lookahead based
+   *         bit allocation, 0.0 (constant bitrate) .. 1.0 (constant QP). */
+  double qcomp;
+
+  /** \brief CU-tree temporal QP adaptation. -1: auto (on with lookahead). */
+  int8_t cutree;
+
+  /** \brief CU-tree QP offset strength. Negative: auto, 5 * (1 - qcomp). */
+  double cutree_strength;
+
+  /** \brief Scene cut detection threshold 0..100. 0 disables, -1: auto. */
+  int32_t scenecut;
+
 } kvz_config;
 
 /**

@@ -82,6 +82,8 @@ libkvazaar_la_SOURCES = \
 	imagelist.h \
 	input_frame_buffer.c \
 	input_frame_buffer.h \
+	lookahead.c \
+	lookahead.h \
 	inter.c \
 	inter.h \
 	intra.c \

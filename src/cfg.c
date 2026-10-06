@@ -199,6 +199,13 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->enable_cross_component_prediction = 0;
 
+  cfg->lookahead = 0;
+  cfg->crf = -1.0;
+  cfg->qcomp = 0.6;
+  cfg->cutree = -1;
+  cfg->cutree_strength = -1.0;
+  cfg->scenecut = -1;
+
   return 1;
 }
 
@@ -1448,6 +1455,24 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("enable-logging") {
     cfg->enable_logging_output = atobool(value);
   }
+  else if OPT("lookahead") {
+    cfg->lookahead = atoi(value);
+  }
+  else if OPT("crf") {
+    cfg->crf = atof(value);
+  }
+  else if OPT("qcomp") {
+    cfg->qcomp = atof(value);
+  }
+  else if OPT("cutree") {
+    cfg->cutree = (int8_t)atobool(value);
+  }
+  else if OPT("cutree-strength") {
+    cfg->cutree_strength = atof(value);
+  }
+  else if OPT("scenecut") {
+    cfg->scenecut = atoi(value);
+  }
   else if OPT("cross-comp-pred") {
     cfg->enable_cross_component_prediction = atobool(value);
   }
@@ -1791,6 +1816,31 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
+    error = 1;
+  }
+
+  if (cfg->lookahead < 0 || cfg->lookahead > 250) {
+    fprintf(stderr, "Input error: --lookahead must be in range 0..250\n");
+    error = 1;
+  }
+
+  if (cfg->crf >= 0 && cfg->crf > 51) {
+    fprintf(stderr, "Input error: --crf must be in range 0..51\n");
+    error = 1;
+  }
+
+  if (cfg->crf >= 0 && cfg->target_bitrate > 0) {
+    fprintf(stderr, "Input error: --crf and --bitrate can not be used together\n");
+    error = 1;
+  }
+
+  if (cfg->qcomp < 0.0 || cfg->qcomp > 1.0) {
+    fprintf(stderr, "Input error: --qcomp must be in range 0.0..1.0\n");
+    error = 1;
+  }
+
+  if (cfg->scenecut > 100) {
+    fprintf(stderr, "Input error: --scenecut must be in range 0..100\n");
     error = 1;
   }
 

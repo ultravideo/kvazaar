@@ -152,6 +152,9 @@ typedef struct encoder_control_t
 
   struct kvz_rc_data *rc_data;
 
+  //! Lookahead, NULL if not used. Accessed only from the API thread.
+  struct kvz_lookahead *lookahead;
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);

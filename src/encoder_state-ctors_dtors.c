@@ -47,6 +47,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"
+#include "lookahead.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -67,6 +68,10 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->rc_alpha = 3.2003;
   state->frame->rc_beta = -1.367;
   state->frame->icost = 0;
+
+  state->frame->new_segment = false;
+  state->frame->segment_start = 0;
+  state->frame->la = NULL;
 
   // Reset max_qp_delta_depth here, was causing problems when headers are requested before input is fed in
   state->frame->max_qp_delta_depth = 0;
@@ -109,6 +114,8 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
+  kvz_lookahead_free_result(state->frame->la);
+  state->frame->la = NULL;
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 

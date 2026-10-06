@@ -48,6 +48,7 @@
 #include "filter.h"
 #include "image.h"
 #include "rate_control.h"
+#include "lookahead.h"
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
@@ -897,10 +898,20 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
              ref_state->frame->slicetype == KVZ_SLICE_I &&
              ref_state->frame->num != 0){
 
-            while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
-              ref_state = ref_state->previous_encoder_state;
+            const encoder_state_t *search_state = ref_state;
+            bool found = false;
+            for (int s = 0; s <= state->encoder_control->cfg.owf; s++) {
+              if (search_state->frame->poc == state->frame->poc - state->encoder_control->cfg.gop_len) {
+                found = true;
+                break;
+              }
+              search_state = search_state->previous_encoder_state;
             }
-            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+            // The picture is not found after an IDR in the middle of the
+            // sequence (scene cut).
+            if (found) {
+              kvz_threadqueue_job_dep_add(job[0], search_state->tile->wf_jobs[dep_lcu->id]);
+            }
           }
         }
 
@@ -1243,9 +1254,13 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   int intra_offset = 0;
 
   if (state->encoder_control->cfg.intra_period) {
+    // Intra periods restart at each new segment (scene cut).
+    int segment_frame = frame_number - state->frame->segment_start;
     int offset = state->encoder_control->cfg.gop_len - 1;
-    intra_group = (frame_number + offset) / state->encoder_control->cfg.intra_period;
-    intra_offset = (frame_number + offset) % state->encoder_control->cfg.intra_period;
+    intra_group = (segment_frame + offset) / state->encoder_control->cfg.intra_period;
+    intra_offset = (segment_frame + offset) % state->encoder_control->cfg.intra_period;
+    // Make the groups of different segments distinct.
+    intra_group += state->frame->segment_start;
   }
 
   state->tile->frame->source->intra_group = intra_group;
@@ -1463,6 +1478,14 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   const kvz_config * const cfg = &state->encoder_control->cfg;
 
+  if (state->frame->new_segment) {
+    state->frame->segment_start = state->frame->num;
+  }
+
+  // Lookahead analysis results for the frame.
+  kvz_lookahead_free_result(state->frame->la);
+  state->frame->la = kvz_lookahead_take_result(state->encoder_control->lookahead, frame);
+
   encoder_set_source_picture(state, frame);
 
   assert(!state->tile->frame->cu_array);
@@ -1575,7 +1598,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
   // Variance adaptive quantization - END
 
-  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq) {
+  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq || cfg->cutree > 0) {
     state->frame->max_qp_delta_depth = 0;
   } else {
     state->frame->max_qp_delta_depth = -1;
@@ -1597,12 +1620,18 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   if (owf == 0) previous = state;
   state->frame->previous_layer_state = previous;
+
+  // Frame number relative to the start of the current segment. A new segment
+  // starts with an IDR picture at the beginning of the sequence and at scene
+  // cuts detected by the lookahead.
+  const int32_t segment_num = state->frame->num - state->frame->segment_start;
+
   // Set POC.
-  if (state->frame->num == 0) {
+  if (segment_num == 0) {
     state->frame->poc = 0;
   } else if (cfg->gop_len && !cfg->gop_lowdelay) {
 
-    int32_t framenum = state->frame->num - 1;
+    int32_t framenum = segment_num - 1;
     // Handle closed GOP
     // Closed GOP structure has an extra IDR between the GOPs
     if (cfg->intra_period > 0 && !cfg->open_gop) {
@@ -1626,13 +1655,13 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else if (cfg->intra_period > 0) {
-    state->frame->poc = state->frame->num % cfg->intra_period;
+    state->frame->poc = segment_num % cfg->intra_period;
   } else {
-    state->frame->poc = state->frame->num;
+    state->frame->poc = segment_num;
   }
 
   // Check whether the frame is a keyframe or not.
-  if (state->frame->num == 0 || state->frame->poc == 0) {
+  if (segment_num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
   } else if(!is_closed_normal_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
@@ -1645,7 +1674,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Set pictype.
   if (state->frame->is_irap) {
-    if (state->frame->num == 0 ||
+    if (segment_num == 0 ||
         cfg->intra_period == 1 ||
         cfg->gop_len == 0 ||
         cfg->gop_lowdelay ||
@@ -1671,6 +1700,22 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->frame->slicetype = KVZ_SLICE_B;
   } else {
     state->frame->slicetype = KVZ_SLICE_P;
+  }
+
+  // CU-tree QP offsets from the lookahead.
+  if (cfg->cutree > 0) {
+    const int num_lcus = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
+    if (!cfg->vaq) {
+      for (int i = 0; i < num_lcus; i++) state->frame->aq_offsets[i] = 0.0;
+    }
+    // Pictures that are not used for reference do not propagate anything.
+    const bool is_ref = cfg->gop_len == 0 || state->frame->is_irap ||
+                        cfg->gop[state->frame->gop_offset].is_ref;
+    if (state->frame->la && state->frame->la->ctu_offsets && is_ref) {
+      for (int i = 0; i < num_lcus; i++) {
+        state->frame->aq_offsets[i] += state->frame->la->ctu_offsets[i];
+      }
+    }
   }
 
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
@@ -1845,6 +1890,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->num = prev_state->frame->num + 1;
   state->frame->poc = prev_state->frame->poc + 1;
   state->frame->irap_poc = prev_state->frame->irap_poc;
+  state->frame->segment_start = prev_state->frame->segment_start;
 
   state->frame->prepared = 1;
 

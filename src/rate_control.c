@@ -37,6 +37,7 @@
 #include "encoder.h"
 #include "kvazaar.h"
 #include "pthread.h"
+#include "lookahead.h"
 
 
 static const int MIN_SMOOTHING_WINDOW = 40;
@@ -195,6 +196,22 @@ static double gop_allocate_bits(encoder_state_t * const state)
       state->frame->new_ratecontrol->smoothing_window += 10;
     }
   }
+  // Use the lookahead to give more bits to GOPs that are more complex than
+  // the surrounding frames.
+  const kvz_la_result *la = state->frame->la;
+  if (la && encoder->lookahead) {
+    int64_t first = la->index;
+    int64_t last = la->index;
+    if (!state->frame->new_segment && encoder->cfg.gop_len > 0) {
+      if (encoder->cfg.gop_lowdelay) {
+        last = la->index + encoder->cfg.gop_len - 1;
+      } else {
+        first = la->index - encoder->cfg.gop_len + 1;
+      }
+    }
+    gop_target_bits *= kvz_lookahead_bit_weight(encoder->lookahead, first, last);
+  }
+
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
@@ -804,7 +821,7 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
   ctu->i_cost = 0;
 
   // Apply variance adaptive quantization
-  if (encoder->cfg.vaq) {
+  if (encoder->cfg.vaq || encoder->cfg.cutree > 0) {
     vector2d_t lcu = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
@@ -1039,12 +1056,22 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
     const int gop_len = ctrl->cfg.gop_len;
 
+    // With CRF the base QP comes from the lookahead complexity estimate.
+    double base_qp = ctrl->cfg.qp;
+    const bool crf = ctrl->cfg.crf >= 0 && state->frame->la;
+    if (crf) {
+      base_qp = CLIP(0.0, 51.0, state->frame->la->crf_qp);
+    }
+
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      double qp = ctrl->cfg.qp;
+      double qp = base_qp;
       qp += gop->qp_offset;
       qp += CLIP(0.0, 3.0, qp * gop->qp_model_scale + gop->qp_model_offset);
       state->frame->QP = CLIP_TO_QP((int)(qp + 0.5));
 
+    }
+    else if (crf) {
+      state->frame->QP = CLIP_TO_QP((int)(base_qp + ctrl->cfg.intra_qp_offset + 0.5));
     }
     else {
       state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + ctrl->cfg.intra_qp_offset);
@@ -1150,7 +1177,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
   lcu->qp = state->qp;
 
   // Apply variance adaptive quantization
-  if (ctrl->cfg.vaq) {
+  if (ctrl->cfg.vaq || ctrl->cfg.cutree > 0) {
     vector2d_t lcu_pos = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y

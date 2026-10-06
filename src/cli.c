@@ -178,6 +178,14 @@ static const struct option long_options[] = {
   { "no-fast-bipred",           no_argument, NULL, 0 },
   { "enable-logging",           no_argument, NULL, 0 },
   { "no-enable-logging",        no_argument, NULL, 0 },
+  { "lookahead",          required_argument, NULL, 0 },
+  { "crf",                required_argument, NULL, 0 },
+  { "qcomp",              required_argument, NULL, 0 },
+  { "cutree",                   no_argument, NULL, 0 },
+  { "no-cutree",                no_argument, NULL, 0 },
+  { "cutree-strength",    required_argument, NULL, 0 },
+  { "scenecut",           required_argument, NULL, 0 },
+  { "no-scenecut",              no_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
@@ -547,6 +555,24 @@ void print_help(void)
     "      --(no-)vaq <integer>   : Enable variance adaptive quantization with given\n"
     "                               strength, in range 1..20. Recommended: 5.\n"
     "                               [disabled]\n"
+    "      --crf <float>          : Constant rate factor, 0..51. Selects the\n"
+    "                               frame QP from the frame complexity measured\n"
+    "                               by the lookahead. Enables the lookahead.\n"
+    "                               [disabled]\n"
+    "      --lookahead <integer>  : Number of frames analysed ahead of encoding,\n"
+    "                               0..250. Used for CRF, CU-tree, scene cut\n"
+    "                               detection and bitrate allocation. Adds\n"
+    "                               latency. [0, 20 with --crf]\n"
+    "      --qcomp <float>        : QP curve compression for CRF and lookahead\n"
+    "                               bit allocation, 0.0..1.0. [0.6]\n"
+    "      --(no-)cutree          : Temporal QP adaptation by propagating block\n"
+    "                               importance through the lookahead.\n"
+    "                               [enabled with lookahead]\n"
+    "      --cutree-strength <float>: CU-tree QP offset strength.\n"
+    "                               [5 * (1 - qcomp)]\n"
+    "      --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.\n"
+    "                               Inserts an IDR picture at scene changes.\n"
+    "                               [40 with lookahead]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

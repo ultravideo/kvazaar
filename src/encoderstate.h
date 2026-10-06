@@ -109,6 +109,19 @@ typedef struct encoder_state_config_frame_t {
   int32_t irap_poc;  /*!< \brief POC of the associated IRAP picture */
 
   /**
+   * \brief Frame starts a new coded video sequence (set by the input buffer).
+   *
+   * True for the first frame and for frames following a scene cut.
+   */
+  bool new_segment;
+
+  /** \brief Frame number (coding order) of the first frame of the segment. */
+  int32_t segment_start;
+
+  /** \brief Lookahead analysis results for the frame, NULL if not available. */
+  struct kvz_la_result *la;
+
+  /**
    * \brief Frame-level quantization parameter
    *
    * \see encoder_state_t::qp

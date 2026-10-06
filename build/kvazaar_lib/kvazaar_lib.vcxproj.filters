@@ -183,6 +183,9 @@
     <ClCompile Include="..\..\src\input_frame_buffer.c">
       <Filter>Control</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\lookahead.c">
+      <Filter>Control</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\nal.c">
       <Filter>Bitstream</Filter>
     </ClCompile>
@@ -275,6 +278,9 @@
       <Filter>Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\input_frame_buffer.h">
+      <Filter>Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\lookahead.h">
       <Filter>Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\rate_control.h">

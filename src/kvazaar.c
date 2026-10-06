@@ -51,6 +51,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"
+#include "lookahead.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
@@ -238,13 +239,24 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
 }
 
 
-static int kvazaar_encode(kvz_encoder *enc,
-                          kvz_picture *pic_in,
-                          kvz_data_chunk **data_out,
-                          uint32_t *len_out,
-                          kvz_picture **pic_out,
-                          kvz_picture **src_out,
-                          kvz_frame_info *info_out)
+/**
+ * \brief Feed a picture to the encoder and collect a finished picture.
+ *
+ * \param pic_in  picture to add to the input buffer or NULL
+ * \param eos     when pic_in is NULL: signal the end of the input to the
+ *                input buffer so that the remaining pictures are released
+ * \param flush   wait for the next picture to be finished if any pictures
+ *                are being encoded
+ */
+static int encode_internal(kvz_encoder *enc,
+                           kvz_picture *pic_in,
+                           bool eos,
+                           bool flush,
+                           kvz_data_chunk **data_out,
+                           uint32_t *len_out,
+                           kvz_picture **pic_out,
+                           kvz_picture **src_out,
+                           kvz_frame_info *info_out)
 {
   if (data_out) *data_out = NULL;
   if (len_out) *len_out = 0;
@@ -262,10 +274,13 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
-  kvz_picture* frame = kvz_encoder_feed_frame(
-    &enc->input_buffer, state, pic_in,
-    enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
-  );
+  kvz_picture* frame = NULL;
+  if (pic_in != NULL || eos) {
+    frame = kvz_encoder_feed_frame(
+      &enc->input_buffer, state, pic_in,
+      enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
+    );
+  }
   if (frame) {
     assert(state->frame->num == enc->frames_started);
 
@@ -286,7 +301,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
   if ((!output_state->frame->done &&
-       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) ||
+       (flush || enc->cur_state_num == enc->out_state_num)) ||
        (state->frame->num == 0  && state->encoder_control->cfg.rc_algorithm == KVZ_OBA)) {
 
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
@@ -309,6 +324,98 @@ static int kvazaar_encode(kvz_encoder *enc,
   }
 
   return 1;
+}
+
+
+/**
+ * \brief Encode with the lookahead in front of the input buffer.
+ *
+ * Input pictures are first queued in the lookahead. A picture is released to
+ * the input buffer when the lookahead is full, or when flushing. Before a
+ * picture that starts a new scene is released, the input buffer is drained
+ * so that the scene starts a new coded video sequence with an IDR picture.
+ *
+ * As with the plain encoder, at most one picture is output per call and,
+ * when pic_in is NULL, a picture is output as long as any remain.
+ */
+static int encode_with_lookahead(kvz_encoder *enc,
+                                 kvz_picture *pic_in,
+                                 kvz_data_chunk **data_out,
+                                 uint32_t *len_out,
+                                 kvz_picture **pic_out,
+                                 kvz_picture **src_out,
+                                 kvz_frame_info *info_out)
+{
+  kvz_lookahead *la = enc->control->lookahead;
+  const bool flush = pic_in == NULL;
+
+  if (data_out) *data_out = NULL;
+  if (len_out) *len_out = 0;
+  if (pic_out) *pic_out = NULL;
+  if (src_out) *src_out = NULL;
+
+  if (pic_in) {
+    kvz_lookahead_push(la, pic_in);
+  }
+
+#define GOT_OUTPUT() ((len_out && *len_out > 0) || (data_out && *data_out) || \
+                      (pic_out && *pic_out) || (src_out && *src_out))
+
+  for (;;) {
+    if (enc->scenecut_pending) {
+      // Drain the input buffer before starting the new scene.
+      if (kvz_input_frame_buffer_pending(&enc->input_buffer)) {
+        if (!encode_internal(enc, NULL, true, flush, data_out, len_out, pic_out, src_out, info_out)) {
+          return 0;
+        }
+        if (GOT_OUTPUT()) return 1;
+        continue;
+      }
+      kvz_input_frame_buffer_restart(&enc->input_buffer);
+      enc->scenecut_pending = false;
+      enc->scenecut_ready = true;
+    }
+
+    const int count = kvz_lookahead_count(la);
+    if (count > kvz_lookahead_depth(la) || (flush && count > 0)) {
+      if (!enc->scenecut_ready && kvz_lookahead_next_is_scenecut(la) &&
+          enc->input_buffer.num_in > 0) {
+        enc->scenecut_pending = true;
+        continue;
+      }
+      enc->scenecut_ready = false;
+
+      kvz_picture *frame = kvz_lookahead_pop(la);
+      const int ok = encode_internal(enc, frame, false, flush, data_out, len_out, pic_out, src_out, info_out);
+      kvz_image_free(frame);
+      if (!ok) return 0;
+      if (GOT_OUTPUT()) return 1;
+      continue;
+    }
+
+    if (flush) {
+      // The lookahead is empty, release the rest of the input buffer.
+      return encode_internal(enc, NULL, true, true, data_out, len_out, pic_out, src_out, info_out);
+    }
+    return 1;
+  }
+#undef GOT_OUTPUT
+}
+
+
+static int kvazaar_encode(kvz_encoder *enc,
+                          kvz_picture *pic_in,
+                          kvz_data_chunk **data_out,
+                          uint32_t *len_out,
+                          kvz_picture **pic_out,
+                          kvz_picture **src_out,
+                          kvz_frame_info *info_out)
+{
+  if (enc->control->lookahead) {
+    return encode_with_lookahead(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+  }
+  return encode_internal(enc, pic_in, pic_in == NULL, pic_in == NULL,
+                         data_out, len_out, pic_out, src_out, info_out);
 }
 
 

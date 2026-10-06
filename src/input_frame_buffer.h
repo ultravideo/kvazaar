@@ -72,9 +72,27 @@ typedef struct input_frame_buffer_t {
    */
   int gop_skipped;
 
+  /** \brief Number of times the buffer has been restarted at a scene cut. */
+  int segments;
+
+  /** \brief DTS of the previous output picture, used after restarts. */
+  int64_t last_dts;
+
 } input_frame_buffer_t;
 
 void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer);
+
+/**
+ * \brief Start a new segment, e.g. at a scene cut.
+ *
+ * All buffered pictures must have been output (by feeding NULL until no
+ * more pictures are returned). The next input picture is output as the
+ * first picture of a new coded video sequence.
+ */
+void kvz_input_frame_buffer_restart(input_frame_buffer_t *input_buffer);
+
+/** \brief Whether the buffer holds pictures that have not been output. */
+bool kvz_input_frame_buffer_pending(const input_frame_buffer_t *input_buffer);
 
 kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
                                     struct encoder_state_t *const state,

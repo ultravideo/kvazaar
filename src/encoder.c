@@ -42,6 +42,7 @@
 #include "kvz_math.h"
 #include "fast_coeff_cost.h"
 #include "rate_control.h"
+#include "lookahead.h"
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
@@ -236,6 +237,32 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     // to ensure that the pair of fields will be output for the same picture.
     if (encoder->cfg.owf % 2 == 1) {
       encoder->cfg.owf += 1;
+    }
+  }
+
+  // Resolve the lookahead related automatic settings.
+  {
+    kvz_config *const c = &encoder->cfg;
+    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0;
+    if (c->lookahead == 0 && explicit_tools) {
+      c->lookahead = 20;
+      if (cfg->enable_logging_output) fprintf(stderr, "--lookahead set to %d.\n", c->lookahead);
+    }
+    if (c->lookahead > 0 && c->source_scan_type != KVZ_INTERLACING_NONE) {
+      fprintf(stderr, "Lookahead is not supported with interlaced coding, disabling it.\n");
+      c->lookahead = 0;
+    }
+    if (c->lookahead == 0) {
+      if (c->crf >= 0) {
+        fprintf(stderr, "CRF requires the lookahead.\n");
+        goto init_failed;
+      }
+      c->cutree = 0;
+      c->scenecut = 0;
+    } else {
+      if (c->cutree < 0) c->cutree = 1;
+      if (c->scenecut < 0) c->scenecut = 40;
+      if (c->cutree_strength < 0) c->cutree_strength = 5.0 * (1.0 - c->qcomp);
     }
   }
 
@@ -610,6 +637,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     }
   }
 
+  if (encoder->cfg.lookahead > 0) {
+    encoder->lookahead = kvz_lookahead_alloc(encoder);
+    if (!encoder->lookahead) {
+      fprintf(stderr, "Failed to initialize lookahead.\n");
+      goto init_failed;
+    }
+  }
+
   return encoder;
 
 init_failed:
@@ -623,6 +658,9 @@ init_failed:
 void kvz_encoder_control_free(encoder_control_t *const encoder)
 {
   if (!encoder) return;
+
+  kvz_lookahead_free(encoder->lookahead);
+  encoder->lookahead = NULL;
 
   //Slices
   FREE_POINTER(encoder->slice_addresses_in_ts);
