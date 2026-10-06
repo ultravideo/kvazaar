@@ -5,6 +5,7 @@ TESTS = $(check_PROGRAMS) \
     test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
+    test_lookahead.sh \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \
@@ -22,6 +23,7 @@ EXTRA_DIST = \
     test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
+    test_lookahead.sh \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \

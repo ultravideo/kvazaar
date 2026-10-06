@@ -17,6 +17,7 @@ http://ultravideo.fi/#encoder for more information.
   - [Example:](#example)
   - [Parameters](#parameters)
   - [LP-GOP syntax](#lp-gop-syntax)
+  - [Lookahead](#lookahead)
 - [Presets](#presets)
 - [Kvazaar library](#kvazaar-library)
 - [Compiling Kvazaar](#compiling-kvazaar)
@@ -150,6 +151,9 @@ Video structure:
                                    - lambda: rate control from:
                                      DOI: 10.1109/TIP.2014.2336550 
                                    - oba: DOI: 10.1109/TCSVT.2016.2589878
+                                   - abr: frame QP from the lookahead
+                                     complexity, adjusted to reach the
+                                     bitrate. Enables the lookahead.
       --(no-)intra-bits      : Use Hadamard cost based allocation for intra
                                frames. Default on for gop 8 and off for lp-gop
       --(no-)clip-neighbour  : On oba based rate control whether to clip 
@@ -190,6 +194,24 @@ Video structure:
       --(no-)vaq <integer>   : Enable variance adaptive quantization with given
                                strength, in range 1..20. Recommended: 5.
                                [disabled]
+      --crf <float>          : Constant rate factor, 0..51. Selects the
+                               frame QP from the frame complexity measured
+                               by the lookahead. Enables the lookahead.
+                               [disabled]
+      --lookahead <integer>  : Number of frames analysed ahead of encoding,
+                               0..250. Used for CRF, CU-tree, scene cut
+                               detection and bitrate allocation. Adds
+                               latency. [0, 20 with --crf]
+      --qcomp <float>        : QP curve compression for CRF and lookahead
+                               bit allocation, 0.0..1.0. [0.6]
+      --(no-)cutree          : Temporal QP adaptation by propagating block
+                               importance through the lookahead.
+                               [enabled with lookahead]
+      --cutree-strength <float>: CU-tree QP offset strength.
+                               [3.75 * (1 - qcomp)]
+      --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.
+                               Inserts an IDR picture at scene changes.
+                               [40 with lookahead]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -376,6 +398,56 @@ QP
 +1 o       o o       o o       o ooooooooo
    g8d4t1    g8d3t1    g8d2t1    g8d1t1
 ```
+
+### Lookahead
+`--lookahead N` keeps N input pictures queued before they are encoded.
+Each queued picture is downscaled by two and analysed with a cheap intra
+and motion search on 8x8 low resolution blocks. The analysis is used by:
+
+- **Scene cut detection** (`--scenecut`, default 40): when the inter cost
+  of a picture is close to its intra cost the pictures before it are
+  flushed with a shortened GOP and the picture is coded as an IDR that
+  starts a new coded video sequence. The intra period restarts from it.
+- **CU-tree** (`--cutree`, default on): the amount of information each
+  block passes on to the following pictures is propagated backwards
+  through the lookahead and converted into CTU QP offsets
+  (`-strength * log2((intra + propagate) / intra)`, zero mean per picture,
+  limited to +-4). Pictures that are not used for reference are not
+  adapted.
+- **CRF** (`--crf X`, `--qcomp`): the base QP of a picture is
+  `X + 6 * (1 - qcomp) * log2(complexity / reference)`, where the
+  complexity is the low resolution inter cost blurred over the neighbouring
+  pictures of the same scene. The GOP QP offsets are applied on top as in
+  the constant QP mode. CRF X gives roughly the bitrate of QP X.
+- **ABR rate control** (`--bitrate N --rc-algorithm abr`): bits are
+  modelled per GOP position as `k * complexity / qscale^1.3` with k learned
+  from the coded pictures. Once per GOP the rate factor is chosen so that
+  the pictures up to the end of the lookahead hit the target bitrate after
+  correcting the error so far (including the pictures still being coded).
+  The base QP changes at most 2 per GOP.
+
+With `--lookahead 0` (the default) the encoder output is unchanged.
+
+Measured BD-rate (Y-PSNR) against constant QP with the same preset,
+QP 22..37 (bitrate targets taken from the constant QP runs), 96 frames of
+BQMall, BasketballDrillText, Johnny, ChinaSpeed and a BQMall /
+BasketballDrillText splice with two scene cuts, 2 threads:
+
+| Mode                                     | ultrafast | medium  |
+|------------------------------------------|-----------|---------|
+| `--lookahead 20 --no-cutree` (scene cut) | -1.5 %    |         |
+| `--lookahead 20`                         | -3.4 %    | -2.5 %  |
+| `--crf X`                                | -4.0 %    | -2.6 %  |
+| `--bitrate N` (lambda)                   | +17.7 %   | +22.5 % |
+| `--bitrate N --lookahead 20` (lambda)    | +13.4 %   |         |
+| `--bitrate N --rc-algorithm abr`         | +2.2 %    | +2.9 %  |
+
+The scene cut gain comes from the splice (-7.5 %), the other sequences
+have no cuts. The mean absolute bitrate error of the ABR mode on these
+short sequences is 3.3 % (ultrafast) / 7.5 % (medium) compared to 7.1 % /
+8.1 % with the lambda rate control. The lookahead analysis runs in the
+calling thread and costs about 15 % of the encoding time with ultrafast
+at 2560x1600 on two threads.
 
 ## Presets
 The names of the presets are the same as with x264: ultrafast,

@@ -506,6 +506,10 @@ if(NOT DEFINED MSVC)
     add_test( NAME test_intra COMMAND ${PROJECT_SOURCE_DIR}/tests/test_intra.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()
 
+  if(NOT "test_lookahead.sh" IN_LIST XFAIL)
+    add_test( NAME test_lookahead COMMAND ${PROJECT_SOURCE_DIR}/tests/test_lookahead.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
   if(NOT "test_rate_control.sh" IN_LIST XFAIL)
     add_test( NAME test_rate_control COMMAND ${PROJECT_SOURCE_DIR}/tests/test_rate_control.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()

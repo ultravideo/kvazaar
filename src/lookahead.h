@@ -45,7 +45,7 @@
  *  - CU-tree: temporal propagation of block importance into per-CTU QP
  *    offsets,
  *  - CRF: complexity based frame QP selection,
- *  - complexity based GOP bit allocation in the lambda rate control.
+ *  - ABR rate control (--rc-algorithm abr): complexity based bits model.
  */
 
 #include "global.h" // IWYU pragma: keep

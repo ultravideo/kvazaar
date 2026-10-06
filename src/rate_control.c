@@ -1156,7 +1156,9 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
     // Include the expected bits of the frames that are still being coded.
     const double error = rc->abr_total_bits + rc->abr_inflight_bits -
                          target * (rc->abr_frames + rc->abr_inflight_frames);
-    const double horizon = MAX((double)n, ABR_ERROR_SECONDS * framerate);
+    // Early in the sequence the error is corrected faster.
+    const double horizon = MAX((double)n, MIN(ABR_ERROR_SECONDS * framerate,
+                                              (double)(rc->abr_frames + rc->abr_inflight_frames)));
     double budget = target * n - error * n / horizon;
     budget = MAX(budget, 0.3 * target * n);
     double rate_factor = pow(budget / expected, 1.0 / ABR_GAMMA);
