@@ -1340,8 +1340,11 @@ void kvz_set_qg_qp_lambda(encoder_state_t * const state, int x, int y)
     return;
   }
   const int w32 = CEILDIV(ctrl->in.width, 32);
-  const int bx = (x + state->tile->offset_x) / 32;
-  const int by = (y + state->tile->offset_y) / 32;
+  const int h32 = CEILDIV(ctrl->in.height, 32);
+  // CUs of a CTU partially outside the picture may start below or to the
+  // right of the last quantization group of the offset array.
+  const int bx = MIN((x + state->tile->offset_x) / 32, w32 - 1);
+  const int by = MIN((y + state->tile->offset_y) / 32, h32 - 1);
   int qp = state->qp_base + (int)round(state->frame->aq_offsets32[bx + by * w32]);
   qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, qp);
   state->qp = CLIP_TO_QP(qp);
