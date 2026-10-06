@@ -39,6 +39,7 @@
 
 #include "encoder.h"
 #include "image.h"
+#include "threads.h"
 #include "strategies/strategies-picture.h"
 
 /** \brief Low resolution analysis block size in low resolution pixels. */
@@ -88,6 +89,8 @@ struct kvz_lookahead {
   int stride;         //!< low resolution stride
   int buf_height;
 
+  optimized_sad_func_ptr_t sad8;  //!< 8 pixel wide SAD, NULL if not available
+
   la_frame **queue;
   int count;
   int capacity;
@@ -122,12 +125,42 @@ struct kvz_lookahead {
   bool hist_key[LA_HIST];
 
   kvz_la_result *results;
+
+  // Analysis thread. The pictures are analysed in display order by a
+  // dedicated thread, or in kvz_lookahead_push when threads are disabled.
+  bool threaded;
+  pthread_t thread;
+  pthread_mutex_t lock;
+  pthread_cond_t cond;
+  bool stop;
+  int64_t analysed;     //!< number of analysed pictures (in display order)
+
+  /** \brief Display index of the last picture of the window used at the
+   *         latest release. Only pictures up to this one are read by the
+   *         rate control so that the results do not depend on timing. */
+  int64_t window_last;
 };
 
 
 static INLINE int hist_slot(int64_t index)
 {
   return (int)(index % LA_HIST);
+}
+
+
+/**
+ * \brief Temporal complexity of an analysed picture.
+ *
+ * The P-cost of the first picture of a scene is meaningless, the complexity
+ * of the following picture is used instead when it is within the window.
+ */
+static double frame_cost(const kvz_lookahead *la, int64_t index, int64_t last)
+{
+  const int slot = hist_slot(index);
+  if (la->hist_cut[slot] && index + 1 <= last && !la->hist_cut[hist_slot(index + 1)]) {
+    return la->hist_cost[hist_slot(index + 1)];
+  }
+  return la->hist_cost[slot];
 }
 
 
@@ -162,6 +195,9 @@ static la_frame *alloc_frame(const kvz_lookahead *la)
 }
 
 
+static void *analysis_thread(void *arg);
+
+
 kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
 {
   const kvz_config *cfg = &encoder->cfg;
@@ -179,6 +215,7 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   la->nblocks = la->bw * la->bh;
   la->stride = la->bw * LA_BLOCK + 2 * LA_PAD;
   la->buf_height = la->bh * LA_BLOCK + 2 * LA_PAD;
+  la->sad8 = kvz_get_optimized_sad(LA_BLOCK);
 
   la->capacity = la->depth + 4 * KVZ_MAX_GOP_LENGTH + 4;
   la->queue = calloc(la->capacity, sizeof(la_frame *));
@@ -213,6 +250,18 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   // equals the CRF value. Empirically tuned.
   la->crf_base_cost = (cfg->gop_len > 0 && !cfg->gop_lowdelay) ? 260.0 : 185.0;
 
+  la->window_last = -1;
+  pthread_mutex_init(&la->lock, NULL);
+  pthread_cond_init(&la->cond, NULL);
+  if (cfg->threads > 0) {
+    if (pthread_create(&la->thread, NULL, analysis_thread, la) != 0) {
+      fprintf(stderr, "Lookahead: failed to create the analysis thread.\n");
+      kvz_lookahead_free(la);
+      return NULL;
+    }
+    la->threaded = true;
+  }
+
   return la;
 }
 
@@ -220,6 +269,15 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
 void kvz_lookahead_free(kvz_lookahead *la)
 {
   if (!la) return;
+  if (la->threaded) {
+    pthread_mutex_lock(&la->lock);
+    la->stop = true;
+    pthread_cond_broadcast(&la->cond);
+    pthread_mutex_unlock(&la->lock);
+    pthread_join(la->thread, NULL);
+  }
+  pthread_mutex_destroy(&la->lock);
+  pthread_cond_destroy(&la->cond);
   for (int i = 0; i < la->count; i++) {
     free_frame(la->queue[i]);
   }
@@ -313,45 +371,37 @@ static uint32_t intra_block_cost(const kvz_lookahead *la, const la_frame *f, int
   top[LA_BLOCK] = has_top ? orig[-stride + LA_BLOCK - 1 + (bx + 1 < la->bw ? 1 : 0)] : top[LA_BLOCK - 1];
   left[LA_BLOCK] = has_left ? orig[LA_BLOCK * stride - 1 - (by + 1 < la->bh ? 0 : stride)] : left[LA_BLOCK - 1];
 
-  kvz_pixel pred[LA_BLOCK * LA_BLOCK];
-  uint32_t best = UINT32_MAX;
+  // Predictions: DC, vertical, horizontal and planar.
+  kvz_pixel pred[4][LA_BLOCK * LA_BLOCK];
+  int8_t valid[4] = { 1, has_top, has_left, has_top && has_left };
 
-  // DC
   {
     int sum = 0;
     int n = 0;
     if (has_top)  { for (int i = 0; i < LA_BLOCK; i++) sum += top[i];  n += LA_BLOCK; }
     if (has_left) { for (int i = 0; i < LA_BLOCK; i++) sum += left[i]; n += LA_BLOCK; }
     const kvz_pixel dc = n ? (kvz_pixel)((sum + n / 2) / n) : mid;
-    for (int i = 0; i < LA_BLOCK * LA_BLOCK; i++) pred[i] = dc;
-    best = MIN(best, kvz_satd_any_size(LA_BLOCK, LA_BLOCK, pred, LA_BLOCK, orig, stride));
+    for (int i = 0; i < LA_BLOCK * LA_BLOCK; i++) pred[0][i] = dc;
   }
-  // Vertical
-  if (has_top) {
-    for (int y = 0; y < LA_BLOCK; y++) {
-      for (int x = 0; x < LA_BLOCK; x++) pred[y * LA_BLOCK + x] = top[x];
-    }
-    best = MIN(best, kvz_satd_any_size(LA_BLOCK, LA_BLOCK, pred, LA_BLOCK, orig, stride));
-  }
-  // Horizontal
-  if (has_left) {
-    for (int y = 0; y < LA_BLOCK; y++) {
-      for (int x = 0; x < LA_BLOCK; x++) pred[y * LA_BLOCK + x] = left[y];
-    }
-    best = MIN(best, kvz_satd_any_size(LA_BLOCK, LA_BLOCK, pred, LA_BLOCK, orig, stride));
-  }
-  // Planar
-  if (has_top && has_left) {
+  {
     const int tr = top[LA_BLOCK];
     const int bl = left[LA_BLOCK];
     for (int y = 0; y < LA_BLOCK; y++) {
       for (int x = 0; x < LA_BLOCK; x++) {
+        pred[1][y * LA_BLOCK + x] = top[x];
+        pred[2][y * LA_BLOCK + x] = left[y];
         const int hor = (LA_BLOCK - 1 - x) * left[y] + (x + 1) * tr;
         const int ver = (LA_BLOCK - 1 - y) * top[x] + (y + 1) * bl;
-        pred[y * LA_BLOCK + x] = (kvz_pixel)((hor + ver + LA_BLOCK) >> 4);
+        pred[3][y * LA_BLOCK + x] = (kvz_pixel)((hor + ver + LA_BLOCK) >> 4);
       }
     }
-    best = MIN(best, kvz_satd_any_size(LA_BLOCK, LA_BLOCK, pred, LA_BLOCK, orig, stride));
+  }
+  const kvz_pixel *preds[4] = { pred[0], pred[1], pred[2], pred[3] };
+  unsigned costs[4];
+  kvz_satd_any_size_quad(LA_BLOCK, LA_BLOCK, preds, LA_BLOCK, orig, stride, 4, costs, valid);
+  uint32_t best = UINT32_MAX;
+  for (int i = 0; i < 4; i++) {
+    if (valid[i]) best = MIN(best, costs[i]);
   }
 
   // Constant for the mode signaling.
@@ -394,6 +444,9 @@ static INLINE void clamp_mv(const kvz_lookahead *la, int bx, int by, int *mvx, i
 static INLINE uint32_t block_sad(const kvz_lookahead *la, const kvz_pixel *orig,
                                  const kvz_pixel *ref, int mvx, int mvy)
 {
+  if (la->sad8) {
+    return la->sad8(orig, ref + mvy * la->stride + mvx, LA_BLOCK, la->stride, la->stride);
+  }
   return kvz_reg_sad(orig, ref + mvy * la->stride + mvx, LA_BLOCK, LA_BLOCK, la->stride, la->stride);
 }
 
@@ -566,6 +619,75 @@ static void decide_scenecut(kvz_lookahead *la, la_frame *f)
 }
 
 
+/**
+ * \brief Analyse a queued picture. Pictures are analysed in display order.
+ */
+static void analyse_picture(kvz_lookahead *la, la_frame *f)
+{
+  // The previous picture is either queued or the latest released one. It
+  // has been analysed and can not be freed before this picture is analysed.
+  pthread_mutex_lock(&la->lock);
+  la_frame *prev = NULL;
+  if (la->count > 0 && la->queue[0]->index < f->index) {
+    prev = la->queue[f->index - 1 - la->queue[0]->index];
+  } else if (la->retired && la->retired->index == f->index - 1) {
+    prev = la->retired;
+  }
+  pthread_mutex_unlock(&la->lock);
+
+  downscale(la, f->pic, f);
+  analyse_frame(la, f, prev);
+  decide_scenecut(la, f);
+
+  const int slot = hist_slot(f->index);
+  la->hist_cost[slot] = (double)f->inter_sum / la->nblocks;
+  la->hist_intra[slot] = (double)f->intra_sum / la->nblocks;
+  la->hist_cut[slot] = f->scenecut || f->index == 0;
+
+  pthread_mutex_lock(&la->lock);
+  la->analysed = f->index + 1;
+  pthread_cond_broadcast(&la->cond);
+  pthread_mutex_unlock(&la->lock);
+}
+
+
+static void *analysis_thread(void *arg)
+{
+  kvz_lookahead *la = arg;
+  pthread_mutex_lock(&la->lock);
+  for (;;) {
+    la_frame *f = NULL;
+    while (!la->stop) {
+      if (la->count > 0) {
+        const int64_t pos = la->analysed - la->queue[0]->index;
+        if (pos >= 0 && pos < la->count) {
+          f = la->queue[pos];
+          break;
+        }
+      }
+      pthread_cond_wait(&la->cond, &la->lock);
+    }
+    if (la->stop) break;
+    pthread_mutex_unlock(&la->lock);
+    analyse_picture(la, f);
+    pthread_mutex_lock(&la->lock);
+  }
+  pthread_mutex_unlock(&la->lock);
+  return NULL;
+}
+
+
+/** \brief Wait until the picture with the given display index is analysed. */
+static void wait_analysed(kvz_lookahead *la, int64_t index)
+{
+  pthread_mutex_lock(&la->lock);
+  while (la->analysed <= index) {
+    pthread_cond_wait(&la->cond, &la->lock);
+  }
+  pthread_mutex_unlock(&la->lock);
+}
+
+
 void kvz_lookahead_push(kvz_lookahead *la, kvz_picture *pic)
 {
   la_frame *f = alloc_frame(la);
@@ -577,41 +699,26 @@ void kvz_lookahead_push(kvz_lookahead *la, kvz_picture *pic)
   f->pic = kvz_image_copy_ref(pic);
   f->index = la->next_index++;
 
-  downscale(la, pic, f);
-
-  la_frame *prev = NULL;
-  if (la->count > 0) {
-    prev = la->queue[la->count - 1];
-  } else if (la->retired && la->retired->index == f->index - 1) {
-    prev = la->retired;
-  }
-  analyse_frame(la, f, prev);
-  decide_scenecut(la, f);
-
-  const int slot = hist_slot(f->index);
-  la->hist_cost[slot] = (double)f->inter_sum / la->nblocks;
-  la->hist_intra[slot] = (double)f->intra_sum / la->nblocks;
-  la->hist_cut[slot] = f->scenecut || f->index == 0;
-  if (f->index > 0 && !f->scenecut) {
-    const int prev_slot = hist_slot(f->index - 1);
-    if (la->hist_cut[prev_slot]) {
-      // The P-cost of the first frame of a scene is meaningless, use the
-      // temporal complexity of the following frame instead.
-      la->hist_cost[prev_slot] = la->hist_cost[slot];
-    }
-  }
-
+  pthread_mutex_lock(&la->lock);
   if (la->count == la->capacity) {
     la->capacity *= 2;
     la->queue = realloc(la->queue, la->capacity * sizeof(la_frame *));
   }
   la->queue[la->count++] = f;
+  pthread_cond_broadcast(&la->cond);
+  pthread_mutex_unlock(&la->lock);
+
+  if (!la->threaded) {
+    analyse_picture(la, f);
+  }
 }
 
 
 bool kvz_lookahead_next_is_scenecut(kvz_lookahead *la)
 {
-  return la->count > 0 && la->queue[0]->scenecut;
+  if (la->count == 0) return false;
+  wait_analysed(la, la->queue[0]->index);
+  return la->queue[0]->scenecut;
 }
 
 
@@ -623,17 +730,17 @@ bool kvz_lookahead_next_is_scenecut(kvz_lookahead *la)
  * information a block inherits from its reference is propagated to the
  * reference blocks pointed to by the motion vector.
  */
-static void cutree_propagate(kvz_lookahead *la)
+static void cutree_propagate(kvz_lookahead *la, int window)
 {
   const int bw = la->bw;
   const int bh = la->bh;
 
-  for (int i = 0; i < la->count; i++) {
+  for (int i = 0; i < window; i++) {
     float *prop = la->queue[i]->prop;
     for (int b = 0; b < la->nblocks; b++) prop[b] = 0.0f;
   }
 
-  for (int i = la->count - 1; i >= 1; i--) {
+  for (int i = window - 1; i >= 1; i--) {
     const la_frame *f = la->queue[i];
     la_frame *ref = la->queue[i - 1];
     if (!f->has_prev || f->scenecut) continue;
@@ -715,18 +822,19 @@ static double *cutree_ctu_offsets(const kvz_lookahead *la, const la_frame *f)
  * \brief Complexity of the frame blurred over the neighbouring frames of
  * the same scene.
  */
-static double blurred_cost(const kvz_lookahead *la, const la_frame *f)
+static double blurred_cost(const kvz_lookahead *la, const la_frame *f, int window)
 {
   const int64_t idx = f->index;
-  double sum = la->hist_cost[hist_slot(idx)];
+  const int64_t last = la->window_last;
+  double sum = frame_cost(la, idx, last);
   double wsum = 1.0;
 
-  // Future frames from the queue (queue[0] is f).
+  // Future frames from the window (queue[0] is f).
   double w = 1.0;
-  for (int k = 1; k <= LA_BLUR && k < la->count; k++) {
+  for (int k = 1; k <= LA_BLUR && k < window; k++) {
     if (la->queue[k]->scenecut) break;
     w *= 0.5;
-    sum += w * la->hist_cost[hist_slot(idx + k)];
+    sum += w * frame_cost(la, idx + k, last);
     wsum += w;
   }
   // Past frames.
@@ -734,7 +842,7 @@ static double blurred_cost(const kvz_lookahead *la, const la_frame *f)
   for (int k = 1; k <= LA_BLUR && idx - k >= 0 && k < LA_HIST - la->capacity; k++) {
     if (la->hist_cut[hist_slot(idx - k + 1)]) break;
     w *= 0.5;
-    sum += w * la->hist_cost[hist_slot(idx - k)];
+    sum += w * frame_cost(la, idx - k, last);
     wsum += w;
   }
   return sum / wsum;
@@ -745,6 +853,12 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
 {
   if (la->count == 0) return NULL;
 
+  // The window is the oldest depth pictures. The newest picture may still be
+  // under analysis while the encoder continues.
+  const int window = MIN(la->count, la->depth);
+  wait_analysed(la, la->queue[window - 1]->index);
+  la->window_last = la->queue[window - 1]->index;
+
   la_frame *f = la->queue[0];
 
   kvz_la_result *res = calloc(1, sizeof(kvz_la_result));
@@ -752,15 +866,15 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   res->pic = f->pic;
   res->index = f->index;
   res->scenecut = f->scenecut;
-  res->cost = la->hist_cost[hist_slot(f->index)];
+  res->cost = frame_cost(la, f->index, la->window_last);
   res->intra_cost = (double)f->intra_sum / la->nblocks;
 
   if (la->cutree) {
-    cutree_propagate(la);
+    cutree_propagate(la, window);
     res->ctu_offsets = cutree_ctu_offsets(la, f);
   }
 
-  res->blurred_cost = MAX(1.0, blurred_cost(la, f));
+  res->blurred_cost = MAX(1.0, blurred_cost(la, f, window));
   if (la->crf) {
     // qscale ~ complexity^(1 - qcomp), QP = 6 * log2(qscale) + const
     res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(res->blurred_cost / la->crf_base_cost);
@@ -770,6 +884,7 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   la->results = res;
 
   // Remove from the queue.
+  pthread_mutex_lock(&la->lock);
   memmove(&la->queue[0], &la->queue[1], (la->count - 1) * sizeof(la_frame *));
   la->count--;
 
@@ -777,8 +892,10 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   // data as it may be needed for the motion search of the next frame.
   kvz_picture *pic = f->pic;
   f->pic = NULL;
-  free_frame(la->retired);
+  la_frame *old = la->retired;
   la->retired = f;
+  pthread_mutex_unlock(&la->lock);
+  free_frame(old);
 
   return pic;
 }
@@ -811,18 +928,18 @@ void kvz_lookahead_free_result(kvz_la_result *res)
 
 int64_t kvz_lookahead_newest(const kvz_lookahead *la)
 {
-  return la ? la->next_index - 1 : -1;
+  return la ? la->window_last : -1;
 }
 
 
 bool kvz_lookahead_frame_info(const kvz_lookahead *la, int64_t index,
                               double *cost, double *intra, bool *key)
 {
-  if (!la || index < 0 || index >= la->next_index || index <= la->next_index - LA_HIST) {
+  if (!la || index < 0 || index > la->window_last || index <= la->window_last - LA_HIST + la->capacity) {
     return false;
   }
   const int slot = hist_slot(index);
-  *cost = MAX(1.0, la->hist_cost[slot]);
+  *cost = MAX(1.0, frame_cost(la, index, la->window_last));
   *intra = MAX(1.0, la->hist_intra[slot]);
   *key = la->hist_key[slot];
   return true;
