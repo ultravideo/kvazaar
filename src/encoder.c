@@ -243,7 +243,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   // Resolve the lookahead related automatic settings.
   {
     kvz_config *const c = &encoder->cfg;
-    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0;
+    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0 ||
+                                (c->target_bitrate > 0 && c->rc_algorithm == KVZ_ABR);
     if (c->lookahead == 0 && explicit_tools) {
       c->lookahead = 20;
       if (cfg->enable_logging_output) fprintf(stderr, "--lookahead set to %d.\n", c->lookahead);
@@ -253,8 +254,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       c->lookahead = 0;
     }
     if (c->lookahead == 0) {
-      if (c->crf >= 0) {
-        fprintf(stderr, "CRF requires the lookahead.\n");
+      if (c->crf >= 0 || c->rc_algorithm == KVZ_ABR) {
+        fprintf(stderr, "CRF and ABR rate control require the lookahead.\n");
         goto init_failed;
       }
       c->cutree = 0;
@@ -262,7 +263,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     } else {
       if (c->cutree < 0) c->cutree = 1;
       if (c->scenecut < 0) c->scenecut = 40;
-      if (c->cutree_strength < 0) c->cutree_strength = 5.0 * (1.0 - c->qcomp);
+      if (c->cutree_strength < 0) c->cutree_strength = 3.75 * (1.0 - c->qcomp);
     }
   }
 

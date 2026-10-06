@@ -72,6 +72,11 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->new_segment = false;
   state->frame->segment_start = 0;
   state->frame->la = NULL;
+  state->frame->abr_pending = false;
+  state->frame->abr_qscale = 0.0;
+  state->frame->abr_cost = 0.0;
+  state->frame->abr_class = 0;
+  state->frame->abr_expected_bits = 0.0;
 
   // Reset max_qp_delta_depth here, was causing problems when headers are requested before input is fed in
   state->frame->max_qp_delta_depth = 0;

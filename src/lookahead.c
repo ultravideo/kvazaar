@@ -53,10 +53,10 @@
 #define LA_HIST 1024
 /** \brief Frames used in each direction for CRF complexity blurring. */
 #define LA_BLUR 8
-/** \brief Number of past frames used for the ABR complexity normalization. */
-#define LA_ABR_PAST 96
 /** \brief Lagrange multiplier for the motion vector cost in the low-res search. */
 #define LA_MV_LAMBDA 4
+/** \brief Maximum absolute CU-tree QP offset of a CTU. */
+#define LA_CUTREE_MAX_OFFSET 4.0
 
 typedef struct la_frame {
   kvz_picture *pic;
@@ -117,7 +117,9 @@ struct kvz_lookahead {
 
   // Per frame history (ring buffer indexed by display index)
   double hist_cost[LA_HIST];
+  double hist_intra[LA_HIST];
   bool hist_cut[LA_HIST];
+  bool hist_key[LA_HIST];
 
   kvz_la_result *results;
 };
@@ -209,7 +211,7 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   la->qcomp = cfg->qcomp;
   // Reference complexity per low-res block, the cost at which the frame QP
   // equals the CRF value. Empirically tuned.
-  la->crf_base_cost = (cfg->gop_len > 0 && !cfg->gop_lowdelay) ? 60.0 : 40.0;
+  la->crf_base_cost = (cfg->gop_len > 0 && !cfg->gop_lowdelay) ? 260.0 : 185.0;
 
   return la;
 }
@@ -560,6 +562,7 @@ static void decide_scenecut(kvz_lookahead *la, la_frame *f)
     // Periodic intra picture.
     la->last_key = f->index;
   }
+  la->hist_key[hist_slot(f->index)] = la->last_key == f->index;
 }
 
 
@@ -587,6 +590,7 @@ void kvz_lookahead_push(kvz_lookahead *la, kvz_picture *pic)
 
   const int slot = hist_slot(f->index);
   la->hist_cost[slot] = (double)f->inter_sum / la->nblocks;
+  la->hist_intra[slot] = (double)f->intra_sum / la->nblocks;
   la->hist_cut[slot] = f->scenecut || f->index == 0;
   if (f->index > 0 && !f->scenecut) {
     const int prev_slot = hist_slot(f->index - 1);
@@ -691,6 +695,18 @@ static double *cutree_ctu_offsets(const kvz_lookahead *la, const la_frame *f)
       offsets[cx + cy * w_lcu] = n ? -la->cutree_strength * sum / n : 0.0;
     }
   }
+
+  // Only the distribution of the bits inside the frame is changed. The frame
+  // level QP is already adapted to the temporal structure by the GOP QP
+  // offsets, and applying the frame level part of the CU-tree on top of them
+  // was found to hurt the coding efficiency.
+  const int num_lcus = w_lcu * h_lcu;
+  double mean = 0.0;
+  for (int i = 0; i < num_lcus; i++) mean += offsets[i];
+  mean /= num_lcus;
+  for (int i = 0; i < num_lcus; i++) {
+    offsets[i] = CLIP(-LA_CUTREE_MAX_OFFSET, LA_CUTREE_MAX_OFFSET, offsets[i] - mean);
+  }
   return offsets;
 }
 
@@ -744,10 +760,10 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
     res->ctu_offsets = cutree_ctu_offsets(la, f);
   }
 
+  res->blurred_cost = MAX(1.0, blurred_cost(la, f));
   if (la->crf) {
-    const double cost = MAX(1.0, blurred_cost(la, f));
     // qscale ~ complexity^(1 - qcomp), QP = 6 * log2(qscale) + const
-    res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(cost / la->crf_base_cost);
+    res->crf_qp = la->crf_value + 6.0 * (1.0 - la->qcomp) * log2(res->blurred_cost / la->crf_base_cost);
   }
 
   res->next = la->results;
@@ -793,28 +809,22 @@ void kvz_lookahead_free_result(kvz_la_result *res)
 }
 
 
-double kvz_lookahead_bit_weight(kvz_lookahead *la, int64_t first, int64_t last)
+int64_t kvz_lookahead_newest(const kvz_lookahead *la)
 {
-  if (!la || la->next_index == 0) return 1.0;
-
-  const int64_t newest = la->next_index - 1;
-  const int64_t oldest = MAX(0, newest - (LA_HIST - 1));
-  first = CLIP(oldest, newest, first);
-  last = CLIP(first, newest, last);
-
-  double num = 0.0;
-  for (int64_t i = first; i <= last; i++) {
-    num += pow(MAX(1.0, la->hist_cost[hist_slot(i)]), la->qcomp);
-  }
-  num /= (double)(last - first + 1);
-
-  const int64_t den_first = MAX(oldest, first - LA_ABR_PAST);
-  double den = 0.0;
-  for (int64_t i = den_first; i <= newest; i++) {
-    den += pow(MAX(1.0, la->hist_cost[hist_slot(i)]), la->qcomp);
-  }
-  den /= (double)(newest - den_first + 1);
-
-  if (den <= 0.0) return 1.0;
-  return CLIP(0.5, 2.0, num / den);
+  return la ? la->next_index - 1 : -1;
 }
+
+
+bool kvz_lookahead_frame_info(const kvz_lookahead *la, int64_t index,
+                              double *cost, double *intra, bool *key)
+{
+  if (!la || index < 0 || index >= la->next_index || index <= la->next_index - LA_HIST) {
+    return false;
+  }
+  const int slot = hist_slot(index);
+  *cost = MAX(1.0, la->hist_cost[slot]);
+  *intra = MAX(1.0, la->hist_intra[slot]);
+  *key = la->hist_key[slot];
+  return true;
+}
+

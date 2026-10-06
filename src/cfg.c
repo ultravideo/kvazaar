@@ -492,7 +492,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
-  static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
+  static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", "abr", NULL };
 
   static const char * const file_format_names[] = {"auto", "y4m", "yuv", NULL};
 
@@ -1412,10 +1412,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("rc-algorithm") {
     int8_t rc_algorithm = 0;
     if (!parse_enum(value, rc_algorithm_names, &rc_algorithm)) {
-      fprintf(stderr, "Invalid rate control algorithm %s. Valid values include %s, %s, and %s\n", value, 
+      fprintf(stderr, "Invalid rate control algorithm %s. Valid values include %s, %s, %s and %s\n", value,
         rc_algorithm_names[0],
         rc_algorithm_names[1],
-        rc_algorithm_names[2]);
+        rc_algorithm_names[2],
+        rc_algorithm_names[3]);
       return 0;
     }
     cfg->rc_algorithm = rc_algorithm;

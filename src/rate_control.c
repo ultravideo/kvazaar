@@ -196,22 +196,6 @@ static double gop_allocate_bits(encoder_state_t * const state)
       state->frame->new_ratecontrol->smoothing_window += 10;
     }
   }
-  // Use the lookahead to give more bits to GOPs that are more complex than
-  // the surrounding frames.
-  const kvz_la_result *la = state->frame->la;
-  if (la && encoder->lookahead) {
-    int64_t first = la->index;
-    int64_t last = la->index;
-    if (!state->frame->new_segment && encoder->cfg.gop_len > 0) {
-      if (encoder->cfg.gop_lowdelay) {
-        last = la->index + encoder->cfg.gop_len - 1;
-      } else {
-        first = la->index - encoder->cfg.gop_len + 1;
-      }
-    }
-    gop_target_bits *= kvz_lookahead_bit_weight(encoder->lookahead, first, last);
-  }
-
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
@@ -1026,6 +1010,196 @@ void kvz_update_after_picture(encoder_state_t * const state) {
  * \brief Allocate bits and set lambda and QP for the current picture.
  * \param state the main encoder state
  */
+/**
+ * \brief Frame QP from a base QP using the GOP QP offsets as in CQP mode.
+ */
+static int8_t gop_frame_qp(const encoder_state_t * const state, double base_qp)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
+
+  if (ctrl->cfg.gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
+    double qp = base_qp;
+    qp += gop->qp_offset;
+    qp += CLIP(0.0, 3.0, qp * gop->qp_model_scale + gop->qp_model_offset);
+    return CLIP_TO_QP((int)(qp + 0.5));
+  }
+  return CLIP_TO_QP((int)(base_qp + ctrl->cfg.intra_qp_offset + 0.5));
+}
+
+
+static INLINE double qp_to_qscale(double qp)
+{
+  return 0.85 * pow(2.0, (qp - 12.0) / 6.0);
+}
+
+
+static INLINE double qscale_to_qp(double qscale)
+{
+  return 12.0 + 6.0 * log2(qscale / 0.85);
+}
+
+
+/** \brief Prior of the ABR bits model for inter pictures, per pixel. */
+#define ABR_PRIOR_K_INTER 0.0015
+/** \brief Prior of the ABR bits model for intra pictures, per pixel. */
+#define ABR_PRIOR_K_INTRA 0.005
+/** \brief Adaptation speed of the ABR bits model. */
+#define ABR_K_ALPHA 0.3
+/** \brief Time in seconds over which the bitrate error is corrected. */
+#define ABR_ERROR_SECONDS 2.0
+/** \brief Maximum change of the base QP between GOPs. */
+#define ABR_MAX_QP_STEP 2.0
+/** \brief Exponent of the quantizer scale in the bits model. */
+#define ABR_GAMMA 1.3
+
+
+static double abr_class_k(const encoder_control_t *const ctrl, const kvz_rc_data *rc, int cls)
+{
+  const int intra_class = KVZ_MAX_GOP_LENGTH;
+  if (rc->abr_k_count[cls] > 0) return rc->abr_k[cls];
+  if (cls == intra_class) return ABR_PRIOR_K_INTRA * ctrl->in.pixels_per_pic;
+
+  // Use the average of the observed inter classes.
+  double sum = 0.0;
+  int n = 0;
+  for (int i = 0; i < MAX(1, ctrl->cfg.gop_len); i++) {
+    if (rc->abr_k_count[i] > 0) {
+      sum += rc->abr_k[i];
+      n++;
+    }
+  }
+  return n ? sum / n : ABR_PRIOR_K_INTER * ctrl->in.pixels_per_pic;
+}
+
+
+/**
+ * \brief Set the frame QP for the lookahead based average bitrate control.
+ *
+ * One pass ABR in the spirit of x264. The bits of a frame are modelled as
+ *   bits = k * complexity / qscale^gamma
+ * with a separate k for each GOP position and for intra pictures. The base
+ * quantizer scale of a frame is
+ *   qscale = complexity^(1 - qcomp) / rate_factor
+ * where the rate factor is chosen so that the frames from the current GOP to
+ * the end of the lookahead would hit the target bitrate, after correcting
+ * the bitrate error accumulated so far. The GOP QP offsets are applied on
+ * top of the base QP like in the CQP mode.
+ */
+void kvz_set_picture_qp_abr(encoder_state_t * const state)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  kvz_rc_data *rc = state->frame->new_ratecontrol;
+  const int intra_class = KVZ_MAX_GOP_LENGTH;
+  const double qcomp = ctrl->cfg.qcomp;
+
+  // Account the frame previously coded by this encoder state. Its bitstream
+  // has been written since the state is being reused.
+  if (state->frame->abr_pending) {
+    const double bits = (double)state->stats_bitstream_length * 8;
+    const int cls = state->frame->abr_class;
+    const double k = bits * pow(state->frame->abr_qscale, ABR_GAMMA) / state->frame->abr_cost;
+    if (rc->abr_k_count[cls] == 0) {
+      rc->abr_k[cls] = k;
+    } else {
+      rc->abr_k[cls] += ABR_K_ALPHA * (k - rc->abr_k[cls]);
+    }
+    rc->abr_k_count[cls]++;
+    rc->abr_total_bits += bits;
+    rc->abr_frames++;
+    rc->abr_inflight_bits -= state->frame->abr_expected_bits;
+    rc->abr_inflight_frames--;
+    state->frame->abr_pending = false;
+  }
+
+  const kvz_la_result *la = state->frame->la;
+  const double framerate = ctrl->cfg.framerate_num != 0 ?
+    ctrl->cfg.framerate_num / (double)ctrl->cfg.framerate_denom : ctrl->cfg.framerate;
+  const double target = ctrl->target_avg_bppic;
+
+  // Expected bits of the window of frames at rate factor 1.
+  int64_t first = la ? la->index : 0;
+  if (la && ctrl->cfg.gop_len > 0 && !ctrl->cfg.gop_lowdelay && !state->frame->new_segment) {
+    first = MAX(0, la->index - ctrl->cfg.gop_len + 1);
+  }
+  const int64_t last = kvz_lookahead_newest(ctrl->lookahead);
+  double k_avg = 0.0;
+  {
+    const int classes = MAX(1, ctrl->cfg.gop_len);
+    for (int i = 0; i < classes; i++) k_avg += abr_class_k(ctrl, rc, i);
+    k_avg /= classes;
+  }
+  const double k_intra = abr_class_k(ctrl, rc, intra_class);
+
+  double expected = 0.0;
+  int n = 0;
+  for (int64_t i = first; i <= last; i++) {
+    double cost, intra;
+    bool key;
+    if (!kvz_lookahead_frame_info(ctrl->lookahead, i, &cost, &intra, &key)) continue;
+    const double rceq = pow(cost, (1.0 - qcomp) * ABR_GAMMA);
+    if (key) {
+      expected += k_intra * intra / rceq;
+    } else {
+      expected += k_avg * cost / rceq;
+    }
+    n++;
+  }
+
+  // The rate factor is updated once per GOP so that all the pictures of a
+  // GOP use the same rate factor.
+  const bool gop_start = ctrl->cfg.gop_len == 0 || ctrl->cfg.gop_lowdelay ||
+                         state->frame->gop_offset == 0 || state->frame->new_segment ||
+                         rc->abr_rate_factor <= 0.0;
+  if (gop_start && n > 0 && expected > 0.0) {
+    // Spread the accumulated error over ABR_ERROR_SECONDS.
+    // Include the expected bits of the frames that are still being coded.
+    const double error = rc->abr_total_bits + rc->abr_inflight_bits -
+                         target * (rc->abr_frames + rc->abr_inflight_frames);
+    const double horizon = MAX((double)n, ABR_ERROR_SECONDS * framerate);
+    double budget = target * n - error * n / horizon;
+    budget = MAX(budget, 0.3 * target * n);
+    double rate_factor = pow(budget / expected, 1.0 / ABR_GAMMA);
+    if (rc->abr_rate_factor > 0.0 && !state->frame->new_segment) {
+      // Limit the change of the base QP between GOPs.
+      const double max_step = ABR_MAX_QP_STEP;
+      rate_factor = CLIP(rc->abr_rate_factor * pow(2.0, -max_step / 6.0),
+                         rc->abr_rate_factor * pow(2.0, max_step / 6.0),
+                         rate_factor);
+    }
+    rc->abr_rate_factor = rate_factor;
+  }
+
+  double qscale;
+  if (rc->abr_rate_factor > 0.0) {
+    const double cost = la ? MAX(1.0, la->blurred_cost) : 1.0;
+    qscale = pow(cost, 1.0 - qcomp) / rc->abr_rate_factor;
+  } else {
+    qscale = qp_to_qscale(ctrl->cfg.qp);
+  }
+
+  const double base_qp = CLIP(0.0, 51.0, qscale_to_qp(qscale));
+
+  state->frame->abr_pending = true;
+  state->frame->abr_qscale = qp_to_qscale(base_qp);
+  state->frame->abr_class = state->frame->is_irap ? intra_class :
+                            (ctrl->cfg.gop_len > 0 ? state->frame->gop_offset : 0);
+  if (la) {
+    state->frame->abr_cost = state->frame->is_irap ? MAX(1.0, la->intra_cost) : MAX(1.0, la->cost);
+  } else {
+    state->frame->abr_cost = 1.0;
+  }
+  state->frame->abr_expected_bits = abr_class_k(ctrl, rc, state->frame->abr_class) *
+                                    state->frame->abr_cost /
+                                    pow(state->frame->abr_qscale, ABR_GAMMA);
+  rc->abr_inflight_bits += state->frame->abr_expected_bits;
+  rc->abr_inflight_frames++;
+
+  state->frame->QP = gop_frame_qp(state, base_qp);
+  state->frame->lambda = qp_to_lambda(state, state->frame->QP);
+}
+
+
 void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
@@ -1130,7 +1304,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
   }
-  else if (ctrl->cfg.target_bitrate > 0) {
+  else if (ctrl->cfg.target_bitrate > 0 && ctrl->cfg.rc_algorithm == KVZ_LAMBDA) {
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
 

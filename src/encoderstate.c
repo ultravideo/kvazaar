@@ -663,6 +663,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   switch (encoder->cfg.rc_algorithm) {
     case KVZ_NO_RC:
     case KVZ_LAMBDA:
+    case KVZ_ABR:
       kvz_set_lcu_lambda_and_qp(state, lcu->position);
       break;
     case KVZ_OBA:
@@ -1730,6 +1731,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       break;
     case KVZ_OBA:
       kvz_estimate_pic_lambda(state);
+      break;
+    case KVZ_ABR:
+      kvz_set_picture_qp_abr(state);
       break;
     default:
       assert(0);

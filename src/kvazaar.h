@@ -241,6 +241,7 @@ enum kvz_rc_algorithm
   KVZ_NO_RC = 0,
   KVZ_LAMBDA = 1,
   KVZ_OBA = 2,
+  KVZ_ABR = 3, //!< Lookahead complexity based average bitrate
 };
 
 enum kvz_file_format
@@ -519,7 +520,7 @@ typedef struct kvz_config
   /** \brief CU-tree temporal QP adaptation. -1: auto (on with lookahead). */
   int8_t cutree;
 
-  /** \brief CU-tree QP offset strength. Negative: auto, 5 * (1 - qcomp). */
+  /** \brief CU-tree QP offset strength. Negative: auto, 3.75 * (1 - qcomp). */
   double cutree_strength;
 
   /** \brief Scene cut detection threshold 0..100. 0 disables, -1: auto. */

@@ -121,6 +121,17 @@ typedef struct encoder_state_config_frame_t {
   /** \brief Lookahead analysis results for the frame, NULL if not available. */
   struct kvz_la_result *la;
 
+  /** \brief ABR rate control: the frame has not been accounted yet. */
+  bool abr_pending;
+  /** \brief ABR rate control: quantizer scale used for the frame. */
+  double abr_qscale;
+  /** \brief ABR rate control: complexity of the frame for the bits model. */
+  double abr_cost;
+  /** \brief ABR rate control: expected bits of the frame. */
+  double abr_expected_bits;
+  /** \brief ABR rate control: bits model class of the frame. */
+  int abr_class;
+
   /**
    * \brief Frame-level quantization parameter
    *

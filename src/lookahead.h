@@ -65,6 +65,7 @@ typedef struct kvz_la_result {
   bool scenecut;            //!< frame starts a new scene (encoded as IDR)
   double cost;              //!< inter (P) cost of the frame per low-res block
   double intra_cost;        //!< intra cost of the frame per low-res block
+  double blurred_cost;      //!< cost blurred over neighbouring frames
   double crf_qp;            //!< base QP chosen by the CRF model (if CRF)
   double *ctu_offsets;      //!< CU-tree QP offset per CTU, NULL if not used
   struct kvz_la_result *next;
@@ -109,13 +110,18 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la);
 kvz_la_result *kvz_lookahead_take_result(kvz_lookahead *la, const kvz_picture *pic);
 void kvz_lookahead_free_result(kvz_la_result *res);
 
+/** \brief Display index of the newest analysed frame, -1 if none. */
+int64_t kvz_lookahead_newest(const kvz_lookahead *la);
+
 /**
- * \brief Relative bit allocation weight of display frames [first, last].
+ * \brief Complexity of an analysed frame.
  *
- * Returns the complexity of the given frames compared to the average
- * complexity of the surrounding frames, including the frames still in the
- * lookahead. 1.0 means average complexity.
+ * \param cost   inter (P) cost per low-res block
+ * \param intra  intra cost per low-res block
+ * \param key    whether the frame is expected to be coded as an intra picture
+ * \return false if the frame is not available
  */
-double kvz_lookahead_bit_weight(kvz_lookahead *la, int64_t first, int64_t last);
+bool kvz_lookahead_frame_info(const kvz_lookahead *la, int64_t index,
+                              double *cost, double *intra, bool *key);
 
 #endif // LOOKAHEAD_H_
