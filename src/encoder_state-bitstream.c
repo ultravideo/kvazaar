@@ -466,12 +466,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     // hide one line or show an extra line of non-video. Neither seems like a
     // very good option, so let's not even try.
     assert(!(encoder->in.width % 2));
+    // The offsets are in units of SubWidthC x SubHeightC (Table 6-1).
+    const enum kvz_chroma_format csp = encoder->cfg.chroma_format;
+    const int sub_width_c = (csp == KVZ_CSP_420 || KVZ_IS_422(csp)) ? 1 : 0;
+    const int sub_height_c = (csp == KVZ_CSP_420) ? 1 : 0;
     WRITE_U(stream, 1, 1, "conformance_window_flag");
     WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
+    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> sub_width_c,
              "conf_win_right_offset");
     WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
+    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> sub_height_c,
              "conf_win_bottom_offset");
   } else {
     WRITE_U(stream, 0, 1, "conformance_window_flag");
