@@ -1597,9 +1597,11 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   state->frame->la = kvz_lookahead_take_result(state->encoder_control->lookahead, frame);
 
   if (cfg->adaptive_gop && state->frame->la && state->frame->la->gop_size > 0) {
-    state->frame->gop_offset = (int8_t)kvz_lookahead_gop_template(cfg, state->frame->la->gop_size,
-                                                                 state->frame->la->gop_pos,
-                                                                 state->frame->la->gop_span);
+    const kvz_la_result *la = state->frame->la;
+    // A non-reference (flash) picture uses the settings of the highest layer.
+    state->frame->gop_offset = (int8_t)kvz_lookahead_gop_template(cfg, la->gop_size,
+                                                                 la->gop_nonref ? 1 : la->gop_pos,
+                                                                 la->gop_nonref ? 1 : la->gop_span);
   }
 
   encoder_set_source_picture(state, frame);

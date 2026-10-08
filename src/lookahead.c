@@ -98,6 +98,7 @@ typedef struct la_frame {
   bool scenecut;
   bool segstart;      //!< starts a new coded video sequence (IDR)
   bool flash_checked; //!< adaptive GOP: checked for a flash
+  bool disturbed;     //!< adaptive GOP: flash picture, coded as non-reference
   int64_t segment_start; //!< display index of the first picture of the scene
 
   bool mctf_done;          //!< temporal filtering has been considered
@@ -1438,9 +1439,12 @@ static void agop_order(kvz_la_result **res, int avail, int lo, int hi, int8_t *c
     }
     order[(*num)++] = mid;
   }
-  chain[chain_len] = (int8_t)mid;
-  agop_order(res, avail, lo, mid, chain, chain_len + 1, order, num);
-  agop_order(res, avail, mid, hi, chain, chain_len + 1, order, num);
+  // A non-reference picture is not a reference of the pictures below it.
+  const bool ref = mid > avail || !res[mid - 1]->gop_nonref;
+  if (ref) chain[chain_len] = (int8_t)mid;
+  const int len = chain_len + (ref ? 1 : 0);
+  agop_order(res, avail, lo, mid, chain, len, order, num);
+  agop_order(res, avail, mid, hi, chain, len, order, num);
 }
 
 
@@ -1450,22 +1454,28 @@ static void agop_order(kvz_la_result **res, int avail, int lo, int hi, int8_t *c
  * The scene cut is a flash (or another short disturbance) if one of the
  * following pictures is predicted well from the picture before the cut.
  */
-static bool agop_is_flash(kvz_lookahead *la, int64_t c, int64_t last)
+static int agop_is_flash(kvz_lookahead *la, int64_t c, int64_t last)
 {
   const la_frame *before = frame_at(la, c - 1);
-  if (!before) return false;
+  if (!before) return 0;
   memset(la->s_seed, 0, la->nblocks * 2 * sizeof(int16_t));
   for (int k = 1; k <= LA_FLASH_LEN && c + k <= last; k++) {
     const la_frame *g = frame_at(la, c + k);
     if (!g) break;
     const double cost = pair_cost(la, g, before, la->s_seed, false, la->s_mv[0], NULL);
-    if (cost < LA_FLASH_RATIO * (double)g->intra_sum) return true;
+    if (cost < LA_FLASH_RATIO * (double)g->intra_sum) return k;
   }
-  return false;
+  return 0;
 }
 
 
-/** \brief Adaptive GOP: remove the scene cuts that are flashes. */
+/**
+ * \brief Adaptive GOP: remove the scene cuts that are flashes.
+ *
+ * The pictures of a flash are marked as disturbed. They are coded as
+ * non-reference pictures (except an unavoidable anchor) with the QP of the
+ * highest GOP layer, and the mini-GOP anchors avoid them.
+ */
 static void agop_remove_flashes(kvz_lookahead *la)
 {
   const int64_t last = la->queue[la->count - 1]->index;
@@ -1475,10 +1485,12 @@ static void agop_remove_flashes(kvz_lookahead *la)
     g->flash_checked = true;
     const int64_t until = MIN(g->index + LA_FLASH_LEN, last);
     wait_analysed(la, until);
-    if (!agop_is_flash(la, g->index, until)) continue;
+    const int len = agop_is_flash(la, g->index, until);
+    if (len == 0) continue;
     // The pictures of the flash are coded in the scene.
     for (int k = 0; k <= LA_FLASH_LEN && i + k < la->count; k++) {
       la_frame *h = la->queue[i + k];
+      if (k < len) h->disturbed = true;
       if (!h->scenecut) continue;
       h->scenecut = false;
       h->segstart = false;
@@ -1537,6 +1549,18 @@ static void agop_plan(kvz_lookahead *la)
   int n = 1;
   while (n * 2 <= max_n) n *= 2;
   while (n > 1 && agop_split(la, s, n)) n /= 2;
+  if (la->queue[n - 1]->disturbed) {
+    // The anchor is a reference of the following mini-GOPs, so a flash
+    // picture is avoided: the nearest length with another anchor.
+    int best = n;
+    for (int m = n / 2; m >= 1 && best == n; m /= 2) {
+      if (!la->queue[m - 1]->disturbed) best = m;
+    }
+    for (int m = n * 2; m <= max_n && best == n; m *= 2) {
+      if (!la->queue[m - 1]->disturbed) best = m;
+    }
+    n = best;
+  }
   la->plan.n = n;
   la->plan.n_struct = n;
 
@@ -1574,10 +1598,13 @@ static void agop_next(kvz_lookahead *la)
 
   kvz_picture *pics[KVZ_MAX_GOP_LENGTH];
   kvz_la_result *res[KVZ_MAX_GOP_LENGTH];
+  bool nonref[KVZ_MAX_GOP_LENGTH];
   for (int i = 0; i < n; i++) {
     const int pos = i + 1;
+    // Flash pictures other than the anchor are not used as references.
+    nonref[i] = la->queue[0]->disturbed && !(pos == n && n == n_struct);
     // Only the pictures high in the hierarchy are temporally filtered.
-    const bool use_filter = (pos & -pos) >= 4 || (pos == n && n == n_struct);
+    const bool use_filter = !nonref[i] && ((pos & -pos) >= 4 || (pos == n && n == n_struct));
     res[i] = NULL;
     pics[i] = pop_one(la, use_filter, &res[i]);
     assert(pics[i] && res[i]);
@@ -1600,6 +1627,7 @@ static void agop_next(kvz_lookahead *la)
     res[i]->gop_span = n_struct;
     res[i]->gop_key = false;
     res[i]->gop_poc = (int32_t)(res[i]->index - la->agop_seg);
+    res[i]->gop_nonref = nonref[i];
   }
   res[n - 1]->gop_key = key;
 

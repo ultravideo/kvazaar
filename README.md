@@ -488,7 +488,12 @@ and motion search on 8x8 low resolution blocks. The analysis is used by:
   - Flashes: a scene cut is cancelled when one of the next three pictures
     is predicted well (inter cost below 0.7 * intra cost) from the
     picture before the cut, so a flash or a short disturbance does not
-    insert IDR pictures.
+    insert IDR pictures. The flash pictures are coded as non-reference
+    pictures with the QP of the highest GOP layer, they are left out of
+    the references of the other pictures and a mini-GOP anchor is moved
+    off a flash picture (to the nearest power of two length). Fades are
+    still coded as references: coding the pictures of a cross-fade or a
+    fade to black as non-reference pictures was 33-69 % worse.
 
   The pictures are held in the lookahead for 2 * `--gop` more pictures
   (latency and memory). The ABR bits model averages the GOP positions of
@@ -541,7 +546,11 @@ Most of the gain of the natural sequences comes from the 32 picture
 mini-GOPs. Shorter mini-GOPs than the GOP table were worse on all of these
 sequences (`--gop 16` content coded as GOP 8: +1.0..+5.1 %), so the model
 splits a mini-GOP only with a clear margin. The flash sequence gains from
-not inserting IDR pictures at the flashes. The CPU time is 0-5 % higher.
+not inserting IDR pictures at the flashes. Coding the flash pictures as
+non-reference pictures gives a further -4.8 % (ultrafast) / -3.7 %
+(medium) on it, and -21.1 % / -15.6 % on a version with weaker (+30 luma)
+flashes where a 32 picture anchor fell on a flash; the other sequences
+are unchanged. The CPU time is 0-5 % higher.
 
 `--cutree-qg32` (CU-tree offsets per 32x32 quantization group instead of
 per CTU) is experimental and off by default: -3.4 % at ultrafast like the

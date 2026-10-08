@@ -101,6 +101,7 @@ typedef struct kvz_la_result {
   int32_t gop_poc;          //!< POC, display index relative to the IDR picture
   int gop_num_refs;         //!< number of references of a non-anchor picture
   int8_t gop_refs[KVZ_LA_MAX_GOP_REFS]; //!< POC deltas of the references
+  bool gop_nonref;          //!< flash picture coded as non-reference
 
   struct kvz_la_result *next;
 } kvz_la_result;
