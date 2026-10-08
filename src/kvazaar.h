@@ -539,6 +539,10 @@ typedef struct kvz_config
   /** \brief CU-tree QP offsets for 32x32 quantization groups (experimental). -1: auto (off). */
   int8_t cutree_qg32;
 
+  /** \brief Adaptive GOP: the lookahead chooses the length of each random
+   *         access mini-GOP and places the periodic key pictures. */
+  int8_t adaptive_gop;
+
 } kvz_config;
 
 /**
@@ -588,6 +592,8 @@ typedef struct kvz_picture {
     int height;
     int8_t *roi_array;
   } roi;
+
+  int8_t gop_layer; //!< \brief GOP layer of a reconstructed picture (adaptive GOP).
 
 } kvz_picture;
 

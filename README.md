@@ -220,6 +220,13 @@ Video structure:
                                the GOP key pictures before coding (random
                                access GOP). Enables the lookahead.
                                [disabled]
+      --(no-)adaptive-gop    : The lookahead chooses the length of each
+                               random access mini-GOP (1..2 * --gop), places
+                               the periodic intra pictures at mini-GOP
+                               anchors (--period is the maximum distance)
+                               and does not treat flashes as scene cuts.
+                               Enables the lookahead, adds 2 * --gop
+                               pictures of latency. [disabled]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -458,6 +465,36 @@ and motion search on 8x8 low resolution blocks. The analysis is used by:
   (-4.1 % ultrafast, -2.8 % medium, -0.6 % veryslow on top of the other
   lookahead tools, up to 5 % more time).
 
+- **Adaptive GOP** (`--adaptive-gop`, random access GOP of 8 or 16): the
+  pictures are released from the lookahead in coding order, one mini-GOP
+  at a time, and the lookahead decides the structure:
+  - Mini-GOP length: hierarchical mini-GOPs of 1 to 2 * `--gop` pictures.
+    A mini-GOP is halved when the low resolution cost of the anchor
+    predicted over the whole length plus the bi-predicted middle picture
+    is more than 1.25 times the cost of the two halves predicted as
+    anchors (searches seeded by the followed motion, range +-87 low
+    resolution pixels). The pictures keep the QP and layer settings of
+    the GOP table pictures at the same distance from their references. A
+    32 picture mini-GOP uses the settings of the GOP 16 anchor for its
+    middle picture and a 3 lower QP offset for its anchor.
+  - References: a picture keeps the ends of the enclosing intervals of the
+    hierarchy (and one earlier picture as in the GOP tables), an anchor
+    the three pictures of the lowest layers. With mini-GOPs of `--gop`
+    pictures the output is identical to the GOP tables.
+  - Intra pictures: the periodic intra picture is the first mini-GOP
+    anchor within the last `--gop` / 2 pictures of `--period` (a CRA, or
+    an IDR with a closed GOP), so the mini-GOPs are not broken up before
+    it. `--period` no longer needs to be a multiple of `--gop`.
+  - Flashes: a scene cut is cancelled when one of the next three pictures
+    is predicted well (inter cost below 0.7 * intra cost) from the
+    picture before the cut, so a flash or a short disturbance does not
+    insert IDR pictures.
+
+  The pictures are held in the lookahead for 2 * `--gop` more pictures
+  (latency and memory). The ABR bits model averages the GOP positions of
+  the longest mini-GOP, and the rate factor is updated at the anchors and
+  at the starts of the halves of the 32 picture mini-GOPs.
+
 The lookahead analysis runs in its own thread when threads are enabled.
 The results do not depend on the number of threads. With `--lookahead 0`
 (the default) the encoder output is unchanged.
@@ -482,6 +519,29 @@ With `--preset veryslow` (64 frames of the same sequences) `--lookahead
 temporal filter (AVX2 motion search) adds about 80 ms of CPU time per
 filtered 832x480 picture (one in eight pictures), about 4 % of the
 veryslow encoding time but 1.8x the ultrafast time.
+
+`--adaptive-gop` against `--lookahead 20` with the same preset (constant
+QP 22-37, the first 96-144 pictures, `--period 64`):
+
+| Sequence                     | ultrafast | medium  |
+|------------------------------|-----------|---------|
+| BQMall                       | -0.6 %    | -1.0 %  |
+| BasketballDrillText          | -3.0 %    |         |
+| Foreman                      | -3.3 %    | -1.0 %  |
+| ChinaSpeed                   | -0.7 %    |         |
+| Johnny                       | -3.0 %    | -2.4 %  |
+| KristenAndSara               | -2.7 %    |         |
+| SlideShow                    | -5.6 %    | -5.0 %  |
+| Stockholm 1x / 4x speed mix  | -2.2 %    |         |
+| Stockholm 4x speed           | -5.7 %    | -4.0 %  |
+| Johnny-Kristen cross-fade    | -4.6 %    | -3.3 %  |
+| Stockholm with 4 flashes     | -43.9 %   | -42.3 % |
+
+Most of the gain of the natural sequences comes from the 32 picture
+mini-GOPs. Shorter mini-GOPs than the GOP table were worse on all of these
+sequences (`--gop 16` content coded as GOP 8: +1.0..+5.1 %), so the model
+splits a mini-GOP only with a clear margin. The flash sequence gains from
+not inserting IDR pictures at the flashes. The CPU time is 0-5 % higher.
 
 `--cutree-qg32` (CU-tree offsets per 32x32 quantization group instead of
 per CTU) is experimental and off by default: -3.4 % at ultrafast like the

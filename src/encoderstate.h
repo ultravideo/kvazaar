@@ -121,6 +121,11 @@ typedef struct encoder_state_config_frame_t {
   /** \brief Lookahead analysis results for the frame, NULL if not available. */
   struct kvz_la_result *la;
 
+  /** \brief Adaptive GOP: number of IRAP pictures coded so far. */
+  int32_t agop_irap_count;
+  /** \brief Adaptive GOP: frame number of the latest IRAP picture. */
+  int32_t agop_irap_num;
+
   /** \brief ABR rate control: the frame has not been accounted yet. */
   bool abr_pending;
   /** \brief ABR rate control: quantizer scale used for the frame. */

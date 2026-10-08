@@ -101,6 +101,17 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Check for closed gop, we need an extra frame in the buffer in this case
   if (!cfg->open_gop && cfg->intra_period > 0 && cfg->gop_len > 0) is_closed_gop = true;
 
+  if (cfg->adaptive_gop) {
+    // The lookahead releases the pictures in coding order and sets the
+    // DTS. The GOP structure comes with the lookahead results.
+    if (img_in == NULL) return NULL;
+    state->frame->gop_offset = 0;
+    state->frame->new_segment = buf->num_out == 0;
+    buf->num_in++;
+    buf->num_out++;
+    return kvz_image_copy_ref(img_in);
+  }
+
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
     // No reordering of output pictures necessary.
 

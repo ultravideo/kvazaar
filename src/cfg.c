@@ -210,6 +210,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vbv_init = 0.9;
   cfg->mctf = 0;
   cfg->cutree_qg32 = -1;
+  cfg->adaptive_gop = 0;
 
   return 1;
 }
@@ -1494,6 +1495,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("cutree-qg32") {
     cfg->cutree_qg32 = (int8_t)atobool(value);
   }
+  else if OPT("adaptive-gop") {
+    cfg->adaptive_gop = (int8_t)atobool(value);
+  }
   else if OPT("cross-comp-pred") {
     cfg->enable_cross_component_prediction = atobool(value);
   }
@@ -1665,6 +1669,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->gop_len &&
       cfg->intra_period > 1 &&
       !cfg->gop_lowdelay &&
+      !cfg->adaptive_gop &&
       cfg->intra_period % cfg->gop_len != 0)
   {
     fprintf(stderr,

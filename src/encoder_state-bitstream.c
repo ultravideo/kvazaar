@@ -46,6 +46,7 @@
 #include "imagelist.h"
 #include "kvazaar.h"
 #include "kvz_math.h"
+#include "lookahead.h"
 #include "nal.h"
 #include "scalinglist.h"
 #include "sei.h"
@@ -155,11 +156,22 @@ static uint8_t max_required_dpb_size(const encoder_control_t * const encoder)
 
   if (encoder->cfg.gop_len == 0) max_buffer = encoder->cfg.ref_frames + 1;
 
+  if (encoder->cfg.adaptive_gop) {
+    // The pictures at the ends of the enclosing intervals and the current one.
+    max_buffer = MAX(max_buffer, (int)kvz_math_floor_log2(encoder->agop_max_len) + 2);
+  }
+
   return max_buffer;
 }
 
 static uint8_t max_num_reorder_pics(const encoder_control_t * const encoder)
 {
+  if (encoder->cfg.adaptive_gop && encoder->agop_max_len > encoder->cfg.gop_len) {
+    // A picture is preceded in decoding order by at most log2(GOP) pictures
+    // that follow it in output order (the pictures at the right ends of the
+    // enclosing intervals).
+    return kvz_math_floor_log2(encoder->agop_max_len);
+  }
   return encoder->cfg.gop_lowdelay ? 0 : MAX(encoder->cfg.gop_len - 1, 0);
 }
 
@@ -849,7 +861,34 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
     WRITE_UE(stream, ref_negative, "num_negative_pics");
     WRITE_UE(stream, ref_positive, "num_positive_pics");
-    for (j = 0; j < ref_negative; j++) {
+    const bool agop_rps = encoder->cfg.adaptive_gop && state->frame->la &&
+                          state->frame->la->gop_size > 0;
+    if (agop_rps) {
+      // Adaptive GOP: the reference picture set is the whole DPB, nearest
+      // pictures first in both directions.
+      int deltas[2][MAX_REF_PIC_COUNT];
+      int counts[2] = { 0, 0 };
+      for (int i = 0; i < state->frame->ref->used_size; i++) {
+        const int d = state->frame->ref->pocs[i] - state->frame->poc;
+        const int dir = d > 0;
+        int k = counts[dir]++;
+        while (k > 0 && abs(deltas[dir][k - 1]) > abs(d)) {
+          deltas[dir][k] = deltas[dir][k - 1];
+          k--;
+        }
+        deltas[dir][k] = d;
+      }
+      for (int dir = 0; dir < 2; dir++) {
+        int last = 0;
+        for (j = 0; j < counts[dir]; j++) {
+          const int d = abs(deltas[dir][j]);
+          WRITE_UE(stream, d - last - 1, dir ? "delta_poc_s1_minus1" : "delta_poc_s0_minus1");
+          last = d;
+          WRITE_U(stream, !state->frame->is_irap, 1, dir ? "used_by_curr_pic_s1_flag" : "used_by_curr_pic_s0_flag");
+        }
+      }
+    }
+    for (j = 0; !agop_rps && j < ref_negative; j++) {
       int8_t delta_poc = 0;
 
       if (encoder->cfg.gop_len) {
@@ -876,7 +915,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     }
     last_poc = 0;
     poc_shift = 0;
-    for (j = 0; j < ref_positive; j++) {      
+    for (j = 0; !agop_rps && j < ref_positive; j++) {
       int8_t delta_poc = 0;
       
       if (encoder->cfg.gop_len) {

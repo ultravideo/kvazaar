@@ -382,8 +382,7 @@ static int encode_with_lookahead(kvz_encoder *enc,
       enc->scenecut_ready = true;
     }
 
-    const int count = kvz_lookahead_count(la);
-    if (count > kvz_lookahead_depth(la) || (flush && count > 0)) {
+    if (kvz_lookahead_ready(la, flush)) {
       if (!enc->scenecut_ready && kvz_lookahead_next_is_scenecut(la) &&
           enc->input_buffer.num_in > 0) {
         enc->scenecut_pending = true;

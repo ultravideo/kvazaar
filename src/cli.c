@@ -193,6 +193,8 @@ static const struct option long_options[] = {
   { "cutree-qg32",              no_argument, NULL, 0 },
   { "no-cutree-qg32",           no_argument, NULL, 0 },
   { "no-mctf",                  no_argument, NULL, 0 },
+  { "adaptive-gop",             no_argument, NULL, 0 },
+  { "no-adaptive-gop",          no_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
@@ -593,6 +595,13 @@ void print_help(void)
     "                               the GOP key pictures before coding (random\n"
     "                               access GOP). Enables the lookahead.\n"
     "                               [disabled]\n"
+    "      --(no-)adaptive-gop    : The lookahead chooses the length of each\n"
+    "                               random access mini-GOP (1..2 * --gop), places\n"
+    "                               the periodic intra pictures at mini-GOP\n"
+    "                               anchors (--period is the maximum distance)\n"
+    "                               and does not treat flashes as scene cuts.\n"
+    "                               Enables the lookahead, adds 2 * --gop\n"
+    "                               pictures of latency. [disabled]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

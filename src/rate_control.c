@@ -1139,6 +1139,39 @@ static void abr_account_previous(encoder_state_t * const state)
 }
 
 
+/**
+ * \brief Average bits model parameter of the inter pictures of a GOP.
+ *
+ * \param min_count  set to the smallest number of observations of the
+ *                   classes, or NULL
+ */
+static double abr_inter_k_avg(const encoder_control_t *const ctrl, const kvz_rc_data *rc,
+                              int *min_count)
+{
+  double k_avg = 0.0;
+  int n = INT32_MAX;
+  int classes = 0;
+  if (ctrl->cfg.adaptive_gop && ctrl->agop_max_len > ctrl->cfg.gop_len) {
+    // The classes of the pictures of a mini-GOP of the maximum length.
+    const int len = ctrl->agop_max_len;
+    for (int pos = 1; pos <= len; pos++) {
+      const int cls = kvz_lookahead_gop_template(&ctrl->cfg, len, pos, pos & -pos);
+      k_avg += abr_class_k(ctrl, rc, cls);
+      n = MIN(n, rc->abr_k_count[cls]);
+      classes++;
+    }
+  } else {
+    classes = MAX(1, ctrl->cfg.gop_len);
+    for (int i = 0; i < classes; i++) {
+      k_avg += abr_class_k(ctrl, rc, i);
+      n = MIN(n, rc->abr_k_count[i]);
+    }
+  }
+  if (min_count) *min_count = n;
+  return k_avg / classes;
+}
+
+
 /** \brief Store the bits model information of the frame being started. */
 static void abr_register_frame(encoder_state_t * const state, double base_qp)
 {
@@ -1200,13 +1233,9 @@ static double vbv_limit_qscale(encoder_state_t * const state, double qscale)
   const double r_cur = MAX(1.0, la->blurred_cost);
   double k_avg = 0.0;
   {
-    const int classes = MAX(1, ctrl->cfg.gop_len);
-    int n = INT32_MAX;
-    for (int i = 0; i < classes; i++) {
-      k_avg += abr_class_k(ctrl, rc, i);
-      n = MIN(n, rc->abr_k_count[i]);
-    }
-    k_avg = k_avg / classes * VBV_UNCERTAINTY(n);
+    int n;
+    k_avg = abr_inter_k_avg(ctrl, rc, &n);
+    k_avg = k_avg * VBV_UNCERTAINTY(n);
   }
   const double k_intra = abr_class_k(ctrl, rc, intra_class) * VBV_UNCERTAINTY(rc->abr_k_count[intra_class]);
 
@@ -1262,12 +1291,7 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
     first = MAX(0, la->index - ctrl->cfg.gop_len + 1);
   }
   const int64_t last = kvz_lookahead_newest(ctrl->lookahead);
-  double k_avg = 0.0;
-  {
-    const int classes = MAX(1, ctrl->cfg.gop_len);
-    for (int i = 0; i < classes; i++) k_avg += abr_class_k(ctrl, rc, i);
-    k_avg /= classes;
-  }
+  const double k_avg = abr_inter_k_avg(ctrl, rc, NULL);
   const double k_intra = abr_class_k(ctrl, rc, intra_class);
 
   double expected = 0.0;
@@ -1287,9 +1311,15 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
 
   // The rate factor is updated once per GOP so that all the pictures of a
   // GOP use the same rate factor.
+  // Adaptive GOP: at the anchor and, in mini-GOPs longer than the GOP
+  // table, also at the pictures that start the halves of the hierarchy so
+  // that the rate factor is updated as often as with the GOP table.
+  const bool agop_anchor = la && la->gop_size > 0 &&
+                           (la->gop_pos == la->gop_size ||
+                            (la->gop_size > ctrl->cfg.gop_len && la->gop_span >= ctrl->cfg.gop_len / 2));
   const bool gop_start = ctrl->cfg.gop_len == 0 || ctrl->cfg.gop_lowdelay ||
                          state->frame->gop_offset == 0 || state->frame->new_segment ||
-                         rc->abr_rate_factor <= 0.0;
+                         agop_anchor || rc->abr_rate_factor <= 0.0;
   if (gop_start && n > 0 && expected > 0.0) {
     // Spread the accumulated error over ABR_ERROR_SECONDS.
     // Include the expected bits of the frames that are still being coded.

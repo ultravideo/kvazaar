@@ -49,6 +49,7 @@
 #include "image.h"
 #include "rate_control.h"
 #include "lookahead.h"
+#include "kvz_math.h"
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
@@ -1158,10 +1159,101 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
 }
 
 /**
+ * \brief Adaptive GOP: remove the references that are no longer used.
+ *
+ * A picture inside a mini-GOP keeps the pictures at the ends of the
+ * enclosing intervals of the hierarchy. An anchor keeps the pictures of the
+ * lowest GOP layers, nearest first, as many as the anchor of the GOP table.
+ */
+static void agop_remove_refs(encoder_state_t *state)
+{
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  const kvz_la_result *la = state->frame->la;
+  image_list_t *list = state->frame->ref;
+  const int32_t poc = state->frame->poc;
+  const int32_t irap_poc = state->frame->irap_poc;
+
+  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL ||
+      state->frame->pictype == KVZ_NAL_IDR_N_LP) {
+    while (list->used_size > 0) kvz_image_list_rem(list, list->used_size - 1);
+    return;
+  }
+
+  bool keep[MAX_REF_PIC_COUNT + 16] = { false };
+  const int num = list->used_size;
+  for (int i = 0; i < num; i++) {
+    const int32_t ref_poc = list->pocs[i];
+    // Trailing pictures cannot refer to pictures preceding the IRAP.
+    keep[i] = !(ref_poc < irap_poc && irap_poc < poc);
+  }
+
+  if (la->gop_pos == la->gop_size) {
+    const int max_refs = MAX(1, cfg->gop[state->frame->gop_offset].ref_neg_count);
+    bool chosen[MAX_REF_PIC_COUNT + 16] = { false };
+    for (int n = 0; n < max_refs; n++) {
+      int best = -1;
+      for (int i = 0; i < num; i++) {
+        if (!keep[i] || chosen[i]) continue;
+        if (best < 0) {
+          best = i;
+          continue;
+        }
+        const int layer = list->images[i]->gop_layer;
+        const int best_layer = list->images[best]->gop_layer;
+        const int dist = abs(poc - list->pocs[i]);
+        const int best_dist = abs(poc - list->pocs[best]);
+        if (layer < best_layer || (layer == best_layer && dist < best_dist)) best = i;
+      }
+      if (best < 0) break;
+      chosen[best] = true;
+    }
+    for (int i = 0; i < num; i++) keep[i] = chosen[i];
+  } else {
+    // The start of the mini-GOP is the furthest listed picture in the past.
+    int32_t start_poc = poc;
+    for (int r = 0; r < la->gop_num_refs; r++) {
+      start_poc = MIN(start_poc, poc + la->gop_refs[r]);
+    }
+    int older = -1;
+    for (int i = 0; i < num; i++) {
+      bool listed = false;
+      for (int r = 0; r < la->gop_num_refs; r++) {
+        if (list->pocs[i] == poc + la->gop_refs[r]) listed = true;
+      }
+      if (keep[i] && !listed && list->pocs[i] < start_poc) {
+        // Prefer the pictures of the two lowest layers.
+        const bool low = list->images[i]->gop_layer <= 2;
+        const bool older_low = older >= 0 && list->images[older]->gop_layer <= 2;
+        if (older < 0 || (low && !older_low) ||
+            (low == older_low && list->pocs[i] > list->pocs[older])) {
+          older = i;
+        }
+      }
+      keep[i] = keep[i] && listed;
+    }
+    // As in the GOP tables, a picture preceding the mini-GOP is kept while
+    // the number of references stays below log2(GOP) + 1.
+    if (older >= 0 && la->gop_num_refs < (int)kvz_math_floor_log2(cfg->gop_len) + 1) {
+      keep[older] = true;
+    }
+  }
+
+  for (int i = num - 1; i >= 0; i--) {
+    if (!keep[i]) kvz_image_list_rem(list, i);
+  }
+}
+
+
+/**
  * \brief Remove any references that should no longer be used.
  */
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
+
+  if (encoder->cfg.adaptive_gop && state->frame->la && state->frame->la->gop_size > 0) {
+    agop_remove_refs(state);
+    return;
+  }
 
   int neg_refs = encoder->cfg.gop[state->frame->gop_offset].ref_neg_count;
   int pos_refs = encoder->cfg.gop[state->frame->gop_offset].ref_pos_count;
@@ -1259,7 +1351,19 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   int intra_group = 0;
   int intra_offset = 0;
 
-  if (state->encoder_control->cfg.intra_period) {
+  const kvz_la_result *la = state->frame->la;
+  if (state->encoder_control->cfg.adaptive_gop && la && la->gop_size > 0) {
+    // IRAP pictures are counted in coding order. The offset is the number
+    // of pictures since the latest IRAP picture.
+    if (state->frame->new_segment || la->gop_key) {
+      state->frame->agop_irap_count++;
+      state->frame->agop_irap_num = frame_number;
+    }
+    intra_group = state->frame->agop_irap_count;
+    intra_offset = frame_number - state->frame->agop_irap_num;
+    state->tile->frame->rec->gop_layer =
+      state->encoder_control->cfg.gop[state->frame->gop_offset].layer;
+  } else if (state->encoder_control->cfg.intra_period) {
     // Intra periods restart at each new segment (scene cut).
     int segment_frame = frame_number - state->frame->segment_start;
     int offset = state->encoder_control->cfg.gop_len - 1;
@@ -1492,6 +1596,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   kvz_lookahead_free_result(state->frame->la);
   state->frame->la = kvz_lookahead_take_result(state->encoder_control->lookahead, frame);
 
+  if (cfg->adaptive_gop && state->frame->la && state->frame->la->gop_size > 0) {
+    state->frame->gop_offset = (int8_t)kvz_lookahead_gop_template(cfg, state->frame->la->gop_size,
+                                                                 state->frame->la->gop_pos,
+                                                                 state->frame->la->gop_span);
+  }
+
   encoder_set_source_picture(state, frame);
 
   assert(!state->tile->frame->cu_array);
@@ -1638,7 +1748,15 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   const int32_t segment_num = state->frame->num - state->frame->segment_start;
 
   // Set POC.
-  if (segment_num == 0) {
+  const kvz_la_result *agop = cfg->adaptive_gop && state->frame->la &&
+                              state->frame->la->gop_size > 0 ? state->frame->la : NULL;
+  if (agop) {
+    // Adaptive GOP: the structure comes from the lookahead.
+    state->frame->poc = segment_num == 0 ? 0 : agop->gop_poc;
+    kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+    is_closed_normal_gop = true;
+    state->frame->is_irap = segment_num == 0 || agop->gop_key;
+  } else if (segment_num == 0) {
     state->frame->poc = 0;
   } else if (cfg->gop_len && !cfg->gop_lowdelay) {
 
@@ -1672,7 +1790,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   // Check whether the frame is a keyframe or not.
-  if (segment_num == 0 || state->frame->poc == 0) {
+  if (agop) {
+    // Set above.
+  } else if (segment_num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
   } else if(!is_closed_normal_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
@@ -1899,6 +2019,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
+      prev_state->frame->is_irap ||
       encoder->cfg.gop[prev_state->frame->gop_offset].is_ref) {
 
     // Store current list of POCs for use in TMVP derivation
@@ -1930,6 +2051,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->poc = prev_state->frame->poc + 1;
   state->frame->irap_poc = prev_state->frame->irap_poc;
   state->frame->segment_start = prev_state->frame->segment_start;
+  state->frame->agop_irap_count = prev_state->frame->agop_irap_count;
+  state->frame->agop_irap_num = prev_state->frame->agop_irap_num;
 
   state->frame->prepared = 1;
 

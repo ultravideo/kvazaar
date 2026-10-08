@@ -48,13 +48,25 @@
 /** \brief log2 of the number of low-res blocks in a CTU dimension. */
 #define LA_CTU_SHIFT 2
 /** \brief Padding around the low resolution picture. */
-#define LA_PAD 48
-/** \brief Maximum motion vector component in low resolution pixels. */
-#define LA_SEARCH (LA_PAD - LA_BLOCK - 1)
+#define LA_PAD 96
+/** \brief Maximum motion vector component in low resolution pixels in the
+ *         search between consecutive pictures. */
+#define LA_SEARCH (48 - LA_BLOCK - 1)
+/** \brief Maximum motion vector component in low resolution pixels in the
+ *         searches over longer distances of the adaptive GOP. */
+#define LA_SEARCH_FAR (LA_PAD - LA_BLOCK - 1)
 /** \brief Size of the ring buffer for per frame complexity history. */
 #define LA_HIST 1024
 /** \brief Frames used in each direction for CRF complexity blurring. */
 #define LA_BLUR 8
+/** \brief Adaptive GOP: a mini-GOP is split in two when its estimated cost
+ *         is this much higher than the cost of the two halves. */
+#define LA_AGOP_SPLIT_MARGIN 1.25
+/** \brief Adaptive GOP: maximum length of a flash in pictures. */
+#define LA_FLASH_LEN 3
+/** \brief Adaptive GOP: inter / intra cost ratio below which a picture
+ *         after a scene cut is predicted well from the picture before it. */
+#define LA_FLASH_RATIO 0.7
 /** \brief Lagrange multiplier for the motion vector cost in the low-res search. */
 #define LA_MV_LAMBDA 4
 /** \brief Distance of the neighbours used by the temporal filter. */
@@ -84,6 +96,8 @@ typedef struct la_frame {
 
   bool has_prev;      //!< inter costs were computed against the previous frame
   bool scenecut;
+  bool segstart;      //!< starts a new coded video sequence (IDR)
+  bool flash_checked; //!< adaptive GOP: checked for a flash
   int64_t segment_start; //!< display index of the first picture of the scene
 
   bool mctf_done;          //!< temporal filtering has been considered
@@ -166,7 +180,59 @@ struct kvz_lookahead {
    *         latest release. Only pictures up to this one are read by the
    *         rate control so that the results do not depend on timing. */
   int64_t window_last;
+
+  // Adaptive GOP
+  bool agop;              //!< --adaptive-gop
+  int agop_max;           //!< maximum mini-GOP length
+  int agop_table;         //!< length of the GOP table (--gop)
+  bool agop_closed;       //!< periodic key pictures start a new segment (IDR)
+  int64_t agop_seg;       //!< display index of the current IDR picture
+  int64_t agop_last_key;  //!< display index of the latest key picture
+  /** \brief Decision for the mini-GOP starting at queue[0]. */
+  struct {
+    bool valid;
+    bool idr;             //!< queue[0] is an IDR picture alone
+    bool key;             //!< the anchor is a periodic key picture (CRA)
+    int n;                //!< number of pictures
+    int n_struct;         //!< size of the GOP structure (n < n_struct if truncated)
+  } plan;
+  /** \brief Pictures of the current mini-GOP in coding order. */
+  kvz_picture *rel_pic[KVZ_MAX_GOP_LENGTH];
+  int rel_count, rel_pos;
+  int64_t rel_coded;      //!< pictures released in the segment
+  int64_t last_dts;
+  bool have_dts;
+  int64_t pts_hist[LA_HIST];
+  // Scratch buffers of the mini-GOP decision
+  int16_t *s_mv[4];
+  int16_t *s_seed;
+  uint32_t *s_cost[2];
 };
+
+
+int kvz_lookahead_gop_template(const kvz_config *cfg, int size, int pos, int span)
+{
+  if (size > cfg->gop_len) {
+    if (pos == size) return cfg->gop_len + 1;
+    if (span >= cfg->gop_len) return cfg->gop_len;
+  }
+  if (pos == size) {
+    for (int i = 0; i < cfg->gop_len; i++) {
+      if (cfg->gop[i].poc_offset == cfg->gop_len) return i;
+    }
+    return 0;
+  }
+  if (size == cfg->gop_len) {
+    for (int i = 0; i < cfg->gop_len; i++) {
+      if (cfg->gop[i].poc_offset == pos) return i;
+    }
+  }
+  for (int i = 0; i < cfg->gop_len; i++) {
+    const int p = cfg->gop[i].poc_offset;
+    if ((p & -p) == span) return i;
+  }
+  return 0;
+}
 
 
 static INLINE int hist_slot(int64_t index)
@@ -224,6 +290,7 @@ static la_frame *alloc_frame(const kvz_lookahead *la)
 
 
 static void *analysis_thread(void *arg);
+static void agop_plan(kvz_lookahead *la);
 
 
 kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
@@ -258,7 +325,7 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   la->keyint = 0;
   if (cfg->intra_period > 0) {
     la->keyint = cfg->intra_period;
-    if (cfg->gop_len > 0 && !cfg->gop_lowdelay && !cfg->open_gop) {
+    if (cfg->gop_len > 0 && !cfg->gop_lowdelay && !cfg->open_gop && !cfg->adaptive_gop) {
       // Closed GOP inserts an extra IDR after each intra period.
       la->keyint += 1;
     }
@@ -279,6 +346,17 @@ kvz_lookahead *kvz_lookahead_alloc(const encoder_control_t *encoder)
   la->crf_base_cost = (cfg->gop_len > 0 && !cfg->gop_lowdelay) ? 260.0 : 185.0;
 
   la->window_last = -1;
+
+  la->agop = cfg->adaptive_gop > 0;
+  if (la->agop) {
+    la->agop_max = encoder->agop_max_len;
+    la->agop_table = cfg->gop_len;
+    la->agop_closed = !cfg->open_gop;
+    for (int i = 0; i < 4; i++) la->s_mv[i] = MALLOC(int16_t, la->nblocks * 2);
+    la->s_seed = MALLOC(int16_t, la->nblocks * 2);
+    la->s_cost[0] = MALLOC(uint32_t, la->nblocks);
+    la->s_cost[1] = MALLOC(uint32_t, la->nblocks);
+  }
 
   la->mctf = cfg->mctf > 0;
   if (cfg->crf >= 0) {
@@ -332,6 +410,11 @@ void kvz_lookahead_free(kvz_lookahead *la)
   }
   free_frame(la->retired);
   free(la->queue);
+  for (int i = la->rel_pos; i < la->rel_count; i++) kvz_image_free(la->rel_pic[i]);
+  for (int i = 0; i < 4; i++) free(la->s_mv[i]);
+  free(la->s_seed);
+  free(la->s_cost[0]);
+  free(la->s_cost[1]);
   for (int i = 0; i < LA_MV_DIST; i++) free(la->mv_hist[i]);
   while (la->results) {
     kvz_la_result *next = la->results->next;
@@ -351,6 +434,18 @@ int kvz_lookahead_count(const kvz_lookahead *la)
 int kvz_lookahead_depth(const kvz_lookahead *la)
 {
   return la->depth;
+}
+
+
+bool kvz_lookahead_ready(const kvz_lookahead *la, bool flush)
+{
+  if (!la->agop) {
+    return la->count > la->depth || (flush && la->count > 0);
+  }
+  if (la->rel_pos < la->rel_count) return true;
+  // The next mini-GOP is decided when its pictures and the window of
+  // the last one are available.
+  return la->count > la->depth + la->agop_max || (flush && la->count > 0);
 }
 
 
@@ -477,15 +572,15 @@ static INLINE int median3(int a, int b, int c)
 }
 
 
-static INLINE void clamp_mv(const kvz_lookahead *la, int bx, int by, int *mvx, int *mvy)
+static INLINE void clamp_mv(const kvz_lookahead *la, int range, int bx, int by, int *mvx, int *mvy)
 {
   // Keep the block inside the padded area.
   const int x = bx * LA_BLOCK;
   const int y = by * LA_BLOCK;
-  const int min_x = -MIN(LA_SEARCH, x + LA_PAD - 1);
-  const int min_y = -MIN(LA_SEARCH, y + LA_PAD - 1);
-  const int max_x = MIN(LA_SEARCH, la->bw * LA_BLOCK + LA_PAD - LA_BLOCK - x - 1);
-  const int max_y = MIN(LA_SEARCH, la->bh * LA_BLOCK + LA_PAD - LA_BLOCK - y - 1);
+  const int min_x = -MIN(range, x + LA_PAD - 1);
+  const int min_y = -MIN(range, y + LA_PAD - 1);
+  const int max_x = MIN(range, la->bw * LA_BLOCK + LA_PAD - LA_BLOCK - x - 1);
+  const int max_y = MIN(range, la->bh * LA_BLOCK + LA_PAD - LA_BLOCK - y - 1);
   *mvx = CLIP(min_x, max_x, *mvx);
   *mvy = CLIP(min_y, max_y, *mvy);
 }
@@ -502,40 +597,19 @@ static INLINE uint32_t block_sad(const kvz_lookahead *la, const kvz_pixel *orig,
 
 
 /**
- * \brief Motion search of one block against the previous frame.
- * \return inter cost (SATD + motion vector cost)
+ * \brief Motion search of one low resolution block.
+ *
+ * Checks the candidates, followed by a hexagon search and a small diamond
+ * refinement around the best one.
+ *
+ * \return SATD + motion vector cost of the best motion vector
  */
-static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_frame *ref,
-                                 int bx, int by)
+static uint32_t search_block(const kvz_lookahead *la, const kvz_pixel *orig,
+                             const kvz_pixel *ref_blk, int bx, int by,
+                             int cand[][2], int num_cand, int pmv_x, int pmv_y,
+                             int range, int *mv_x, int *mv_y)
 {
   const int stride = la->stride;
-  const int b = bx + by * la->bw;
-  const kvz_pixel *orig = &f->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
-  const kvz_pixel *ref_blk = &ref->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
-
-  // Spatial predictors.
-  int cand[6][2];
-  int num_cand = 0;
-  cand[num_cand][0] = 0; cand[num_cand][1] = 0; num_cand++;
-  int pa[2] = { 0, 0 }, pb[2] = { 0, 0 }, pc[2] = { 0, 0 };
-  if (bx > 0) {
-    pa[0] = f->mv[2 * (b - 1)]; pa[1] = f->mv[2 * (b - 1) + 1];
-    cand[num_cand][0] = pa[0]; cand[num_cand][1] = pa[1]; num_cand++;
-  }
-  if (by > 0) {
-    pb[0] = f->mv[2 * (b - la->bw)]; pb[1] = f->mv[2 * (b - la->bw) + 1];
-    cand[num_cand][0] = pb[0]; cand[num_cand][1] = pb[1]; num_cand++;
-    if (bx + 1 < la->bw) {
-      pc[0] = f->mv[2 * (b - la->bw + 1)]; pc[1] = f->mv[2 * (b - la->bw + 1) + 1];
-      cand[num_cand][0] = pc[0]; cand[num_cand][1] = pc[1]; num_cand++;
-    }
-  }
-  if (ref->has_prev) {
-    // Temporal predictor, motion of the colocated block in the previous frame.
-    cand[num_cand][0] = ref->mv[2 * b]; cand[num_cand][1] = ref->mv[2 * b + 1]; num_cand++;
-  }
-  const int pmv_x = median3(pa[0], pb[0], pc[0]);
-  const int pmv_y = median3(pa[1], pb[1], pc[1]);
 
 #define MV_COST(x, y) (LA_MV_LAMBDA * (mv_bits((x) - pmv_x) + mv_bits((y) - pmv_y)))
 
@@ -543,7 +617,7 @@ static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_
   uint32_t best = UINT32_MAX;
   for (int i = 0; i < num_cand; i++) {
     int x = cand[i][0], y = cand[i][1];
-    clamp_mv(la, bx, by, &x, &y);
+    clamp_mv(la, range, bx, by, &x, &y);
     const uint32_t cost = block_sad(la, orig, ref_blk, x, y) + MV_COST(x, y);
     if (cost < best) {
       best = cost;
@@ -560,7 +634,7 @@ static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_
     for (int i = 0; i < 6; i++) {
       int x = cx + hex[i][0], y = cy + hex[i][1];
       int x_c = x, y_c = y;
-      clamp_mv(la, bx, by, &x_c, &y_c);
+      clamp_mv(la, range, bx, by, &x_c, &y_c);
       if (x_c != x || y_c != y) continue;
       const uint32_t cost = block_sad(la, orig, ref_blk, x, y) + MV_COST(x, y);
       if (cost < best) {
@@ -576,7 +650,7 @@ static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_
     for (int i = 0; i < 4; i++) {
       int x = cx + dia[i][0], y = cy + dia[i][1];
       int x_c = x, y_c = y;
-      clamp_mv(la, bx, by, &x_c, &y_c);
+      clamp_mv(la, range, bx, by, &x_c, &y_c);
       if (x_c != x || y_c != y) continue;
       const uint32_t cost = block_sad(la, orig, ref_blk, x, y) + MV_COST(x, y);
       if (cost < best) {
@@ -587,14 +661,74 @@ static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_
     }
   }
 
-  f->mv[2 * b] = (int16_t)best_x;
-  f->mv[2 * b + 1] = (int16_t)best_y;
+  *mv_x = best_x;
+  *mv_y = best_y;
 
   const uint32_t satd = kvz_satd_any_size(LA_BLOCK, LA_BLOCK,
                                           orig, stride,
                                           ref_blk + best_y * stride + best_x, stride);
   return satd + MV_COST(best_x, best_y);
 #undef MV_COST
+}
+
+
+/**
+ * \brief Spatial motion vector candidates and predictor of a block from the
+ *        already searched blocks of a motion field.
+ * \return number of candidates
+ */
+static int spatial_candidates(const kvz_lookahead *la, const int16_t *mvf, int bx, int by,
+                              int cand[][2], int *pmv_x, int *pmv_y)
+{
+  const int b = bx + by * la->bw;
+  int num_cand = 0;
+  int pa[2] = { 0, 0 }, pb[2] = { 0, 0 }, pc[2] = { 0, 0 };
+  if (bx > 0) {
+    pa[0] = mvf[2 * (b - 1)]; pa[1] = mvf[2 * (b - 1) + 1];
+    cand[num_cand][0] = pa[0]; cand[num_cand][1] = pa[1]; num_cand++;
+  }
+  if (by > 0) {
+    pb[0] = mvf[2 * (b - la->bw)]; pb[1] = mvf[2 * (b - la->bw) + 1];
+    cand[num_cand][0] = pb[0]; cand[num_cand][1] = pb[1]; num_cand++;
+    if (bx + 1 < la->bw) {
+      pc[0] = mvf[2 * (b - la->bw + 1)]; pc[1] = mvf[2 * (b - la->bw + 1) + 1];
+      cand[num_cand][0] = pc[0]; cand[num_cand][1] = pc[1]; num_cand++;
+    }
+  }
+  *pmv_x = median3(pa[0], pb[0], pc[0]);
+  *pmv_y = median3(pa[1], pb[1], pc[1]);
+  return num_cand;
+}
+
+
+/**
+ * \brief Motion search of one block against the previous frame.
+ * \return inter cost (SATD + motion vector cost)
+ */
+static uint32_t inter_block_cost(const kvz_lookahead *la, la_frame *f, const la_frame *ref,
+                                 int bx, int by)
+{
+  const int stride = la->stride;
+  const int b = bx + by * la->bw;
+  const kvz_pixel *orig = &f->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
+  const kvz_pixel *ref_blk = &ref->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
+
+  // Zero, spatial and temporal candidates.
+  int cand[6][2];
+  int pmv_x, pmv_y;
+  cand[0][0] = 0; cand[0][1] = 0;
+  int num_cand = 1 + spatial_candidates(la, f->mv, bx, by, cand + 1, &pmv_x, &pmv_y);
+  if (ref->has_prev) {
+    // Temporal predictor, motion of the colocated block in the previous frame.
+    cand[num_cand][0] = ref->mv[2 * b]; cand[num_cand][1] = ref->mv[2 * b + 1]; num_cand++;
+  }
+
+  int mv_x, mv_y;
+  const uint32_t cost = search_block(la, orig, ref_blk, bx, by, cand, num_cand, pmv_x, pmv_y,
+                                     LA_SEARCH, &mv_x, &mv_y);
+  f->mv[2 * b] = (int16_t)mv_x;
+  f->mv[2 * b + 1] = (int16_t)mv_y;
+  return cost;
 }
 
 
@@ -630,10 +764,13 @@ static void analyse_frame(const kvz_lookahead *la, la_frame *f, const la_frame *
 static void decide_scenecut(kvz_lookahead *la, la_frame *f)
 {
   f->scenecut = false;
+  f->segstart = false;
 
   if (f->index == 0) {
     la->last_key = 0;
     la->segment_start = 0;
+    f->segstart = true;
+    if (la->agop) la->hist_key[hist_slot(f->index)] = true;
     return;
   }
 
@@ -661,11 +798,16 @@ static void decide_scenecut(kvz_lookahead *la, la_frame *f)
   if (f->scenecut) {
     la->last_key = f->index;
     la->segment_start = f->index;
+    f->segstart = true;
   } else if (la->keyint > 0 && (f->index - la->segment_start) % la->keyint == 0) {
-    // Periodic intra picture.
+    // Periodic intra picture. With the adaptive GOP this is only the
+    // nominal position used for the scene cut threshold, the picture is
+    // chosen when the mini-GOPs are decided.
     la->last_key = f->index;
   }
-  la->hist_key[hist_slot(f->index)] = la->last_key == f->index;
+  // With the adaptive GOP the periodic key pictures are marked when they
+  // are chosen.
+  la->hist_key[hist_slot(f->index)] = la->agop ? f->scenecut : la->last_key == f->index;
   f->segment_start = la->segment_start;
 }
 
@@ -837,6 +979,12 @@ void kvz_lookahead_push(kvz_lookahead *la, kvz_picture *pic)
 
 bool kvz_lookahead_next_is_scenecut(kvz_lookahead *la)
 {
+  if (la->agop) {
+    // A new segment starts only at the start of a mini-GOP.
+    if (la->rel_pos < la->rel_count || la->count == 0) return false;
+    agop_plan(la);
+    return la->plan.idr && la->queue[0]->index > 0;
+  }
   if (la->count == 0) return false;
   wait_analysed(la, la->queue[0]->index);
   return la->queue[0]->scenecut;
@@ -1037,7 +1185,14 @@ static void collect_motion(kvz_lookahead *la, const la_frame *f, int window, kvz
 }
 
 
-kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
+/**
+ * \brief Run the final analysis of the oldest queued picture and remove it
+ *        from the queue.
+ *
+ * \param use_filter  code the temporally filtered picture if there is one
+ * \param res_out     the analysis result of the picture
+ */
+static kvz_picture *pop_one(kvz_lookahead *la, bool use_filter, kvz_la_result **res_out)
 {
   if (la->count == 0) return NULL;
 
@@ -1048,9 +1203,11 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   la->window_last = la->queue[window - 1]->index;
 
   la_frame *f = la->queue[0];
+  la->pts_hist[hist_slot(f->index)] = f->pic->pts;
 
   kvz_la_result *res = calloc(1, sizeof(kvz_la_result));
   if (!res) return NULL;
+  if (res_out) *res_out = res;
   res->pic = f->pic;
   res->index = f->index;
   res->scenecut = f->scenecut;
@@ -1081,6 +1238,10 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   }
   kvz_picture *filtered = f->filtered;
   f->filtered = NULL;
+  if (filtered && !use_filter) {
+    kvz_image_free(filtered);
+    filtered = NULL;
+  }
 
   if (filtered) {
     // The encoder codes the filtered picture, the original one is kept for
@@ -1107,6 +1268,386 @@ kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
   pthread_mutex_unlock(&la->lock);
   free_frame(old);
 
+  return pic;
+}
+
+
+/** \brief Analysed frame with the given display index (queued or retired). */
+static la_frame *frame_at(const kvz_lookahead *la, int64_t index)
+{
+  if (la->count > 0 && index >= la->queue[0]->index && index < la->queue[0]->index + la->count) {
+    return la->queue[index - la->queue[0]->index];
+  }
+  if (la->retired && la->retired->index == index) return la->retired;
+  return NULL;
+}
+
+
+/**
+ * \brief Motion of each block of picture `from` to picture `to` (to < from)
+ *        by following the motion between consecutive pictures.
+ */
+static void trajectory(const kvz_lookahead *la, int64_t from, int64_t to, int16_t *out)
+{
+  const int bw = la->bw, bh = la->bh;
+  for (int by = 0; by < bh; by++) {
+    for (int bx = 0; bx < bw; bx++) {
+      int vx = 0, vy = 0;
+      for (int64_t j = from; j > to; j--) {
+        const la_frame *g = frame_at(la, j);
+        if (!g || !g->has_prev) break;
+        const int cx = CLIP(0, bw - 1, (bx * LA_BLOCK + vx + LA_BLOCK / 2) >> 3);
+        const int cy = CLIP(0, bh - 1, (by * LA_BLOCK + vy + LA_BLOCK / 2) >> 3);
+        vx += g->mv[2 * (cx + cy * bw)];
+        vy += g->mv[2 * (cx + cy * bw) + 1];
+      }
+      const int b = bx + by * bw;
+      out[2 * b] = (int16_t)CLIP(-LA_SEARCH_FAR, LA_SEARCH_FAR, vx);
+      out[2 * b + 1] = (int16_t)CLIP(-LA_SEARCH_FAR, LA_SEARCH_FAR, vy);
+    }
+  }
+}
+
+
+/**
+ * \brief Cost of predicting picture cur from picture ref.
+ *
+ * \param seed   motion vector candidate of each block
+ * \param negate use the negated seed
+ * \param mvf    output motion field
+ * \param costs  output cost of each block (min of inter and intra), or NULL
+ * \return sum of the block costs
+ */
+static double pair_cost(const kvz_lookahead *la, const la_frame *cur, const la_frame *ref,
+                        const int16_t *seed, bool negate, int16_t *mvf, uint32_t *costs)
+{
+  const int stride = la->stride;
+  double sum = 0.0;
+  for (int by = 0; by < la->bh; by++) {
+    for (int bx = 0; bx < la->bw; bx++) {
+      const int b = bx + by * la->bw;
+      const kvz_pixel *orig = &cur->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
+      const kvz_pixel *ref_blk = &ref->lowres[by * LA_BLOCK * stride + bx * LA_BLOCK];
+      int cand[6][2];
+      int pmv_x, pmv_y;
+      cand[0][0] = 0; cand[0][1] = 0;
+      cand[1][0] = negate ? -seed[2 * b] : seed[2 * b];
+      cand[1][1] = negate ? -seed[2 * b + 1] : seed[2 * b + 1];
+      const int num_cand = 2 + spatial_candidates(la, mvf, bx, by, cand + 2, &pmv_x, &pmv_y);
+      int mv_x, mv_y;
+      const uint32_t inter = search_block(la, orig, ref_blk, bx, by, cand, num_cand,
+                                          pmv_x, pmv_y, LA_SEARCH_FAR, &mv_x, &mv_y);
+      mvf[2 * b] = (int16_t)mv_x;
+      mvf[2 * b + 1] = (int16_t)mv_y;
+      const uint32_t c = MIN(inter, cur->intra[b]);
+      if (costs) costs[b] = c;
+      sum += c;
+    }
+  }
+  return sum;
+}
+
+
+/**
+ * \brief Cost of a bi-predicted picture from the forward and backward
+ *        searches. Each block uses the cheapest of intra, forward, backward
+ *        and the average of the two predictions.
+ */
+static double bi_cost(const kvz_lookahead *la, const la_frame *cur,
+                      const la_frame *ref0, const int16_t *mv0, const uint32_t *cost0,
+                      const la_frame *ref1, const int16_t *mv1, const uint32_t *cost1)
+{
+  const int stride = la->stride;
+  double sum = 0.0;
+  for (int by = 0; by < la->bh; by++) {
+    for (int bx = 0; bx < la->bw; bx++) {
+      const int b = bx + by * la->bw;
+      const int off = by * LA_BLOCK * stride + bx * LA_BLOCK;
+      const kvz_pixel *p0 = &ref0->lowres[off + mv0[2 * b + 1] * stride + mv0[2 * b]];
+      const kvz_pixel *p1 = &ref1->lowres[off + mv1[2 * b + 1] * stride + mv1[2 * b]];
+      kvz_pixel avg[LA_BLOCK * LA_BLOCK];
+      for (int y = 0; y < LA_BLOCK; y++) {
+        for (int x = 0; x < LA_BLOCK; x++) {
+          avg[y * LA_BLOCK + x] = (kvz_pixel)((p0[y * stride + x] + p1[y * stride + x] + 1) >> 1);
+        }
+      }
+      // Both motion vectors are signalled, approximated by a constant.
+      const uint32_t bi = kvz_satd_any_size(LA_BLOCK, LA_BLOCK, &cur->lowres[off], stride,
+                                            avg, LA_BLOCK) + 2 * LA_MV_LAMBDA * 4;
+      sum += MIN(MIN(cost0[b], cost1[b]), bi);
+    }
+  }
+  return sum;
+}
+
+
+/**
+ * \brief Whether the mini-GOP from picture s (the previous anchor) to s + n
+ *        should be split into two mini-GOPs of n / 2 pictures.
+ *
+ * Without the split, the anchor s + n is predicted from s and the middle
+ * picture is bi-predicted from s and s + n. With the split, both s + n / 2
+ * and s + n are anchors predicted over n / 2 pictures. The rest of the
+ * pictures have the same structure in both cases.
+ */
+static bool agop_split(kvz_lookahead *la, int64_t s, int n)
+{
+  const int64_t m = s + n / 2;
+  const int64_t e = s + n;
+  const la_frame *fs = frame_at(la, s);
+  const la_frame *fm = frame_at(la, m);
+  const la_frame *fe = frame_at(la, e);
+  if (!fs || !fm || !fe || !fm->has_prev || !fe->has_prev) return false;
+
+  int16_t *mv_full = la->s_mv[0];
+  int16_t *mv_fwd = la->s_mv[1];
+  int16_t *mv_half = la->s_mv[2];
+  int16_t *mv_bwd = la->s_mv[3];
+
+  trajectory(la, e, s, la->s_seed);
+  const double full = pair_cost(la, fe, fs, la->s_seed, false, mv_full, NULL);
+
+  trajectory(la, m, s, la->s_seed);
+  const double first = pair_cost(la, fm, fs, la->s_seed, false, mv_fwd, la->s_cost[0]);
+
+  trajectory(la, e, m, la->s_seed);
+  const double second = pair_cost(la, fe, fm, la->s_seed, false, mv_half, NULL);
+  pair_cost(la, fm, fe, la->s_seed, true, mv_bwd, la->s_cost[1]);
+  const double mid = bi_cost(la, fm, fs, mv_fwd, la->s_cost[0], fe, mv_bwd, la->s_cost[1]);
+
+  // Longer mini-GOPs were better unless the prediction over the longer
+  // distance is clearly worse, so the split needs a clear margin.
+  return full + mid > LA_AGOP_SPLIT_MARGIN * (first + second);
+}
+
+
+/** \brief Coding order of a mini-GOP: hierarchical bisection. */
+static void agop_order(kvz_la_result **res, int avail, int lo, int hi, int8_t *chain,
+                       int chain_len, int *order, int *num)
+{
+  if (hi - lo < 2) return;
+  const int mid = (lo + hi) / 2;
+  if (mid <= avail) {
+    kvz_la_result *r = res[mid - 1];
+    r->gop_span = (hi - lo) / 2;
+    // The pictures at the ends of the enclosing intervals are kept as
+    // references, as in the GOP tables.
+    r->gop_num_refs = 0;
+    for (int i = 0; i < chain_len && r->gop_num_refs < KVZ_LA_MAX_GOP_REFS; i++) {
+      r->gop_refs[r->gop_num_refs++] = (int8_t)(chain[i] - mid);
+    }
+    order[(*num)++] = mid;
+  }
+  chain[chain_len] = (int8_t)mid;
+  agop_order(res, avail, lo, mid, chain, chain_len + 1, order, num);
+  agop_order(res, avail, mid, hi, chain, chain_len + 1, order, num);
+}
+
+
+/**
+ * \brief Adaptive GOP: whether the scene cut at picture c is a flash.
+ *
+ * The scene cut is a flash (or another short disturbance) if one of the
+ * following pictures is predicted well from the picture before the cut.
+ */
+static bool agop_is_flash(kvz_lookahead *la, int64_t c, int64_t last)
+{
+  const la_frame *before = frame_at(la, c - 1);
+  if (!before) return false;
+  memset(la->s_seed, 0, la->nblocks * 2 * sizeof(int16_t));
+  for (int k = 1; k <= LA_FLASH_LEN && c + k <= last; k++) {
+    const la_frame *g = frame_at(la, c + k);
+    if (!g) break;
+    const double cost = pair_cost(la, g, before, la->s_seed, false, la->s_mv[0], NULL);
+    if (cost < LA_FLASH_RATIO * (double)g->intra_sum) return true;
+  }
+  return false;
+}
+
+
+/** \brief Adaptive GOP: remove the scene cuts that are flashes. */
+static void agop_remove_flashes(kvz_lookahead *la)
+{
+  const int64_t last = la->queue[la->count - 1]->index;
+  for (int i = 0; i < MIN(la->agop_max + 1, la->count); i++) {
+    la_frame *g = la->queue[i];
+    if (!g->scenecut || g->flash_checked) continue;
+    g->flash_checked = true;
+    const int64_t until = MIN(g->index + LA_FLASH_LEN, last);
+    wait_analysed(la, until);
+    if (!agop_is_flash(la, g->index, until)) continue;
+    // The pictures of the flash are coded in the scene.
+    for (int k = 0; k <= LA_FLASH_LEN && i + k < la->count; k++) {
+      la_frame *h = la->queue[i + k];
+      if (!h->scenecut) continue;
+      h->scenecut = false;
+      h->segstart = false;
+      h->flash_checked = true;
+      la->hist_cut[hist_slot(h->index)] = false;
+      la->hist_key[hist_slot(h->index)] = false;
+    }
+  }
+}
+
+
+/**
+ * \brief Decide the mini-GOP that starts with the oldest queued picture.
+ *
+ * The mini-GOP ends at the latest before the next segment start (scene
+ * cut). Its length is halved as long as the cost model prefers two shorter
+ * mini-GOPs. A periodic key picture is placed at the first anchor within
+ * the last --gop / 2 pictures of the intra period so that it does not break
+ * the mini-GOP structure. With a closed GOP the key picture is an IDR picture
+ * that starts a new segment.
+ */
+static void agop_plan(kvz_lookahead *la)
+{
+  if (la->plan.valid) return;
+  la_frame *f0 = la->queue[0];
+  wait_analysed(la, MIN(f0->index + la->agop_max, la->queue[la->count - 1]->index));
+
+  agop_remove_flashes(la);
+
+  la->plan.valid = true;
+  la->plan.n = 1;
+  la->plan.n_struct = 1;
+  la->plan.key = false;
+  la->plan.idr = f0->segstart;
+  if (la->plan.idr) return;
+
+  const int64_t s = f0->index - 1;
+  int seg_n = 0;
+  for (int i = 0; i < MIN(la->agop_max, la->count); i++) {
+    if (i > 0 && la->queue[i]->segstart) break;
+    seg_n = i + 1;
+  }
+  const int64_t due = la->keyint > 0 ? la->agop_last_key + la->keyint : INT64_MAX;
+
+  if (due - s > seg_n && seg_n < la->agop_table) {
+    // The segment ends within a mini-GOP of the GOP table length. The
+    // pictures are coded with the structure of a full mini-GOP from which
+    // the missing pictures are left out, as with the GOP tables. Nothing
+    // refers to them after the segment, so no anchor is needed.
+    la->plan.n_struct = la->agop_table;
+    la->plan.n = seg_n;
+    return;
+  }
+
+  const int max_n = (int)MIN(seg_n, due - s);
+  int n = 1;
+  while (n * 2 <= max_n) n *= 2;
+  while (n > 1 && agop_split(la, s, n)) n /= 2;
+  la->plan.n = n;
+  la->plan.n_struct = n;
+
+  const int64_t e = s + n;
+  if (la->keyint > 0 && e > due - la->agop_table / 2) {
+    if (la->agop_closed) {
+      // The key picture starts a new segment, the pictures before it form
+      // a truncated mini-GOP.
+      la->queue[n - 1]->segstart = true;
+      if (n == 1) {
+        la->plan.idr = true;
+      } else {
+        la->plan.n = n - 1;
+        la->plan.n_struct = n;
+      }
+    } else {
+      la->plan.key = true;
+    }
+  }
+}
+
+
+/**
+ * \brief Analyse the pictures of the planned mini-GOP and put them in the
+ *        release list in coding order.
+ */
+static void agop_next(kvz_lookahead *la)
+{
+  agop_plan(la);
+  const int n = la->plan.n;
+  const int n_struct = la->plan.n_struct;
+  const bool key = la->plan.key;
+  const bool idr = la->plan.idr;
+  la->plan.valid = false;
+
+  kvz_picture *pics[KVZ_MAX_GOP_LENGTH];
+  kvz_la_result *res[KVZ_MAX_GOP_LENGTH];
+  for (int i = 0; i < n; i++) {
+    const int pos = i + 1;
+    // Only the pictures high in the hierarchy are temporally filtered.
+    const bool use_filter = (pos & -pos) >= 4 || (pos == n && n == n_struct);
+    res[i] = NULL;
+    pics[i] = pop_one(la, use_filter, &res[i]);
+    assert(pics[i] && res[i]);
+  }
+
+  if (idr) {
+    la->agop_seg = res[0]->index;
+    la->agop_last_key = res[0]->index;
+    la->rel_coded = 0;
+  }
+  if (key) {
+    la->agop_last_key = res[n - 1]->index;
+  }
+  if (idr || key) {
+    la->hist_key[hist_slot(res[n - 1]->index)] = true;
+  }
+  for (int i = 0; i < n; i++) {
+    res[i]->gop_size = n_struct;
+    res[i]->gop_pos = i + 1;
+    res[i]->gop_span = n_struct;
+    res[i]->gop_key = false;
+    res[i]->gop_poc = (int32_t)(res[i]->index - la->agop_seg);
+  }
+  res[n - 1]->gop_key = key;
+
+  int order[KVZ_MAX_GOP_LENGTH];
+  int num = 0;
+  if (n == n_struct) order[num++] = n;
+  int8_t chain[8] = { 0, (int8_t)n_struct };
+  agop_order(res, n, 0, n_struct, chain, 2, order, &num);
+  assert(num == n);
+
+  // Decoding timestamps: the decoding order is delayed by the maximum
+  // reordering of the stream.
+  const int reorder = la->agop_max - 1;
+  int64_t dur = 1;
+  if (res[n - 1]->index > la->agop_seg) {
+    dur = MAX(1, la->pts_hist[hist_slot(la->agop_seg + 1)] - la->pts_hist[hist_slot(la->agop_seg)]);
+  }
+  for (int k = 0; k < n; k++) {
+    kvz_picture *pic = pics[order[k] - 1];
+    const int64_t c = la->rel_coded++;
+    int64_t dts;
+    if (c >= reorder) {
+      dts = la->pts_hist[hist_slot(la->agop_seg + c - reorder)] - 1;
+    } else {
+      dts = la->pts_hist[hist_slot(la->agop_seg)] - (reorder - c) * dur;
+    }
+    if (la->have_dts && dts <= la->last_dts) dts = la->last_dts + 1;
+    la->last_dts = dts;
+    la->have_dts = true;
+    pic->dts = dts;
+    la->rel_pic[k] = pic;
+  }
+  la->rel_count = n;
+  la->rel_pos = 0;
+}
+
+
+kvz_picture *kvz_lookahead_pop(kvz_lookahead *la)
+{
+  if (!la->agop) {
+    return pop_one(la, true, NULL);
+  }
+  if (la->rel_pos == la->rel_count) {
+    if (la->count == 0) return NULL;
+    agop_next(la);
+  }
+  kvz_picture *pic = la->rel_pic[la->rel_pos];
+  la->rel_pic[la->rel_pos++] = NULL;
   return pic;
 }
 

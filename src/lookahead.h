@@ -59,6 +59,9 @@ struct encoder_control_t;
  * Created when the frame leaves the lookahead and handed over to the encoder
  * state that encodes the frame (see kvz_lookahead_take_result).
  */
+/** \brief Maximum number of references of a picture in an adaptive GOP. */
+#define KVZ_LA_MAX_GOP_REFS 8
+
 typedef struct kvz_la_result {
   const kvz_picture *pic;   //!< picture the result belongs to (lookup key)
   int64_t index;            //!< display order index in the lookahead
@@ -82,6 +85,23 @@ typedef struct kvz_la_result {
   int16_t *future_mvs;
   int num_past_mvs, num_future_mvs;
   int mv_bw, mv_bh;         //!< size of the motion fields in blocks
+
+  /**
+   * \brief Adaptive GOP structure of the picture (--adaptive-gop).
+   *
+   * The pictures of a mini-GOP of gop_size pictures are released in coding
+   * order: the anchor (the last picture in display order) first, followed
+   * by the hierarchical bisection of the interval. gop_size is 0 when the
+   * GOP is not adaptive.
+   */
+  int gop_size;
+  int gop_pos;              //!< position in the mini-GOP, 1..gop_size (anchor)
+  int gop_span;             //!< POC distance to the nearest references
+  bool gop_key;             //!< the anchor is a periodic intra (CRA) picture
+  int32_t gop_poc;          //!< POC, display index relative to the IDR picture
+  int gop_num_refs;         //!< number of references of a non-anchor picture
+  int8_t gop_refs[KVZ_LA_MAX_GOP_REFS]; //!< POC deltas of the references
+
   struct kvz_la_result *next;
 } kvz_la_result;
 
@@ -97,6 +117,13 @@ int kvz_lookahead_count(const kvz_lookahead *la);
 int kvz_lookahead_depth(const kvz_lookahead *la);
 
 /**
+ * \brief Whether a picture can be released with kvz_lookahead_pop.
+ *
+ * \param flush  the end of the input has been reached
+ */
+bool kvz_lookahead_ready(const kvz_lookahead *la, bool flush);
+
+/**
  * \brief Add an input picture to the lookahead and analyse it.
  *
  * Takes a new reference to the picture.
@@ -107,11 +134,15 @@ void kvz_lookahead_push(kvz_lookahead *la, kvz_picture *pic);
 bool kvz_lookahead_next_is_scenecut(kvz_lookahead *la);
 
 /**
- * \brief Release the oldest picture.
+ * \brief Release the next picture.
  *
  * Runs the final analysis (scene cut, CU-tree, CRF) for the oldest picture
  * and returns it. The caller owns the returned reference. The analysis
  * result is kept until kvz_lookahead_take_result is called.
+ *
+ * With the adaptive GOP, the length of the next mini-GOP is decided when
+ * its first picture is due, all its pictures are analysed and they are
+ * released in coding order with the DTS set.
  */
 kvz_picture *kvz_lookahead_pop(kvz_lookahead *la);
 
@@ -137,5 +168,20 @@ int64_t kvz_lookahead_newest(const kvz_lookahead *la);
  */
 bool kvz_lookahead_frame_info(const kvz_lookahead *la, int64_t index,
                               double *cost, double *intra, bool *key);
+
+/**
+ * \brief Adaptive GOP: index of the GOP table entry whose QP and layer
+ *        settings are used for a picture.
+ *
+ * The anchor of a mini-GOP uses the settings of the anchor of the GOP
+ * table, the other pictures those of the table pictures at the same
+ * distance from their references. Mini-GOPs longer than the table use the
+ * two entries after the table for the anchor and the middle picture.
+ *
+ * \param size  mini-GOP size
+ * \param pos   position in the mini-GOP, 1..size
+ * \param span  distance of the picture to its nearest references
+ */
+int kvz_lookahead_gop_template(const kvz_config *cfg, int size, int pos, int span);
 
 #endif // LOOKAHEAD_H_

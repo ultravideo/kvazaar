@@ -72,6 +72,8 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->new_segment = false;
   state->frame->segment_start = 0;
   state->frame->la = NULL;
+  state->frame->agop_irap_count = 0;
+  state->frame->agop_irap_num = 0;
   state->frame->abr_pending = false;
   state->frame->abr_qscale = 0.0;
   state->frame->abr_cost = 0.0;

@@ -247,7 +247,17 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       fprintf(stderr, "--mctf requires a random access GOP of length 8 or 16, disabling it.\n");
       c->mctf = 0;
     }
+    if (c->adaptive_gop && (c->gop_lowdelay || (c->gop_len != 8 && c->gop_len != 16) ||
+                            c->intra_period == 1)) {
+      fprintf(stderr, "--adaptive-gop requires a random access GOP of length 8 or 16, disabling it.\n");
+      c->adaptive_gop = 0;
+    }
+    if (c->adaptive_gop && c->target_bitrate > 0 && c->rc_algorithm != KVZ_ABR) {
+      fprintf(stderr, "--adaptive-gop supports only the abr rate control, disabling it.\n");
+      c->adaptive_gop = 0;
+    }
     const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0 || c->mctf ||
+                                c->adaptive_gop ||
                                 (c->target_bitrate > 0 && c->rc_algorithm == KVZ_ABR);
     if (c->lookahead == 0 && explicit_tools) {
       c->lookahead = 20;
@@ -266,6 +276,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       c->scenecut = 0;
       c->mctf = 0;
       c->cutree_qg32 = 0;
+      c->adaptive_gop = 0;
     } else {
       if (c->mctf && c->lookahead < 3) {
         // The temporal filter needs the two following pictures.
@@ -277,6 +288,26 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       if (c->cutree_qg32 < 0) c->cutree_qg32 = 0;
       if (c->cutree <= 0) c->cutree_qg32 = 0;
     }
+  }
+
+  encoder->agop_max_len = encoder->cfg.gop_len;
+  if (encoder->cfg.adaptive_gop) {
+    // Mini-GOPs up to twice the length of the GOP table.
+    encoder->agop_max_len = MIN(KVZ_MAX_GOP_LENGTH, 2 * encoder->cfg.gop_len);
+    encoder->poc_lsb_bits = MAX(4, kvz_math_ceil_log2(encoder->agop_max_len * 2 + 1));
+
+    // Settings of the anchor and of the middle picture of the mini-GOPs
+    // longer than the GOP table, after the table entries. The middle
+    // picture uses the settings of the anchor of the table. The anchor is
+    // referenced over longer distances and by more pictures, so it gets a
+    // lower QP.
+    kvz_gop_config *gop = encoder->cfg.gop;
+    const int len = encoder->cfg.gop_len;
+    gop[len] = gop[0];
+    gop[len].poc_offset = len;
+    gop[len + 1] = gop[0];
+    gop[len + 1].poc_offset = 2 * len;
+    gop[len + 1].qp_offset -= 3;
   }
 
   encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
