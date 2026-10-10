@@ -145,6 +145,14 @@ file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/str
 
 list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 
+# The AArch64 NEON DCT/IDCT/DST is bit-exact but was slower than generic under
+# QEMU user-mode emulation, so it is only compiled when this option is enabled.
+# NEON itself needs no extra flags on AArch64: the sources are compiled as is.
+option(KVZ_NEON_DCT "Compile and register the experimental AArch64 NEON DCT strategies" OFF)
+if(KVZ_NEON_DCT)
+  add_definitions(-DKVZ_NEON_DCT)
+endif()
+
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
