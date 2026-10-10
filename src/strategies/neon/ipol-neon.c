@@ -113,6 +113,16 @@ static inline uint8x8_t ver_finish_pixel(int32x4_t lo, int32x4_t hi)
   return vqmovun_s16(vcombine_s16(vqmovn_s32(lo), vqmovn_s32(hi)));
 }
 
+/* Like ver_finish_pixel, but stores sum >> 6 in int16 first, as the generic
+ * block filters do (int16_t sample = ... >> shift2). That store wraps when the
+ * half-pel diagonal sum exceeds int16, so the vector path must wrap too.
+ * vrshrq_n_s16 computes (x + 32) >> 6 without an intermediate overflow. */
+static inline uint8x8_t ver_finish_pixel_wrap16(int32x4_t lo, int32x4_t hi)
+{
+  int16x8_t s = vcombine_s16(vmovn_s32(vshrq_n_s32(lo, 6)), vmovn_s32(vshrq_n_s32(hi, 6)));
+  return vqmovun_s16(vrshrq_n_s16(s, 6));
+}
+
 static void ver_pass_pixel(const int16_t hor[][LCU_WIDTH], const int8_t *f, int taps,
                            int width, int height,
                            kvz_pixel *dst, int16_t dst_stride)
@@ -323,7 +333,7 @@ static inline void ver8_s16_row(const int16_t *p, int16_t stride, const int8_t *
   for (; i + 8 <= n; i += 8) {
     int32x4_t lo, hi;
     ver_sum8_s32(p + i, stride, f, 8, &lo, &hi);
-    vst1_u8(out + i, ver_finish_pixel(lo, hi));
+    vst1_u8(out + i, ver_finish_pixel_wrap16(lo, hi));
   }
   for (; i < n; ++i) {
     int32_t s = 0;

@@ -75,8 +75,17 @@ static void fill_src(int mode)
   for (int i = 0; i < 256 * 256; ++i) {
     if (mode == 0) {
       src_buf[i] = (kvz_pixel)(rnd() & 0xFF);
-    } else {
+    } else if (mode == 1) {
       src_buf[i] = (rnd() & 1) ? 255 : 0;
+    } else {
+      // Worst case for the half-pel filter (-1, 4, -11, 40, 40, -11, 4, -1):
+      // 255 under the positive taps and 0 under the negative ones, in both
+      // directions. The diagonal sum then exceeds int16 after the >> 6, which
+      // generic wraps by storing it in an int16_t.
+      static const kvz_pixel pat[8] = { 0, 255, 0, 255, 255, 0, 255, 0 };
+      const int x = i & 255, y = i >> 8;
+      const int pos_row = pat[y & 7] != 0;
+      src_buf[i] = pos_row ? pat[x & 7] : (kvz_pixel)(255 - pat[x & 7]);
     }
   }
 }
@@ -124,7 +133,7 @@ static int compare_hi(int w, int h, const char *what, int *mism_x, int *mism_y)
 static int run_luma_pixel(void)
 {
   int mx = 0, my = 0;
-  for (int mode = 0; mode < 2; ++mode) {
+  for (int mode = 0; mode < 3; ++mode) {
     fill_src(mode);
     for (int wi = 0; wi < 6; ++wi) for (int hi = 0; hi < 6; ++hi) {
       for (int mxi = 0; mxi < 16; ++mxi) for (int myi = 0; myi < 16; ++myi) {
@@ -144,7 +153,7 @@ static int run_luma_pixel(void)
 static int run_luma_hi(void)
 {
   int mx = 0, my = 0;
-  for (int mode = 0; mode < 2; ++mode) {
+  for (int mode = 0; mode < 3; ++mode) {
     fill_src(mode);
     for (int wi = 0; wi < 6; ++wi) for (int hi = 0; hi < 6; ++hi) {
       for (int mxi = 0; mxi < 16; ++mxi) for (int myi = 0; myi < 16; ++myi) {
@@ -275,7 +284,7 @@ static int run_block_filters(void)
   static const int bsizes[] = { 8, 16, 32, 64 };
   static const int offs[] = { -1, 0, 1 };
   static const char *names[4] = { "hpel_hor_ver", "hpel_diag", "qpel_hor_ver", "qpel_diag" };
-  for (int mode = 0; mode < 2; ++mode) {
+  for (int mode = 0; mode < 3; ++mode) {
     fill_src(mode);
     for (int wi = 0; wi < 4; ++wi) for (int hi = 0; hi < 4; ++hi) {
       for (int fl = 1; fl <= 3; ++fl) for (int ox = 0; ox < 3; ++ox) for (int oy = 0; oy < 3; ++oy) {
