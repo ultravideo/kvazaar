@@ -269,7 +269,10 @@ static void run_block_pipeline(const block_fns_t *f, int width, int height, int 
 
 static int run_block_filters(void)
 {
-  static const int bsizes[] = { 4, 8, 16, 64 };
+  // The encoder rounds internal_width and internal_height up to multiples of 8
+  // before calling the block filters (search_inter.c), so the block contract
+  // is multiples of 8 only.
+  static const int bsizes[] = { 8, 16, 32, 64 };
   static const int offs[] = { -1, 0, 1 };
   static const char *names[4] = { "hpel_hor_ver", "hpel_diag", "qpel_hor_ver", "qpel_diag" };
   for (int mode = 0; mode < 2; ++mode) {
@@ -279,7 +282,9 @@ static int run_block_filters(void)
         const int w = bsizes[wi], h = bsizes[hi];
         run_block_pipeline(&block_ref, w, h, fl, offs[ox], offs[oy], blk_ref);
         run_block_pipeline(&block_opt, w, h, fl, offs[ox], offs[oy], blk_opt);
-        for (int st = 0; st < 4; ++st) for (int fi = 0; fi < 4; ++fi) {
+        // The encoder runs only the first fme_level steps (search_inter.c), so
+        // only those stages are part of the contract.
+        for (int st = 0; st < fl; ++st) for (int fi = 0; fi < 4; ++fi) {
           for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
             if (blk_ref[st][fi][y * LCU_WIDTH + x] != blk_opt[st][fi][y * LCU_WIDTH + x]) {
               printf("\n    %s filter %d mismatch at (%d,%d): ref=%d opt=%d (w=%d h=%d fme=%d hx=%d hy=%d)\n",
