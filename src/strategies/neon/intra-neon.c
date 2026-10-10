@@ -61,18 +61,90 @@ static const int16_t modedisp2invsampledisp[9] = { 0, 4096, 1638, 910, 630, 482,
  */
 static inline void angular_filter_row(const kvz_pixel *r, int width, int f, kvz_pixel *out)
 {
-  const uint16_t wa = (uint16_t)(32 - f);
-  const uint16_t wb = (uint16_t)f;
+  /* The weights fit in 8 bits, so widening u8 multiplies replace the separate
+   * widening moves. */
+  const uint8x8_t wa = vdup_n_u8((uint8_t)(32 - f));
+  const uint8x8_t wb = vdup_n_u8((uint8_t)f);
   int x = 0;
+  for (; x + 16 <= width; x += 16) {
+    const uint8x16_t a = vld1q_u8(r + x);
+    const uint8x16_t b = vld1q_u8(r + x + 1);
+    const uint16x8_t lo = vmlal_u8(vmull_u8(vget_low_u8(a), wa), vget_low_u8(b), wb);
+    const uint16x8_t hi = vmlal_high_u8(vmull_high_u8(a, vcombine_u8(wa, wa)), b, vcombine_u8(wb, wb));
+    vst1q_u8(out + x, vrshrn_high_n_u16(vrshrn_n_u16(lo, 5), hi, 5));
+  }
   for (; x + 8 <= width; x += 8) {
-    uint16x8_t a = vmovl_u8(vld1_u8(r + x));
-    uint16x8_t b = vmovl_u8(vld1_u8(r + x + 1));
-    uint16x8_t s = vmulq_n_u16(a, wa);
-    s = vmlaq_n_u16(s, b, wb);
-    vst1_u8(out + x, vrshrn_n_u16(s, 5));
+    const uint16x8_t sum = vmlal_u8(vmull_u8(vld1_u8(r + x), wa), vld1_u8(r + x + 1), wb);
+    vst1_u8(out + x, vrshrn_n_u16(sum, 5));
   }
   for (; x < width; ++x) {
     out[x] = (kvz_pixel)(((32 - f) * r[x] + f * r[x + 1] + 16) >> 5);
+  }
+}
+
+/* Two 4-wide angular rows at once: lanes 0-3 are row y (offset d0, fraction f0)
+ * and lanes 4-7 are row y + 1. Only r[d .. d + 4] is read, like generic. A
+ * fraction of 0 gives ((32 * r[x] + 16) >> 5) == r[x], the plain copy. */
+static inline uint8x8_t angular_rows_w4(const kvz_pixel *r, int d0, int f0, int d1, int f1)
+{
+  uint32_t a0, a1, b0, b1;
+  memcpy(&a0, r + d0, 4);
+  memcpy(&b0, r + d0 + 1, 4);
+  memcpy(&a1, r + d1, 4);
+  memcpy(&b1, r + d1 + 1, 4);
+  const uint8x8_t a = vreinterpret_u8_u64(vcreate_u64((uint64_t)a0 | ((uint64_t)a1 << 32)));
+  const uint8x8_t b = vreinterpret_u8_u64(vcreate_u64((uint64_t)b0 | ((uint64_t)b1 << 32)));
+  const uint16x4_t wa0 = vdup_n_u16((uint16_t)(32 - f0)), wa1 = vdup_n_u16((uint16_t)(32 - f1));
+  const uint16x4_t wb0 = vdup_n_u16((uint16_t)f0), wb1 = vdup_n_u16((uint16_t)f1);
+  uint16x8_t s = vmulq_u16(vmovl_u8(a), vcombine_u16(wa0, wa1));
+  s = vmlaq_u16(s, vmovl_u8(b), vcombine_u16(wb0, wb1));
+  return vrshrn_n_u16(s, 5);
+}
+
+/* In-register transpose of an 8x8 byte block. */
+static inline void transpose8x8_u8(uint8x8_t r[8])
+{
+  const uint8x8x2_t t0 = vtrn_u8(r[0], r[1]);
+  const uint8x8x2_t t1 = vtrn_u8(r[2], r[3]);
+  const uint8x8x2_t t2 = vtrn_u8(r[4], r[5]);
+  const uint8x8x2_t t3 = vtrn_u8(r[6], r[7]);
+  const uint16x4x2_t u0 = vtrn_u16(vreinterpret_u16_u8(t0.val[0]), vreinterpret_u16_u8(t1.val[0]));
+  const uint16x4x2_t u1 = vtrn_u16(vreinterpret_u16_u8(t0.val[1]), vreinterpret_u16_u8(t1.val[1]));
+  const uint16x4x2_t u2 = vtrn_u16(vreinterpret_u16_u8(t2.val[0]), vreinterpret_u16_u8(t3.val[0]));
+  const uint16x4x2_t u3 = vtrn_u16(vreinterpret_u16_u8(t2.val[1]), vreinterpret_u16_u8(t3.val[1]));
+  const uint32x2x2_t v0 = vtrn_u32(vreinterpret_u32_u16(u0.val[0]), vreinterpret_u32_u16(u2.val[0]));
+  const uint32x2x2_t v1 = vtrn_u32(vreinterpret_u32_u16(u1.val[0]), vreinterpret_u32_u16(u3.val[0]));
+  const uint32x2x2_t v2 = vtrn_u32(vreinterpret_u32_u16(u0.val[1]), vreinterpret_u32_u16(u2.val[1]));
+  const uint32x2x2_t v3 = vtrn_u32(vreinterpret_u32_u16(u1.val[1]), vreinterpret_u32_u16(u3.val[1]));
+  r[0] = vreinterpret_u8_u32(v0.val[0]);
+  r[4] = vreinterpret_u8_u32(v0.val[1]);
+  r[1] = vreinterpret_u8_u32(v1.val[0]);
+  r[5] = vreinterpret_u8_u32(v1.val[1]);
+  r[2] = vreinterpret_u8_u32(v2.val[0]);
+  r[6] = vreinterpret_u8_u32(v2.val[1]);
+  r[3] = vreinterpret_u8_u32(v3.val[0]);
+  r[7] = vreinterpret_u8_u32(v3.val[1]);
+}
+
+/* dst[y * width + x] = src[x * width + y] for a square block. */
+static inline void transpose_block(const kvz_pixel *src, kvz_pixel *dst, int width)
+{
+  if (width == 4) {
+    static const uint8_t idx[16] = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 };
+    vst1q_u8(dst, vqtbl1q_u8(vld1q_u8(src), vld1q_u8(idx)));
+    return;
+  }
+  for (int by = 0; by < width; by += 8) {
+    for (int bx = 0; bx < width; bx += 8) {
+      uint8x8_t r[8];
+      for (int k = 0; k < 8; ++k) {
+        r[k] = vld1_u8(src + (by + k) * width + bx);
+      }
+      transpose8x8_u8(r);
+      for (int k = 0; k < 8; ++k) {
+        vst1_u8(dst + (bx + k) * width + by, r[k]);
+      }
+    }
   }
 }
 
@@ -123,7 +195,16 @@ static void angular_pred_neon(const int_fast8_t log2_width,
   kvz_pixel tmp_out[32 * 32];
   kvz_pixel *buf = vertical_mode ? dst : tmp_out;
 
-  if (sample_disp != 0) {
+  if (sample_disp != 0 && width == 4) {
+    int_fast16_t delta_pos = 0;
+    for (int_fast8_t y = 0; y < 4; y += 2) {
+      const int p0 = delta_pos + sample_disp;
+      const int p1 = p0 + sample_disp;
+      delta_pos = p1;
+      vst1_u8(&buf[y * 4], angular_rows_w4(ref_main, p0 >> 5, p0 & 31, p1 >> 5, p1 & 31));
+    }
+  }
+  else if (sample_disp != 0) {
     int_fast16_t delta_pos = 0;
     for (int_fast8_t y = 0; y < width; ++y) {
       delta_pos += sample_disp;
@@ -140,17 +221,26 @@ static void angular_pred_neon(const int_fast8_t log2_width,
     }
   }
   else {
-    for (int_fast8_t y = 0; y < width; ++y) {
-      memcpy(&buf[y * width], ref_main, (size_t)width);
+    // Pure horizontal or vertical: every row is the reference row.
+    if (width >= 16) {
+      const uint8x16_t r0 = vld1q_u8(ref_main);
+      const uint8x16_t r1 = width == 32 ? vld1q_u8(ref_main + 16) : r0;
+      for (int_fast8_t y = 0; y < width; ++y) {
+        vst1q_u8(&buf[y * width], r0);
+        if (width == 32) vst1q_u8(&buf[y * width + 16], r1);
+      }
+    } else if (width == 8) {
+      const uint8x8_t r0 = vld1_u8(ref_main);
+      for (int_fast8_t y = 0; y < 8; ++y) vst1_u8(&buf[y * 8], r0);
+    } else {
+      uint32_t r0;
+      memcpy(&r0, ref_main, 4);
+      vst1q_u8(buf, vreinterpretq_u8_u32(vdupq_n_u32(r0)));
     }
   }
 
   if (!vertical_mode) {
-    for (int_fast8_t y = 0; y < width; ++y) {
-      for (int_fast8_t x = 0; x < width; ++x) {
-        dst[y * width + x] = tmp_out[x * width + y];
-      }
-    }
+    transpose_block(tmp_out, dst, width);
   }
 }
 
@@ -221,37 +311,50 @@ static void intra_pred_filtered_dc_neon(const int_fast8_t log2_width,
                                         kvz_pixel *const out_block)
 {
   const int width = 1 << log2_width;
+  const kvz_pixel *const top = ref_top + 1;
+  const kvz_pixel *const left = ref_left + 1;
 
-  int sum = 0;
-  for (int i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
+  // DC value: the rounded mean of the top and left references.
+  uint32_t sum;
+  if (width == 4) {
+    uint32_t t, l;
+    memcpy(&t, top, 4);
+    memcpy(&l, left, 4);
+    sum = vaddlv_u8(vreinterpret_u8_u64(vcreate_u64((uint64_t)t | ((uint64_t)l << 32))));
+  } else {
+    uint16x8_t acc = vdupq_n_u16(0);
+    for (int i = 0; i < width; i += 8) {
+      acc = vaddw_u8(acc, vld1_u8(top + i));
+      acc = vaddw_u8(acc, vld1_u8(left + i));
+    }
+    sum = vaddlvq_u16(acc);
   }
   const kvz_pixel dc_val = (kvz_pixel)((sum + width) >> (log2_width + 1));
 
-  // Fill the whole block with the DC value, then patch the first row and column.
-  for (int y = 0; y < width; ++y) {
-    kvz_pixel *row = &out_block[y * width];
-    int x = 0;
-    for (; x + 8 <= width; x += 8) {
-      vst1_u8(row + x, vdup_n_u8(dc_val));
-    }
-    for (; x < width; ++x) {
-      row[x] = dc_val;
-    }
+  // Fill the block with the DC value. width * width is a multiple of 16.
+  const uint8x16_t fill = vdupq_n_u8(dc_val);
+  for (int i = 0; i < width * width; i += 16) {
+    vst1q_u8(out_block + i, fill);
   }
 
-  // Filter top-left with ([1 2 1] / 4)
-  out_block[0] = (kvz_pixel)((ref_left[1] + 2 * dc_val + ref_top[1] + 2) / 4);
-
-  // Filter rest of the top row with ([1 3] / 4)
-  for (int x = 1; x < width; ++x) {
-    out_block[x] = (kvz_pixel)((ref_top[x + 1] + 3 * dc_val + 2) / 4);
+  // Top row: (top[x] + 3 * dc + 2) >> 2, in 16-bit lanes.
+  const uint16x8_t bias = vdupq_n_u16((uint16_t)(3 * dc_val + 2));
+  if (width == 4) {
+    uint32_t t;
+    memcpy(&t, top, 4);
+    const uint8x8_t r = vshrn_n_u16(vaddw_u8(bias, vreinterpret_u8_u32(vdup_n_u32(t))), 2);
+    vst1_lane_u32((uint32_t *)(void *)out_block, vreinterpret_u32_u8(r), 0);
+  } else {
+    for (int x = 0; x < width; x += 8) {
+      vst1_u8(out_block + x, vshrn_n_u16(vaddw_u8(bias, vld1_u8(top + x)), 2));
+    }
   }
-  // Filter rest of the left column with ([1 3] / 4)
+  // Left column, same filter.
   for (int y = 1; y < width; ++y) {
-    out_block[y * width] = (kvz_pixel)((ref_left[y + 1] + 3 * dc_val + 2) / 4);
+    out_block[y * width] = (kvz_pixel)((left[y] + 3 * dc_val + 2) >> 2);
   }
+  // Top-left corner with ([1 2 1] / 4).
+  out_block[0] = (kvz_pixel)((left[0] + 2 * dc_val + top[0] + 2) >> 2);
 }
 
 int kvz_strategy_register_intra_neon(void* opaque, uint8_t bitdepth)

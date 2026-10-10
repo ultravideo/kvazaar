@@ -241,6 +241,19 @@ static uint32_t ver_sad_neon(const kvz_pixel *pic_data, const kvz_pixel *ref_dat
 static unsigned hor_sad_neon(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                              int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
+  if (block_width < 8) {
+    /* Narrow frame-border strips: a plain loop beats per-row vector setup. */
+    unsigned sum = 0;
+    for (int y = 0; y < block_height; ++y) {
+      const kvz_pixel *p = pic_data + y * pic_stride;
+      const int ref = ref_data[y * ref_stride];
+      for (int x = 0; x < block_width; ++x) {
+        sum += abs((int)p[x] - ref);
+      }
+    }
+    return sum;
+  }
+
   uint32x4_t acc = vdupq_n_u32(0);
   unsigned tail = 0;
 
@@ -605,24 +618,38 @@ static unsigned pixels_calc_ssd_neon(const kvz_pixel *const ref, const kvz_pixel
                                      const int ref_stride, const int rec_stride,
                                      const int width)
 {
-  int32x4_t acc = vdupq_n_s32(0);
-  int tail = 0;
-
+  /* |a - b| fits in 8 bits and its square in 16, so square the absolute
+   * difference with a widening multiply and accumulate pairwise into 32 bits. */
+  uint32x4_t acc = vdupq_n_u32(0);
+  if (width == 4) {
+    for (int y = 0; y < 4; y += 2) {
+      const uint8x8_t d = vabd_u8(load_row_pair4(ref + y * ref_stride, ref_stride),
+                                  load_row_pair4(rec + y * rec_stride, rec_stride));
+      acc = vpadalq_u16(acc, vmull_u8(d, d));
+    }
+    return vaddvq_u32(acc);
+  }
+  unsigned tail = 0;
   for (int y = 0; y < width; ++y) {
     const kvz_pixel *r = ref + y * ref_stride;
     const kvz_pixel *c = rec + y * rec_stride;
     int x = 0;
-    for (; x + 8 <= width; x += 8) {
-      int16x8_t d = load_diff8(r + x, c + x);
-      acc = vmlal_s16(acc, vget_low_s16(d), vget_low_s16(d));
-      acc = vmlal_high_s16(acc, d, d);
+    for (; x + 16 <= width; x += 16) {
+      const uint8x16_t d = vabdq_u8(vld1q_u8(r + x), vld1q_u8(c + x));
+      acc = vpadalq_u16(acc, vmull_u8(vget_low_u8(d), vget_low_u8(d)));
+      acc = vpadalq_u16(acc, vmull_high_u8(d, d));
+    }
+    if (x + 8 <= width) {
+      const uint8x8_t d = vabd_u8(vld1_u8(r + x), vld1_u8(c + x));
+      acc = vpadalq_u16(acc, vmull_u8(d, d));
+      x += 8;
     }
     for (; x < width; ++x) {
-      int diff = (int)r[x] - (int)c[x];
-      tail += diff * diff;
+      const int diff = (int)r[x] - (int)c[x];
+      tail += (unsigned)(diff * diff);
     }
   }
-  return (unsigned)(vaddvq_s32(acc) + tail);
+  return vaddvq_u32(acc) + tail;
 }
 
 //////////////////////////////////////////////////////////////////////////

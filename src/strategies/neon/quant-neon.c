@@ -65,13 +65,6 @@
 /* Quantization of four coefficients: returns the unsigned levels in 32-bit
  * lanes, and the 64-bit (abs * quant + add) >> q_bits values are kept for the
  * sign-hiding pass. */
-static INLINE int64x2_t quant_level64(int32x2_t a, int32x2_t q, int64_t add, int32_t q_bits)
-{
-  int64x2_t p = vmull_s32(a, q);
-  p = vaddq_s64(p, vdupq_n_s64(add));
-  return vshlq_s64(p, vdupq_n_s64(-(int64_t)q_bits));
-}
-
 static void kvz_quant_neon(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
@@ -92,23 +85,31 @@ static void kvz_quant_neon(const encoder_state_t * const state, coeff_t *coef, c
   uint32_t ac_sum = 0;
   int32_t n = 0;
 
-  for (; n + 4 <= n_total; n += 4) {
-    const int16x4_t c16 = vld1_s16(coef + n);
-    const int32x4_t c32 = vmovl_s16(c16);
-    const int32x4_t abs32 = vabsq_s32(c32);
-    const int32x4_t q32 = vmovl_s16(vld1_s16(quant_coeff + n));
-
-    const int64x2_t lo = quant_level64(vget_low_s32(abs32), vget_low_s32(q32), add, q_bits);
-    const int64x2_t hi = quant_level64(vget_high_s32(abs32), vget_high_s32(q32), add, q_bits);
-    const int32x4_t level = vcombine_s32(vmovn_s64(lo), vmovn_s64(hi));
-
-    ac_sum += (uint32_t)vaddvq_s32(level);
+  /* 32-bit lanes are exact: |coef| <= 32768 and the scaling factor is an int16,
+   * so |abs * q| <= 2^30, and adding add (< 2^26 for 8-bit) still fits in int32.
+   * vabsq_s16(-32768) wraps to -32768, which as u16 is the correct 32768. */
+  const int32x4_t vadd = vdupq_n_s32(add);
+  const int32x4_t vneg_qbits = vdupq_n_s32(-q_bits);
+  int32x4_t vacc = vdupq_n_s32(0);
+  for (; n + 8 <= n_total; n += 8) {
+    const int16x8_t c = vld1q_s16(coef + n);
+    const uint16x8_t a16 = vreinterpretq_u16_s16(vabsq_s16(c));
+    const int16x8_t q = vld1q_s16(quant_coeff + n);
+    int32x4_t ll = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), vmovl_s16(vget_low_s16(q)));
+    int32x4_t lh = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_high_u16(a16)), vmovl_high_s16(q));
+    ll = vshlq_s32(ll, vneg_qbits);
+    lh = vshlq_s32(lh, vneg_qbits);
+    vacc = vaddq_s32(vacc, vaddq_s32(ll, lh));
 
     // level * sign, with sign = -1 for negative coefficients (and +1 for zero).
-    const int32x4_t neg = vshrq_n_s32(c32, 31);
-    const int32x4_t signed_level = vsubq_s32(veorq_s32(level, neg), neg);
-    vst1_s16(q_coef + n, vqmovn_s32(signed_level));
+    const int16x8_t neg = vshrq_n_s16(c, 15);
+    const int32x4_t nl = vmovl_s16(vget_low_s16(neg));
+    const int32x4_t nh = vmovl_high_s16(neg);
+    ll = vsubq_s32(veorq_s32(ll, nl), nl);
+    lh = vsubq_s32(veorq_s32(lh, nh), nh);
+    vst1q_s16(q_coef + n, vqmovn_high_s32(vqmovn_s32(ll), lh));
   }
+  ac_sum += (uint32_t)vaddvq_s32(vacc);
   for (; n < n_total; ++n) {
     int32_t level = coef[n];
     int64_t abs_level = (int64_t)abs(level);
@@ -127,22 +128,19 @@ static void kvz_quant_neon(const encoder_state_t * const state, coeff_t *coef, c
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
 
   n = 0;
-  for (; n + 4 <= n_total; n += 4) {
-    const int32x4_t abs32 = vabsq_s32(vmovl_s16(vld1_s16(coef + n)));
-    const int32x4_t q32 = vmovl_s16(vld1_s16(quant_coeff + n));
-
-    const int32x2_t al = vget_low_s32(abs32), ah = vget_high_s32(abs32);
-    const int32x2_t ql = vget_low_s32(q32), qh = vget_high_s32(q32);
-
-    const int64x2_t pl = vmull_s32(al, ql);
-    const int64x2_t ph = vmull_s32(ah, qh);
-    const int64x2_t ll = quant_level64(al, ql, add, q_bits);
-    const int64x2_t lh = quant_level64(ah, qh, add, q_bits);
-
-    // delta_u = (abs * q - (level << q_bits)) >> q_bits8
-    const int64x2_t dl = vshlq_s64(vsubq_s64(pl, vshlq_s64(ll, vdupq_n_s64(q_bits))), vdupq_n_s64(-(int64_t)q_bits8));
-    const int64x2_t dh = vshlq_s64(vsubq_s64(ph, vshlq_s64(lh, vdupq_n_s64(q_bits))), vdupq_n_s64(-(int64_t)q_bits8));
-    vst1q_s32(delta_u + n, vcombine_s32(vmovn_s64(dl), vmovn_s64(dh)));
+  const int32x4_t vqbits = vdupq_n_s32(q_bits);
+  const int32x4_t vneg_qbits8 = vdupq_n_s32(-q_bits8);
+  for (; n + 8 <= n_total; n += 8) {
+    const int16x8_t c = vld1q_s16(coef + n);
+    const uint16x8_t a16 = vreinterpretq_u16_s16(vabsq_s16(c));
+    const int16x8_t q = vld1q_s16(quant_coeff + n);
+    const int32x4_t pl = vmulq_s32(vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), vmovl_s16(vget_low_s16(q)));
+    const int32x4_t ph = vmulq_s32(vreinterpretq_s32_u32(vmovl_high_u16(a16)), vmovl_high_s16(q));
+    const int32x4_t ll = vshlq_s32(vaddq_s32(pl, vadd), vneg_qbits);
+    const int32x4_t lh = vshlq_s32(vaddq_s32(ph, vadd), vneg_qbits);
+    // delta_u = (abs * q - (level << q_bits)) >> q_bits8; every term fits in int32.
+    vst1q_s32(delta_u + n, vshlq_s32(vsubq_s32(pl, vshlq_s32(ll, vqbits)), vneg_qbits8));
+    vst1q_s32(delta_u + n + 4, vshlq_s32(vsubq_s32(ph, vshlq_s32(lh, vqbits)), vneg_qbits8));
   }
   for (; n < n_total; ++n) {
     int32_t level = coef[n];
