@@ -34,6 +34,7 @@
 
 #include "strategies/avx2/quant-avx2.h"
 #include "strategies/generic/quant-generic.h"
+#include "strategies/neon/quant-neon.h"
 #include "strategyselector.h"
 
 
@@ -53,6 +54,9 @@ int kvz_strategy_register_quant(void* opaque, uint8_t bitdepth) {
 
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_quant_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_quant_neon(opaque, bitdepth);
   }
   return success;
 }

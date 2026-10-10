@@ -140,7 +140,8 @@ AC_SUBST([AM_CFLAGS])
 AS_CASE([$host_cpu],
         [i?86], [BITS="32" ASFLAGS="$ASFLAGS -DARCH_X86_64=0" X86="true"],
         [x86_64], [BITS="64" ASFLAGS="$ASFLAGS -DARCH_X86_64=1 -m amd64" X86="true"],
-        [powerpc*], [PPC="true"]
+        [powerpc*], [PPC="true"],
+        [aarch64*], [ARM="true"]
 )
 
 AS_CASE([$host_os],

@@ -40,10 +40,13 @@ check_PROGRAMS = kvazaar_tests
 kvazaar_tests_SOURCES = \
 	coeff_sum_tests.c \
 	dct_tests.c \
+	intra_pred_tests.c \
 	intra_sad_tests.c \
+	ipol_tests.c \
 	mv_cand_tests.c \
 	sad_tests.c \
 	sad_tests.h \
+	sao_tests.c \
 	satd_tests.c \
 	satd_tests.h \
 	speed_tests.c \

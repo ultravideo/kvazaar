@@ -19,6 +19,7 @@ include_HEADERS = \
 noinst_LTLIBRARIES = \
 	libaltivec.la \
 	libavx2.la \
+	libneon.la \
 	libsse2.la \
 	libsse41.la
 
@@ -165,6 +166,7 @@ libkvazaar_la_CFLAGS =
 libkvazaar_la_LIBADD = \
 	libaltivec.la \
 	libavx2.la \
+	libneon.la \
 	libsse2.la \
 	libsse41.la
 
@@ -186,6 +188,21 @@ endif
 libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.c \
 	strategies/altivec/picture-altivec.h
+
+libneon_la_SOURCES = \
+	strategies/neon/neon-common.h \
+	strategies/neon/dct-neon.c \
+	strategies/neon/dct-neon.h \
+	strategies/neon/intra-neon.c \
+	strategies/neon/intra-neon.h \
+	strategies/neon/ipol-neon.c \
+	strategies/neon/ipol-neon.h \
+	strategies/neon/picture-neon.c \
+	strategies/neon/picture-neon.h \
+	strategies/neon/quant-neon.c \
+	strategies/neon/quant-neon.h \
+	strategies/neon/sao-neon.c \
+	strategies/neon/sao-neon.h
 
 libavx2_la_SOURCES = \
 	strategies/avx2/avx2_common_functions.h \

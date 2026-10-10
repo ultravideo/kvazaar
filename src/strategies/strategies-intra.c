@@ -34,6 +34,7 @@
 
 #include "strategies/avx2/intra-avx2.h"
 #include "strategies/generic/intra-generic.h"
+#include "strategies/neon/intra-neon.h"
 #include "strategyselector.h"
 
 
@@ -49,6 +50,9 @@ int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
 
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_intra_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_intra_neon(opaque, bitdepth);
   }
 
   return success;

@@ -34,6 +34,7 @@
 
 #include "strategies/avx2/ipol-avx2.h"
 #include "strategies/generic/ipol-generic.h"
+#include "strategies/neon/ipol-neon.h"
 #include "strategyselector.h"
 
 
@@ -56,6 +57,9 @@ int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth) {
 
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_ipol_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_ipol_neon(opaque, bitdepth);
   }
   return success;
 }

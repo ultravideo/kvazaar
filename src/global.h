@@ -407,6 +407,20 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 #  define COMPILE_ARM 0
 #endif
 
+// NEON intrinsics are only used on AArch64, where Advanced SIMD is part of
+// the base architecture. 32-bit ARM uses the generic C code.
+#if defined(__aarch64__) || defined(_M_ARM64)
+#  define COMPILE_ARM64 1
+#else
+#  define COMPILE_ARM64 0
+#endif
+
+#if COMPILE_ARM64 && (defined(__ARM_NEON) || defined(_M_ARM64))
+#  define COMPILE_ARM_NEON 1
+#else
+#  define COMPILE_ARM_NEON 0
+#endif
+
 // Min & max delta QP limits based on bit depth
 #define KVZ_QP_DELTA_MIN -(26 + 3 * (KVZ_BIT_DEPTH - 8))
 #define KVZ_QP_DELTA_MAX 25 + 3 * (KVZ_BIT_DEPTH - 8)
