@@ -448,11 +448,15 @@ static void fast_inverse_dst_4x4_neon(int8_t bitdepth, const int16_t *input, int
 
 #endif // KVZ_NEON_DCT
 
+#endif //COMPILE_ARM_NEON
+
+/* Defined on every platform so that non-ARM builds link. The call site only runs
+ * when the NEON hardware flag is set, which is never the case off ARM. */
 int kvz_strategy_register_dct_neon(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-#ifdef KVZ_NEON_DCT
+#if COMPILE_ARM_NEON && defined(KVZ_NEON_DCT)
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "neon", 40, &fast_forward_dst_4x4_neon);
     success &= kvz_strategyselector_register(opaque, "dct_4x4", "neon", 40, &dct_4x4_neon);
@@ -474,5 +478,3 @@ int kvz_strategy_register_dct_neon(void* opaque, uint8_t bitdepth)
 
   return success;
 }
-
-#endif //COMPILE_ARM_NEON
