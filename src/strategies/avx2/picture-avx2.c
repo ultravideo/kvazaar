@@ -70,6 +70,17 @@ uint32_t kvz_reg_sad_avx2(const uint8_t * const data1, const uint8_t * const dat
 {
   if (width == 0)
     return 0;
+  if (width < 4) {
+    // Too narrow for the vector paths. A plain loop is faster than their setup.
+    uint32_t sum = 0;
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        int d = (int)data1[y * stride1 + x] - (int)data2[y * stride2 + x];
+        sum += (uint32_t)(d < 0 ? -d : d);
+      }
+    }
+    return sum;
+  }
   if (width == 4)
     return reg_sad_w4(data1, data2, height, stride1, stride2);
   if (width == 8)
