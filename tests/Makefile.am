@@ -47,6 +47,7 @@ kvazaar_tests_SOURCES = \
 	sad_tests.c \
 	sad_tests.h \
 	sao_tests.c \
+	strategy_diff_tests.c \
 	satd_tests.c \
 	satd_tests.h \
 	speed_tests.c \

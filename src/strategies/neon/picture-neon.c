@@ -781,29 +781,39 @@ static void bipred_average_neon(lcu_t *const lcu,
  */
 static double pixel_var_neon(const kvz_pixel *arr, const uint32_t len)
 {
-  uint32x4_t sum_acc = vdupq_n_u32(0);
-  uint32x4_t sq_acc = vdupq_n_u32(0);
-  uint32_t sum = 0;
-  uint32_t sumsq = 0;
+  /* The encoder calls this on whole frames (VAQ), so the sum of squares needs
+   * 64 bits. Each 16-pixel step adds at most 4 * 255^2 to a 32-bit lane, so
+   * the lanes are flushed into 64-bit accumulators every 4096 steps. */
+  uint64x2_t sum64 = vdupq_n_u64(0);
+  uint64x2_t sq64 = vdupq_n_u64(0);
   uint32_t i = 0;
 
-  for (; i + 16 <= len; i += 16) {
-    uint8x16_t v = vld1q_u8(arr + i);
-    sum_acc = vpadalq_u16(sum_acc, vpaddlq_u8(v));
-    uint16x8_t sq_lo = vmull_u8(vget_low_u8(v), vget_low_u8(v));
-    uint16x8_t sq_hi = vmull_u8(vget_high_u8(v), vget_high_u8(v));
-    sq_acc = vpadalq_u16(sq_acc, sq_lo);
-    sq_acc = vpadalq_u16(sq_acc, sq_hi);
+  while (i + 16 <= len) {
+    uint32x4_t sum_acc = vdupq_n_u32(0);
+    uint32x4_t sq_acc = vdupq_n_u32(0);
+    for (int step = 0; step < 4096 && i + 16 <= len; ++step, i += 16) {
+      uint8x16_t v = vld1q_u8(arr + i);
+      sum_acc = vpadalq_u16(sum_acc, vpaddlq_u8(v));
+      sq_acc = vpadalq_u16(sq_acc, vmull_u8(vget_low_u8(v), vget_low_u8(v)));
+      sq_acc = vpadalq_u16(sq_acc, vmull_high_u8(v, v));
+    }
+    sum64 = vpadalq_u32(sum64, sum_acc);
+    sq64 = vpadalq_u32(sq64, sq_acc);
   }
-  sum = vaddvq_u32(sum_acc);
-  sumsq = vaddvq_u32(sq_acc);
+
+  uint64_t sum = vaddvq_u64(sum64);
+  uint64_t sumsq = vaddvq_u64(sq64);
   for (; i < len; ++i) {
     sum += arr[i];
     sumsq += (uint32_t)arr[i] * arr[i];
   }
 
+  /* Population variance (n * sum(x^2) - sum(x)^2) / n^2, with the numerator
+   * computed exactly. Like the AVX2 version this is not bit-identical to the
+   * generic two-pass double loop, only more accurate. */
+  const unsigned __int128 num = (unsigned __int128)len * sumsq - (unsigned __int128)sum * sum;
   const double n = (double)len;
-  return (n * (double)sumsq - (double)sum * (double)sum) / (n * n);
+  return (double)num / (n * n);
 }
 
 #endif // COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
