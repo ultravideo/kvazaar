@@ -63,6 +63,17 @@ static unsigned reg_sad_neon(const kvz_pixel *const data1, const kvz_pixel *cons
                              const int width, const int height,
                              const unsigned stride1, const unsigned stride2)
 {
+  if (width < 8) {
+    /* Too narrow for a vector to pay for its setup and reduction. */
+    unsigned sum = 0;
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        sum += abs((int)data1[y * stride1 + x] - (int)data2[y * stride2 + x]);
+      }
+    }
+    return sum;
+  }
+
   uint32x4_t acc = vdupq_n_u32(0);
   unsigned tail = 0;
 
@@ -86,13 +97,52 @@ static unsigned reg_sad_neon(const kvz_pixel *const data1, const kvz_pixel *cons
   return vaddvq_u32(acc) + tail;
 }
 
+/* Dedicated 4-wide and 8-wide SAD. The generic row loop above handles narrow
+ * blocks with a scalar tail, which made 4x4 and 8x8 slower than generic. Here a
+ * 4-pixel row pair fills one 64-bit vector and an 8-pixel row fills one vector. */
+static inline uint8x8_t load_row_pair4(const kvz_pixel *p, unsigned stride)
+{
+  uint32_t r0, r1;
+  memcpy(&r0, p, 4);
+  memcpy(&r1, p + stride, 4);
+  return vreinterpret_u8_u64(vcreate_u64((uint64_t)r0 | ((uint64_t)r1 << 32)));
+}
+
+static inline unsigned sad_w4_neon(const kvz_pixel *p1, unsigned s1,
+                                   const kvz_pixel *p2, unsigned s2, int height)
+{
+  uint16x8_t acc = vdupq_n_u16(0);
+  unsigned tail = 0;
+  int y = 0;
+  for (; y + 2 <= height; y += 2) {
+    acc = vaddw_u8(acc, vabd_u8(load_row_pair4(p1 + y * s1, s1),
+                                load_row_pair4(p2 + y * s2, s2)));
+  }
+  for (; y < height; ++y) {
+    for (int x = 0; x < 4; ++x) {
+      tail += abs((int)p1[y * s1 + x] - (int)p2[y * s2 + x]);
+    }
+  }
+  return vaddlvq_u16(acc) + tail;
+}
+
+static inline unsigned sad_w8_neon(const kvz_pixel *p1, unsigned s1,
+                                   const kvz_pixel *p2, unsigned s2, int height)
+{
+  uint16x8_t acc = vdupq_n_u16(0);
+  for (int y = 0; y < height; ++y) {
+    acc = vaddw_u8(acc, vabd_u8(vld1_u8(p1 + y * s1), vld1_u8(p2 + y * s2)));
+  }
+  return vaddlvq_u16(acc);
+}
+
 static unsigned sad_4x4_neon(const kvz_pixel *block1, const kvz_pixel *block2)
 {
-  return reg_sad_neon(block1, block2, 4, 4, 4, 4);
+  return sad_w4_neon(block1, 4, block2, 4, 4);
 }
 static unsigned sad_8x8_neon(const kvz_pixel *block1, const kvz_pixel *block2)
 {
-  return reg_sad_neon(block1, block2, 8, 8, 8, 8);
+  return sad_w8_neon(block1, 8, block2, 8, 8);
 }
 static unsigned sad_16x16_neon(const kvz_pixel *block1, const kvz_pixel *block2)
 {
@@ -109,13 +159,13 @@ static unsigned sad_64x64_neon(const kvz_pixel *block1, const kvz_pixel *block2)
 
 static void sad_4x4_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
 {
-  costs_out[0] = reg_sad_neon(preds[0], orig, 4, 4, 4, 4);
-  costs_out[1] = reg_sad_neon(preds[1], orig, 4, 4, 4, 4);
+  costs_out[0] = sad_4x4_neon(preds[0], orig);
+  costs_out[1] = sad_4x4_neon(preds[1], orig);
 }
 static void sad_8x8_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
 {
-  costs_out[0] = reg_sad_neon(preds[0], orig, 8, 8, 8, 8);
-  costs_out[1] = reg_sad_neon(preds[1], orig, 8, 8, 8, 8);
+  costs_out[0] = sad_8x8_neon(preds[0], orig);
+  costs_out[1] = sad_8x8_neon(preds[1], orig);
 }
 static void sad_16x16_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
 {
@@ -141,8 +191,16 @@ static uint32_t reg_sad_w ## w ## _neon(const kvz_pixel * const data1, const kvz
 { \
   return reg_sad_neon(data1, data2, (w), height, stride1, stride2); \
 }
-REG_SAD_FIXED_W(4)
-REG_SAD_FIXED_W(8)
+static uint32_t reg_sad_w4_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                                const int32_t height, const uint32_t stride1, const uint32_t stride2)
+{
+  return sad_w4_neon(data1, stride1, data2, stride2, height);
+}
+static uint32_t reg_sad_w8_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                                const int32_t height, const uint32_t stride1, const uint32_t stride2)
+{
+  return sad_w8_neon(data1, stride1, data2, stride2, height);
+}
 REG_SAD_FIXED_W(12)
 REG_SAD_FIXED_W(16)
 REG_SAD_FIXED_W(24)
