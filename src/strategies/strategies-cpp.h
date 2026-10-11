@@ -89,6 +89,14 @@
 #define KVZ_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
+// Keeps a function out of line (when inlining both template instances into
+// one caller schedules worse).
+#if defined(_MSC_VER)
+#define KVZ_NOINLINE __declspec(noinline)
+#else
+#define KVZ_NOINLINE __attribute__((noinline))
+#endif
+
 // Fully unrolls the following loop over a compile-time trip count, for
 // loops whose vector state must stay in registers.
 #if defined(__clang__)

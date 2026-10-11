@@ -206,14 +206,15 @@ libneon_la_SOURCES = \
 	strategies/neon/sao-neon.h
 
 libavx2_la_SOURCES = \
+	strategies/strategies-cpp.h \
 	strategies/avx2/avx2_common_functions.h \
-	strategies/avx2/dct-avx2.c \
+	strategies/avx2/dct-avx2.cpp \
 	strategies/avx2/dct-avx2.h \
-	strategies/avx2/intra-avx2.c \
+	strategies/avx2/intra-avx2.cpp \
 	strategies/avx2/intra-avx2.h \
 	strategies/avx2/ipol-avx2.c \
 	strategies/avx2/ipol-avx2.h \
-	strategies/avx2/picture-avx2.c \
+	strategies/avx2/picture-avx2.cpp \
 	strategies/avx2/picture-avx2.h \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
@@ -240,6 +241,7 @@ STRATEGY_CXXFLAGS = -std=c++17 -fno-exceptions -fno-rtti -fvisibility=hidden \
 	-I$(srcdir) -I$(srcdir)/extras
 
 libneon_la_CXXFLAGS = $(AM_CXXFLAGS) $(STRATEGY_CXXFLAGS)
+libavx2_la_CXXFLAGS = $(AM_CXXFLAGS) $(STRATEGY_CXXFLAGS)
 
 if HAVE_PPC
 
@@ -253,9 +255,11 @@ if HAVE_X86
 
 if HAVE_AVX2_GCC
 libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2
+libavx2_la_CXXFLAGS += -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2
 endif
 if HAVE_AVX2_CLANG
 libavx2_la_CFLAGS = -mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2
+libavx2_la_CXXFLAGS += -mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2
 endif
 if HAVE_SSE4_1
 libsse41_la_CFLAGS = -msse4.1

@@ -119,6 +119,10 @@ inline uint8x8_t ver_finish_pixel_wrap16(int32x4_t lo, int32x4_t hi)
 inline void hshift_clip_row(const int16_t *h, int n, kvz_pixel *out);
 
 /*
+ * Note: with clang several NEON intrinsics are macros, so a template call with
+ * commas in its argument list must be parenthesized or assigned first when it
+ * is an intrinsic's argument.
+ *
  * Constant-tap building blocks. The filters are always rows of
  * kvz_g_luma_filter or kvz_g_chroma_filter, so the taps are template
  * arguments: zero taps are removed at compile time (and their samples are not
@@ -218,7 +222,7 @@ void hor_rows(const kvz_pixel *base, int16_t src_stride, int width, int rows, in
     const kvz_pixel *s = base + (intptr_t)y * src_stride;
     int x = 0;
     for (; x + 8 <= width; x += 8) {
-      vst1q_s16(&dst[y][x], hor8<C0, C1, C2, C3, C4, C5, C6, C7>(s + x));
+      vst1q_s16(&dst[y][x], (hor8<C0, C1, C2, C3, C4, C5, C6, C7>(s + x)));
     }
     for (; x < width; ++x) {
       dst[y][x] = (int16_t)hor_scalar<C0, C1, C2, C3, C4, C5, C6, C7>(s + x);
@@ -517,7 +521,7 @@ template <int C0, int C1, int C2, int C3, int C4, int C5, int C6, int C7>
 void hor8_row_c(const kvz_pixel *p, int n, int16_t *out)
 {
   int i = 0;
-  for (; i + 8 <= n; i += 8) vst1q_s16(out + i, hor8<C0, C1, C2, C3, C4, C5, C6, C7>(p + i));
+  for (; i + 8 <= n; i += 8) vst1q_s16(out + i, (hor8<C0, C1, C2, C3, C4, C5, C6, C7>(p + i)));
   for (; i < n; ++i) out[i] = (int16_t)hor_scalar<C0, C1, C2, C3, C4, C5, C6, C7>(p + i);
 }
 
@@ -527,7 +531,8 @@ void ver8_px_row_c(const kvz_pixel *p, int16_t stride, int n, kvz_pixel *out)
 {
   int i = 0;
   for (; i + 8 <= n; i += 8) {
-    vst1_u8(out + i, vqrshrun_n_s16(ver8_px<C0, C1, C2, C3, C4, C5, C6, C7>(p + i, stride), 6));
+    const int16x8_t sum = ver8_px<C0, C1, C2, C3, C4, C5, C6, C7>(p + i, stride);
+    vst1_u8(out + i, vqrshrun_n_s16(sum, 6));
   }
   for (; i < n; ++i) {
     out[i] = clip_to_pixel_8bit((ver_px_scalar<C0, C1, C2, C3, C4, C5, C6, C7>(p + i, stride) + 32) >> 6);

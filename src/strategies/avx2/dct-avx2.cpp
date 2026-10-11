@@ -34,12 +34,11 @@
 * \file
 */
 
+#include "strategies/strategies-cpp.h"
+
+extern "C" {
 #include "strategies/avx2/dct-avx2.h"
-
-#if COMPILE_INTEL_AVX2
 #include "kvazaar.h"
-#include <immintrin.h>
-
 #include "strategyselector.h"
 #include "tables.h"
 
@@ -54,30 +53,47 @@ extern const int16_t kvz_g_dct_4_t[4][4];
 extern const int16_t kvz_g_dct_8_t[8][8];
 extern const int16_t kvz_g_dct_16_t[16][16];
 extern const int16_t kvz_g_dct_32_t[32][32];
+}
+
+#if COMPILE_INTEL_AVX2
+
+namespace {
+
+/*
+ * The transforms are registered only for the bitdepth the encoder is built
+ * for (the encoder always passes KVZ_BIT_DEPTH), so every pass shift is a
+ * compile-time constant: kernels take it as a template parameter and round
+ * with an immediate shift and a constant bias.
+ */
+constexpr int log2_size(int n) { return n == 4 ? 2 : n == 8 ? 3 : n == 16 ? 4 : 5; }
+template <int N> constexpr int kFwdShift1 = log2_size(N) - 1 + (KVZ_BIT_DEPTH - 8);
+template <int N> constexpr int kFwdShift2 = log2_size(N) + 6;
+constexpr int kInvShift1 = 7;
+constexpr int kInvShift2 = 12 - (KVZ_BIT_DEPTH - 8);
 
 /*
 * \file
 * \brief AVX2 transformations.
 */
 
-static INLINE __m256i swap_lanes(__m256i v)
+inline __m256i swap_lanes(__m256i v)
 {
   return _mm256_permute4x64_epi64(v, _MM_SHUFFLE(1, 0, 3, 2));
 }
 
-static INLINE __m256i truncate_avx2(__m256i v, __m256i debias, int32_t shift)
+// (v + (1 << (SH - 1))) >> SH
+template <int SH>
+KVZ_FORCE_INLINE __m256i truncate_avx2(__m256i v)
 {
-  __m256i truncable = _mm256_add_epi32 (v,         debias);
-  return              _mm256_srai_epi32(truncable, shift);
+  return _mm256_srai_epi32(_mm256_add_epi32(v, _mm256_set1_epi32(1 << (SH - 1))), SH);
 }
 
 // 4x4 matrix multiplication with value clipping.
 // Parameters: Two 4x4 matrices containing 16-bit values in consecutive addresses,
 //             destination for the result and the shift value for clipping.
-static __m256i mul_clip_matrix_4x4_avx2(const __m256i left, const __m256i right, int shift)
+template <int SH>
+__m256i mul_clip_matrix_4x4_avx2(const __m256i left, const __m256i right)
 {
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
 
   __m256i right_los = _mm256_permute4x64_epi64(right, _MM_SHUFFLE(2, 0, 2, 0));
   __m256i right_his = _mm256_permute4x64_epi64(right, _MM_SHUFFLE(3, 1, 3, 1));
@@ -98,17 +114,15 @@ static __m256i mul_clip_matrix_4x4_avx2(const __m256i left, const __m256i right,
   __m256i rows_up = _mm256_add_epi32(prod1, prod2);
   __m256i rows_dn = _mm256_add_epi32(prod3, prod4);
 
-  __m256i rows_up_tr = truncate_avx2(rows_up, debias, shift);
-  __m256i rows_dn_tr = truncate_avx2(rows_dn, debias, shift);
+  __m256i rows_up_tr = truncate_avx2<SH>(rows_up);
+  __m256i rows_dn_tr = truncate_avx2<SH>(rows_dn);
 
   __m256i result = _mm256_packs_epi32(rows_up_tr, rows_dn_tr);
   return result;
 }
 
-static void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
   const int16_t *tdst = &kvz_g_dst_4_t[0][0];
   const int16_t *dst  = &kvz_g_dst_4  [0][0];
 
@@ -116,16 +130,14 @@ static void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
   __m256i  dst_v = _mm256_load_si256((const __m256i *)  dst);
   __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
 
-  __m256i tmp    = mul_clip_matrix_4x4_avx2(in_v,  tdst_v, shift_1st);
-  __m256i result = mul_clip_matrix_4x4_avx2(dst_v, tmp,    shift_2nd);
+  __m256i tmp    = mul_clip_matrix_4x4_avx2<kFwdShift1<4>>(in_v,  tdst_v);
+  __m256i result = mul_clip_matrix_4x4_avx2<kFwdShift2<4>>(dst_v, tmp);
 
   _mm256_storeu_si256((__m256i *)output, result);
 }
 
-static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
 
   const int16_t *tdst = &kvz_g_dst_4_t[0][0];
   const int16_t *dst  = &kvz_g_dst_4  [0][0];
@@ -134,16 +146,14 @@ static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   __m256i  dst_v = _mm256_load_si256((const __m256i *) dst);
   __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
 
-  __m256i tmp    = mul_clip_matrix_4x4_avx2(tdst_v, in_v,  shift_1st);
-  __m256i result = mul_clip_matrix_4x4_avx2(tmp,    dst_v, shift_2nd);
+  __m256i tmp    = mul_clip_matrix_4x4_avx2<kInvShift1>(tdst_v, in_v);
+  __m256i result = mul_clip_matrix_4x4_avx2<kInvShift2>(tmp,    dst_v);
 
   _mm256_storeu_si256((__m256i *)output, result);
 }
 
-static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
   const int16_t *tdct = &kvz_g_dct_4_t[0][0];
   const int16_t *dct  = &kvz_g_dct_4  [0][0];
 
@@ -151,16 +161,14 @@ static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
   __m256i  dct_v = _mm256_load_si256((const __m256i *)  dct);
   __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
 
-  __m256i tmp    = mul_clip_matrix_4x4_avx2(in_v,  tdct_v, shift_1st);
-  __m256i result = mul_clip_matrix_4x4_avx2(dct_v, tmp,    shift_2nd);
+  __m256i tmp    = mul_clip_matrix_4x4_avx2<kFwdShift1<4>>(in_v,  tdct_v);
+  __m256i result = mul_clip_matrix_4x4_avx2<kFwdShift2<4>>(dct_v, tmp);
 
   _mm256_storeu_si256((__m256i *)output, result);
 }
 
-static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
 
   const int16_t *tdct = &kvz_g_dct_4_t[0][0];
   const int16_t *dct  = &kvz_g_dct_4  [0][0];
@@ -169,18 +177,17 @@ static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   __m256i  dct_v = _mm256_load_si256((const __m256i *) dct);
   __m256i   in_v = _mm256_loadu_si256((const __m256i *)input);
 
-  __m256i tmp    = mul_clip_matrix_4x4_avx2(tdct_v, in_v,  shift_1st);
-  __m256i result = mul_clip_matrix_4x4_avx2(tmp,    dct_v, shift_2nd);
+  __m256i tmp    = mul_clip_matrix_4x4_avx2<kInvShift1>(tdct_v, in_v);
+  __m256i result = mul_clip_matrix_4x4_avx2<kInvShift2>(tmp,    dct_v);
 
   _mm256_storeu_si256((__m256i *)output, result);
 }
 
-static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
+template <int SH>
+void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, int16_t *dst)
 {
   const __m256i transp_mask = _mm256_broadcastsi128_si256(_mm_setr_epi8(0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15));
 
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
 
   __m256i left_dr[4] = {
     _mm256_load_si256((const __m256i *)left + 0),
@@ -236,8 +243,8 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
     __m256i lo   = _mm256_add_epi32(lo_1,  lo_2);
     __m256i hi   = _mm256_add_epi32(hi_1,  hi_2);
 
-    __m256i lo_tr = truncate_avx2(lo, debias, shift);
-    __m256i hi_tr = truncate_avx2(hi, debias, shift);
+    __m256i lo_tr = truncate_avx2<SH>(lo);
+    __m256i hi_tr = truncate_avx2<SH>(hi);
 
     __m256i final_dr = _mm256_packs_epi32(lo_tr, hi_tr);
 
@@ -247,11 +254,10 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
 
 // Multiplies A by B_T's transpose and stores result's transpose in output,
 // which should be an array of 4 __m256i's
-static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
-    __m256i *output, const int8_t shift)
+template <int SH>
+void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
+    __m256i *output)
 {
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
 
   // Keep upper row intact and swap neighboring 16-bit words in lower row
   const __m256i shuf_lorow_mask =
@@ -295,8 +301,8 @@ static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
     __m256i hsum2c_0    = _mm256_hadd_epi32(hsum0,    hsum1);
     __m256i hsum2c_1    = _mm256_hadd_epi32(hsum2,    hsum3);
 
-    __m256i hsum2c_0_tr = truncate_avx2(hsum2c_0, debias, shift);
-    __m256i hsum2c_1_tr = truncate_avx2(hsum2c_1, debias, shift);
+    __m256i hsum2c_0_tr = truncate_avx2<SH>(hsum2c_0);
+    __m256i hsum2c_1_tr = truncate_avx2<SH>(hsum2c_1);
 
     __m256i tmp_dc      = _mm256_packs_epi32(hsum2c_0_tr, hsum2c_1_tr);
 
@@ -306,11 +312,10 @@ static void matmul_8x8_a_bt_t(const int16_t *a, const int16_t *b_t,
 
 // Multiplies A by B_T's transpose and stores result in output
 // which should be an array of 4 __m256i's
-static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
-    int16_t *output, const int8_t shift)
+template <int SH>
+void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
+    int16_t *output)
 {
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
 
   const __m256i shuf_lorow_mask =
       _mm256_setr_epi8(0,  1,  2,  3,  4,  5,  6,  7,
@@ -350,8 +355,8 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
     __m256i hsum2c_0    = _mm256_hadd_epi32(hsum0,    hsum1);
     __m256i hsum2c_1    = _mm256_hadd_epi32(hsum2,    hsum3);
 
-    __m256i hsum2c_0_tr = truncate_avx2(hsum2c_0, debias, shift);
-    __m256i hsum2c_1_tr = truncate_avx2(hsum2c_1, debias, shift);
+    __m256i hsum2c_0_tr = truncate_avx2<SH>(hsum2c_0);
+    __m256i hsum2c_1_tr = truncate_avx2<SH>(hsum2c_1);
 
     __m256i tmp_dr      = _mm256_packs_epi32(hsum2c_0_tr, hsum2c_1_tr);
 
@@ -361,10 +366,8 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
   }
 }
 
-static void matrix_dct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_dct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[8] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[8] + 8;
 
   const int16_t *dct  = &kvz_g_dct_8[0][0];
 
@@ -383,21 +386,19 @@ static void matrix_dct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *
 
   __m256i tmpres[4];
 
-  matmul_8x8_a_bt_t(input,  dct, tmpres, shift_1st);
-  matmul_8x8_a_bt  (dct, tmpres, output, shift_2nd);
+  matmul_8x8_a_bt_t<kFwdShift1<8>>(input,  dct, tmpres);
+  matmul_8x8_a_bt<kFwdShift2<8>>(dct, tmpres, output);
 }
 
-static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
   ALIGNED(64) int16_t tmp[8 * 8];
 
   const int16_t *tdct = &kvz_g_dct_8_t[0][0];
   const int16_t *dct  = &kvz_g_dct_8  [0][0];
 
-  mul_clip_matrix_8x8_avx2(tdct, input, tmp,    shift_1st);
-  mul_clip_matrix_8x8_avx2(tmp,  dct,   output, shift_2nd);
+  mul_clip_matrix_8x8_avx2<kInvShift1>(tdct, input, tmp);
+  mul_clip_matrix_8x8_avx2<kInvShift2>(tmp,  dct,   output);
 
   /*
    * Because:
@@ -412,13 +413,11 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t 
    */
 }
 
-static void matmul_16x16_a_bt(const __m256i *a,
-                              const __m256i *b_t,
-                                    __m256i *output,
-                              const int32_t  shift)
+template <int SH>
+KVZ_NOINLINE void matmul_16x16_a_bt(const __m256i *a,
+                       const __m256i *b_t,
+                             __m256i *output)
 {
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
 
   for (int32_t y = 0; y < 16; y++) {
     __m256i a_r = a[y];
@@ -469,7 +468,7 @@ static void matmul_16x16_a_bt(const __m256i *a,
       __m256i s9  = _mm256_add_epi32(s6, s7);
 
       __m256i res = _mm256_hadd_epi32(s8, s9);
-      results_32[fco] = truncate_avx2(res, debias, shift);
+      results_32[fco] = truncate_avx2<SH>(res);
     }
     output[y] = _mm256_packs_epi32(results_32[0], results_32[1]);
   }
@@ -477,7 +476,7 @@ static void matmul_16x16_a_bt(const __m256i *a,
 
 // NOTE: The strides measured by s_stride_log2 and d_stride_log2 are in units
 // of 16 coeffs, not 1!
-static void transpose_16x16_stride(const int16_t *src,
+void transpose_16x16_stride(const int16_t *src,
                                          int16_t *dst,
                                          uint8_t  s_stride_log2,
                                          uint8_t  d_stride_log2)
@@ -552,22 +551,12 @@ static void transpose_16x16_stride(const int16_t *src,
   }
 }
 
-static void transpose_16x16(const int16_t *src, int16_t *dst)
+void transpose_16x16(const int16_t *src, int16_t *dst)
 {
   transpose_16x16_stride(src, dst, 0, 0);
 }
 
-static __m256i truncate_inv(__m256i v, int32_t shift)
-{
-  int32_t add = 1 << (shift - 1);
-
-  __m256i debias  = _mm256_set1_epi32(add);
-  __m256i v2      = _mm256_add_epi32 (v,  debias);
-  __m256i trunced = _mm256_srai_epi32(v2, shift);
-  return  trunced;
-}
-
-static __m256i extract_odds(__m256i v)
+__m256i extract_odds(__m256i v)
 {
   // 0 1 2 3 4 5 6 7 | 8 9 a b c d e f => 1 3 5 7 1 3 5 7 | 9 b d f 9 b d f
   const __m256i oddmask = _mm256_setr_epi8( 2,  3,  6,  7, 10, 11, 14, 15,
@@ -579,7 +568,7 @@ static __m256i extract_odds(__m256i v)
   return _mm256_permute4x64_epi64   (tmp, _MM_SHUFFLE(3, 1, 2, 0));
 }
 
-static __m256i extract_combine_odds(__m256i v0, __m256i v1)
+__m256i extract_combine_odds(__m256i v0, __m256i v1)
 {
   // 0 1 2 3 4 5 6 7 | 8 9 a b c d e f => 1 3 5 7 1 3 5 7 | 9 b d f 9 b d f
   const __m256i oddmask = _mm256_setr_epi8( 2,  3,  6,  7, 10, 11, 14, 15,
@@ -598,7 +587,7 @@ static __m256i extract_combine_odds(__m256i v0, __m256i v1)
 // Extract items 2, 6, A and E from first four columns of DCT, order them as
 // follows:
 // D0,2 D0,6 D1,2 D1,6 D1,a D1,e D0,a D0,e | D2,2 D2,6 D3,2 D3,6 D3,a D3,e D2,a D2,e
-static __m256i extract_26ae(const __m256i *tdct)
+__m256i extract_26ae(const __m256i *tdct)
 {
   // 02 03 22 23 06 07 26 27 | 0a 0b 2a 2b 02 0f 2e 2f
   // =>
@@ -623,7 +612,7 @@ static __m256i extract_26ae(const __m256i *tdct)
 }
 
 // 2 6 2 6 a e a e | 2 6 2 6 a e a e
-static __m256i extract_26ae_vec(__m256i col)
+__m256i extract_26ae_vec(__m256i col)
 {
   const __m256i mask_26ae = _mm256_set1_epi32(0x0d0c0504);
 
@@ -634,7 +623,7 @@ static __m256i extract_26ae_vec(__m256i col)
 }
 
 // D00 D80 D01 D81 D41 Dc1 D40 Dc0 | D40 Dc0 D41 Dc1 D01 D81 D00 D80
-static __m256i extract_d048c(const __m256i *tdct)
+__m256i extract_d048c(const __m256i *tdct)
 {
   const __m256i final_shuf = _mm256_setr_epi8( 0,  1,  8,  9,  2,  3, 10, 11,
                                                6,  7, 14, 15,  4,  5, 12, 13,
@@ -653,7 +642,7 @@ static __m256i extract_d048c(const __m256i *tdct)
 }
 
 // 0 8 0 8 4 c 4 c | 4 c 4 c 0 8 0 8
-static __m256i extract_d048c_vec(__m256i col)
+__m256i extract_d048c_vec(__m256i col)
 {
   const __m256i shufmask = _mm256_setr_epi8( 0,  1,  0,  1,  8,  9,  8,  9,
                                              8,  9,  8,  9,  0,  1,  0,  1,
@@ -668,7 +657,8 @@ static __m256i extract_d048c_vec(__m256i col)
   return final;
 }
 
-static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, int32_t shift)
+template <int SH>
+void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst)
 {
   __m256i tsrc[16];
 
@@ -754,8 +744,8 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
     __m256i res_hi    = _mm256_add_epi32        (e,        o_hi);
     __m256i res_hi2   = _mm256_permute4x64_epi64(res_hi,   _MM_SHUFFLE(1, 0, 3, 2));
 
-    __m256i res_lo_t  = truncate_inv(res_lo,  shift);
-    __m256i res_hi_t  = truncate_inv(res_hi2, shift);
+    __m256i res_lo_t  = truncate_avx2<SH>(res_lo);
+    __m256i res_hi_t  = truncate_avx2<SH>(res_hi2);
 
     __m256i res_16_1  = _mm256_packs_epi32      (res_lo_t, res_hi_t);
     __m256i final     = _mm256_shuffle_epi8     (res_16_1, final_shufmask);
@@ -764,20 +754,16 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
   }
 }
 
-static void matrix_idct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_idct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
   ALIGNED(64) int16_t tmp[16 * 16];
 
-  partial_butterfly_inverse_16_avx2(input, tmp,    shift_1st);
-  partial_butterfly_inverse_16_avx2(tmp,   output, shift_2nd);
+  partial_butterfly_inverse_16_avx2<kInvShift1>(input, tmp);
+  partial_butterfly_inverse_16_avx2<kInvShift2>(tmp,   output);
 }
 
-static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[16] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[16] + 8;
 
   const int16_t *dct  = &kvz_g_dct_16[0][0];
 
@@ -801,142 +787,90 @@ static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t
 
   // Hack! (A * B^T)^T = B * A^T, so we can dispatch the transpose-produciong
   // multiply completely
-  matmul_16x16_a_bt(d_v, i_v, tmp, shift_1st);
-  matmul_16x16_a_bt(d_v, tmp, o_v, shift_2nd);
+  matmul_16x16_a_bt<kFwdShift1<16>>(d_v, i_v, tmp);
+  matmul_16x16_a_bt<kFwdShift2<16>>(d_v, tmp, o_v);
 }
 
-// 32x32 matrix multiplication with value clipping.
-// Parameters: Two 32x32 matrices containing 16-bit values in consecutive addresses,
-//             destination for the result and the shift value for clipping.
-static void mul_clip_matrix_32x32_avx2(const int16_t *left,
-                                       const int16_t *right,
-                                             int16_t *dst,
-                                       const int32_t  shift)
+// Rounds, saturates and stores one 32-wide output row from its accumulators
+// (columns 0-7, 8-15, 16-23, 24-31).
+template <int SH>
+KVZ_FORCE_INLINE void store_row_32(__m256i a0, __m256i a1, __m256i a2, __m256i a3, __m256i *dst)
 {
-  const int32_t add    = 1 << (shift - 1);
-  const __m256i debias = _mm256_set1_epi32(add);
+  const __m256i h01 = _mm256_packs_epi32(truncate_avx2<SH>(a0), truncate_avx2<SH>(a1));
+  const __m256i h23 = _mm256_packs_epi32(truncate_avx2<SH>(a2), truncate_avx2<SH>(a3));
+  _mm256_storeu_si256(dst + 0, _mm256_permute4x64_epi64(h01, _MM_SHUFFLE(3, 1, 2, 0)));
+  _mm256_storeu_si256(dst + 1, _mm256_permute4x64_epi64(h23, _MM_SHUFFLE(3, 1, 2, 0)));
+}
 
+/*
+ * 32x32 matrix multiplication with rounding:
+ *   dst = sat16((left * right + (1 << (SH - 1))) >> SH)
+ * Step g of the inner product multiplies the pair left[i][2g], left[i][2g+1]
+ * (one broadcast dword) with right rows 2g and 2g+1 interleaved (madd).
+ *
+ * The interleaved right rows are arranged once per call; then each output
+ * row keeps its 4 accumulators in registers over the whole inner product
+ * (the arranged rows are memory operands of vpmaddwd), instead of
+ * accumulating all 128 vectors in memory.
+ */
+template <int SH>
+void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right, int16_t *dst)
+{
   const uint32_t *l_32  = (const uint32_t *)left;
   const __m256i  *r_v   = (const __m256i *)right;
         __m256i  *dst_v = (      __m256i *)dst;
 
-  __m256i accu[128] = {_mm256_setzero_si256()};
-  size_t i, j;
+  // rr[g][0..3]: columns 0-7, 8-15, 16-23 and 24-31 of right rows 2g and 2g+1, interleaved.
+  __m256i rr[16][4];
+  for (int g = 0; g < 16; ++g) {
+    const __m256i r0 = _mm256_loadu_si256(&r_v[4 * g + 0]);
+    const __m256i r1 = _mm256_loadu_si256(&r_v[4 * g + 1]);
+    const __m256i r2 = _mm256_loadu_si256(&r_v[4 * g + 2]);
+    const __m256i r3 = _mm256_loadu_si256(&r_v[4 * g + 3]);
 
-  for (j = 0; j < 64; j += 4) {
-    const __m256i r0 = _mm256_loadu_si256(&r_v[j + 0]);
-    const __m256i r1 = _mm256_loadu_si256(&r_v[j + 1]);
-    const __m256i r2 = _mm256_loadu_si256(&r_v[j + 2]);
-    const __m256i r3 = _mm256_loadu_si256(&r_v[j + 3]);
+    const __m256i r02l = _mm256_unpacklo_epi16(r0, r2);
+    const __m256i r02h = _mm256_unpackhi_epi16(r0, r2);
+    const __m256i r13l = _mm256_unpacklo_epi16(r1, r3);
+    const __m256i r13h = _mm256_unpackhi_epi16(r1, r3);
 
-    __m256i r02l   = _mm256_unpacklo_epi16(r0, r2);
-    __m256i r02h   = _mm256_unpackhi_epi16(r0, r2);
-    __m256i r13l   = _mm256_unpacklo_epi16(r1, r3);
-    __m256i r13h   = _mm256_unpackhi_epi16(r1, r3);
-
-    __m256i r02_07 = _mm256_permute2x128_si256(r02l, r02h, 0x20);
-    __m256i r02_8f = _mm256_permute2x128_si256(r02l, r02h, 0x31);
-
-    __m256i r13_07 = _mm256_permute2x128_si256(r13l, r13h, 0x20);
-    __m256i r13_8f = _mm256_permute2x128_si256(r13l, r13h, 0x31);
-
-    for (i = 0; i < 32; i += 2) {
-      size_t acc_base = i << 2;
-
-      uint32_t curr_e    = l_32[(i + 0) * (32 / 2) + (j >> 2)];
-      uint32_t curr_o    = l_32[(i + 1) * (32 / 2) + (j >> 2)];
-
-      __m256i even       = _mm256_set1_epi32(curr_e);
-      __m256i odd        = _mm256_set1_epi32(curr_o);
-
-      __m256i p_e0       = _mm256_madd_epi16(even, r02_07);
-      __m256i p_e1       = _mm256_madd_epi16(even, r02_8f);
-      __m256i p_e2       = _mm256_madd_epi16(even, r13_07);
-      __m256i p_e3       = _mm256_madd_epi16(even, r13_8f);
-
-      __m256i p_o0       = _mm256_madd_epi16(odd,  r02_07);
-      __m256i p_o1       = _mm256_madd_epi16(odd,  r02_8f);
-      __m256i p_o2       = _mm256_madd_epi16(odd,  r13_07);
-      __m256i p_o3       = _mm256_madd_epi16(odd,  r13_8f);
-
-      accu[acc_base + 0] = _mm256_add_epi32 (p_e0, accu[acc_base + 0]);
-      accu[acc_base + 1] = _mm256_add_epi32 (p_e1, accu[acc_base + 1]);
-      accu[acc_base + 2] = _mm256_add_epi32 (p_e2, accu[acc_base + 2]);
-      accu[acc_base + 3] = _mm256_add_epi32 (p_e3, accu[acc_base + 3]);
-
-      accu[acc_base + 4] = _mm256_add_epi32 (p_o0, accu[acc_base + 4]);
-      accu[acc_base + 5] = _mm256_add_epi32 (p_o1, accu[acc_base + 5]);
-      accu[acc_base + 6] = _mm256_add_epi32 (p_o2, accu[acc_base + 6]);
-      accu[acc_base + 7] = _mm256_add_epi32 (p_o3, accu[acc_base + 7]);
-    }
+    rr[g][0] = _mm256_permute2x128_si256(r02l, r02h, 0x20);
+    rr[g][1] = _mm256_permute2x128_si256(r02l, r02h, 0x31);
+    rr[g][2] = _mm256_permute2x128_si256(r13l, r13h, 0x20);
+    rr[g][3] = _mm256_permute2x128_si256(r13l, r13h, 0x31);
   }
 
-  for (i = 0; i < 32; i++) {
-    size_t acc_base = i << 2;
-    size_t dst_base = i << 1;
-
-    __m256i q0  = truncate_avx2(accu[acc_base + 0], debias, shift);
-    __m256i q1  = truncate_avx2(accu[acc_base + 1], debias, shift);
-    __m256i q2  = truncate_avx2(accu[acc_base + 2], debias, shift);
-    __m256i q3  = truncate_avx2(accu[acc_base + 3], debias, shift);
-
-    __m256i h01 = _mm256_packs_epi32(q0, q1);
-    __m256i h23 = _mm256_packs_epi32(q2, q3);
-
-            h01 = _mm256_permute4x64_epi64(h01, _MM_SHUFFLE(3, 1, 2, 0));
-            h23 = _mm256_permute4x64_epi64(h23, _MM_SHUFFLE(3, 1, 2, 0));
-
-    _mm256_storeu_si256(dst_v + dst_base + 0, h01);
-    _mm256_storeu_si256(dst_v + dst_base + 1, h23);
+  for (int i = 0; i < 32; ++i) {
+    const uint32_t *l_row = l_32 + i * 16;
+    __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 8
+#pragma GCC unroll 4
+#endif
+    for (int g = 0; g < 16; ++g) {
+      const __m256i pair = _mm256_set1_epi32(l_row[g]);
+      a0 = _mm256_add_epi32(_mm256_madd_epi16(pair, rr[g][0]), a0);
+      a1 = _mm256_add_epi32(_mm256_madd_epi16(pair, rr[g][1]), a1);
+      a2 = _mm256_add_epi32(_mm256_madd_epi16(pair, rr[g][2]), a2);
+      a3 = _mm256_add_epi32(_mm256_madd_epi16(pair, rr[g][3]), a3);
+    }
+    store_row_32<SH>(a0, a1, a2, a3, dst_v + 2 * i);
   }
 }
 
-// Macro that generates 2D transform functions with clipping values.
-// Sets correct shift values and matrices according to transform type and
-// block size. Performs matrix multiplication horizontally and vertically.
-#define TRANSFORM(type, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
-{\
-  int32_t shift_1st = kvz_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = kvz_g_convert_to_bit[n] + 8; \
-  ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
-\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(input, tdct, tmp, shift_1st);\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
-}\
+void matrix_dct_32x32_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+{
+  ALIGNED(64) int16_t tmp[32 * 32];
+  mul_clip_matrix_32x32_avx2<kFwdShift1<32>>(input, &kvz_g_dct_32_t[0][0], tmp);
+  mul_clip_matrix_32x32_avx2<kFwdShift2<32>>(&kvz_g_dct_32[0][0], tmp, output);
+}
 
-// Macro that generates 2D inverse transform functions with clipping values.
-// Sets correct shift values and matrices according to transform type and
-// block size. Performs matrix multiplication horizontally and vertically.
-#define ITRANSFORM(type, n) \
-static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
-{\
-  int32_t shift_1st = 7; \
-  int32_t shift_2nd = 12 - (bitdepth - 8); \
-  ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
-\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, input, tmp, shift_1st);\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
-}\
+void matrix_idct_32x32_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
+{
+  ALIGNED(64) int16_t tmp[32 * 32];
+  mul_clip_matrix_32x32_avx2<kInvShift1>(&kvz_g_dct_32_t[0][0], input, tmp);
+  mul_clip_matrix_32x32_avx2<kInvShift2>(tmp, &kvz_g_dct_32[0][0], output);
+}
 
-// Ha, we've got a tailored implementation for these
-// TRANSFORM(dst, 4);
-// ITRANSFORM(dst, 4);
-// TRANSFORM(dct, 4);
-// ITRANSFORM(dct, 4);
-// TRANSFORM(dct, 8);
-// ITRANSFORM(dct, 8);
-// TRANSFORM(dct, 16);
-// ITRANSFORM(dct, 16);
-
-// Generate all the transform functions
-
-TRANSFORM(dct, 32);
-ITRANSFORM(dct, 32);
-
+} // namespace
 
 #endif //COMPILE_INTEL_AVX2
 
@@ -944,20 +878,22 @@ int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-  // Coefficients are the same for all bitdepths, no need to disable for 10-bit
-  success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
+  // The pass shifts are compile-time constants for KVZ_BIT_DEPTH, which is the
+  // bitdepth the encoder always uses.
+  if (bitdepth != KVZ_BIT_DEPTH) return success;
+  success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_dst_4x4_avx2));
 
-  success &= kvz_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
-  success &= kvz_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-  success &= kvz_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-  success &= kvz_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
+  success &= kvz_strategyselector_register(opaque, "dct_4x4", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_dct_4x4_avx2));
+  success &= kvz_strategyselector_register(opaque, "dct_8x8", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_dct_8x8_avx2));
+  success &= kvz_strategyselector_register(opaque, "dct_16x16", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_dct_16x16_avx2));
+  success &= kvz_strategyselector_register(opaque, "dct_32x32", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_dct_32x32_avx2));
 
-  success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
+  success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_idst_4x4_avx2));
 
-  success &= kvz_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
-  success &= kvz_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-  success &= kvz_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-  success &= kvz_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+  success &= kvz_strategyselector_register(opaque, "idct_4x4", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_idct_4x4_avx2));
+  success &= kvz_strategyselector_register(opaque, "idct_8x8", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_idct_8x8_avx2));
+  success &= kvz_strategyselector_register(opaque, "idct_16x16", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_idct_16x16_avx2));
+  success &= kvz_strategyselector_register(opaque, "idct_32x32", "avx2", 40, KVZ_STRATEGY_FPTR(matrix_idct_32x32_avx2));
  
 #endif //COMPILE_INTEL_AVX2  
   return success;

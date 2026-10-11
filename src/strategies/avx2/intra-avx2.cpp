@@ -30,19 +30,24 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
+#include "strategies/strategies-cpp.h"
+
+extern "C" {
 #include "strategies/avx2/intra-avx2.h"
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #include "kvazaar.h"
+#include "strategyselector.h"
+#if COMPILE_INTEL_AVX2 && defined X86_64
+#include "strategies/missing-intel-intrinsics.h"
+#endif
+}
+
+#if COMPILE_INTEL_AVX2 && defined X86_64
 #if KVZ_BIT_DEPTH == 8
 
-#include <immintrin.h>
-#include <stdlib.h>
-
-#include "strategyselector.h"
-#include "strategies/missing-intel-intrinsics.h"
+namespace {
 
 
-static const int16_t delta_int_table[] = {
+const int16_t delta_int_table[] = {
 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 0, 1, 2, 3, 4, 4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 13, 13, 14, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 23, 24, 25, 26,
 0, 1, 1, 2, 3, 3, 4, 5, 5, 6, 7, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20, 21,
@@ -62,7 +67,7 @@ static const int16_t delta_int_table[] = {
 -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20, -21, -22, -23, -24, -25, -26, -27, -28, -29, -30, -31, -32,
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver[] = {
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 3
 11, 21, 22, 10,  1, 31, 12, 20, 23,  9,  2, 30, 13, 19, 24,  8,  3, 29, 14, 18, 25,  7,  4, 28, 15, 17, 26,  6,  5, 27, 16, 16, 27,  5,  6, 26, 17, 15, 28,  4,  7, 25, 18, 14, 29,  3,  8, 24, 19, 13, 30,  2,  9, 23, 20, 12, 31,  1, 10, 22, 21, 11, 32,  0,   // Mode 4
@@ -82,7 +87,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor[] = {
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16,   // Mode 3
 11, 21, 22, 10,  1, 31, 12, 20, 23,  9,  2, 30, 13, 19, 24,  8,   // Mode 4
@@ -102,7 +107,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[] = {
 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08 , // Mode 2
 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09,
 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07 , // Mode 3
@@ -139,7 +144,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
 0x08, 0x09, 0x07, 0x08, 0x06, 0x07, 0x05, 0x06, 0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02,
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 3
   11, 21, 22, 10,  1, 31, 12, 20, 23,  9,  2, 30, 13, 19, 24,  8,  3, 29, 14, 18, 25,  7,  4, 28, 15, 17, 26,  6,  5, 27, 16, 16,   // Mode 4
@@ -159,7 +164,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_ho
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
   };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[] = {
 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,  // Mode 2
 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,
 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09,
@@ -230,7 +235,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
 0x08, 0x09, 0x07, 0x08, 0x06, 0x07, 0x05, 0x06, 0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02, };
 
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_hor[] = {
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 3
 11, 21, 22, 10,  1, 31, 12, 20, 23,  9,  2, 30, 13, 19, 24,  8,  3, 29, 14, 18, 25,  7,  4, 28, 15, 17, 26,  6,  5, 27, 16, 16, 27,  5,  6, 26, 17, 15, 28,  4,  7, 25, 18, 14, 29,  3,  8, 24, 19, 13, 30,  2,  9, 23, 20, 12, 31,  1, 10, 22, 21, 11, 32,  0,   // Mode 4
@@ -250,7 +255,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_ho
 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f, 0x10,  // Mode 2
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f, 0x10,
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,  // Mode 3
@@ -287,7 +292,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
   0x0f, 0x10, 0x0e, 0x0f, 0x0d, 0x0e, 0x0c, 0x0d, 0x0b, 0x0c, 0x0a, 0x0b, 0x09, 0x0a, 0x08, 0x09, 0x07, 0x08, 0x06, 0x07, 0x05, 0x06, 0x04, 0x05, 0x03, 0x04, 0x02, 0x03, 0x01, 0x02, 0x00, 0x01,
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
   0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
@@ -358,7 +363,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode 2 
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
    6, 26,  6, 26,  6, 26,  6, 26, 12, 20, 12, 20, 12, 20, 12, 20,  // Mode 3 
@@ -395,7 +400,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    6, 26, 12, 20, 18, 14, 24,  8,  6, 26, 12, 20, 18, 14, 24,  8,   // Mode 3
   11, 21, 22, 10,  1, 31, 12, 20, 11, 21, 22, 10,  1, 31, 12, 20,   // Mode 4
@@ -415,7 +420,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 18
 };
 
-static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
   0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
@@ -488,7 +493,7 @@ static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vector
 
 
 //  Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
-static INLINE void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int32_t pred_mode)
+inline void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int32_t pred_mode)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -522,7 +527,7 @@ static INLINE void angular_pred_avx2_linear_filter_w4_ver(kvz_pixel* dst, const 
 }
 
 
-static INLINE void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+inline void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 8;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -561,7 +566,7 @@ static INLINE void angular_pred_avx2_linear_filter_w8_ver(kvz_pixel* dst, const 
 }
 
 
-static INLINE void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+inline void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 16;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -597,7 +602,7 @@ static INLINE void angular_pred_avx2_linear_filter_w16_ver(kvz_pixel* dst, const
 }
 
 NO_ASAN
-static INLINE void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
+inline void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const kvz_pixel* const ref, const int16_t* delta_int, const int pred_mode)
 {
   const int height = 32;
   const __m256i v16s = _mm256_set1_epi16(16);
@@ -641,7 +646,7 @@ static INLINE void angular_pred_avx2_linear_filter_w32_ver(kvz_pixel* dst, const
 }
 
 
-static INLINE void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+inline void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -676,7 +681,7 @@ static INLINE void angular_pred_avx2_linear_filter_w4_hor(kvz_pixel* dst, const 
 }
 
 
-static INLINE void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+inline void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 8;
   const int16_t* dint = delta_int;
@@ -711,7 +716,7 @@ static INLINE void angular_pred_avx2_linear_filter_w8_hor(kvz_pixel* dst, const 
 }
 
 
-static INLINE void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+inline void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 16;
   const int16_t* dint = delta_int;
@@ -761,7 +766,7 @@ static INLINE void angular_pred_avx2_linear_filter_w16_hor(kvz_pixel* dst, const
 
 
 NO_ASAN
-static INLINE void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
+inline void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const kvz_pixel* const ref, const int mode, const int16_t* delta_int)
 {
   const int height = 32;
   const int16_t* dint = delta_int;
@@ -812,31 +817,24 @@ static INLINE void angular_pred_avx2_linear_filter_w32_hor(kvz_pixel* dst, const
   }
 }
 
- /**
- * \brief Generage angular predictions.
- * \param log2_width    Log2 of width, range 2..5.
- * \param intra_mode    Angular mode in range 2..34.
- * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
- * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
- * \param dst           Buffer of size width*width.
+/**
+ * \brief Angular prediction for one block width W (4, 8, 16 or 32).
+ *
+ * The width is a template parameter, so the reference copies, the row
+ * copies and fills, and the choice of the interpolation kernel are all
+ * resolved at compile time.
  */
-static void kvz_angular_pred_avx2(
-  const int_fast8_t log2_width,
-  const int_fast8_t intra_mode,
-  const uint8_t *const in_ref_above,
-  const uint8_t *const in_ref_left,
-  uint8_t *const dst)
+template <int W>
+void angular_pred_w(const int_fast8_t intra_mode,
+                    const uint8_t *const in_ref_above,
+                    const uint8_t *const in_ref_left,
+                    uint8_t *const dst)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
-  assert(intra_mode >= 2 && intra_mode <= 34);
-
   static const int8_t modedisp2sampledisp[9] = { 0, 2, 5, 9, 13, 17, 21, 26, 32 };
   static const int16_t modedisp2invsampledisp[9] = { 0, 4096, 1638, 910, 630, 482, 390, 315, 256 }; // (256 * 32) / sampledisp
 
-                                                    // Temporary buffer for modes 11-25.
-                                                    // It only needs to be big enough to hold indices from -width to width-1.
+  // Temporary buffer for modes 11-25. It holds indices from -W to W-1.
   uint8_t tmp_ref[2 * 32];
-  const int_fast8_t width = 1 << log2_width;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 18;
@@ -845,113 +843,82 @@ static void kvz_angular_pred_avx2(
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
 
-  // Pointer for the reference we are interpolating from.
-  const uint8_t *ref_main;
-  // Pointer for the other reference.
-  const uint8_t *ref_side;
+  // Pointer for the reference we are interpolating from, indexed from block index 0.
+  const uint8_t *ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
 
-  // Set ref_main and ref_side such that, when indexed with 0, they point to
-  // index 0 in block coordinates.
   if (sample_disp < 0) {
-    // Negative sample_disp means, we need to use both references.
-
-    ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
-    ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-
-    // Move the reference pixels to start from the middle to the later half of
-    // the tmp_ref, so there is room for negative indices.
-    for (int_fast8_t x = -1; x < width; ++x) {
-      tmp_ref[x + width] = ref_main[x];
-    }
-    // Get a pointer to block index 0 in tmp_ref.
-    ref_main = tmp_ref + width;
+    // Negative sample_disp means both references are needed. Copy indices
+    // -1 .. W-1 of the main reference to the later half of tmp_ref, so there
+    // is room for negative indices.
+    const uint8_t *ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+    memcpy(&tmp_ref[W - 1], ref_main - 1, W + 1);
+    ref_main = tmp_ref + W;
 
     // Extend the side reference to the negative indices of main reference.
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
-    int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
-    int_fast8_t most_negative_index = (width * sample_disp) >> 5;
+    const int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
+    const int_fast8_t most_negative_index = (W * sample_disp) >> 5;
     for (int_fast8_t x = -2; x >= most_negative_index; --x) {
       col_sample_disp += inv_abs_sample_disp;
-      int_fast8_t side_index = col_sample_disp >> 8;
-      tmp_ref[x + width] = ref_side[side_index - 1];
+      const int_fast8_t side_index = col_sample_disp >> 8;
+      tmp_ref[x + W] = ref_side[side_index - 1];
     }
   }
-  else {
-    // sample_disp >= 0 means we don't need to refer to negative indices,
-    // which means we can just use the references as is.
-    ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-    ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
-  }
 
-
-  if(sample_disp == 0) {
+  if (sample_disp == 0) {
     if (vertical_mode) {
-      for (int_fast32_t y = 0; y < width; ++y) {
-        switch (width) {
-        case 4:  memcpy(&dst[y * 4], &ref_main[0], 4 * sizeof(uint8_t)); break;
-        case 8:  memcpy(&dst[y * 8], &ref_main[0], 8 * sizeof(uint8_t)); break;
-        case 16: memcpy(&dst[y * 16], &ref_main[0], 16 * sizeof(uint8_t)); break;
-        case 32: memcpy(&dst[y * 32], &ref_main[0], 32 * sizeof(uint8_t)); break;
-        default:
-          assert(false && "Intra angular predicion: illegal width.\n");
-          break;
-        }
-      }
-    }
-    else {
-      for (int y = 0; y < width; ++y) {
-        switch (width) {
-        case 4:  memset(&dst[y * 4], ref_main[y], 4 * sizeof(uint8_t)); break;
-        case 8:  memset(&dst[y * 8], ref_main[y], 8 * sizeof(uint8_t)); break;
-        case 16: memset(&dst[y * 16], ref_main[y], 16 * sizeof(uint8_t)); break;
-        case 32: memset(&dst[y * 32], ref_main[y], 32 * sizeof(uint8_t)); break;
-        default:
-          assert(false && "Intra angular predicion: illegal width.\n");
-          break;
-        }
-      }
+      for (int y = 0; y < W; ++y) memcpy(&dst[y * W], ref_main, W);
+    } else {
+      for (int y = 0; y < W; ++y) memset(&dst[y * W], ref_main[y], W);
     }
     return;
   }
 
-  if ((abs(sample_disp) & 0x1f )== 0) {
-    int table_offset = vertical_mode ? (34 - intra_mode) * 32 : (intra_mode - 2) * 32;
-    const int16_t* delta_int = &delta_int_table[table_offset];
-    for (int y = 0; y < width; ++y) {
-      uint8_t* dst_row = dst + y * width;
-      const uint8_t* ref_row = ref_main + delta_int[y];
-      switch (width) {
-      case 4: memcpy(dst_row, ref_row, 4 * sizeof(uint8_t)); break;
-      case 8: memcpy(dst_row, ref_row, 8 * sizeof(uint8_t)); break;
-      case 16: memcpy(dst_row, ref_row, 16 * sizeof(uint8_t)); break;
-      case 32: memcpy(dst_row, ref_row, 32 * sizeof(uint8_t)); break;
-      }
-    }
+  if ((abs(sample_disp) & 0x1f) == 0) {
+    const int table_offset = vertical_mode ? (34 - intra_mode) * 32 : (intra_mode - 2) * 32;
+    const int16_t *delta_int = &delta_int_table[table_offset];
+    for (int y = 0; y < W; ++y) memcpy(dst + y * W, ref_main + delta_int[y], W);
     return;
   }
 
   // The mode is not horizontal or vertical, we have to do interpolation.
   if (vertical_mode) {
-    const int16_t* delta_int = &delta_int_table[(34 - intra_mode) * 32];
-    switch (width) {
-    case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main,  delta_int, intra_mode); break;
-    case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main,  delta_int, intra_mode); break;
-    case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main,  delta_int, intra_mode); break;
-    case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main,  delta_int, intra_mode); break;
-    default:
-      break;
-    }
+    const int16_t *delta_int = &delta_int_table[(34 - intra_mode) * 32];
+    if constexpr (W == 4) angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, delta_int, intra_mode);
+    else if constexpr (W == 8) angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, delta_int, intra_mode);
+    else if constexpr (W == 16) angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, delta_int, intra_mode);
+    else angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, delta_int, intra_mode);
+  } else {
+    const int16_t *delta_int = &delta_int_table[(intra_mode - 2) * 32];
+    if constexpr (W == 4) angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, intra_mode, delta_int);
+    else if constexpr (W == 8) angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, intra_mode, delta_int);
+    else if constexpr (W == 16) angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, intra_mode, delta_int);
+    else angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, intra_mode, delta_int);
   }
-  else {
-    const int16_t* delta_int = &delta_int_table[(intra_mode - 2) * 32];
-    switch (width) {
-    case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, intra_mode, delta_int); break;
-    case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, intra_mode, delta_int); break;
-    case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, intra_mode, delta_int); break;
-    case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, intra_mode, delta_int); break;
-    default:
-      break;
-    }
+}
+
+/**
+ * \brief Generage angular predictions.
+ * \param log2_width    Log2 of width, range 2..5.
+ * \param intra_mode    Angular mode in range 2..34.
+ * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
+ * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+ * \param dst           Buffer of size width*width.
+ */
+void kvz_angular_pred_avx2(
+  const int_fast8_t log2_width,
+  const int_fast8_t intra_mode,
+  const uint8_t *const in_ref_above,
+  const uint8_t *const in_ref_left,
+  uint8_t *const dst)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  assert(intra_mode >= 2 && intra_mode <= 34);
+  switch (log2_width) {
+    case 2: angular_pred_w<4>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 3: angular_pred_w<8>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 4: angular_pred_w<16>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    default: angular_pred_w<32>(intra_mode, in_ref_above, in_ref_left, dst); break;
   }
 }
 
@@ -962,7 +929,67 @@ static void kvz_angular_pred_avx2(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void kvz_intra_pred_planar_avx2(
+/*
+ * Planar prediction for W = 8, 16 or 32:
+ *   dst = ((W-1-x) * left[y] + (x+1) * tr + (W-1-y) * top[x] + (y+1) * bl + W) >> (log2(W) + 1)
+ * The vertical term is updated per row as ver += bl - top[x], starting from
+ * W * top[x], so a row costs one multiply per vector. Every intermediate and
+ * the final sum fit int16 for 8-bit samples (max 2 * 32 * 255 + 32).
+ */
+template <int W>
+void planar_w(const uint8_t *const ref_top, const uint8_t *const ref_left, uint8_t *const dst)
+{
+  constexpr int kLog2 = W == 8 ? 3 : W == 16 ? 4 : 5;
+  const int16_t top_right = ref_top[W + 1];
+  const int16_t bottom_left = ref_left[W + 1];
+
+  if constexpr (W == 8) {
+    const __m128i top = _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)(ref_top + 1)));
+    const __m128i x_plus_1 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+    const __m128i w_minus_x_plus_1 = _mm_sub_epi16(_mm_set1_epi16(W), x_plus_1);
+    const __m128i hor_const = _mm_add_epi16(_mm_mullo_epi16(x_plus_1, _mm_set1_epi16(top_right)), _mm_set1_epi16(W));
+    const __m128i ver_step = _mm_sub_epi16(_mm_set1_epi16(bottom_left), top);
+    __m128i ver = _mm_slli_epi16(top, kLog2);
+    for (int y = 0; y < W; ++y) {
+      ver = _mm_add_epi16(ver, ver_step);
+      const __m128i hor = _mm_add_epi16(_mm_mullo_epi16(w_minus_x_plus_1, _mm_set1_epi16(ref_left[y + 1])), hor_const);
+      const __m128i sum = _mm_srli_epi16(_mm_add_epi16(ver, hor), kLog2 + 1);
+      _mm_storel_epi64((__m128i *)&dst[y * W], _mm_packus_epi16(sum, sum));
+    }
+  } else {
+    constexpr int kVecs = W / 16;
+    __m256i ver[kVecs], ver_step[kVecs], w_minus_x_plus_1[kVecs], hor_const[kVecs];
+    KVZ_UNROLL
+    for (int i = 0; i < kVecs; ++i) {
+      const __m256i top = _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)(ref_top + 1 + 16 * i)));
+      const __m256i x_plus_1 = _mm256_add_epi16(_mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+                                                _mm256_set1_epi16(16 * i));
+      w_minus_x_plus_1[i] = _mm256_sub_epi16(_mm256_set1_epi16(W), x_plus_1);
+      hor_const[i] = _mm256_add_epi16(_mm256_mullo_epi16(x_plus_1, _mm256_set1_epi16(top_right)), _mm256_set1_epi16(W));
+      ver_step[i] = _mm256_sub_epi16(_mm256_set1_epi16(bottom_left), top);
+      ver[i] = _mm256_slli_epi16(top, kLog2);
+    }
+    for (int y = 0; y < W; ++y) {
+      const __m256i left = _mm256_set1_epi16(ref_left[y + 1]);
+      __m256i sum[kVecs];
+      KVZ_UNROLL
+      for (int i = 0; i < kVecs; ++i) {
+        ver[i] = _mm256_add_epi16(ver[i], ver_step[i]);
+        const __m256i hor = _mm256_add_epi16(_mm256_mullo_epi16(w_minus_x_plus_1[i], left), hor_const[i]);
+        sum[i] = _mm256_srli_epi16(_mm256_add_epi16(ver[i], hor), kLog2 + 1);
+      }
+      if constexpr (W == 16) {
+        const __m128i row = _mm_packus_epi16(_mm256_castsi256_si128(sum[0]), _mm256_extracti128_si256(sum[0], 1));
+        _mm_storeu_si128((__m128i *)&dst[y * W], row);
+      } else {
+        const __m256i row = _mm256_permute4x64_epi64(_mm256_packus_epi16(sum[0], sum[1]), _MM_SHUFFLE(3, 1, 2, 0));
+        _mm256_storeu_si256((__m256i *)&dst[y * W], row);
+      }
+    }
+  }
+}
+
+void kvz_intra_pred_planar_avx2(
   const int_fast8_t log2_width,
   const uint8_t *const ref_top,
   const uint8_t *const ref_left,
@@ -970,40 +997,17 @@ static void kvz_intra_pred_planar_avx2(
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
-  const int_fast8_t width = 1 << log2_width;
-  const uint8_t top_right = ref_top[width + 1];
-  const uint8_t bottom_left = ref_left[width + 1];
-
-  if (log2_width > 2) {
-    
-    __m128i v_width = _mm_set1_epi16(width);
-    __m128i v_top_right = _mm_set1_epi16(top_right);
-    __m128i v_bottom_left = _mm_set1_epi16(bottom_left);
-
-    for (int y = 0; y < width; ++y) {
-
-      __m128i x_plus_1 = _mm_setr_epi16(-7, -6, -5, -4, -3, -2, -1, 0);
-      __m128i v_ref_left = _mm_set1_epi16(ref_left[y + 1]);
-      __m128i y_plus_1 = _mm_set1_epi16(y + 1);
-
-      for (int x = 0; x < width; x += 8) {
-        x_plus_1 = _mm_add_epi16(x_plus_1, _mm_set1_epi16(8));
-        __m128i v_ref_top = _mm_loadl_epi64((__m128i*)&(ref_top[x + 1]));
-        v_ref_top = _mm_cvtepu8_epi16(v_ref_top);
-
-        __m128i hor = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, x_plus_1), v_ref_left), _mm_mullo_epi16(x_plus_1, v_top_right));
-        __m128i ver = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, y_plus_1), v_ref_top), _mm_mullo_epi16(y_plus_1, v_bottom_left));
-
-        //dst[y * width + x] = ho
-
-        __m128i chunk = _mm_srli_epi16(_mm_add_epi16(_mm_add_epi16(ver, hor), v_width), (log2_width + 1));
-        chunk = _mm_packus_epi16(chunk, chunk);
-        _mm_storel_epi64((__m128i*)&(dst[y * width + x]), chunk);
-      }
-    }
+  if (log2_width == 3) {
+    planar_w<8>(ref_top, ref_left, dst);
+  } else if (log2_width == 4) {
+    planar_w<16>(ref_top, ref_left, dst);
+  } else if (log2_width == 5) {
+    planar_w<32>(ref_top, ref_left, dst);
   } else {
     // Only if log2_width == 2 <=> width == 4
-    assert(width == 4);
+    const int width = 4;
+    const uint8_t top_right = ref_top[width + 1];
+    const uint8_t bottom_left = ref_left[width + 1];
     const __m128i rl_shufmask = _mm_setr_epi32(0x04040404, 0x05050505,
                                                0x06060606, 0x07070707);
 
@@ -1061,7 +1065,7 @@ static void kvz_intra_pred_planar_avx2(
 // different addends, multipliers etc for different pixels in the block,
 // but for a fixed-size implementation one vector wide, all the weights,
 // addends etc can be preinitialized for each position.
-static void pred_filtered_dc_4x4(const uint8_t *ref_top,
+void pred_filtered_dc_4x4(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
                                        uint8_t *out_block)
 {
@@ -1122,7 +1126,7 @@ static void pred_filtered_dc_4x4(const uint8_t *ref_top,
   _mm_storeu_si128((__m128i *)out_block, final);
 }
 
-static void pred_filtered_dc_8x8(const uint8_t *ref_top,
+void pred_filtered_dc_8x8(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
                                        uint8_t *out_block)
 {
@@ -1220,13 +1224,13 @@ static void pred_filtered_dc_8x8(const uint8_t *ref_top,
   _mm256_storeu_si256(((__m256i *)out_block) + 1, res_dn);
 }
 
-static INLINE __m256i cvt_u32_si256(const uint32_t u)
+inline __m256i cvt_u32_si256(const uint32_t u)
 {
   const __m256i zero = _mm256_setzero_si256();
   return _mm256_insert_epi32(zero, u, 0);
 }
 
-static void pred_filtered_dc_16x16(const uint8_t *ref_top,
+void pred_filtered_dc_16x16(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
                                          uint8_t *out_block)
 {
@@ -1302,7 +1306,7 @@ static void pred_filtered_dc_16x16(const uint8_t *ref_top,
   }
 }
 
-static void pred_filtered_dc_32x32(const uint8_t *ref_top,
+void pred_filtered_dc_32x32(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
                                          uint8_t *out_block)
 {
@@ -1387,7 +1391,7 @@ static void pred_filtered_dc_32x32(const uint8_t *ref_top,
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 */
-static void kvz_intra_pred_filtered_dc_avx2(
+void kvz_intra_pred_filtered_dc_avx2(
   const int_fast8_t log2_width,
   const uint8_t *ref_top,
   const uint8_t *ref_left,
@@ -1406,6 +1410,8 @@ static void kvz_intra_pred_filtered_dc_avx2(
   }
 }
 
+} // namespace
+
 #endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
@@ -1415,9 +1421,9 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
-    success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
-    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
-    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &kvz_intra_pred_filtered_dc_avx2);
+    success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, KVZ_STRATEGY_FPTR(kvz_angular_pred_avx2));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, KVZ_STRATEGY_FPTR(kvz_intra_pred_planar_avx2));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, KVZ_STRATEGY_FPTR(kvz_intra_pred_filtered_dc_avx2));
   }
 #endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

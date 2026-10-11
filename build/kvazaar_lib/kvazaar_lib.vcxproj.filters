@@ -75,10 +75,10 @@
     <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c">
       <Filter>Optimization\strategies\sse2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\dct-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\dct-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\dct-generic.c">
@@ -111,7 +111,7 @@
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c">
       <Filter>Optimization\strategies\generic</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\search.c">
@@ -367,6 +367,9 @@
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\strategies-picture.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-cpp.h">
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\strategies-quant.h">
