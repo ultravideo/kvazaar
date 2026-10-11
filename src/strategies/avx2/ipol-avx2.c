@@ -179,6 +179,28 @@ static void kvz_ipol_8tap_hor_px_im_avx2(int8_t *filter,
 
   kvz_pixel *top_left = src + src_stride * y_offset + x_offset;
 
+  if (filter == kvz_g_luma_filter[0]) {
+    // Filter row 0 is a single tap of 64 at position 3: the sample shifted
+    // left by 6. Rows and store widths follow the general loops below.
+    for (int yy = 0; yy < height + KVZ_EXT_PADDING_LUMA; yy += 2) {
+      for (int r = 0; r < 2; ++r) {
+        const kvz_pixel *in = top_left + src_stride * (yy + r) + 3;
+        int16_t *out = dst + (yy + r) * dst_stride;
+        int xx = 0;
+        for (; xx + 7 < width; xx += 8) {
+          _mm_storeu_si128((__m128i *)(out + xx),
+                           _mm_slli_epi16(_mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)(in + xx))), 6));
+        }
+        if (xx < width) {
+          uint32_t px;
+          memcpy(&px, in + xx, 4);
+          _mm_storel_epi64((__m128i *)(out + xx), _mm_slli_epi16(_mm_cvtepu8_epi16(_mm_cvtsi32_si128((int)px)), 6));
+        }
+      }
+    }
+    return;
+  }
+
   int y = 0;
   int x = 0;
 
@@ -260,6 +282,29 @@ static void kvz_ipol_8tap_ver_im_px_avx2(int8_t *filter,
   int16_t dst_stride,
   int wrap16)
 {
+  if (filter == kvz_g_luma_filter[0]) {
+    // Filter row 0 is a single tap of 64 at position 3: (64 * h) >> 6 == h,
+    // with or without the int16 store, so the result is clip((h + 32) >> 6).
+    // Rows are written in pairs like the general loop below.
+    const __m128i offset = _mm_set1_epi16(32);
+    for (int y = 0; y < height; y += 2) {
+      for (int r = 0; r < 2; ++r) {
+        const int16_t *in = src + (y + r + 3) * src_stride;
+        kvz_pixel *out = dst + (y + r) * dst_stride;
+        int x = 0;
+        for (; x + 7 < width; x += 8) {
+          __m128i v = _mm_srai_epi16(_mm_add_epi16(_mm_loadu_si128((const __m128i *)(in + x)), offset), 6);
+          _mm_storel_epi64((__m128i *)(out + x), _mm_packus_epi16(v, v));
+        }
+        for (; x + 3 < width; x += 4) {
+          __m128i v = _mm_srai_epi16(_mm_add_epi16(_mm_loadl_epi64((const __m128i *)(in + x)), offset), 6);
+          *(uint32_t *)(out + x) = (uint32_t)_mm_cvtsi128_si32(_mm_packus_epi16(v, v));
+        }
+      }
+    }
+    return;
+  }
+
   // Interpolation filter shifts
   int32_t shift2 = 6;
 

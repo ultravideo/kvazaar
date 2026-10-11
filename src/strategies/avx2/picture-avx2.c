@@ -208,19 +208,15 @@ static unsigned sad_8bit_64x64_avx2(const uint8_t * buf1, const uint8_t * buf2)
   return m256i_horizontal_sum(sum0);
 }
 
-static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
+/*
+ * 4x4 SATD cores on 16-byte vectors holding a 4x4 block row by row. The
+ * horizontal and vertical Hadamard butterflies are hadd/hsub pairs; the sum of
+ * the 16 absolute values (at most 65280) is read as an unsigned 16-bit lane.
+ */
+static INLINE unsigned satd_4x4_core_avx2(__m128i org_lo, __m128i org_hi, __m128i cur_lo, __m128i cur_hi)
 {
-
-  __m128i original = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)org));
-  __m128i current = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)cur));
-
-  __m128i diff_lo = _mm_sub_epi16(current, original);
-
-  original = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(org + 8)));
-  current = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(cur + 8)));
-
-  __m128i diff_hi = _mm_sub_epi16(current, original);
-
+  const __m128i diff_lo = _mm_sub_epi16(_mm_cvtepu8_epi16(cur_lo), _mm_cvtepu8_epi16(org_lo));
+  const __m128i diff_hi = _mm_sub_epi16(_mm_cvtepu8_epi16(cur_hi), _mm_cvtepu8_epi16(org_hi));
 
   //Hor
   __m128i row0 = _mm_hadd_epi16(diff_lo, diff_hi);
@@ -247,27 +243,21 @@ static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
   row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
 
   unsigned sum = _mm_extract_epi16(row3, 0);
-  unsigned satd = (sum + 1) >> 1;
-
-  return satd;
+  return (sum + 1) >> 1;
 }
 
-
-static void satd_8bit_4x4_dual_avx2(
-  const pred_buffer preds, const uint8_t * const orig, unsigned num_modes, unsigned *satds_out) 
+static INLINE void satd_4x4_dual_core_avx2(__m128i orig_lo, __m128i orig_hi, __m128i p0_lo, __m128i p0_hi,
+                                           __m128i p1_lo, __m128i p1_hi, unsigned *satds_out)
 {
+  const __m256i original_lo = _mm256_broadcastsi128_si256(_mm_cvtepu8_epi16(orig_lo));
+  const __m256i original_hi = _mm256_broadcastsi128_si256(_mm_cvtepu8_epi16(orig_hi));
+  __m256i pred_lo = _mm256_cvtepu8_epi16(p0_lo);
+  pred_lo = _mm256_inserti128_si256(pred_lo, _mm_cvtepu8_epi16(p1_lo), 1);
+  __m256i pred_hi = _mm256_cvtepu8_epi16(p0_hi);
+  pred_hi = _mm256_inserti128_si256(pred_hi, _mm_cvtepu8_epi16(p1_hi), 1);
 
-  __m256i original = _mm256_broadcastsi128_si256(_mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)orig)));
-  __m256i pred = _mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)preds[0]));
-  pred = _mm256_inserti128_si256(pred, _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)preds[1])), 1);
-
-  __m256i diff_lo = _mm256_sub_epi16(pred, original);
-
-  original = _mm256_broadcastsi128_si256(_mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(orig + 8))));
-  pred = _mm256_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(preds[0] + 8)));
-  pred = _mm256_inserti128_si256(pred, _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(preds[1] + 8))), 1);
-
-  __m256i diff_hi = _mm256_sub_epi16(pred, original);
+  const __m256i diff_lo = _mm256_sub_epi16(pred_lo, original_lo);
+  const __m256i diff_hi = _mm256_sub_epi16(pred_hi, original_hi);
 
   //Hor
   __m256i row0 = _mm256_hadd_epi16(diff_lo, diff_hi);
@@ -294,13 +284,34 @@ static void satd_8bit_4x4_dual_avx2(
   row3 = _mm256_add_epi16(row3, _mm256_shufflelo_epi16(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
 
   unsigned sum1 = _mm_extract_epi16(_mm256_castsi256_si128(row3), 0);
-  sum1 = (sum1 + 1) >> 1;
-
   unsigned sum2 = _mm_extract_epi16(_mm256_extracti128_si256(row3, 1), 0);
-  sum2 = (sum2 + 1) >> 1;
+  satds_out[0] = (sum1 + 1) >> 1;
+  satds_out[1] = (sum2 + 1) >> 1;
+}
 
-  satds_out[0] = sum1;
-  satds_out[1] = sum2;
+// Packs rows y and y + 1 of a 4-wide strided block into the low 8 bytes.
+static INLINE __m128i load_2rows4_avx2(const uint8_t *buf, int32_t stride)
+{
+  uint32_t r0, r1;
+  memcpy(&r0, buf, 4);
+  memcpy(&r1, buf + stride, 4);
+  return _mm_cvtsi64_si128((long long)((uint64_t)r0 | ((uint64_t)r1 << 32)));
+}
+#define LOAD_4X4_HALVES(buf, stride) load_2rows4_avx2((buf), (stride)), load_2rows4_avx2((buf) + 2 * (stride), (stride))
+
+static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
+{
+  return satd_4x4_core_avx2(_mm_loadl_epi64((const __m128i *)org), _mm_loadl_epi64((const __m128i *)(org + 8)),
+                            _mm_loadl_epi64((const __m128i *)cur), _mm_loadl_epi64((const __m128i *)(cur + 8)));
+}
+
+static void satd_8bit_4x4_dual_avx2(
+  const pred_buffer preds, const uint8_t * const orig, unsigned num_modes, unsigned *satds_out) 
+{
+  satd_4x4_dual_core_avx2(_mm_loadl_epi64((const __m128i *)orig), _mm_loadl_epi64((const __m128i *)(orig + 8)),
+                          _mm_loadl_epi64((const __m128i *)preds[0]), _mm_loadl_epi64((const __m128i *)(preds[0] + 8)),
+                          _mm_loadl_epi64((const __m128i *)preds[1]), _mm_loadl_epi64((const __m128i *)(preds[1] + 8)),
+                          satds_out);
 }
 
 static INLINE void hor_transform_row_avx2(__m128i* row){
@@ -449,6 +460,63 @@ INLINE static void sum_block_dual_avx2(__m256i *ver_row, unsigned *sum0, unsigne
   *sum1 = _mm_cvtsi128_si32(_mm256_extracti128_si256(sad, 1));
 }
 
+/*
+ * Last vertical butterfly stage fused with the absolute sum. The stage pairs
+ * rows (0, 4), (1, 5), (2, 6) and (3, 7), and |a + b| + |a - b| ==
+ * 2 * max(|a|, |b|) for integers, so the stage, half of the absolute values and
+ * half of the accumulation are replaced by maxima. Returns half of the
+ * absolute sum. The terms are at most 8160 for 8-bit input, so the sum of the
+ * four maxima (at most 32640) fits a 16-bit lane.
+ */
+INLINE static unsigned ver_transform_absmax_sum_avx2(__m128i (*rows)[8])
+{
+  __m128i temp0[8], temp1[8];
+  add_sub_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_avx2(temp0, (*rows), 6, 7, 6, 7);
+
+  add_sub_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_avx2(temp1, temp0, 6, 7, 5, 7);
+
+  const __m128i m0 = _mm_max_epi16(_mm_abs_epi16(temp1[0]), _mm_abs_epi16(temp1[4]));
+  const __m128i m1 = _mm_max_epi16(_mm_abs_epi16(temp1[1]), _mm_abs_epi16(temp1[5]));
+  const __m128i m2 = _mm_max_epi16(_mm_abs_epi16(temp1[2]), _mm_abs_epi16(temp1[6]));
+  const __m128i m3 = _mm_max_epi16(_mm_abs_epi16(temp1[3]), _mm_abs_epi16(temp1[7]));
+  const __m128i sum16 = _mm_add_epi16(_mm_add_epi16(m0, m1), _mm_add_epi16(m2, m3));
+  __m128i sum = _mm_madd_epi16(sum16, _mm_set1_epi16(1));
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2)));
+  sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(0, 1, 0, 1)));
+  return (unsigned)_mm_cvtsi128_si32(sum);
+}
+
+INLINE static void ver_transform_absmax_sum_dual_avx2(__m256i (*rows)[8], unsigned *half0, unsigned *half1)
+{
+  __m256i temp0[8], temp1[8];
+  add_sub_dual_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_dual_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_dual_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_dual_avx2(temp0, (*rows), 6, 7, 6, 7);
+
+  add_sub_dual_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_dual_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_dual_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_dual_avx2(temp1, temp0, 6, 7, 5, 7);
+
+  const __m256i m0 = _mm256_max_epi16(_mm256_abs_epi16(temp1[0]), _mm256_abs_epi16(temp1[4]));
+  const __m256i m1 = _mm256_max_epi16(_mm256_abs_epi16(temp1[1]), _mm256_abs_epi16(temp1[5]));
+  const __m256i m2 = _mm256_max_epi16(_mm256_abs_epi16(temp1[2]), _mm256_abs_epi16(temp1[6]));
+  const __m256i m3 = _mm256_max_epi16(_mm256_abs_epi16(temp1[3]), _mm256_abs_epi16(temp1[7]));
+  const __m256i sum16 = _mm256_add_epi16(_mm256_add_epi16(m0, m1), _mm256_add_epi16(m2, m3));
+  __m256i sum = _mm256_madd_epi16(sum16, _mm256_set1_epi16(1));
+  sum = _mm256_add_epi32(sum, _mm256_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2)));
+  sum = _mm256_add_epi32(sum, _mm256_shuffle_epi32(sum, _MM_SHUFFLE(0, 1, 0, 1)));
+  *half0 = (unsigned)_mm_cvtsi128_si32(_mm256_castsi256_si128(sum));
+  *half1 = (unsigned)_mm_cvtsi128_si32(_mm256_extracti128_si256(sum, 1));
+}
+
 INLINE static __m128i diff_row_avx2(const uint8_t *buf1, const uint8_t *buf2)
 {
   __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)buf1));
@@ -531,12 +599,12 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned s
 
   diff_blocks_dual_avx2(&temp, buf1, stride1, buf2, stride2, orig, stride_orig);
   hor_transform_block_dual_avx2(&temp);
-  ver_transform_block_dual_avx2(&temp);
-  
-  sum_block_dual_avx2(temp, sum0, sum1);
+  unsigned half0, half1;
+  ver_transform_absmax_sum_dual_avx2(&temp, &half0, &half1);
 
-  *sum0 = (*sum0 + 2) >> 2;
-  *sum1 = (*sum1 + 2) >> 2;
+  // (sum + 2) >> 2 with sum = 2 * half.
+  *sum0 = (2 * half0 + 2) >> 2;
+  *sum1 = (2 * half1 + 2) >> 2;
 }
 
 /**
@@ -547,8 +615,7 @@ static unsigned kvz_satd_4x4_subblock_8bit_avx2(const uint8_t * buf1,
                                                 const uint8_t * buf2,
                                                 const int32_t     stride2)
 {
-  // TODO: AVX2 implementation
-  return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
+  return satd_4x4_core_avx2(LOAD_4X4_HALVES(buf2, stride2), LOAD_4X4_HALVES(buf1, stride1));
 }
 
 static void kvz_satd_4x4_subblock_quad_avx2(const uint8_t *preds[4],
@@ -557,8 +624,10 @@ static void kvz_satd_4x4_subblock_quad_avx2(const uint8_t *preds[4],
                                        const int orig_stride,
                                        unsigned costs[4])
 {
-  // TODO: AVX2 implementation
-  kvz_satd_4x4_subblock_quad_generic(preds, stride, orig, orig_stride, costs);
+  const __m128i o_lo = load_2rows4_avx2(orig, orig_stride);
+  const __m128i o_hi = load_2rows4_avx2(orig + 2 * orig_stride, orig_stride);
+  satd_4x4_dual_core_avx2(o_lo, o_hi, LOAD_4X4_HALVES(preds[0], stride), LOAD_4X4_HALVES(preds[1], stride), &costs[0]);
+  satd_4x4_dual_core_avx2(o_lo, o_hi, LOAD_4X4_HALVES(preds[2], stride), LOAD_4X4_HALVES(preds[3], stride), &costs[2]);
 }
 
 static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned stride1, const uint8_t * buf2, unsigned stride2)
@@ -567,12 +636,9 @@ static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned strid
 
   diff_blocks_avx2(&temp, buf1, stride1, buf2, stride2);
   hor_transform_block_avx2(&temp);
-  ver_transform_block_avx2(&temp);
-  
-  unsigned sad = sum_block_avx2(temp);
 
-  unsigned result = (sad + 2) >> 2;
-  return result;
+  // (sum + 2) >> 2 with sum = 2 * half.
+  return (2 * ver_transform_absmax_sum_avx2(&temp) + 2) >> 2;
 }
 
 static void satd_8x8_subblock_quad_avx2(const uint8_t **preds,
