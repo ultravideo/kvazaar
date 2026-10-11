@@ -30,21 +30,21 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
+#include "strategies/strategies-cpp.h"
+
+extern "C" {
 #include "strategies/neon/picture-neon.h"
-
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
-
-#if COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
-
-#include <stdlib.h>
-#include <string.h>
-
 #include "kvazaar.h"
 #include "strategies/neon/neon-common.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
 #include "strategies/strategies-picture.h"
 #include "strategyselector.h"
+}
+
+#if COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
+
+namespace {
 
 /*
  * 8-bit NEON versions of the functions of picture-generic.c. Every function
@@ -55,14 +55,87 @@
 //////////////////////////////////////////////////////////////////////////
 // SAD
 
-/**
- * Sum of absolute differences of a width x height block. The absolute
- * differences are accumulated in 32-bit lanes, so there is no overflow.
- */
-static unsigned reg_sad_neon(const kvz_pixel *const data1, const kvz_pixel *const data2,
-                             const int width, const int height,
-                             const unsigned stride1, const unsigned stride2)
+/* Loads a 4-pixel row pair (rows y and y + 1) into one 64-bit vector. */
+inline uint8x8_t load_row_pair4(const kvz_pixel *p, unsigned stride)
 {
+  uint32_t r0, r1;
+  memcpy(&r0, p, 4);
+  memcpy(&r1, p + stride, 4);
+  return vreinterpret_u8_u64(vcreate_u64((uint64_t)r0 | ((uint64_t)r1 << 32)));
+}
+
+/*
+ * SAD of a W-wide block of `height` rows. |a - b| is accumulated with vabal
+ * into 16-bit lanes. A row adds at most ceil(W / 8) * 255 to a lane, so the
+ * lanes are flushed into 32-bit lanes every kRows rows, which keeps the sums
+ * exact for any height. Only the bytes of the block are read: a 4-wide strip
+ * (W = 4 or 12) is loaded as row pairs.
+ */
+template <int W>
+unsigned sad_rows(const kvz_pixel *p1, unsigned s1, const kvz_pixel *p2, unsigned s2, int height)
+{
+  static_assert(W == 4 || W == 8 || W == 12 || W == 24 || (W % 16 == 0 && W <= 64), "unsupported width");
+  constexpr int kPerLane = (W + 7) / 8;
+  constexpr int kRows = (65535 / (255 * kPerLane)) & ~1;
+  constexpr int kStrip = W % 8 ? W - 4 : -1;          // x of the 4-wide strip
+  constexpr int kEight = W % 16 >= 8 ? W - 8 - (kStrip >= 0 ? 4 : 0) : -1; // x of a lone 8-wide part
+  constexpr int kSixteen = W - (W % 16);              // columns covered by 16-wide parts
+
+  uint32x4_t total = vdupq_n_u32(0);
+  unsigned tail = 0;
+  for (int y0 = 0; y0 < height; y0 += kRows) {
+    const int y1 = height - y0 < kRows ? height : y0 + kRows;
+    uint16x8_t acc = vdupq_n_u16(0);
+    if constexpr (kStrip >= 0) {
+      int y = y0;
+      for (; y + 2 <= y1; y += 2) {
+        acc = vabal_u8(acc, load_row_pair4(p1 + y * s1 + kStrip, s1), load_row_pair4(p2 + y * s2 + kStrip, s2));
+      }
+      for (; y < y1; ++y) {
+        for (int x = kStrip; x < W; ++x) {
+          tail += abs((int)p1[y * s1 + x] - (int)p2[y * s2 + x]);
+        }
+      }
+    }
+    for (int y = y0; y < y1; ++y) {
+      const kvz_pixel *r1 = p1 + y * s1;
+      const kvz_pixel *r2 = p2 + y * s2;
+      if constexpr (kEight >= 0) {
+        acc = vabal_u8(acc, vld1_u8(r1 + kEight), vld1_u8(r2 + kEight));
+      }
+      for (int x = 0; x < kSixteen; x += 16) {
+        const uint8x16_t a = vld1q_u8(r1 + x);
+        const uint8x16_t b = vld1q_u8(r2 + x);
+        acc = vabal_u8(acc, vget_low_u8(a), vget_low_u8(b));
+        acc = vabal_high_u8(acc, a, b);
+      }
+    }
+    total = vpadalq_u16(total, acc);
+  }
+  return vaddvq_u32(total) + tail;
+}
+
+/**
+ * Sum of absolute differences of a width x height block. Common widths go
+ * to the width-specialized kernel; others use the generic row loop, which
+ * accumulates in 32-bit lanes.
+ */
+unsigned reg_sad_neon(const kvz_pixel *const data1, const kvz_pixel *const data2,
+                      const int width, const int height,
+                      const unsigned stride1, const unsigned stride2)
+{
+  switch (width) {
+    case 4:  return sad_rows<4>(data1, stride1, data2, stride2, height);
+    case 8:  return sad_rows<8>(data1, stride1, data2, stride2, height);
+    case 12: return sad_rows<12>(data1, stride1, data2, stride2, height);
+    case 16: return sad_rows<16>(data1, stride1, data2, stride2, height);
+    case 24: return sad_rows<24>(data1, stride1, data2, stride2, height);
+    case 32: return sad_rows<32>(data1, stride1, data2, stride2, height);
+    case 48: return sad_rows<48>(data1, stride1, data2, stride2, height);
+    case 64: return sad_rows<64>(data1, stride1, data2, stride2, height);
+    default: break;
+  }
+
   if (width < 8) {
     /* Too narrow for a vector to pay for its setup and reduction. */
     unsigned sum = 0;
@@ -97,133 +170,44 @@ static unsigned reg_sad_neon(const kvz_pixel *const data1, const kvz_pixel *cons
   return vaddvq_u32(acc) + tail;
 }
 
-/* Dedicated 4-wide and 8-wide SAD. The generic row loop above handles narrow
- * blocks with a scalar tail, which made 4x4 and 8x8 slower than generic. Here a
- * 4-pixel row pair fills one 64-bit vector and an 8-pixel row fills one vector. */
-static inline uint8x8_t load_row_pair4(const kvz_pixel *p, unsigned stride)
+template <int N>
+unsigned sad_nxn_neon(const kvz_pixel *block1, const kvz_pixel *block2)
 {
-  uint32_t r0, r1;
-  memcpy(&r0, p, 4);
-  memcpy(&r1, p + stride, 4);
-  return vreinterpret_u8_u64(vcreate_u64((uint64_t)r0 | ((uint64_t)r1 << 32)));
+  return sad_rows<N>(block1, N, block2, N, N);
 }
 
-static inline unsigned sad_w4_neon(const kvz_pixel *p1, unsigned s1,
-                                   const kvz_pixel *p2, unsigned s2, int height)
+template <int N>
+void sad_nxn_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
 {
-  uint16x8_t acc = vdupq_n_u16(0);
-  unsigned tail = 0;
-  int y = 0;
-  for (; y + 2 <= height; y += 2) {
-    acc = vaddw_u8(acc, vabd_u8(load_row_pair4(p1 + y * s1, s1),
-                                load_row_pair4(p2 + y * s2, s2)));
-  }
-  for (; y < height; ++y) {
-    for (int x = 0; x < 4; ++x) {
-      tail += abs((int)p1[y * s1 + x] - (int)p2[y * s2 + x]);
-    }
-  }
-  return vaddlvq_u16(acc) + tail;
+  costs_out[0] = sad_rows<N>(preds[0], N, orig, N, N);
+  costs_out[1] = sad_rows<N>(preds[1], N, orig, N, N);
 }
 
-static inline unsigned sad_w8_neon(const kvz_pixel *p1, unsigned s1,
-                                   const kvz_pixel *p2, unsigned s2, int height)
+/* Fixed-width SAD entry points for get_optimized_sad. */
+template <int W>
+uint32_t reg_sad_w_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                        const int32_t height, const uint32_t stride1, const uint32_t stride2)
 {
-  uint16x8_t acc = vdupq_n_u16(0);
-  for (int y = 0; y < height; ++y) {
-    acc = vaddw_u8(acc, vabd_u8(vld1_u8(p1 + y * s1), vld1_u8(p2 + y * s2)));
-  }
-  return vaddlvq_u16(acc);
+  return sad_rows<W>(data1, stride1, data2, stride2, height);
 }
 
-static unsigned sad_4x4_neon(const kvz_pixel *block1, const kvz_pixel *block2)
-{
-  return sad_w4_neon(block1, 4, block2, 4, 4);
-}
-static unsigned sad_8x8_neon(const kvz_pixel *block1, const kvz_pixel *block2)
-{
-  return sad_w8_neon(block1, 8, block2, 8, 8);
-}
-static unsigned sad_16x16_neon(const kvz_pixel *block1, const kvz_pixel *block2)
-{
-  return reg_sad_neon(block1, block2, 16, 16, 16, 16);
-}
-static unsigned sad_32x32_neon(const kvz_pixel *block1, const kvz_pixel *block2)
-{
-  return reg_sad_neon(block1, block2, 32, 32, 32, 32);
-}
-static unsigned sad_64x64_neon(const kvz_pixel *block1, const kvz_pixel *block2)
-{
-  return reg_sad_neon(block1, block2, 64, 64, 64, 64);
-}
-
-static void sad_4x4_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
-{
-  costs_out[0] = sad_4x4_neon(preds[0], orig);
-  costs_out[1] = sad_4x4_neon(preds[1], orig);
-}
-static void sad_8x8_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
-{
-  costs_out[0] = sad_8x8_neon(preds[0], orig);
-  costs_out[1] = sad_8x8_neon(preds[1], orig);
-}
-static void sad_16x16_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
-{
-  costs_out[0] = reg_sad_neon(preds[0], orig, 16, 16, 16, 16);
-  costs_out[1] = reg_sad_neon(preds[1], orig, 16, 16, 16, 16);
-}
-static void sad_32x32_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
-{
-  costs_out[0] = reg_sad_neon(preds[0], orig, 32, 32, 32, 32);
-  costs_out[1] = reg_sad_neon(preds[1], orig, 32, 32, 32, 32);
-}
-static void sad_64x64_dual_neon(const pred_buffer preds, const kvz_pixel *const orig, unsigned num_modes, unsigned *costs_out)
-{
-  costs_out[0] = reg_sad_neon(preds[0], orig, 64, 64, 64, 64);
-  costs_out[1] = reg_sad_neon(preds[1], orig, 64, 64, 64, 64);
-}
-
-/* Fixed-width SAD entry points for get_optimized_sad. The width is a
- * constant, so the compiler can unroll the row loop. */
-#define REG_SAD_FIXED_W(w) \
-static uint32_t reg_sad_w ## w ## _neon(const kvz_pixel * const data1, const kvz_pixel * const data2, \
-                                        const int32_t height, const uint32_t stride1, const uint32_t stride2) \
-{ \
-  return reg_sad_neon(data1, data2, (w), height, stride1, stride2); \
-}
-static uint32_t reg_sad_w4_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
-                                const int32_t height, const uint32_t stride1, const uint32_t stride2)
-{
-  return sad_w4_neon(data1, stride1, data2, stride2, height);
-}
-static uint32_t reg_sad_w8_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
-                                const int32_t height, const uint32_t stride1, const uint32_t stride2)
-{
-  return sad_w8_neon(data1, stride1, data2, stride2, height);
-}
-REG_SAD_FIXED_W(12)
-REG_SAD_FIXED_W(16)
-REG_SAD_FIXED_W(24)
-REG_SAD_FIXED_W(32)
-REG_SAD_FIXED_W(64)
-
-static uint32_t reg_sad_w0_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
-                                const int32_t height, const uint32_t stride1, const uint32_t stride2)
+uint32_t reg_sad_w0_neon(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                         const int32_t height, const uint32_t stride1, const uint32_t stride2)
 {
   return 0;
 }
 
-static optimized_sad_func_ptr_t get_optimized_sad_neon(int32_t width)
+optimized_sad_func_ptr_t get_optimized_sad_neon(int32_t width)
 {
   switch (width) {
     case 0:  return reg_sad_w0_neon;
-    case 4:  return reg_sad_w4_neon;
-    case 8:  return reg_sad_w8_neon;
-    case 12: return reg_sad_w12_neon;
-    case 16: return reg_sad_w16_neon;
-    case 24: return reg_sad_w24_neon;
-    case 32: return reg_sad_w32_neon;
-    case 64: return reg_sad_w64_neon;
+    case 4:  return reg_sad_w_neon<4>;
+    case 8:  return reg_sad_w_neon<8>;
+    case 12: return reg_sad_w_neon<12>;
+    case 16: return reg_sad_w_neon<16>;
+    case 24: return reg_sad_w_neon<24>;
+    case 32: return reg_sad_w_neon<32>;
+    case 64: return reg_sad_w_neon<64>;
     default: return NULL;
   }
 }
@@ -497,39 +481,26 @@ static void satd_8x8_subblock_quad_neon(const kvz_pixel **preds, const int strid
   }
 }
 
-#define SATD_NXN_NEON(n) \
-static unsigned satd_ ## n ## x ## n ## _neon(const kvz_pixel * const block1, \
-                                              const kvz_pixel * const block2) \
-{ \
-  unsigned sum = 0; \
-  for (unsigned y = 0; y < (n); y += 8) { \
-    unsigned row = y * (n); \
-    for (unsigned x = 0; x < (n); x += 8) { \
-      sum += satd_8x8_subblock_neon(&block1[row + x], (n), &block2[row + x], (n)); \
-    } \
-  } \
-  return sum; \
-} \
-\
-static void satd_ ## n ## x ## n ## _dual_neon(const pred_buffer preds, const kvz_pixel * const orig, \
-                                               unsigned num_modes, unsigned *costs_out) \
-{ \
-  for (int k = 0; k < 2; ++k) { \
-    unsigned sum = 0; \
-    for (unsigned y = 0; y < (n); y += 8) { \
-      unsigned row = y * (n); \
-      for (unsigned x = 0; x < (n); x += 8) { \
-        sum += satd_8x8_subblock_neon(&preds[k][row + x], (n), &orig[row + x], (n)); \
-      } \
-    } \
-    costs_out[k] = sum; \
-  } \
+template <int N>
+unsigned satd_nxn_neon(const kvz_pixel * const block1, const kvz_pixel * const block2)
+{
+  unsigned sum = 0;
+  for (int y = 0; y < N; y += 8) {
+    for (int x = 0; x < N; x += 8) {
+      sum += satd_8x8_subblock_neon(&block1[y * N + x], N, &block2[y * N + x], N);
+    }
+  }
+  return sum;
 }
 
-SATD_NXN_NEON(8)
-SATD_NXN_NEON(16)
-SATD_NXN_NEON(32)
-SATD_NXN_NEON(64)
+template <int N>
+void satd_nxn_dual_neon(const pred_buffer preds, const kvz_pixel * const orig,
+                        unsigned num_modes, unsigned *costs_out)
+{
+  for (int k = 0; k < 2; ++k) {
+    costs_out[k] = satd_nxn_neon<N>(preds[k], orig);
+  }
+}
 
 static void satd_4x4_dual_neon(const pred_buffer preds, const kvz_pixel * const orig,
                                unsigned num_modes, unsigned *costs_out)
@@ -871,6 +842,8 @@ static double pixel_var_neon(const kvz_pixel *arr, const uint32_t len)
   return (double)num / (n * n);
 }
 
+} // namespace
+
 #endif // COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
 
 int kvz_strategy_register_picture_neon(void* opaque, uint8_t bitdepth)
@@ -878,42 +851,42 @@ int kvz_strategy_register_picture_neon(void* opaque, uint8_t bitdepth)
   bool success = true;
 #if COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "neon", 40, &reg_sad_neon);
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "neon", 40, KVZ_STRATEGY_FPTR(reg_sad_neon));
 
-    success &= kvz_strategyselector_register(opaque, "sad_4x4", "neon", 40, &sad_4x4_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_8x8", "neon", 40, &sad_8x8_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_16x16", "neon", 40, &sad_16x16_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_32x32", "neon", 40, &sad_32x32_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_64x64", "neon", 40, &sad_64x64_neon);
+    success &= kvz_strategyselector_register(opaque, "sad_4x4", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_neon<64>));
 
-    success &= kvz_strategyselector_register(opaque, "satd_4x4", "neon", 40, &satd_4x4_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_8x8", "neon", 40, &satd_8x8_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_16x16", "neon", 40, &satd_16x16_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_32x32", "neon", 40, &satd_32x32_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_64x64", "neon", 40, &satd_64x64_neon);
+    success &= kvz_strategyselector_register(opaque, "satd_4x4", "neon", 40, KVZ_STRATEGY_FPTR(satd_4x4_neon));
+    success &= kvz_strategyselector_register(opaque, "satd_8x8", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "satd_16x16", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "satd_32x32", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "satd_64x64", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_neon<64>));
 
-    success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "neon", 40, &sad_4x4_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "neon", 40, &sad_8x8_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "neon", 40, &sad_16x16_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "neon", 40, &sad_32x32_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "neon", 40, &sad_64x64_dual_neon);
+    success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_dual_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_dual_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_dual_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_dual_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "neon", 40, KVZ_STRATEGY_FPTR(sad_nxn_dual_neon<64>));
 
-    success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "neon", 40, &satd_4x4_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "neon", 40, &satd_8x8_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "neon", 40, &satd_16x16_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "neon", 40, &satd_32x32_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "neon", 40, &satd_64x64_dual_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_any_size", "neon", 40, &satd_any_size_neon);
-    success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "neon", 40, &satd_any_size_quad_neon);
+    success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "neon", 40, KVZ_STRATEGY_FPTR(satd_4x4_dual_neon));
+    success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_dual_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_dual_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_dual_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "neon", 40, KVZ_STRATEGY_FPTR(satd_nxn_dual_neon<64>));
+    success &= kvz_strategyselector_register(opaque, "satd_any_size", "neon", 40, KVZ_STRATEGY_FPTR(satd_any_size_neon));
+    success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "neon", 40, KVZ_STRATEGY_FPTR(satd_any_size_quad_neon));
 
-    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "neon", 40, &pixels_calc_ssd_neon);
-    success &= kvz_strategyselector_register(opaque, "bipred_average", "neon", 40, &bipred_average_neon);
+    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "neon", 40, KVZ_STRATEGY_FPTR(pixels_calc_ssd_neon));
+    success &= kvz_strategyselector_register(opaque, "bipred_average", "neon", 40, KVZ_STRATEGY_FPTR(bipred_average_neon));
 
-    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "neon", 40, &get_optimized_sad_neon);
-    success &= kvz_strategyselector_register(opaque, "ver_sad", "neon", 40, &ver_sad_neon);
-    success &= kvz_strategyselector_register(opaque, "hor_sad", "neon", 40, &hor_sad_neon_wrapper);
+    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "neon", 40, KVZ_STRATEGY_FPTR(get_optimized_sad_neon));
+    success &= kvz_strategyselector_register(opaque, "ver_sad", "neon", 40, KVZ_STRATEGY_FPTR(ver_sad_neon));
+    success &= kvz_strategyselector_register(opaque, "hor_sad", "neon", 40, KVZ_STRATEGY_FPTR(hor_sad_neon_wrapper));
 
-    success &= kvz_strategyselector_register(opaque, "pixel_var", "neon", 40, &pixel_var_neon);
+    success &= kvz_strategyselector_register(opaque, "pixel_var", "neon", 40, KVZ_STRATEGY_FPTR(pixel_var_neon));
   }
 #endif
   return success;

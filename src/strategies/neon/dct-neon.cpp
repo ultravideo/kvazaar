@@ -48,35 +48,46 @@
  *   Output rounding saturates like the generic CLIP.
  * - Inputs are transposed in 4x4 blocks on load (forward) or on store
  *   (inverse); for 4x4 transforms vld4/vst4 do the transpose.
+ * - The strategies are registered for 8-bit only, so every pass shift is a
+ *   compile-time constant (template parameter) and the rounding shift and
+ *   narrowing of each output fuse into one vrshrn_n (wrapping, forward) or
+ *   vqrshrn_n (saturating, inverse) instruction.
  */
 
+#include "strategies/strategies-cpp.h"
+
+extern "C" {
 #include "strategies/neon/dct-neon.h"
 
 #include "global.h" // IWYU pragma: keep
 
 #if COMPILE_ARM_NEON
-
 #include "kvazaar.h"
 #include "strategies/generic/dct-generic.h"
 #include "strategies/neon/neon-common.h"
 #include "strategies/strategies-dct.h"
 #include "strategyselector.h"
 #include "tables.h"
+#endif
+}
+
+#if COMPILE_ARM_NEON
+
+namespace {
 
 typedef int32x4_t v4;
 
-// The passes are inlined into each transform so that N is a constant and the
-// 1-D kernel call is direct; otherwise the pass overhead dominates 4x4.
-#if defined(_MSC_VER)
-#define DCT_INLINE __forceinline
-#else
-#define DCT_INLINE inline __attribute__((always_inline))
-#endif
+// Pass shifts for 8-bit input (kvz_g_convert_to_bit[N] is log2(N) - 2).
+template <int N> constexpr int log2_minus2() { return N == 4 ? 0 : N == 8 ? 1 : N == 16 ? 2 : 3; }
+template <int N> constexpr int kFwdShift1 = log2_minus2<N>() + 1;
+template <int N> constexpr int kFwdShift2 = log2_minus2<N>() + 8;
+constexpr int kInvShift1 = 7;
+constexpr int kInvShift2 = 12;
 
 // 32-bit copies of the forward basis, so a row segment loads as a coefficient vector.
-static int32_t t4[4][4], t8[8][8], t16[16][16], t32[32][32];
+int32_t t4[4][4], t8[8][8], t16[16][16], t32[32][32];
 
-static void init_tables(void)
+void init_tables()
 {
   for (int k = 0; k < 4; ++k) for (int i = 0; i < 4; ++i) t4[k][i] = kvz_g_dct_4[k][i];
   for (int k = 0; k < 8; ++k) for (int i = 0; i < 8; ++i) t8[k][i] = kvz_g_dct_8[k][i];
@@ -86,13 +97,13 @@ static void init_tables(void)
 
 /* ---------------- Forward helpers ---------------- */
 
-static inline v4 dot2(v4 a, v4 b, const int32_t *c)
+inline v4 dot2(v4 a, v4 b, const int32_t *c)
 {
   const int32x2_t cv = vld1_s32(c);
   return vmlaq_lane_s32(vmulq_lane_s32(a, cv, 0), b, cv, 1);
 }
 
-static inline v4 dot4_acc(v4 acc, const v4 *v, const int32_t *c)
+inline v4 dot4_acc(v4 acc, const v4 *v, const int32_t *c)
 {
   const int32x4_t cv = vld1q_s32(c);
   acc = vmlaq_laneq_s32(acc, v[0], cv, 0);
@@ -101,7 +112,7 @@ static inline v4 dot4_acc(v4 acc, const v4 *v, const int32_t *c)
   return vmlaq_laneq_s32(acc, v[3], cv, 3);
 }
 
-static inline v4 dot4(const v4 *v, const int32_t *c)
+inline v4 dot4(const v4 *v, const int32_t *c)
 {
   const int32x4_t cv = vld1q_s32(c);
   v4 acc = vmulq_laneq_s32(v[0], cv, 0);
@@ -110,32 +121,41 @@ static inline v4 dot4(const v4 *v, const int32_t *c)
   return vmlaq_laneq_s32(acc, v[3], cv, 3);
 }
 
-static inline v4 dotn(const v4 *v, const int32_t *c, int n)
+template <int Terms>
+inline v4 dotn(const v4 *v, const int32_t *c)
 {
   v4 acc = dot4(v, c);
-  for (int i = 4; i < n; i += 4) {
+  KVZ_UNROLL
+  for (int i = 4; i < Terms; i += 4) {
     acc = dot4_acc(acc, v + i, c + i);
   }
   return acc;
 }
 
-// Rounds, wraps to 16 bits and stores output row k of this group of lines.
-#define FWD_OUT(N, k, val) vst1_s16(d + (k) * (N), vmovn_s32(vrshlq_s32((val), nsh)))
+/* Forward 1-D kernels. x[n] holds sample n of four lines; out(k, val) rounds,
+ * shifts and wraps output k of those lines to 16 bits and stores it. */
+template <int N, int SH>
+struct FwdOut {
+  int16_t *d;
+  inline void operator()(int k, v4 val) const { vst1_s16(d + k * N, vrshrn_n_s32(val, SH)); }
+};
 
-/* Forward 1-D kernels. x[n] holds sample n of four lines; output k of those
- * lines goes to d[k * N]. */
-static DCT_INLINE void fwd4_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
+template <int SH>
+KVZ_FORCE_INLINE void fwd4_1d(const int16x4_t *x, int16_t *d)
 {
+  const FwdOut<4, SH> out{d};
   const v4 e0 = vaddl_s16(x[0], x[3]), o0 = vsubl_s16(x[0], x[3]);
   const v4 e1 = vaddl_s16(x[1], x[2]), o1 = vsubl_s16(x[1], x[2]);
-  FWD_OUT(4, 0, dot2(e0, e1, t4[0]));
-  FWD_OUT(4, 2, dot2(e0, e1, t4[2]));
-  FWD_OUT(4, 1, dot2(o0, o1, t4[1]));
-  FWD_OUT(4, 3, dot2(o0, o1, t4[3]));
+  out(0, dot2(e0, e1, t4[0]));
+  out(2, dot2(e0, e1, t4[2]));
+  out(1, dot2(o0, o1, t4[1]));
+  out(3, dot2(o0, o1, t4[3]));
 }
 
-static DCT_INLINE void fwd8_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
+template <int SH>
+KVZ_FORCE_INLINE void fwd8_1d(const int16x4_t *x, int16_t *d)
 {
+  const FwdOut<8, SH> out{d};
   v4 e[4], o[4];
   for (int k = 0; k < 4; ++k) {
     e[k] = vaddl_s16(x[k], x[7 - k]);
@@ -143,41 +163,45 @@ static DCT_INLINE void fwd8_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
   }
   const v4 ee0 = vaddq_s32(e[0], e[3]), eo0 = vsubq_s32(e[0], e[3]);
   const v4 ee1 = vaddq_s32(e[1], e[2]), eo1 = vsubq_s32(e[1], e[2]);
-  FWD_OUT(8, 0, dot2(ee0, ee1, t8[0]));
-  FWD_OUT(8, 4, dot2(ee0, ee1, t8[4]));
-  FWD_OUT(8, 2, dot2(eo0, eo1, t8[2]));
-  FWD_OUT(8, 6, dot2(eo0, eo1, t8[6]));
-  for (int k = 1; k < 8; k += 2) FWD_OUT(8, k, dot4(o, t8[k]));
+  out(0, dot2(ee0, ee1, t8[0]));
+  out(4, dot2(ee0, ee1, t8[4]));
+  out(2, dot2(eo0, eo1, t8[2]));
+  out(6, dot2(eo0, eo1, t8[6]));
+  for (int k = 1; k < 8; k += 2) out(k, dot4(o, t8[k]));
 }
 
-static DCT_INLINE void fwd16_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
+template <int SH>
+KVZ_FORCE_INLINE void fwd16_1d(const int16x4_t *x, int16_t *d)
 {
+  const FwdOut<16, SH> out{d};
   v4 e[8], o[8], ee[4], eo[4];
   for (int k = 0; k < 8; ++k) {
     e[k] = vaddl_s16(x[k], x[15 - k]);
     o[k] = vsubl_s16(x[k], x[15 - k]);
   }
-  for (int k = 1; k < 16; k += 2) FWD_OUT(16, k, dotn(o, t16[k], 8));
+  for (int k = 1; k < 16; k += 2) out(k, dotn<8>(o, t16[k]));
   for (int k = 0; k < 4; ++k) {
     ee[k] = vaddq_s32(e[k], e[7 - k]);
     eo[k] = vsubq_s32(e[k], e[7 - k]);
   }
-  for (int k = 2; k < 16; k += 4) FWD_OUT(16, k, dot4(eo, t16[k]));
+  for (int k = 2; k < 16; k += 4) out(k, dot4(eo, t16[k]));
   const v4 eee0 = vaddq_s32(ee[0], ee[3]), eeo0 = vsubq_s32(ee[0], ee[3]);
   const v4 eee1 = vaddq_s32(ee[1], ee[2]), eeo1 = vsubq_s32(ee[1], ee[2]);
-  FWD_OUT(16, 0, dot2(eee0, eee1, t16[0]));
-  FWD_OUT(16, 8, dot2(eee0, eee1, t16[8]));
-  FWD_OUT(16, 4, dot2(eeo0, eeo1, t16[4]));
-  FWD_OUT(16, 12, dot2(eeo0, eeo1, t16[12]));
+  out(0, dot2(eee0, eee1, t16[0]));
+  out(8, dot2(eee0, eee1, t16[8]));
+  out(4, dot2(eeo0, eeo1, t16[4]));
+  out(12, dot2(eeo0, eeo1, t16[12]));
 }
 
-static DCT_INLINE void fwd32_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
+template <int SH>
+KVZ_FORCE_INLINE void fwd32_1d(const int16x4_t *x, int16_t *d)
 {
+  const FwdOut<32, SH> out{d};
   v4 e[16], o[16], ee[8], eo[8], eee[4], eeo[4];
   for (int k = 0; k < 16; ++k) {
     o[k] = vsubl_s16(x[k], x[31 - k]);
   }
-  for (int k = 1; k < 32; k += 2) FWD_OUT(32, k, dotn(o, t32[k], 16));
+  for (int k = 1; k < 32; k += 2) out(k, dotn<16>(o, t32[k]));
   for (int k = 0; k < 16; ++k) {
     e[k] = vaddl_s16(x[k], x[31 - k]);
   }
@@ -185,37 +209,37 @@ static DCT_INLINE void fwd32_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
     ee[k] = vaddq_s32(e[k], e[15 - k]);
     eo[k] = vsubq_s32(e[k], e[15 - k]);
   }
-  for (int k = 2; k < 32; k += 4) FWD_OUT(32, k, dotn(eo, t32[k], 8));
+  for (int k = 2; k < 32; k += 4) out(k, dotn<8>(eo, t32[k]));
   for (int k = 0; k < 4; ++k) {
     eee[k] = vaddq_s32(ee[k], ee[7 - k]);
     eeo[k] = vsubq_s32(ee[k], ee[7 - k]);
   }
-  for (int k = 4; k < 32; k += 8) FWD_OUT(32, k, dot4(eeo, t32[k]));
+  for (int k = 4; k < 32; k += 8) out(k, dot4(eeo, t32[k]));
   const v4 eeee0 = vaddq_s32(eee[0], eee[3]), eeeo0 = vsubq_s32(eee[0], eee[3]);
   const v4 eeee1 = vaddq_s32(eee[1], eee[2]), eeeo1 = vsubq_s32(eee[1], eee[2]);
-  FWD_OUT(32, 0, dot2(eeee0, eeee1, t32[0]));
-  FWD_OUT(32, 16, dot2(eeee0, eeee1, t32[16]));
-  FWD_OUT(32, 8, dot2(eeeo0, eeeo1, t32[8]));
-  FWD_OUT(32, 24, dot2(eeeo0, eeeo1, t32[24]));
+  out(0, dot2(eeee0, eeee1, t32[0]));
+  out(16, dot2(eeee0, eeee1, t32[16]));
+  out(8, dot2(eeeo0, eeeo1, t32[8]));
+  out(24, dot2(eeeo0, eeeo1, t32[24]));
 }
 
 // 4-point forward DST (fast_forward_dst_4 in dct-generic.c).
-static DCT_INLINE void fwd_dst4_1d(const int16x4_t *x, int16_t *d, int32x4_t nsh)
+template <int SH>
+KVZ_FORCE_INLINE void fwd_dst4_1d(const int16x4_t *x, int16_t *d)
 {
+  const FwdOut<4, SH> out{d};
   const v4 c0 = vaddl_s16(x[0], x[3]);
   const v4 c1 = vaddl_s16(x[1], x[3]);
   const v4 c2 = vsubl_s16(x[0], x[1]);
   const v4 c3 = vmull_n_s16(x[2], 74);
-  FWD_OUT(4, 0, vaddq_s32(vmlaq_n_s32(vmulq_n_s32(c0, 29), c1, 55), c3));
-  FWD_OUT(4, 1, vmulq_n_s32(vsubq_s32(vaddl_s16(x[0], x[1]), vmovl_s16(x[3])), 74));
-  FWD_OUT(4, 2, vsubq_s32(vmlaq_n_s32(vmulq_n_s32(c2, 29), c0, 55), c3));
-  FWD_OUT(4, 3, vaddq_s32(vmlsq_n_s32(vmulq_n_s32(c2, 55), c1, 29), c3));
+  out(0, vaddq_s32(vmlaq_n_s32(vmulq_n_s32(c0, 29), c1, 55), c3));
+  out(1, vmulq_n_s32(vsubq_s32(vaddl_s16(x[0], x[1]), vmovl_s16(x[3])), 74));
+  out(2, vsubq_s32(vmlaq_n_s32(vmulq_n_s32(c2, 29), c0, 55), c3));
+  out(3, vaddq_s32(vmlsq_n_s32(vmulq_n_s32(c2, 55), c1, 29), c3));
 }
 
-typedef void (fwd1d_func)(const int16x4_t *x, int16_t *d, int32x4_t nsh);
-
 // Transposes a 4x4 block of int16 lanes: out[j] lane i = in[i] lane j.
-static inline void transpose4x4_s16(const int16x4_t in[4], int16x4_t out[4])
+inline void transpose4x4_s16(const int16x4_t in[4], int16x4_t out[4])
 {
   const int16x4x2_t a = vtrn_s16(in[0], in[1]);
   const int16x4x2_t b = vtrn_s16(in[2], in[3]);
@@ -227,13 +251,15 @@ static inline void transpose4x4_s16(const int16x4_t in[4], int16x4_t out[4])
   out[3] = vreinterpret_s16_s32(c1.val[1]);
 }
 
+typedef void fwd1d_func(const int16x4_t *x, int16_t *d);
+
 // One forward pass: line j of src (row j, stride N) becomes column j of dst.
-static DCT_INLINE void fwd_pass(const int16_t *src, int16_t *dst, int N, fwd1d_func *fn, int32_t shift)
+template <int N, fwd1d_func Kernel>
+KVZ_FORCE_INLINE void fwd_pass(const int16_t *src, int16_t *dst)
 {
-  const int32x4_t nsh = vdupq_n_s32(-shift);
-  int16x4_t x[32];
+  int16x4_t x[N];
   for (int j0 = 0; j0 < N; j0 += 4) {
-    if (N == 4) {
+    if constexpr (N == 4) {
       const int16x4x4_t v = vld4_s16(src);
       x[0] = v.val[0]; x[1] = v.val[1]; x[2] = v.val[2]; x[3] = v.val[3];
     } else {
@@ -245,53 +271,47 @@ static DCT_INLINE void fwd_pass(const int16_t *src, int16_t *dst, int N, fwd1d_f
         transpose4x4_s16(r, x + n0);
       }
     }
-    fn(x, dst + j0, nsh);
+    Kernel(x, dst + j0);
   }
 }
 
 /* ---------------- Inverse helpers ---------------- */
 
-// acc[i] += x * c[i] for i < 8 (c holds row segment M[f][k0 .. k0 + 7]).
-#define MAC8(acc, xv, c) do { \
-  acc[0] = vmlal_laneq_s16(acc[0], xv, c, 0); acc[1] = vmlal_laneq_s16(acc[1], xv, c, 1); \
-  acc[2] = vmlal_laneq_s16(acc[2], xv, c, 2); acc[3] = vmlal_laneq_s16(acc[3], xv, c, 3); \
-  acc[4] = vmlal_laneq_s16(acc[4], xv, c, 4); acc[5] = vmlal_laneq_s16(acc[5], xv, c, 5); \
-  acc[6] = vmlal_laneq_s16(acc[6], xv, c, 6); acc[7] = vmlal_laneq_s16(acc[7], xv, c, 7); } while (0)
-#define MAC4(acc, xv, c) do { \
-  acc[0] = vmlal_lane_s16(acc[0], xv, c, 0); acc[1] = vmlal_lane_s16(acc[1], xv, c, 1); \
-  acc[2] = vmlal_lane_s16(acc[2], xv, c, 2); acc[3] = vmlal_lane_s16(acc[3], xv, c, 3); } while (0)
-#define MAC2(acc, xv, c) do { \
-  acc[0] = vmlal_lane_s16(acc[0], xv, c, 0); acc[1] = vmlal_lane_s16(acc[1], xv, c, 1); } while (0)
-
-static inline void zero(v4 *a, int n)
+/* out[k] = sum over f = F0, F0 + STEP, ... < N of x[f] * M[f][k], for k < K.
+ * Each coefficient load serves up to eight lane-indexed multiply-accumulates. */
+template <int N, int K, int F0, int STEP>
+KVZ_FORCE_INLINE void inv_sum(v4 *out, const int16x4_t *x, const int16_t *M)
 {
-  for (int i = 0; i < n; ++i) a[i] = vdupq_n_s32(0);
-}
-
-// out[k] = sum over f = f0, f0 + step, ... < N of x[f] * M[f][k], for k < K.
-static DCT_INLINE void inv_sum(v4 *out, int K, const int16x4_t *x, const int16_t *M, int N, int f0, int step)
-{
-  zero(out, K);
-  for (int f = f0; f < N; f += step) {
+  KVZ_UNROLL
+  for (int k = 0; k < K; ++k) out[k] = vdupq_n_s32(0);
+  KVZ_UNROLL
+  for (int f = F0; f < N; f += STEP) {
     const int16_t *row = M + f * N;
-    if (K >= 8) {
+    if constexpr (K >= 8) {
+      KVZ_UNROLL
       for (int k0 = 0; k0 < K; k0 += 8) {
         const int16x8_t c = vld1q_s16(row + k0);
-        MAC8((out + k0), x[f], c);
+        v4 *acc = out + k0;
+        acc[0] = vmlal_laneq_s16(acc[0], x[f], c, 0); acc[1] = vmlal_laneq_s16(acc[1], x[f], c, 1);
+        acc[2] = vmlal_laneq_s16(acc[2], x[f], c, 2); acc[3] = vmlal_laneq_s16(acc[3], x[f], c, 3);
+        acc[4] = vmlal_laneq_s16(acc[4], x[f], c, 4); acc[5] = vmlal_laneq_s16(acc[5], x[f], c, 5);
+        acc[6] = vmlal_laneq_s16(acc[6], x[f], c, 6); acc[7] = vmlal_laneq_s16(acc[7], x[f], c, 7);
       }
-    } else if (K == 4) {
-      const int16x4_t c = vld1_s16(row);
-      MAC4(out, x[f], c);
     } else {
       const int16x4_t c = vld1_s16(row);
-      MAC2(out, x[f], c);
+      out[0] = vmlal_lane_s16(out[0], x[f], c, 0);
+      out[1] = vmlal_lane_s16(out[1], x[f], c, 1);
+      if constexpr (K == 4) {
+        out[2] = vmlal_lane_s16(out[2], x[f], c, 2);
+        out[3] = vmlal_lane_s16(out[3], x[f], c, 3);
+      }
     }
   }
 }
 
 /* Inverse 1-D kernels. x[k] holds coefficient k of four columns; y[n] is
  * output sample n of those columns. */
-static DCT_INLINE void inv4_1d(const int16x4_t *x, v4 *y)
+KVZ_FORCE_INLINE void inv4_1d(const int16x4_t *x, v4 *y)
 {
   const int16x4_t c0 = vld1_s16(kvz_g_dct_4[0]), c1 = vld1_s16(kvz_g_dct_4[1]);
   const int16x4_t c2 = vld1_s16(kvz_g_dct_4[2]), c3 = vld1_s16(kvz_g_dct_4[3]);
@@ -305,13 +325,13 @@ static DCT_INLINE void inv4_1d(const int16x4_t *x, v4 *y)
   y[3] = vsubq_s32(e0, o0);
 }
 
-static DCT_INLINE void inv8_1d(const int16x4_t *x, v4 *y)
+KVZ_FORCE_INLINE void inv8_1d(const int16x4_t *x, v4 *y)
 {
   const int16_t *M = &kvz_g_dct_8[0][0];
   v4 o[4], eo[2], ee[2], e[4];
-  inv_sum(o, 4, x, M, 8, 1, 2);
-  inv_sum(eo, 2, x, M, 8, 2, 4);
-  inv_sum(ee, 2, x, M, 8, 0, 4);
+  inv_sum<8, 4, 1, 2>(o, x, M);
+  inv_sum<8, 2, 2, 4>(eo, x, M);
+  inv_sum<8, 2, 0, 4>(ee, x, M);
   e[0] = vaddq_s32(ee[0], eo[0]);
   e[3] = vsubq_s32(ee[0], eo[0]);
   e[1] = vaddq_s32(ee[1], eo[1]);
@@ -322,14 +342,14 @@ static DCT_INLINE void inv8_1d(const int16x4_t *x, v4 *y)
   }
 }
 
-static DCT_INLINE void inv16_1d(const int16x4_t *x, v4 *y)
+KVZ_FORCE_INLINE void inv16_1d(const int16x4_t *x, v4 *y)
 {
   const int16_t *M = &kvz_g_dct_16[0][0];
   v4 o[8], eo[4], eeo[2], eee[2], ee[4], e[8];
-  inv_sum(o, 8, x, M, 16, 1, 2);
-  inv_sum(eo, 4, x, M, 16, 2, 4);
-  inv_sum(eeo, 2, x, M, 16, 4, 8);
-  inv_sum(eee, 2, x, M, 16, 0, 8);
+  inv_sum<16, 8, 1, 2>(o, x, M);
+  inv_sum<16, 4, 2, 4>(eo, x, M);
+  inv_sum<16, 2, 4, 8>(eeo, x, M);
+  inv_sum<16, 2, 0, 8>(eee, x, M);
   for (int k = 0; k < 2; ++k) {
     ee[k] = vaddq_s32(eee[k], eeo[k]);
     ee[k + 2] = vsubq_s32(eee[1 - k], eeo[1 - k]);
@@ -344,15 +364,15 @@ static DCT_INLINE void inv16_1d(const int16x4_t *x, v4 *y)
   }
 }
 
-static DCT_INLINE void inv32_1d(const int16x4_t *x, v4 *y)
+KVZ_FORCE_INLINE void inv32_1d(const int16x4_t *x, v4 *y)
 {
   const int16_t *M = &kvz_g_dct_32[0][0];
   v4 o[16], eo[8], eeo[4], eeeo[2], eeee[2], eee[4], ee[8], e[16];
-  inv_sum(o, 16, x, M, 32, 1, 2);
-  inv_sum(eo, 8, x, M, 32, 2, 4);
-  inv_sum(eeo, 4, x, M, 32, 4, 8);
-  inv_sum(eeeo, 2, x, M, 32, 8, 16);
-  inv_sum(eeee, 2, x, M, 32, 0, 16);
+  inv_sum<32, 16, 1, 2>(o, x, M);
+  inv_sum<32, 8, 2, 4>(eo, x, M);
+  inv_sum<32, 4, 4, 8>(eeo, x, M);
+  inv_sum<32, 2, 8, 16>(eeeo, x, M);
+  inv_sum<32, 2, 0, 16>(eeee, x, M);
   eee[0] = vaddq_s32(eeee[0], eeeo[0]);
   eee[3] = vsubq_s32(eeee[0], eeeo[0]);
   eee[1] = vaddq_s32(eeee[1], eeeo[1]);
@@ -372,7 +392,7 @@ static DCT_INLINE void inv32_1d(const int16x4_t *x, v4 *y)
 }
 
 // 4-point inverse DST (fast_inverse_dst_4 in dct-generic.c).
-static DCT_INLINE void inv_dst4_1d(const int16x4_t *x, v4 *y)
+KVZ_FORCE_INLINE void inv_dst4_1d(const int16x4_t *x, v4 *y)
 {
   const v4 c0 = vaddl_s16(x[0], x[2]);
   const v4 c1 = vaddl_s16(x[2], x[3]);
@@ -384,23 +404,23 @@ static DCT_INLINE void inv_dst4_1d(const int16x4_t *x, v4 *y)
   y[3] = vsubq_s32(vmlaq_n_s32(vmulq_n_s32(c0, 55), c2, 29), c3);
 }
 
-typedef void (inv1d_func)(const int16x4_t *x, v4 *y);
+typedef void inv1d_func(const int16x4_t *x, v4 *y);
 
 // One inverse pass: column j of src becomes line j of dst (row j, stride N).
-static DCT_INLINE void inv_pass(const int16_t *src, int16_t *dst, int N, inv1d_func *fn, int32_t shift)
+template <int N, int SH, inv1d_func Kernel>
+KVZ_FORCE_INLINE void inv_pass(const int16_t *src, int16_t *dst)
 {
-  const int32x4_t nsh = vdupq_n_s32(-shift);
-  int16x4_t x[32], cols[32];
-  v4 y[32];
+  int16x4_t x[N], cols[N];
+  v4 y[N];
   for (int j0 = 0; j0 < N; j0 += 4) {
     for (int k = 0; k < N; ++k) {
       x[k] = vld1_s16(src + k * N + j0);
     }
-    fn(x, y);
+    Kernel(x, y);
     for (int n = 0; n < N; ++n) {
-      cols[n] = vqmovn_s32(vrshlq_s32(y[n], nsh));
+      cols[n] = vqrshrn_n_s32(y[n], SH);
     }
-    if (N == 4) {
+    if constexpr (N == 4) {
       const int16x4x4_t v = { { cols[0], cols[1], cols[2], cols[3] } };
       vst4_s16(dst, v);
     } else {
@@ -417,45 +437,61 @@ static DCT_INLINE void inv_pass(const int16_t *src, int16_t *dst, int N, inv1d_f
 
 /* ---------------- 2-D transforms ---------------- */
 
-#define DCT_NXN_NEON(N) \
-static void dct_ ## N ## x ## N ## _neon(int8_t bitdepth, const int16_t *input, int16_t *output) \
-{ \
-  int16_t tmp[N * N]; \
-  fwd_pass(input, tmp, N, fwd ## N ## _1d, kvz_g_convert_to_bit[N] + 1 + (bitdepth - 8)); \
-  fwd_pass(tmp, output, N, fwd ## N ## _1d, kvz_g_convert_to_bit[N] + 8); \
-}
+// Passes and kernels are force-inlined into each transform (as in the C
+// version) so that their vector arrays stay in registers.
+template <int N> struct Dct;
+template <> struct Dct<4> {
+  template <int SH> KVZ_FORCE_INLINE static void fwd(const int16x4_t *x, int16_t *d) { fwd4_1d<SH>(x, d); }
+  KVZ_FORCE_INLINE static void inv(const int16x4_t *x, v4 *y) { inv4_1d(x, y); }
+};
+template <> struct Dct<8> {
+  template <int SH> KVZ_FORCE_INLINE static void fwd(const int16x4_t *x, int16_t *d) { fwd8_1d<SH>(x, d); }
+  KVZ_FORCE_INLINE static void inv(const int16x4_t *x, v4 *y) { inv8_1d(x, y); }
+};
+template <> struct Dct<16> {
+  template <int SH> KVZ_FORCE_INLINE static void fwd(const int16x4_t *x, int16_t *d) { fwd16_1d<SH>(x, d); }
+  KVZ_FORCE_INLINE static void inv(const int16x4_t *x, v4 *y) { inv16_1d(x, y); }
+};
+template <> struct Dct<32> {
+  template <int SH> KVZ_FORCE_INLINE static void fwd(const int16x4_t *x, int16_t *d) { fwd32_1d<SH>(x, d); }
+  KVZ_FORCE_INLINE static void inv(const int16x4_t *x, v4 *y) { inv32_1d(x, y); }
+};
 
-#define IDCT_NXN_NEON(N) \
-static void idct_ ## N ## x ## N ## _neon(int8_t bitdepth, const int16_t *input, int16_t *output) \
-{ \
-  int16_t tmp[N * N]; \
-  inv_pass(input, tmp, N, inv ## N ## _1d, 7); \
-  inv_pass(tmp, output, N, inv ## N ## _1d, 12 - (bitdepth - 8)); \
-}
-
-DCT_NXN_NEON(4)
-DCT_NXN_NEON(8)
-DCT_NXN_NEON(16)
-DCT_NXN_NEON(32)
-
-IDCT_NXN_NEON(4)
-IDCT_NXN_NEON(8)
-IDCT_NXN_NEON(16)
-IDCT_NXN_NEON(32)
-
-static void fast_forward_dst_4x4_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
+template <int N>
+void dct_nxn_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int16_t tmp[4 * 4];
-  fwd_pass(input, tmp, 4, fwd_dst4_1d, kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8));
-  fwd_pass(tmp, output, 4, fwd_dst4_1d, kvz_g_convert_to_bit[4] + 8);
+  (void)bitdepth; // registered for 8-bit only
+  int16_t tmp[N * N];
+  fwd_pass<N, Dct<N>::template fwd<kFwdShift1<N>>>(input, tmp);
+  fwd_pass<N, Dct<N>::template fwd<kFwdShift2<N>>>(tmp, output);
 }
 
-static void fast_inverse_dst_4x4_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
+template <int N>
+void idct_nxn_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int16_t tmp[4 * 4];
-  inv_pass(input, tmp, 4, inv_dst4_1d, 7);
-  inv_pass(tmp, output, 4, inv_dst4_1d, 12 - (bitdepth - 8));
+  (void)bitdepth;
+  int16_t tmp[N * N];
+  inv_pass<N, kInvShift1, Dct<N>::inv>(input, tmp);
+  inv_pass<N, kInvShift2, Dct<N>::inv>(tmp, output);
 }
+
+void fast_forward_dst_4x4_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
+{
+  (void)bitdepth;
+  int16_t tmp[4 * 4];
+  fwd_pass<4, fwd_dst4_1d<kFwdShift1<4>>>(input, tmp);
+  fwd_pass<4, fwd_dst4_1d<kFwdShift2<4>>>(tmp, output);
+}
+
+void fast_inverse_dst_4x4_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
+{
+  (void)bitdepth;
+  int16_t tmp[4 * 4];
+  inv_pass<4, kInvShift1, inv_dst4_1d>(input, tmp);
+  inv_pass<4, kInvShift2, inv_dst4_1d>(tmp, output);
+}
+
+} // namespace
 
 #endif //COMPILE_ARM_NEON
 
@@ -468,18 +504,18 @@ int kvz_strategy_register_dct_neon(void* opaque, uint8_t bitdepth)
 #if COMPILE_ARM_NEON
   if (bitdepth == 8) {
     init_tables();
-    success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "neon", 40, &fast_forward_dst_4x4_neon);
-    success &= kvz_strategyselector_register(opaque, "dct_4x4", "neon", 40, &dct_4x4_neon);
-    success &= kvz_strategyselector_register(opaque, "dct_8x8", "neon", 40, &dct_8x8_neon);
-    success &= kvz_strategyselector_register(opaque, "dct_16x16", "neon", 40, &dct_16x16_neon);
-    success &= kvz_strategyselector_register(opaque, "dct_32x32", "neon", 40, &dct_32x32_neon);
+    success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "neon", 40, KVZ_STRATEGY_FPTR(fast_forward_dst_4x4_neon));
+    success &= kvz_strategyselector_register(opaque, "dct_4x4", "neon", 40, KVZ_STRATEGY_FPTR(dct_nxn_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "dct_8x8", "neon", 40, KVZ_STRATEGY_FPTR(dct_nxn_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "dct_16x16", "neon", 40, KVZ_STRATEGY_FPTR(dct_nxn_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "dct_32x32", "neon", 40, KVZ_STRATEGY_FPTR(dct_nxn_neon<32>));
 
-    success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "neon", 40, &fast_inverse_dst_4x4_neon);
+    success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "neon", 40, KVZ_STRATEGY_FPTR(fast_inverse_dst_4x4_neon));
 
-    success &= kvz_strategyselector_register(opaque, "idct_4x4", "neon", 40, &idct_4x4_neon);
-    success &= kvz_strategyselector_register(opaque, "idct_8x8", "neon", 40, &idct_8x8_neon);
-    success &= kvz_strategyselector_register(opaque, "idct_16x16", "neon", 40, &idct_16x16_neon);
-    success &= kvz_strategyselector_register(opaque, "idct_32x32", "neon", 40, &idct_32x32_neon);
+    success &= kvz_strategyselector_register(opaque, "idct_4x4", "neon", 40, KVZ_STRATEGY_FPTR(idct_nxn_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "idct_8x8", "neon", 40, KVZ_STRATEGY_FPTR(idct_nxn_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "idct_16x16", "neon", 40, KVZ_STRATEGY_FPTR(idct_nxn_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "idct_32x32", "neon", 40, KVZ_STRATEGY_FPTR(idct_nxn_neon<32>));
   }
 #else
   (void)opaque;

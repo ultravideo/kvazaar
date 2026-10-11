@@ -190,14 +190,15 @@ libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.h
 
 libneon_la_SOURCES = \
+	strategies/strategies-cpp.h \
 	strategies/neon/neon-common.h \
-	strategies/neon/dct-neon.c \
+	strategies/neon/dct-neon.cpp \
 	strategies/neon/dct-neon.h \
-	strategies/neon/intra-neon.c \
+	strategies/neon/intra-neon.cpp \
 	strategies/neon/intra-neon.h \
-	strategies/neon/ipol-neon.c \
+	strategies/neon/ipol-neon.cpp \
 	strategies/neon/ipol-neon.h \
-	strategies/neon/picture-neon.c \
+	strategies/neon/picture-neon.cpp \
 	strategies/neon/picture-neon.h \
 	strategies/neon/quant-neon.c \
 	strategies/neon/quant-neon.h \
@@ -230,6 +231,15 @@ libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.c \
 	strategies/sse41/picture-sse41.h \
 	strategies/sse41/reg_sad_pow2_widths-sse41.h
+
+# Flags for SIMD strategies written in C++ (see strategies/strategies-cpp.h).
+# They use templates only: no exceptions, RTTI or C++ runtime, so the library
+# is still linked as C. Symbols are hidden like in the C code.
+STRATEGY_CXXFLAGS = -std=c++17 -fno-exceptions -fno-rtti -fvisibility=hidden \
+	-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -ftree-vectorize \
+	-I$(srcdir) -I$(srcdir)/extras
+
+libneon_la_CXXFLAGS = $(AM_CXXFLAGS) $(STRATEGY_CXXFLAGS)
 
 if HAVE_PPC
 

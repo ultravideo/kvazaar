@@ -131,9 +131,11 @@ AC_DEFINE_UNQUOTED([KVZ_COMPILE_DATE], ["$compile_date"], [Compile date])
 
 # --enable-werror
 AC_ARG_ENABLE([werror], [AS_HELP_STRING([--enable-werror], [treat warnings as errors [no]])],
-              [AM_CFLAGS="$AM_CFLAGS -Werror"], []
+              [AM_CFLAGS="$AM_CFLAGS -Werror"
+               AM_CXXFLAGS="$AM_CXXFLAGS -Werror"], []
 )
 AC_SUBST([AM_CFLAGS])
+AC_SUBST([AM_CXXFLAGS])
 
 
 # host and cpu specific settings
