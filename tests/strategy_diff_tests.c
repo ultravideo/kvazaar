@@ -309,9 +309,13 @@ TEST test_transform(void)
   PASS();
 }
 
+// The dual functions take pred_buffer, kvz_pixel (*)[32 * 32], and are only
+// used by intra search for blocks up to 32x32. The 64x64 variants cannot be
+// called through that type without indexing past its rows, so they are not
+// tested here.
 static const char *dual_types[] = {
-  "sad_4x4_dual", "sad_8x8_dual", "sad_16x16_dual", "sad_32x32_dual", "sad_64x64_dual",
-  "satd_4x4_dual", "satd_8x8_dual", "satd_16x16_dual", "satd_32x32_dual", "satd_64x64_dual",
+  "sad_4x4_dual", "sad_8x8_dual", "sad_16x16_dual", "sad_32x32_dual",
+  "satd_4x4_dual", "satd_8x8_dual", "satd_16x16_dual", "satd_32x32_dual",
 };
 
 SUITE(strategy_diff_tests)

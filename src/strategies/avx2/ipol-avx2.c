@@ -556,7 +556,11 @@ static void kvz_ipol_4tap_ver_im_px_avx2(int8_t *filter,
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t*)filter);
+  // A 4-tap filter row is 4 bytes: load only those (the upper half of the
+  // widened vector is not used).
+  int32_t filter_4b;
+  memcpy(&filter_4b, filter, sizeof(filter_4b));
+  __m128i weights_8b = _mm_set1_epi32(filter_4b);
   __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
   __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
   __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
@@ -625,7 +629,11 @@ static void kvz_ipol_4tap_ver_im_hi_avx2(int8_t *filter,
 {
   const int shift2 = 6;
 
-  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
+  // A 4-tap filter row is 4 bytes: load only those (the upper half of the
+  // widened vector is not used).
+  int32_t filter_4b;
+  memcpy(&filter_4b, filter, sizeof(filter_4b));
+  __m128i weights_8b = _mm_set1_epi32(filter_4b);
   __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
   __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
   __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
