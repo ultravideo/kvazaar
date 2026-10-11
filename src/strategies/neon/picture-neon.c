@@ -407,6 +407,44 @@ static INLINE void transpose8x8_s16(int16x8_t r[8])
   r[7] = vcombine_s16(vget_high_s16(v11), vget_high_s16(v31));
 }
 
+/*
+ * The last butterfly stage of the second Hadamard pass feeds straight into the
+ * absolute sum, and |a + b| + |a - b| == 2 * max(|a|, |b|) for integers. So the
+ * last stage and half of the absolute values are replaced by maxima. The sums
+ * are exact: the 4x4 second-pass terms are at most 2040 and the 8x8 terms at
+ * most 8160 (four of them, 32640, still fit a 16-bit lane).
+ */
+static INLINE uint32_t hadamard4_pass_absmax_sum(const int16x4_t r[4])
+{
+  const int16x4_t s03p = vadd_s16(r[0], r[3]);
+  const int16x4_t s03m = vsub_s16(r[0], r[3]);
+  const int16x4_t s12p = vadd_s16(r[1], r[2]);
+  const int16x4_t s12m = vsub_s16(r[1], r[2]);
+  const int16x4_t mp = vmax_s16(vabs_s16(s03p), vabs_s16(s12p));
+  const int16x4_t mm = vmax_s16(vabs_s16(s03m), vabs_s16(s12m));
+  return (uint32_t)vaddlv_s16(vadd_s16(mp, mm)); // half of the 4x4 absolute sum
+}
+
+static INLINE uint32_t hadamard8_pass_absmax_sum(const int16x8_t m[8])
+{
+  const int16x8_t a0 = vaddq_s16(m[0], m[4]), a4 = vsubq_s16(m[0], m[4]);
+  const int16x8_t a1 = vaddq_s16(m[1], m[5]), a5 = vsubq_s16(m[1], m[5]);
+  const int16x8_t a2 = vaddq_s16(m[2], m[6]), a6 = vsubq_s16(m[2], m[6]);
+  const int16x8_t a3 = vaddq_s16(m[3], m[7]), a7 = vsubq_s16(m[3], m[7]);
+
+  const int16x8_t b0 = vaddq_s16(a0, a2), b2 = vsubq_s16(a0, a2);
+  const int16x8_t b1 = vaddq_s16(a1, a3), b3 = vsubq_s16(a1, a3);
+  const int16x8_t b4 = vaddq_s16(a4, a6), b6 = vsubq_s16(a4, a6);
+  const int16x8_t b5 = vaddq_s16(a5, a7), b7 = vsubq_s16(a5, a7);
+
+  const int16x8_t m01 = vmaxq_s16(vabsq_s16(b0), vabsq_s16(b1));
+  const int16x8_t m23 = vmaxq_s16(vabsq_s16(b2), vabsq_s16(b3));
+  const int16x8_t m45 = vmaxq_s16(vabsq_s16(b4), vabsq_s16(b5));
+  const int16x8_t m67 = vmaxq_s16(vabsq_s16(b6), vabsq_s16(b7));
+  const uint16x8_t sum = vreinterpretq_u16_s16(vaddq_s16(vaddq_s16(m01, m23), vaddq_s16(m45, m67)));
+  return vaddlvq_u16(sum); // half of the 8x8 absolute sum
+}
+
 /* SATD of one 4x4 block. Matches hadamard_4x4_generic, including the final
  * halving with rounding. */
 static unsigned satd_4x4_subblock_neon(const kvz_pixel *buf1, int32_t stride1,
@@ -418,13 +456,8 @@ static unsigned satd_4x4_subblock_neon(const kvz_pixel *buf1, int32_t stride1,
   }
   hadamard4_pass(r);
   transpose4x4_s16(r);
-  hadamard4_pass(r);
-
-  int32_t sum = 0;
-  for (int i = 0; i < 4; ++i) {
-    sum += vaddlv_s16(vabs_s16(r[i]));
-  }
-  return (sum + 1) >> 1;
+  // Generic returns (sum + 1) >> 1 of the absolute sum, which is 2 * half.
+  return hadamard4_pass_absmax_sum(r);
 }
 
 /* SATD of one 8x8 block, matching satd_8x8_subblock_generic. */
@@ -437,13 +470,8 @@ static unsigned satd_8x8_subblock_neon(const kvz_pixel *org, int32_t stride_org,
   }
   hadamard8_pass(m);
   transpose8x8_s16(m);
-  hadamard8_pass(m);
-
-  int32_t sum = 0;
-  for (int i = 0; i < 8; ++i) {
-    sum += vaddlvq_s16(vabsq_s16(m[i]));
-  }
-  return (sum + 2) >> 2;
+  // Generic returns (sum + 2) >> 2 of the absolute sum, with sum = 2 * half.
+  return (2 * hadamard8_pass_absmax_sum(m) + 2) >> 2;
 }
 
 static unsigned satd_4x4_neon(const kvz_pixel *piOrg, const kvz_pixel *piCur)
