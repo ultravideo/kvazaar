@@ -42,6 +42,7 @@
 
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-quant.h"
+#include "strategies/strategies-dct.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -265,6 +266,49 @@ TEST test_fast_coeff_cost(void)
   PASS();
 }
 
+
+static int16_t tr_in[32 * 32], tr_ref[32 * 32], tr_opt[32 * 32];
+
+// Forward transforms take 8-bit residuals (|x| <= 255). Inverse transforms take
+// dequantized coefficients, which dequant clips to the full int16 range, so
+// they are tested there, including all-extreme blocks that saturate.
+TEST test_transform(void)
+{
+  dct_func *ref = ref_fn, *opt = cur->fptr;
+  const bool inverse = strstr(cur->type, "idct") || strstr(cur->type, "inverse");
+  int n = 4;
+  if (strstr(cur->type, "8x8")) n = 8;
+  if (strstr(cur->type, "16x16")) n = 16;
+  if (strstr(cur->type, "32x32")) n = 32;
+  for (int mode = 0; mode < 5; ++mode) {
+    for (int trial = 0; trial < 16; ++trial) {
+      for (int i = 0; i < n * n; ++i) {
+        int v;
+        if (!inverse) {
+          v = mode == 0 ? (int)(rnd() % 511) - 255 : mode == 1 ? ((rnd() & 1) ? 255 : -255) :
+              mode == 2 ? 255 : mode == 3 ? -255 : ((i ^ (i >> 3)) & 1 ? 255 : -255);
+        } else {
+          v = mode == 0 ? (int)(rnd() & 0xFFFF) - 32768 : mode == 1 ? ((rnd() & 1) ? 32767 : -32768) :
+              mode == 2 ? 32767 : mode == 3 ? -32768 : (int)(rnd() % 2001) - 1000;
+        }
+        tr_in[i] = (int16_t)v;
+      }
+      memset(tr_ref, 0x55, sizeof(tr_ref));
+      memset(tr_opt, 0x55, sizeof(tr_opt));
+      ref(8, tr_in, tr_ref);
+      opt(8, tr_in, tr_opt);
+      for (int i = 0; i < n * n; ++i) {
+        if (tr_ref[i] != tr_opt[i]) {
+          printf("\n    %s:%s mode=%d trial=%d idx=%d ref=%d opt=%d\n", cur->type,
+                 cur->strategy_name, mode, trial, i, tr_ref[i], tr_opt[i]);
+          FAILm("transform mismatch");
+        }
+      }
+    }
+  }
+  PASS();
+}
+
 static const char *dual_types[] = {
   "sad_4x4_dual", "sad_8x8_dual", "sad_16x16_dual", "sad_32x32_dual", "sad_64x64_dual",
   "satd_4x4_dual", "satd_8x8_dual", "satd_16x16_dual", "satd_32x32_dual", "satd_64x64_dual",
@@ -295,6 +339,9 @@ SUITE(strategy_diff_tests)
       RUN_TEST(test_satd_any_size_quad);
     } else if (strcmp(cur->type, "fast_coeff_cost") == 0) {
       RUN_TEST(test_fast_coeff_cost);
+    } else if (!strncmp(cur->type, "dct_", 4) || !strncmp(cur->type, "idct_", 5) ||
+               !strcmp(cur->type, "fast_forward_dst_4x4") || !strcmp(cur->type, "fast_inverse_dst_4x4")) {
+      RUN_TEST(test_transform);
     } else {
       for (unsigned k = 0; k < sizeof(dual_types) / sizeof(dual_types[0]); ++k) {
         if (strcmp(cur->type, dual_types[k]) == 0) {
