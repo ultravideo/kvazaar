@@ -1336,6 +1336,31 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
   // Copy non-reference CUs to picture.
   kvz_cu_array_copy_from_lcu(state->tile->frame->cu_array, x_px, y_px, lcu);
 
+  // Inter CUs without a coded residual (skipped, or rqt_root_cbf 0 in the
+  // CBF of the top-left entry, which is what the bitstream writer uses) can
+  // carry stale per-TU CBFs from rejected candidates, e.g. from the --rd 2
+  // cost of a candidate whose residual was dropped afterwards. Clear them so
+  // that the CU QPs (set_cu_qps: no cu_qp_delta -> predicted QP) and the
+  // deblocking boundary strengths match the decoder.
+  {
+    cu_array_t *const cua = state->tile->frame->cu_array;
+    const int x_end = MIN(x_px + LCU_WIDTH, state->tile->frame->width);
+    const int y_end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
+    for (int y = y_px; y < y_end; y += SCU_WIDTH) {
+      for (int x = x_px; x < x_end; x += SCU_WIDTH) {
+        cu_info_t *scu = kvz_cu_array_at(cua, x, y);
+        if (scu->type != CU_INTER || scu->cbf == 0) continue;
+        const int cu_width = LCU_WIDTH >> scu->depth;
+        // Raster order visits the top-left entry of a CU first, so a cleared
+        // top-left entry keeps the rest of the CU cleared too.
+        const cu_info_t *cu = kvz_cu_array_at_const(cua, x & ~(cu_width - 1), y & ~(cu_width - 1));
+        if (cu->skipped || !cbf_is_set_any(cu->cbf, cu->depth)) {
+          scu->cbf = 0;
+        }
+      }
+    }
+  }
+
   // Copy pixels to picture.
   {
     videoframe_t * const pic = state->tile->frame;
