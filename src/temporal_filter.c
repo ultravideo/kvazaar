@@ -48,6 +48,8 @@
 #define TF_RANGE_QUARTER 8
 
 #define TF_MAX_REFS 8
+/** \brief Neighbours with a larger block error are not used for the block. */
+#define TF_MAX_BLOCK_ERROR 100
 /** \brief Maximum number of threads used for filtering one picture. */
 #define TF_MAX_JOBS 8
 
@@ -530,6 +532,11 @@ static void tf_filter_rows(tf_ctx *t, int by_start, int by_end)
           ww *= (min_error + 1) / (double)(error + 1);
           // sw = (noise < 25 ? 1.3 : 0.8) * (error < 50 ? 1.3 : 1.0)
           const int sw_idx = noise < 25 ? (error < 50 ? 3 : 2) : (error < 50 ? 1 : 0);
+          // A neighbour that predicts the block badly (e.g. over a fade or
+          // a transition) is not used for it at all. With only the relative
+          // weighting above, the block would be averaged with neighbours
+          // that are all poor predictions.
+          if (error > TF_MAX_BLOCK_ERROR) ww = 0.0;
           rw[r] = (float)(t->rw_strength[r] * ww);
           rlut[r] = &lut[sw_idx * lut_size + max_val];
         }
