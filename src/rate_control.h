@@ -73,6 +73,7 @@ typedef struct kvz_rc_data {
   double abr_total_bits;  //!< bits of the accounted frames
   int64_t abr_frames;     //!< number of accounted frames
   double abr_rate_factor; //!< rate factor of the current GOP
+  double abr_key_est;     //!< expected bits of an intra picture at rate factor 1
   double abr_inflight_bits;   //!< expected bits of the frames being coded
   int64_t abr_inflight_frames; //!< number of frames being coded
   double vbv_fill;        //!< VBV buffer fullness after the accounted frames

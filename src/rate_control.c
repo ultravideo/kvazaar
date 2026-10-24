@@ -1052,6 +1052,12 @@ static INLINE double qscale_to_qp(double qscale)
 #define ABR_MAX_QP_STEP 2.0
 /** \brief Exponent of the quantizer scale in the bits model. */
 #define ABR_GAMMA 1.3
+/** \brief Typical base QP at ABR_BPP_REF bits per pixel. */
+#define ABR_BPP_QP 27.0
+#define ABR_BPP_REF 0.02
+/** \brief The first picture is not coded more than this below the QP
+ *         estimated from the bits per pixel. */
+#define ABR_FIRST_QP_MARGIN 4.0
 
 
 static double abr_class_k(const encoder_control_t *const ctrl, const kvz_rc_data *rc, int cls)
@@ -1296,17 +1302,29 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
 
   double expected = 0.0;
   int n = 0;
+  double key_sum = 0.0;
+  int key_n = 0;
   for (int64_t i = first; i <= last; i++) {
     double cost, intra;
     bool key;
     if (!kvz_lookahead_frame_info(ctrl->lookahead, i, &cost, &intra, &key)) continue;
     const double rceq = pow(cost, (1.0 - qcomp) * ABR_GAMMA);
     if (key) {
-      expected += k_intra * intra / rceq;
+      key_sum += k_intra * intra / rceq;
+      key_n++;
     } else {
       expected += k_avg * cost / rceq;
     }
     n++;
+  }
+  if (ctrl->cfg.intra_period > 1) {
+    // The bits of the periodic intra pictures are spread over the intra
+    // period. Otherwise the rate factor would swing depending on whether
+    // the window happens to contain an intra picture.
+    if (key_n > 0) rc->abr_key_est = key_sum / key_n;
+    expected += rc->abr_key_est * n / MAX(n, ctrl->cfg.intra_period);
+  } else {
+    expected += key_sum;
   }
 
   // The rate factor is updated once per GOP so that all the pictures of a
@@ -1331,8 +1349,9 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
     double budget = target * n - error * n / horizon;
     budget = MAX(budget, 0.3 * target * n);
     double rate_factor = pow(budget / expected, 1.0 / ABR_GAMMA);
-    if (rc->abr_rate_factor > 0.0 && !state->frame->new_segment) {
-      // Limit the change of the base QP between GOPs.
+    if (rc->abr_rate_factor > 0.0) {
+      // Limit the change of the base QP between GOPs, also at scene cuts
+      // where the bits model of the new scene is not known yet.
       const double max_step = ABR_MAX_QP_STEP;
       rate_factor = CLIP(rc->abr_rate_factor * pow(2.0, -max_step / 6.0),
                          rc->abr_rate_factor * pow(2.0, max_step / 6.0),
@@ -1353,7 +1372,15 @@ void kvz_set_picture_qp_abr(encoder_state_t * const state)
     qscale = vbv_limit_qscale(state, qscale);
   }
 
-  const double base_qp = CLIP(0.0, 51.0, qscale_to_qp(qscale));
+  double base_qp = CLIP(0.0, 51.0, qscale_to_qp(qscale));
+  if (rc->abr_frames + rc->abr_inflight_frames == 0) {
+    // Nothing has been coded yet and the bits model is only a prior. Do not
+    // code the first picture at a much lower QP than the bits per pixel
+    // suggest, which could spend the budget of many seconds on it.
+    const double bpp = target / ctrl->in.pixels_per_pic;
+    const double qp_bpp = ABR_BPP_QP + 6.0 / ABR_GAMMA * log2(ABR_BPP_REF / MAX(bpp, 1e-6));
+    base_qp = CLIP(0.0, 51.0, MAX(base_qp, qp_bpp - ABR_FIRST_QP_MARGIN));
+  }
 
   abr_register_frame(state, base_qp);
 
