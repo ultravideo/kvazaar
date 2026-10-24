@@ -210,8 +210,10 @@ static void motion_level(const tf_plane *org, const tf_plane *ref, tf_mv *mvs, i
   const int hb = CEILDIV(org->h, bs);
   const int f = 4;  // all vectors in quarter pixels of this level
 
+  const int full_range = range;
   for (int by = 0; by < hb; by++) {
     for (int bx = 0; bx < wb; bx++) {
+      range = full_range;
       const int px = bx * bs;
       const int py = by * bs;
       tf_mv best = { 0, 0, UINT64_MAX };
@@ -247,6 +249,31 @@ static void motion_level(const tf_plane *org, const tf_plane *ref, tf_mv *mvs, i
         clamp_mv(bs, &x, &y);
         const uint64_t e = block_error(org, ref, px, py, bs, x, y, f, best.err, !subpel);
         if (e < best.err) { best.x = x; best.y = y; best.err = e; }
+      }
+
+      if (!prev && bx > 0 && by > 0) {
+        // Coarsest level: predictive search. The neighbours (incl. the
+        // top-right one) are candidates, followed by a hexagon search with
+        // a final +-1 refinement instead of the exhaustive search.
+        if (bx + 1 < wb) {
+          const tf_mv *tr = &mvs[(by - 1) * wb + bx + 1];
+          int x = tr->x, y = tr->y;
+          clamp_mv(bs, &x, &y);
+          const uint64_t e = block_error(org, ref, px, py, bs, x, y, f, best.err, true);
+          if (e < best.err) { best.x = x; best.y = y; best.err = e; }
+        }
+        static const int hex[6][2] = { { -2, 0 }, { -1, 2 }, { 1, 2 }, { 2, 0 }, { 1, -2 }, { -1, -2 } };
+        for (int iter = 0; iter < 4 * range; iter++) {
+          const int sx = best.x, sy = best.y;
+          for (int i = 0; i < 6; i++) {
+            const int x = sx + 4 * hex[i][0], y = sy + 4 * hex[i][1];
+            if (abs(x) > 4 * (TF_PAD - bs - 2) || abs(y) > 4 * (TF_PAD - bs - 2)) continue;
+            const uint64_t e = block_error(org, ref, px, py, bs, x, y, f, best.err, true);
+            if (e < best.err) { best.x = x; best.y = y; best.err = e; }
+          }
+          if (best.x == sx && best.y == sy) break;
+        }
+        range = 1;
       }
 
       // Integer search around the best candidate.
@@ -447,7 +474,7 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
         for (int bx = 0; bx < wbf; bx++) {
           const int x0 = bx * TF_BLOCK, y0 = by * TF_BLOCK;
           const int bw = MIN(TF_BLOCK, w - x0), bh = MIN(TF_BLOCK, h - y0);
-          double sum = 0, sum2 = 0, sse = 0, diffsum = 0, var_d = 0;
+          int64_t sum = 0, sum2 = 0, sse = 0, diffsum = 0, var_d = 0;
           for (int y = y0; y < y0 + bh; y++) {
             for (int x = x0; x < x0 + bw; x++) {
               const int o = orig->y[y * orig->stride + x];
@@ -464,11 +491,11 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
             }
           }
           const int n = bw * bh;
-          const double var_o = sum2 - sum * sum / n;
+          const double var_o = (double)sum2 - (double)sum * (double)sum / n;
           const double scale = (double)(1 << (2 * (KVZ_BIT_DEPTH - 8)));
-          blk_noise[r][by * wbf + bx] = (int)((15.0 * 2.0 * var_d / scale + 5.0) / (diffsum / scale + 5.0) + 0.5);
-          blk_error[r][by * wbf + bx] = (int)(20.0 * ((sse / scale + 5.0) / (var_o / scale + 5.0)) +
-                                              (sse / scale / n) / 50.0 + 0.5);
+          blk_noise[r][by * wbf + bx] = (int)((15.0 * 2.0 * (double)var_d / scale + 5.0) / ((double)diffsum / scale + 5.0) + 0.5);
+          blk_error[r][by * wbf + bx] = (int)(20.0 * (((double)sse / scale + 5.0) / (var_o / scale + 5.0)) +
+                                              ((double)sse / scale / n) / 50.0 + 0.5);
         }
       }
     }
@@ -485,7 +512,7 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
     const int max_val = (1 << KVZ_BIT_DEPTH) - 1;
     const double bd_scale = (double)(1 << (KVZ_BIT_DEPTH - 8));
     const int lut_size = 2 * max_val + 1;
-    double *lut = MALLOC(double, 5 * lut_size);
+    float *lut = MALLOC(float, 5 * lut_size);
 
     for (int c = 0; c < num_planes && lut; c++) {
       const int pw = c ? w >> shift_w : w;
@@ -504,22 +531,24 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
       for (int i = 0; i < 5; i++) {
         for (int d = -max_val; d <= max_val; d++) {
           const double diff = d / bd_scale;
-          lut[i * lut_size + d + max_val] = weight_scaling * exp(-diff * diff / (2.0 * sw_values[i] * sigma_sq));
+          lut[i * lut_size + d + max_val] = (float)(weight_scaling * exp(-diff * diff / (2.0 * sw_values[i] * sigma_sq)));
         }
       }
 
-      for (int y = 0; y < ph; y++) {
-        for (int x = 0; x < pw; x++) {
-          const int org_val = src[y * src_stride + x];
-          double sum = org_val;
-          double wsum = 1.0;
-          const int b = ((c ? y << shift_h : y) / TF_BLOCK) * wbf + (c ? x << shift_w : x) / TF_BLOCK;
+      // The weights of a reference depend on the 8x8 luma block only, so
+      // they are computed once per block.
+      const int bw_c = TF_BLOCK >> (c ? shift_w : 0);
+      const int bh_c = TF_BLOCK >> (c ? shift_h : 0);
+      for (int y0 = 0; y0 < ph; y0 += bh_c) {
+        for (int x0 = 0; x0 < pw; x0 += bw_c) {
+          const int b = ((c ? y0 << shift_h : y0) / TF_BLOCK) * wbf + (c ? x0 << shift_w : x0) / TF_BLOCK;
           int min_error = INT32_MAX;
           for (int r = 0; r < num_refs; r++) {
             if (blk_error[r]) min_error = MIN(min_error, blk_error[r][b]);
           }
+          float rw[TF_MAX_REFS];
+          const float *rlut[TF_MAX_REFS];
           for (int r = 0; r < num_refs; r++) {
-            const int ref_val = pred[r][c][y * pw + x];
             double ww = 1.0;
             int sw_idx = 4;
             if (blk_error[r]) {
@@ -531,11 +560,25 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
               // sw = (noise < 25 ? 1.3 : 0.8) * (error < 50 ? 1.3 : 1.0)
               sw_idx = noise < 25 ? (error < 50 ? 3 : 2) : (error < 50 ? 1 : 0);
             }
-            const double wgt = ref_strength[r] * ww * lut[sw_idx * lut_size + ref_val - org_val + max_val];
-            sum += wgt * ref_val;
-            wsum += wgt;
+            rw[r] = (float)(ref_strength[r] * ww);
+            rlut[r] = &lut[sw_idx * lut_size + max_val];
           }
-          dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5));
+          const int y_end = MIN(ph, y0 + bh_c);
+          const int x_end = MIN(pw, x0 + bw_c);
+          for (int y = y0; y < y_end; y++) {
+            for (int x = x0; x < x_end; x++) {
+              const int org_val = src[y * src_stride + x];
+              float sum = (float)org_val;
+              float wsum = 1.0f;
+              for (int r = 0; r < num_refs; r++) {
+                const int ref_val = pred[r][c][y * pw + x];
+                const float wgt = rw[r] * rlut[r][ref_val - org_val];
+                sum += wgt * ref_val;
+                wsum += wgt;
+              }
+              dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5f));
+            }
+          }
         }
       }
     }
