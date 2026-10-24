@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "image.h"
+#include "threads.h"
 #include "strategies/strategies-picture.h"
 
 /** \brief Block size of the final motion vectors. */
@@ -47,6 +48,8 @@
 #define TF_RANGE_QUARTER 8
 
 #define TF_MAX_REFS 8
+/** \brief Maximum number of threads used for filtering one picture. */
+#define TF_MAX_JOBS 8
 
 typedef struct {
   kvz_pixel *buf;
@@ -340,13 +343,265 @@ static tf_mv *motion_estimation(const tf_plane org[3], const tf_plane ref[3])
 }
 
 
+/** \brief Shared data of the filtering of one picture. */
+typedef struct {
+  const kvz_picture *orig;
+  const kvz_picture *const *refs;
+  int w, h, num_planes, shift_w, shift_h, wbf, hbf;
+  const tf_plane *org_l;
+  kvz_pixel *pred[TF_MAX_REFS][3];  //!< motion compensated neighbours
+  int *blk_error[TF_MAX_REFS];      //!< per 8x8 block prediction error
+  int *blk_noise[TF_MAX_REFS];      //!< per 8x8 block noise estimate
+  bool ok[TF_MAX_REFS];
+
+  // Filtering
+  int num_refs;
+  kvz_picture *out;
+  float rw_strength[TF_MAX_REFS];
+  const float *lut[3];              //!< weight LUTs of each plane
+  int lut_size, max_val;
+} tf_ctx;
+
+
+/**
+ * \brief Motion search, motion compensation and block statistics of one
+ *        neighbour.
+ */
+static void tf_process_ref(tf_ctx *t, int r)
+{
+  const kvz_picture *orig = t->orig;
+  const kvz_picture *ref = t->refs[r];
+  const int w = t->w, h = t->h, wbf = t->wbf, hbf = t->hbf;
+  const int shift_w = t->shift_w, shift_h = t->shift_h;
+  t->ok[r] = false;
+
+  tf_plane ref_l[3];
+  memset(ref_l, 0, sizeof(ref_l));
+  bool ok = plane_from_picture(&ref_l[0], ref->y, w, h, ref->stride) &&
+            plane_downsample(&ref_l[1], &ref_l[0]) &&
+            plane_downsample(&ref_l[2], &ref_l[1]);
+  tf_mv *mvs = ok ? motion_estimation(t->org_l, ref_l) : NULL;
+  ok = ok && mvs;
+
+  for (int c = 0; ok && c < t->num_planes; c++) {
+    const int pw = c ? w >> shift_w : w;
+    const int ph = c ? h >> shift_h : h;
+    const int stride = c ? ref->stride_c : ref->stride;
+    tf_plane rp;
+    if (c == 0) {
+      rp = ref_l[0];
+    } else if (!plane_from_picture(&rp, ref->data[c], pw, ph, stride)) {
+      ok = false;
+      break;
+    }
+    kvz_pixel *pred = MALLOC(kvz_pixel, pw * ph);
+    t->pred[r][c] = pred;
+    if (!pred) {
+      ok = false;
+      if (c) plane_free(&rp);
+      break;
+    }
+    // Motion vector in units of 1 / (4 << shift) pixels of this plane.
+    const int fx_den = 4 << (c ? shift_w : 0);
+    const int fy_den = 4 << (c ? shift_h : 0);
+    // Each 8x8 luma block covers (8 >> shift) chroma pixels.
+    const int bw_c = TF_BLOCK >> (c ? shift_w : 0);
+    const int bh_c = TF_BLOCK >> (c ? shift_h : 0);
+    const int sh_x = c ? 2 + shift_w : 2;  // log2(fx_den)
+    const int sh_y = c ? 2 + shift_h : 2;
+    for (int by = 0; by < ph; by += bh_c) {
+      for (int bx = 0; bx < pw; bx += bw_c) {
+        const int lx = c ? bx << shift_w : bx;
+        const int ly = c ? by << shift_h : by;
+        const tf_mv *mv = &mvs[(ly / TF_BLOCK) * wbf + lx / TF_BLOCK];
+        const int ix = mv->x >> sh_x;  // floor
+        const int iy = mv->y >> sh_y;
+        const int fx = mv->x - ix * fx_den;
+        const int fy = mv->y - iy * fy_den;
+        const int w00 = (fx_den - fx) * (fy_den - fy), w10 = fx * (fy_den - fy);
+        const int w01 = (fx_den - fx) * fy, w11 = fx * fy;
+        const int shift = sh_x + sh_y;
+        const int round = 1 << (shift - 1);
+        const int x_end = MIN(pw, bx + bw_c);
+        const int y_end = MIN(ph, by + bh_c);
+        for (int y = by; y < y_end; y++) {
+          const int yy = CLIP(-TF_PAD + 1, rp.h + TF_PAD - 2, y + iy);
+          const kvz_pixel *r0 = &rp.p[yy * rp.stride];
+          const kvz_pixel *r1 = r0 + rp.stride;
+          kvz_pixel *dst = &pred[y * pw];
+          if (bx + ix > -TF_PAD + 1 && x_end + ix < rp.w + TF_PAD - 2) {
+            for (int x = bx; x < x_end; x++) {
+              const int xx = x + ix;
+              dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
+            }
+          } else {
+            for (int x = bx; x < x_end; x++) {
+              const int xx = CLIP(-TF_PAD + 1, rp.w + TF_PAD - 2, x + ix);
+              dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
+            }
+          }
+        }
+      }
+    }
+    if (c) plane_free(&rp);
+  }
+  free(mvs);
+  for (int l = 0; l < 3; l++) plane_free(&ref_l[l]);
+  if (!ok) return;
+
+  // Block error and noise as in the VTM temporal filter.
+  int *blk_error = MALLOC(int, wbf * hbf);
+  int *blk_noise = MALLOC(int, wbf * hbf);
+  t->blk_error[r] = blk_error;
+  t->blk_noise[r] = blk_noise;
+  if (!blk_error || !blk_noise) return;
+  const kvz_pixel *pr = t->pred[r][0];
+  for (int by = 0; by < hbf; by++) {
+    for (int bx = 0; bx < wbf; bx++) {
+      const int x0 = bx * TF_BLOCK, y0 = by * TF_BLOCK;
+      const int bw = MIN(TF_BLOCK, w - x0), bh = MIN(TF_BLOCK, h - y0);
+      int64_t sum = 0, sum2 = 0, sse = 0, diffsum = 0, var_d = 0;
+      for (int y = y0; y < y0 + bh; y++) {
+        for (int x = x0; x < x0 + bw; x++) {
+          const int o = orig->y[y * orig->stride + x];
+          const int d = o - pr[y * w + x];
+          sum += o;
+          sum2 += o * o;
+          sse += d * d;
+          if (x + 1 < x0 + bw && y + 1 < y0 + bh) {
+            const int dr = orig->y[y * orig->stride + x + 1] - pr[y * w + x + 1];
+            const int dd = orig->y[(y + 1) * orig->stride + x] - pr[(y + 1) * w + x];
+            var_d += d * d;
+            diffsum += (dr - d) * (dr - d) + (dd - d) * (dd - d);
+          }
+        }
+      }
+      const int n = bw * bh;
+      const double var_o = (double)sum2 - (double)sum * (double)sum / n;
+      const double scale = (double)(1 << (2 * (KVZ_BIT_DEPTH - 8)));
+      blk_noise[by * wbf + bx] = (int)((15.0 * 2.0 * (double)var_d / scale + 5.0) / ((double)diffsum / scale + 5.0) + 0.5);
+      blk_error[by * wbf + bx] = (int)(20.0 * (((double)sse / scale + 5.0) / (var_o / scale + 5.0)) +
+                                       ((double)sse / scale / n) / 50.0 + 0.5);
+    }
+  }
+  t->ok[r] = true;
+}
+
+
+/**
+ * \brief Filter the rows of 8x8 luma blocks [by_start, by_end) of all planes.
+ */
+static void tf_filter_rows(tf_ctx *t, int by_start, int by_end)
+{
+  const kvz_picture *orig = t->orig;
+  const int wbf = t->wbf, num_refs = t->num_refs, max_val = t->max_val;
+  for (int c = 0; c < t->num_planes; c++) {
+    const int sx = c ? t->shift_w : 0, sy = c ? t->shift_h : 0;
+    const int pw = t->w >> sx;
+    const int ph = t->h >> sy;
+    const kvz_pixel *src = orig->data[c];
+    const int src_stride = c ? orig->stride_c : orig->stride;
+    kvz_pixel *dst = t->out->data[c];
+    const int dst_stride = c ? t->out->stride_c : t->out->stride;
+    const float *lut = t->lut[c];
+    const int lut_size = t->lut_size;
+
+    // The weights of a reference depend on the 8x8 luma block only, so
+    // they are computed once per block.
+    const int bw_c = TF_BLOCK >> sx;
+    const int bh_c = TF_BLOCK >> sy;
+    for (int by = by_start; by < by_end; by++) {
+      const int y0 = by * bh_c;
+      if (y0 >= ph) break;
+      for (int x0 = 0; x0 < pw; x0 += bw_c) {
+        const int b = by * wbf + (x0 << sx) / TF_BLOCK;
+        int min_error = INT32_MAX;
+        for (int r = 0; r < num_refs; r++) {
+          min_error = MIN(min_error, t->blk_error[r][b]);
+        }
+        float rw[TF_MAX_REFS];
+        const float *rlut[TF_MAX_REFS];
+        for (int r = 0; r < num_refs; r++) {
+          const int noise = t->blk_noise[r][b];
+          const int error = t->blk_error[r][b];
+          double ww = 1.0;
+          ww *= noise < 25 ? 1.0 : 1.2;
+          ww *= error < 50 ? 1.2 : (error > 100 ? 0.8 : 1.0);
+          ww *= (min_error + 1) / (double)(error + 1);
+          // sw = (noise < 25 ? 1.3 : 0.8) * (error < 50 ? 1.3 : 1.0)
+          const int sw_idx = noise < 25 ? (error < 50 ? 3 : 2) : (error < 50 ? 1 : 0);
+          rw[r] = (float)(t->rw_strength[r] * ww);
+          rlut[r] = &lut[sw_idx * lut_size + max_val];
+        }
+        const int y_end = MIN(ph, y0 + bh_c);
+        const int x_end = MIN(pw, x0 + bw_c);
+        for (int y = y0; y < y_end; y++) {
+          for (int x = x0; x < x_end; x++) {
+            const int org_val = src[y * src_stride + x];
+            float sum = (float)org_val;
+            float wsum = 1.0f;
+            for (int r = 0; r < num_refs; r++) {
+              const int ref_val = t->pred[r][c][y * pw + x];
+              const float wgt = rw[r] * rlut[r][ref_val - org_val];
+              sum += wgt * ref_val;
+              wsum += wgt;
+            }
+            dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5f));
+          }
+        }
+      }
+    }
+  }
+}
+
+
+typedef struct {
+  tf_ctx *t;
+  int kind;    //!< 0: process references, 1: filter rows
+  int first, last, step;
+} tf_job;
+
+
+static void *tf_job_run(void *arg)
+{
+  tf_job *j = arg;
+  if (j->kind == 0) {
+    for (int r = j->first; r < j->last; r += j->step) tf_process_ref(j->t, r);
+  } else {
+    tf_filter_rows(j->t, j->first, j->last);
+  }
+  return NULL;
+}
+
+
+/**
+ * \brief Run the jobs, using up to num_jobs - 1 extra threads. The last job
+ *        runs on the calling thread. Falls back to running the jobs serially
+ *        if a thread can not be created.
+ */
+static void tf_run_jobs(tf_job *jobs, int num_jobs)
+{
+  pthread_t th[TF_MAX_JOBS];
+  bool started[TF_MAX_JOBS];
+  for (int i = 0; i < num_jobs - 1; i++) {
+    started[i] = pthread_create(&th[i], NULL, tf_job_run, &jobs[i]) == 0;
+    if (!started[i]) tf_job_run(&jobs[i]);
+  }
+  tf_job_run(&jobs[num_jobs - 1]);
+  for (int i = 0; i < num_jobs - 1; i++) {
+    if (started[i]) pthread_join(th[i], NULL);
+  }
+}
+
+
 kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
                                  const kvz_picture *const *refs,
                                  const int *offsets,
                                  int num_refs,
                                  int range,
                                  double strength,
-                                 int qp)
+                                 int qp,
+                                 int threads)
 {
   static const double ref_strengths[3][4] = {
     // abs(offset) 1, 2, 3, 4
@@ -360,236 +615,94 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
 
   num_refs = MIN(num_refs, TF_MAX_REFS);
   if (num_refs <= 0 || qp <= sigma_zero_point) return NULL;
+  threads = CLIP(1, TF_MAX_JOBS, threads);
 
-  const int w = orig->width, h = orig->height;
-  const int num_planes = orig->chroma_format == KVZ_CSP_400 ? 1 : 3;
-  const int shift_w = (orig->chroma_format == KVZ_CSP_420 || KVZ_IS_422(orig->chroma_format)) ? 1 : 0;
-  const int shift_h = orig->chroma_format == KVZ_CSP_420 ? 1 : 0;
+  tf_ctx t;
+  memset(&t, 0, sizeof(t));
+  t.orig = orig;
+  t.refs = refs;
+  t.num_refs = num_refs;
+  t.w = orig->width;
+  t.h = orig->height;
+  t.num_planes = orig->chroma_format == KVZ_CSP_400 ? 1 : 3;
+  t.shift_w = (orig->chroma_format == KVZ_CSP_420 || KVZ_IS_422(orig->chroma_format)) ? 1 : 0;
+  t.shift_h = orig->chroma_format == KVZ_CSP_420 ? 1 : 0;
+  t.wbf = CEILDIV(t.w, TF_BLOCK);
+  t.hbf = CEILDIV(t.h, TF_BLOCK);
 
-  kvz_picture *out = kvz_image_alloc(orig->chroma_format, w, h);
+  kvz_picture *out = kvz_image_alloc(orig->chroma_format, t.w, t.h);
   if (!out) return NULL;
   out->pts = orig->pts;
   out->dts = orig->dts;
   out->interlacing = orig->interlacing;
+  t.out = out;
 
   // Planes for the motion search: full, half and quarter resolution luma.
   tf_plane org_l[3];
   memset(org_l, 0, sizeof(org_l));
-  bool ok = plane_from_picture(&org_l[0], orig->y, w, h, orig->stride) &&
+  bool ok = plane_from_picture(&org_l[0], orig->y, t.w, t.h, orig->stride) &&
             plane_downsample(&org_l[1], &org_l[0]) &&
             plane_downsample(&org_l[2], &org_l[1]);
+  t.org_l = org_l;
 
-  // Motion compensated predictions of each neighbour for each plane.
-  kvz_pixel *pred[TF_MAX_REFS][3];
-  memset(pred, 0, sizeof(pred));
-  // Per 8x8 block prediction error and noise estimate of each neighbour.
-  const int wbf = CEILDIV(w, TF_BLOCK), hbf = CEILDIV(h, TF_BLOCK);
-  int *blk_error[TF_MAX_REFS];
-  int *blk_noise[TF_MAX_REFS];
-  memset(blk_error, 0, sizeof(blk_error));
-  memset(blk_noise, 0, sizeof(blk_noise));
-
-  for (int r = 0; ok && r < num_refs; r++) {
-    const kvz_picture *ref = refs[r];
-    tf_plane ref_l[3];
-    memset(ref_l, 0, sizeof(ref_l));
-    ok = plane_from_picture(&ref_l[0], ref->y, w, h, ref->stride) &&
-         plane_downsample(&ref_l[1], &ref_l[0]) &&
-         plane_downsample(&ref_l[2], &ref_l[1]);
-    tf_mv *mvs = ok ? motion_estimation(org_l, ref_l) : NULL;
-    ok = ok && mvs;
-    const int wbf = CEILDIV(w, TF_BLOCK);
-
-    for (int c = 0; ok && c < num_planes; c++) {
-      const int pw = c ? w >> shift_w : w;
-      const int ph = c ? h >> shift_h : h;
-      const int stride = c ? ref->stride_c : ref->stride;
-      tf_plane rp;
-      if (c == 0) {
-        rp = ref_l[0];
-      } else if (!plane_from_picture(&rp, ref->data[c], pw, ph, stride)) {
-        ok = false;
-        break;
-      }
-      pred[r][c] = MALLOC(kvz_pixel, pw * ph);
-      if (!pred[r][c]) {
-        ok = false;
-        if (c) plane_free(&rp);
-        break;
-      }
-      // Motion vector in units of 1 / (4 << shift) pixels of this plane.
-      const int fx_den = 4 << (c ? shift_w : 0);
-      const int fy_den = 4 << (c ? shift_h : 0);
-      // Each 8x8 luma block covers (8 >> shift) chroma pixels.
-      const int bw_c = TF_BLOCK >> (c ? shift_w : 0);
-      const int bh_c = TF_BLOCK >> (c ? shift_h : 0);
-      const int sh_x = c ? 2 + shift_w : 2;  // log2(fx_den)
-      const int sh_y = c ? 2 + shift_h : 2;
-      for (int by = 0; by < ph; by += bh_c) {
-        for (int bx = 0; bx < pw; bx += bw_c) {
-          const int lx = c ? bx << shift_w : bx;
-          const int ly = c ? by << shift_h : by;
-          const tf_mv *mv = &mvs[(ly / TF_BLOCK) * wbf + lx / TF_BLOCK];
-          const int ix = mv->x >> sh_x;  // floor
-          const int iy = mv->y >> sh_y;
-          const int fx = mv->x - ix * fx_den;
-          const int fy = mv->y - iy * fy_den;
-          const int w00 = (fx_den - fx) * (fy_den - fy), w10 = fx * (fy_den - fy);
-          const int w01 = (fx_den - fx) * fy, w11 = fx * fy;
-          const int shift = sh_x + sh_y;
-          const int round = 1 << (shift - 1);
-          const int x_end = MIN(pw, bx + bw_c);
-          const int y_end = MIN(ph, by + bh_c);
-          for (int y = by; y < y_end; y++) {
-            const int yy = CLIP(-TF_PAD + 1, rp.h + TF_PAD - 2, y + iy);
-            const kvz_pixel *r0 = &rp.p[yy * rp.stride];
-            const kvz_pixel *r1 = r0 + rp.stride;
-            kvz_pixel *dst = &pred[r][c][y * pw];
-            if (bx + ix > -TF_PAD + 1 && x_end + ix < rp.w + TF_PAD - 2) {
-              for (int x = bx; x < x_end; x++) {
-                const int xx = x + ix;
-                dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
-              }
-            } else {
-              for (int x = bx; x < x_end; x++) {
-                const int xx = CLIP(-TF_PAD + 1, rp.w + TF_PAD - 2, x + ix);
-                dst[x] = (kvz_pixel)((w00 * r0[xx] + w10 * r0[xx + 1] + w01 * r1[xx] + w11 * r1[xx + 1] + round) >> shift);
-              }
-            }
-          }
-        }
-      }
-      if (c) plane_free(&rp);
+  // The neighbours are processed in parallel. The results do not depend on
+  // the number of threads.
+  if (ok) {
+    tf_job jobs[TF_MAX_JOBS];
+    const int nj = MIN(threads, num_refs);
+    for (int i = 0; i < nj; i++) {
+      jobs[i] = (tf_job){ &t, 0, i, num_refs, nj };
     }
-    free(mvs);
-    for (int l = 0; l < 3; l++) plane_free(&ref_l[l]);
-
-    if (ok) {
-      // Block error and noise as in the VTM temporal filter.
-      blk_error[r] = MALLOC(int, wbf * hbf);
-      blk_noise[r] = MALLOC(int, wbf * hbf);
-      if (!blk_error[r] || !blk_noise[r]) { ok = false; break; }
-      const kvz_pixel *pr = pred[r][0];
-      for (int by = 0; by < hbf; by++) {
-        for (int bx = 0; bx < wbf; bx++) {
-          const int x0 = bx * TF_BLOCK, y0 = by * TF_BLOCK;
-          const int bw = MIN(TF_BLOCK, w - x0), bh = MIN(TF_BLOCK, h - y0);
-          int64_t sum = 0, sum2 = 0, sse = 0, diffsum = 0, var_d = 0;
-          for (int y = y0; y < y0 + bh; y++) {
-            for (int x = x0; x < x0 + bw; x++) {
-              const int o = orig->y[y * orig->stride + x];
-              const int d = o - pr[y * w + x];
-              sum += o;
-              sum2 += o * o;
-              sse += d * d;
-              if (x + 1 < x0 + bw && y + 1 < y0 + bh) {
-                const int dr = orig->y[y * orig->stride + x + 1] - pr[y * w + x + 1];
-                const int dd = orig->y[(y + 1) * orig->stride + x] - pr[(y + 1) * w + x];
-                var_d += d * d;
-                diffsum += (dr - d) * (dr - d) + (dd - d) * (dd - d);
-              }
-            }
-          }
-          const int n = bw * bh;
-          const double var_o = (double)sum2 - (double)sum * (double)sum / n;
-          const double scale = (double)(1 << (2 * (KVZ_BIT_DEPTH - 8)));
-          blk_noise[r][by * wbf + bx] = (int)((15.0 * 2.0 * (double)var_d / scale + 5.0) / ((double)diffsum / scale + 5.0) + 0.5);
-          blk_error[r][by * wbf + bx] = (int)(20.0 * (((double)sse / scale + 5.0) / (var_o / scale + 5.0)) +
-                                              ((double)sse / scale / n) / 50.0 + 0.5);
-        }
-      }
-    }
+    tf_run_jobs(jobs, nj);
+    for (int r = 0; r < num_refs; r++) ok = ok && t.ok[r];
   }
 
+  float *lut = NULL;
   if (ok) {
     // Strength of each neighbour.
     const int strength_idx = num_refs == 2 * range ? 0 : (num_refs == range ? 1 : 2);
-    double ref_strength[TF_MAX_REFS];
     for (int r = 0; r < num_refs; r++) {
-      ref_strength[r] = ref_strengths[strength_idx][MIN(3, abs(offsets[r]) - 1)];
+      t.rw_strength[r] = (float)ref_strengths[strength_idx][MIN(3, abs(offsets[r]) - 1)];
     }
 
-    const int max_val = (1 << KVZ_BIT_DEPTH) - 1;
+    t.max_val = (1 << KVZ_BIT_DEPTH) - 1;
     const double bd_scale = (double)(1 << (KVZ_BIT_DEPTH - 8));
-    const int lut_size = 2 * max_val + 1;
-    float *lut = MALLOC(float, 5 * lut_size);
+    t.lut_size = 2 * t.max_val + 1;
+    lut = MALLOC(float, 5 * t.lut_size * t.num_planes);
+    ok = lut != NULL;
 
-    for (int c = 0; c < num_planes && lut; c++) {
-      const int pw = c ? w >> shift_w : w;
-      const int ph = c ? h >> shift_h : h;
-      const kvz_pixel *src = orig->data[c];
-      const int src_stride = c ? orig->stride_c : orig->stride;
-      kvz_pixel *dst = out->data[c];
-      const int dst_stride = c ? out->stride_c : out->stride;
-
+    for (int c = 0; c < t.num_planes && lut; c++) {
       const double sigma_sq = c == 0 ?
         (qp - sigma_zero_point) * (qp - sigma_zero_point) * sigma_multiplier : 30.0 * 30.0;
       const double weight_scaling = strength * (c == 0 ? 0.4 : chroma_factor);
       // LUTs for the sigma scalings 0.8, 1.04, 1.3 and 1.69 (and 1.0 when
       // the block adaptation is not used).
       static const double sw_values[5] = { 0.8, 1.04, 1.3, 1.69, 1.0 };
+      float *l = &lut[5 * t.lut_size * c];
       for (int i = 0; i < 5; i++) {
-        for (int d = -max_val; d <= max_val; d++) {
+        for (int d = -t.max_val; d <= t.max_val; d++) {
           const double diff = d / bd_scale;
-          lut[i * lut_size + d + max_val] = (float)(weight_scaling * exp(-diff * diff / (2.0 * sw_values[i] * sigma_sq)));
+          l[i * t.lut_size + d + t.max_val] = (float)(weight_scaling * exp(-diff * diff / (2.0 * sw_values[i] * sigma_sq)));
         }
       }
-
-      // The weights of a reference depend on the 8x8 luma block only, so
-      // they are computed once per block.
-      const int bw_c = TF_BLOCK >> (c ? shift_w : 0);
-      const int bh_c = TF_BLOCK >> (c ? shift_h : 0);
-      for (int y0 = 0; y0 < ph; y0 += bh_c) {
-        for (int x0 = 0; x0 < pw; x0 += bw_c) {
-          const int b = ((c ? y0 << shift_h : y0) / TF_BLOCK) * wbf + (c ? x0 << shift_w : x0) / TF_BLOCK;
-          int min_error = INT32_MAX;
-          for (int r = 0; r < num_refs; r++) {
-            if (blk_error[r]) min_error = MIN(min_error, blk_error[r][b]);
-          }
-          float rw[TF_MAX_REFS];
-          const float *rlut[TF_MAX_REFS];
-          for (int r = 0; r < num_refs; r++) {
-            double ww = 1.0;
-            int sw_idx = 4;
-            if (blk_error[r]) {
-              const int noise = blk_noise[r][b];
-              const int error = blk_error[r][b];
-              ww *= noise < 25 ? 1.0 : 1.2;
-              ww *= error < 50 ? 1.2 : (error > 100 ? 0.8 : 1.0);
-              ww *= (min_error + 1) / (double)(error + 1);
-              // sw = (noise < 25 ? 1.3 : 0.8) * (error < 50 ? 1.3 : 1.0)
-              sw_idx = noise < 25 ? (error < 50 ? 3 : 2) : (error < 50 ? 1 : 0);
-            }
-            rw[r] = (float)(ref_strength[r] * ww);
-            rlut[r] = &lut[sw_idx * lut_size + max_val];
-          }
-          const int y_end = MIN(ph, y0 + bh_c);
-          const int x_end = MIN(pw, x0 + bw_c);
-          for (int y = y0; y < y_end; y++) {
-            for (int x = x0; x < x_end; x++) {
-              const int org_val = src[y * src_stride + x];
-              float sum = (float)org_val;
-              float wsum = 1.0f;
-              for (int r = 0; r < num_refs; r++) {
-                const int ref_val = pred[r][c][y * pw + x];
-                const float wgt = rw[r] * rlut[r][ref_val - org_val];
-                sum += wgt * ref_val;
-                wsum += wgt;
-              }
-              dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5f));
-            }
-          }
-        }
-      }
+      t.lut[c] = l;
     }
-    if (!lut) ok = false;
-    free(lut);
   }
+  if (ok) {
+    // Filter bands of block rows in parallel.
+    tf_job jobs[TF_MAX_JOBS];
+    const int nj = MIN(threads, t.hbf);
+    for (int i = 0; i < nj; i++) {
+      jobs[i] = (tf_job){ &t, 1, t.hbf * i / nj, t.hbf * (i + 1) / nj, 1 };
+    }
+    tf_run_jobs(jobs, nj);
+  }
+  free(lut);
 
   for (int r = 0; r < TF_MAX_REFS; r++) {
-    for (int c = 0; c < 3; c++) free(pred[r][c]);
-    free(blk_error[r]);
-    free(blk_noise[r]);
+    for (int c = 0; c < 3; c++) free(t.pred[r][c]);
+    free(t.blk_error[r]);
+    free(t.blk_noise[r]);
   }
   for (int l = 0; l < 3; l++) plane_free(&org_l[l]);
 

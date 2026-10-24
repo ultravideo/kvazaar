@@ -844,7 +844,8 @@ static void mctf_filter(kvz_lookahead *la, la_frame *f)
     }
   }
   const double strength = (f->index - f->segment_start) % 16 == 0 ? 1.5 : 0.95;
-  f->filtered = kvz_temporal_filter(f->pic, refs, offsets, n, LA_MCTF_RANGE, strength, la->mctf_qp);
+  f->filtered = kvz_temporal_filter(f->pic, refs, offsets, n, LA_MCTF_RANGE, strength, la->mctf_qp,
+                                    MAX(1, la->encoder->cfg.threads));
 }
 
 

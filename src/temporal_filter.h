@@ -57,6 +57,8 @@
  * \param range     maximum distance used (the strength table depends on it)
  * \param strength  overall filter strength
  * \param qp        QP used for the filter strength
+ * \param threads   maximum number of threads to use, the result does not
+ *                  depend on it
  * \return newly allocated filtered picture, or NULL on failure
  */
 kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
@@ -65,6 +67,7 @@ kvz_picture *kvz_temporal_filter(const kvz_picture *orig,
                                  int num_refs,
                                  int range,
                                  double strength,
-                                 int qp);
+                                 int qp,
+                                 int threads);
 
 #endif // TEMPORAL_FILTER_H_
