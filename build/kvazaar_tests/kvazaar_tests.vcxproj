@@ -106,6 +106,7 @@
     <ClCompile Include="..\..\tests\sad_tests.c" />
     <ClCompile Include="..\..\tests\satd_tests.c" />
     <ClCompile Include="..\..\tests\speed_tests.c" />
+    <ClCompile Include="..\..\tests\temporal_filter_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
   </ItemGroup>
   <ItemGroup>

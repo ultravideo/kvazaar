@@ -1824,6 +1824,251 @@ static unsigned bilinear_ssd_avx2(const kvz_pixel *org, int org_stride,
   return (unsigned)_mm_cvtsi128_si32(s);
 }
 
+
+static INLINE __m128i load_4x2_u8(const kvz_pixel *a, const kvz_pixel *b)
+{
+  int32_t x, y;
+  memcpy(&x, a, 4);
+  memcpy(&y, b, 4);
+  return _mm_unpacklo_epi32(_mm_cvtsi32_si128(x), _mm_cvtsi32_si128(y));
+}
+
+
+static void tf_bilinear_pred_avx2(kvz_pixel *dst, int dst_stride,
+                                  const kvz_pixel *ref, int ref_stride,
+                                  int width, int height,
+                                  int w00, int w10, int w01, int w11, int shift)
+{
+  if (width != 8 && width != 4) {
+    kvz_tf_bilinear_pred_generic(dst, dst_stride, ref, ref_stride, width, height,
+                                 w00, w10, w01, w11, shift);
+    return;
+  }
+  const __m256i v00 = _mm256_set1_epi16((int16_t)w00);
+  const __m256i v10 = _mm256_set1_epi16((int16_t)w10);
+  const __m256i v01 = _mm256_set1_epi16((int16_t)w01);
+  const __m256i v11 = _mm256_set1_epi16((int16_t)w11);
+  const __m256i rnd = _mm256_set1_epi16((int16_t)(1 << (shift - 1)));
+  const __m128i sh = _mm_cvtsi32_si128(shift);
+  const int rows = width == 8 ? 2 : 4;
+  int y = 0;
+  for (; y + rows <= height; y += rows) {
+    const kvz_pixel *r0 = &ref[y * ref_stride];
+    __m256i a, b, c, d;
+    if (width == 8) {
+      const kvz_pixel *r1 = r0 + ref_stride;
+      const kvz_pixel *r2 = r1 + ref_stride;
+#define LOAD2(p, q) _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)(p)), \
+                                                              _mm_loadl_epi64((const __m128i *)(q))))
+      a = LOAD2(r0, r1);
+      b = LOAD2(r0 + 1, r1 + 1);
+      c = LOAD2(r1, r2);
+      d = LOAD2(r1 + 1, r2 + 1);
+#undef LOAD2
+    } else {
+      const kvz_pixel *rr[5];
+      for (int i = 0; i < 5; i++) rr[i] = r0 + i * ref_stride;
+#define LOAD4(o) _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(load_4x2_u8(rr[0 + (o)], rr[1 + (o)]), \
+                                                           load_4x2_u8(rr[2 + (o)], rr[3 + (o)])))
+#define LOAD4X(o) _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(load_4x2_u8(rr[0 + (o)] + 1, rr[1 + (o)] + 1), \
+                                                            load_4x2_u8(rr[2 + (o)] + 1, rr[3 + (o)] + 1)))
+      a = LOAD4(0);
+      b = LOAD4X(0);
+      c = LOAD4(1);
+      d = LOAD4X(1);
+#undef LOAD4
+#undef LOAD4X
+    }
+    __m256i p = _mm256_add_epi16(_mm256_mullo_epi16(a, v00), _mm256_mullo_epi16(b, v10));
+    p = _mm256_add_epi16(p, _mm256_mullo_epi16(c, v01));
+    p = _mm256_add_epi16(p, _mm256_mullo_epi16(d, v11));
+    p = _mm256_srl_epi16(_mm256_add_epi16(p, rnd), sh);
+    const __m256i packed = _mm256_packus_epi16(p, p);
+    const __m128i lo = _mm256_castsi256_si128(packed);
+    const __m128i hi = _mm256_extracti128_si256(packed, 1);
+    if (width == 8) {
+      _mm_storel_epi64((__m128i *)&dst[y * dst_stride], lo);
+      _mm_storel_epi64((__m128i *)&dst[(y + 1) * dst_stride], hi);
+    } else {
+      const int32_t v0 = _mm_cvtsi128_si32(lo), v1 = _mm_extract_epi32(lo, 1);
+      const int32_t v2 = _mm_cvtsi128_si32(hi), v3 = _mm_extract_epi32(hi, 1);
+      memcpy(&dst[y * dst_stride], &v0, 4);
+      memcpy(&dst[(y + 1) * dst_stride], &v1, 4);
+      memcpy(&dst[(y + 2) * dst_stride], &v2, 4);
+      memcpy(&dst[(y + 3) * dst_stride], &v3, 4);
+    }
+  }
+  if (y < height) {
+    kvz_tf_bilinear_pred_generic(&dst[y * dst_stride], dst_stride, &ref[y * ref_stride], ref_stride,
+                                 width, height - y, w00, w10, w01, w11, shift);
+  }
+}
+
+
+static INLINE int32_t hsum_epi32_128(__m128i v)
+{
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2)));
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(2, 3, 0, 1)));
+  return _mm_cvtsi128_si32(v);
+}
+
+
+static void tf_block_stats_avx2(const kvz_pixel *org, int org_stride,
+                                const kvz_pixel *pred, int pred_stride,
+                                int width, int height, int64_t out[5])
+{
+  if (width != 8 || height != 8) {
+    kvz_tf_block_stats_generic(org, org_stride, pred, pred_stride, width, height, out);
+    return;
+  }
+  const __m128i ones = _mm_set1_epi16(1);
+  // Lanes 0..6: the pixels that have a right neighbour.
+  const __m128i mask7 = _mm_setr_epi16(-1, -1, -1, -1, -1, -1, -1, 0);
+  __m128i o[8], d[8];
+  for (int y = 0; y < 8; y++) {
+    o[y] = _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)&org[y * org_stride]));
+    const __m128i p = _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)&pred[y * pred_stride]));
+    d[y] = _mm_sub_epi16(o[y], p);
+  }
+  __m128i sum = _mm_setzero_si128(), sum2 = _mm_setzero_si128(), sse = _mm_setzero_si128();
+  __m128i var_d = _mm_setzero_si128(), diff = _mm_setzero_si128();
+  for (int y = 0; y < 8; y++) {
+    sum = _mm_add_epi32(sum, _mm_madd_epi16(o[y], ones));
+    sum2 = _mm_add_epi32(sum2, _mm_madd_epi16(o[y], o[y]));
+    sse = _mm_add_epi32(sse, _mm_madd_epi16(d[y], d[y]));
+    if (y < 7) {
+      const __m128i dm = _mm_and_si128(d[y], mask7);
+      var_d = _mm_add_epi32(var_d, _mm_madd_epi16(dm, dm));
+      const __m128i dh = _mm_and_si128(_mm_sub_epi16(_mm_srli_si128(d[y], 2), d[y]), mask7);
+      const __m128i dv = _mm_and_si128(_mm_sub_epi16(d[y + 1], d[y]), mask7);
+      diff = _mm_add_epi32(diff, _mm_add_epi32(_mm_madd_epi16(dh, dh), _mm_madd_epi16(dv, dv)));
+    }
+  }
+  out[0] = hsum_epi32_128(sum);
+  out[1] = hsum_epi32_128(sum2);
+  out[2] = hsum_epi32_128(sse);
+  out[3] = hsum_epi32_128(var_d);
+  out[4] = hsum_epi32_128(diff);
+}
+
+
+/** \brief Filter 8 pixels given as 8 bytes of src and of each prediction. */
+static INLINE __m128i tf_filter_8px(__m128i src8, const __m128i *pred8, int num_refs,
+                                    const float *weights, const float *const *luts,
+                                    __m256i max_val)
+{
+  const __m256i o = _mm256_cvtepu8_epi32(src8);
+  __m256 sum = _mm256_cvtepi32_ps(o);
+  __m256 wsum = _mm256_set1_ps(1.0f);
+  for (int r = 0; r < num_refs; r++) {
+    const __m256i p = _mm256_cvtepu8_epi32(pred8[r]);
+    const __m256 lut = _mm256_i32gather_ps(luts[r], _mm256_sub_epi32(p, o), 4);
+    const __m256 wgt = _mm256_mul_ps(_mm256_set1_ps(weights[r]), lut);
+    sum = _mm256_add_ps(sum, _mm256_mul_ps(wgt, _mm256_cvtepi32_ps(p)));
+    wsum = _mm256_add_ps(wsum, wgt);
+  }
+  __m256i res = _mm256_cvttps_epi32(_mm256_add_ps(_mm256_div_ps(sum, wsum), _mm256_set1_ps(0.5f)));
+  res = _mm256_min_epi32(_mm256_max_epi32(res, _mm256_setzero_si256()), max_val);
+  const __m256i w16 = _mm256_packus_epi32(res, res);
+  const __m256i b8 = _mm256_packus_epi16(w16, w16);
+  return _mm_unpacklo_epi32(_mm256_castsi256_si128(b8), _mm256_extracti128_si256(b8, 1));
+}
+
+
+static void tf_filter_block_avx2(kvz_pixel *dst, int dst_stride,
+                                 const kvz_pixel *src, int src_stride,
+                                 const kvz_pixel *const *preds, int pred_stride,
+                                 int num_refs, const float *weights,
+                                 const float *const *luts,
+                                 int width, int height, int max_val)
+{
+  if (num_refs > 8 || !((width % 8 == 0) || (width == 4 && height % 2 == 0))) {
+    kvz_tf_filter_block_generic(dst, dst_stride, src, src_stride, preds, pred_stride,
+                                num_refs, weights, luts, width, height, max_val);
+    return;
+  }
+  const __m256i maxv = _mm256_set1_epi32(max_val);
+  __m128i p8[8];
+  if (width == 4) {
+    for (int y = 0; y < height; y += 2) {
+      for (int r = 0; r < num_refs; r++) {
+        p8[r] = load_4x2_u8(&preds[r][y * pred_stride], &preds[r][(y + 1) * pred_stride]);
+      }
+      const __m128i res = tf_filter_8px(load_4x2_u8(&src[y * src_stride], &src[(y + 1) * src_stride]),
+                                        p8, num_refs, weights, luts, maxv);
+      const int32_t v0 = _mm_cvtsi128_si32(res), v1 = _mm_extract_epi32(res, 1);
+      memcpy(&dst[y * dst_stride], &v0, 4);
+      memcpy(&dst[(y + 1) * dst_stride], &v1, 4);
+    }
+    return;
+  }
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x += 8) {
+      for (int r = 0; r < num_refs; r++) {
+        p8[r] = _mm_loadl_epi64((const __m128i *)&preds[r][y * pred_stride + x]);
+      }
+      const __m128i res = tf_filter_8px(_mm_loadl_epi64((const __m128i *)&src[y * src_stride + x]),
+                                        p8, num_refs, weights, luts, maxv);
+      _mm_storel_epi64((__m128i *)&dst[y * dst_stride + x], res);
+    }
+  }
+}
+
+
+static void bilinear_ssd_multi_avx2(const kvz_pixel *org, int org_stride,
+                                    const kvz_pixel *ref, int ref_stride,
+                                    int size, const int *mv_x, const int *mv_y,
+                                    int num, unsigned *out)
+{
+  if (size != 8) {
+    kvz_bilinear_ssd_multi_generic(org, org_stride, ref, ref_stride, size, mv_x, mv_y, num, out);
+    return;
+  }
+#define LOAD2(p, q) _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)(p)), \
+                                                            _mm_loadl_epi64((const __m128i *)(q))))
+  // The original block is loaded once, two rows per register.
+  __m256i o[4];
+  for (int i = 0; i < 4; i++) {
+    o[i] = LOAD2(&org[2 * i * org_stride], &org[(2 * i + 1) * org_stride]);
+  }
+  const __m256i rnd = _mm256_set1_epi16(8);
+  for (int n = 0; n < num; n++) {
+    const int fx = mv_x[n] & 3, fy = mv_y[n] & 3;
+    const kvz_pixel *r = ref + (mv_y[n] >> 2) * ref_stride + (mv_x[n] >> 2);
+    __m256i acc = _mm256_setzero_si256();
+    if (!fx && !fy) {
+      for (int i = 0; i < 4; i++) {
+        const kvz_pixel *r0 = &r[2 * i * ref_stride];
+        const __m256i diff = _mm256_sub_epi16(o[i], LOAD2(r0, r0 + ref_stride));
+        acc = _mm256_add_epi32(acc, _mm256_madd_epi16(diff, diff));
+      }
+    } else {
+      const __m256i w00 = _mm256_set1_epi16((int16_t)((4 - fx) * (4 - fy)));
+      const __m256i w10 = _mm256_set1_epi16((int16_t)(fx * (4 - fy)));
+      const __m256i w01 = _mm256_set1_epi16((int16_t)((4 - fx) * fy));
+      const __m256i w11 = _mm256_set1_epi16((int16_t)(fx * fy));
+      for (int i = 0; i < 4; i++) {
+        const kvz_pixel *r0 = &r[2 * i * ref_stride];
+        const kvz_pixel *r1 = r0 + ref_stride;
+        const kvz_pixel *r2 = r1 + ref_stride;
+        const __m256i a = LOAD2(r0, r1);
+        const __m256i b = LOAD2(r0 + 1, r1 + 1);
+        const __m256i c = LOAD2(r1, r2);
+        const __m256i d = LOAD2(r1 + 1, r2 + 1);
+        __m256i p = _mm256_add_epi16(_mm256_mullo_epi16(a, w00), _mm256_mullo_epi16(b, w10));
+        p = _mm256_add_epi16(p, _mm256_mullo_epi16(c, w01));
+        p = _mm256_add_epi16(p, _mm256_mullo_epi16(d, w11));
+        p = _mm256_srli_epi16(_mm256_add_epi16(p, rnd), 4);
+        const __m256i diff = _mm256_sub_epi16(o[i], p);
+        acc = _mm256_add_epi32(acc, _mm256_madd_epi16(diff, diff));
+      }
+    }
+    out[n] = (unsigned)hsum_epi32_128(_mm_add_epi32(_mm256_castsi256_si128(acc),
+                                                    _mm256_extracti128_si256(acc, 1)));
+  }
+#undef LOAD2
+}
+
 #endif // KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
@@ -1866,6 +2111,10 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 
     success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
     success &= kvz_strategyselector_register(opaque, "bilinear_ssd", "avx2", 40, &bilinear_ssd_avx2);
+    success &= kvz_strategyselector_register(opaque, "bilinear_ssd_multi", "avx2", 40, &bilinear_ssd_multi_avx2);
+    success &= kvz_strategyselector_register(opaque, "tf_bilinear_pred", "avx2", 40, &tf_bilinear_pred_avx2);
+    success &= kvz_strategyselector_register(opaque, "tf_block_stats", "avx2", 40, &tf_block_stats_avx2);
+    success &= kvz_strategyselector_register(opaque, "tf_filter_block", "avx2", 40, &tf_filter_block_avx2);
 
   }
 #endif // KVZ_BIT_DEPTH == 8

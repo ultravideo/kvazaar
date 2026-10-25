@@ -552,6 +552,97 @@ static unsigned bilinear_ssd_generic(const kvz_pixel *org, int org_stride,
   return ssd;
 }
 
+void kvz_bilinear_ssd_multi_generic(const kvz_pixel *org, int org_stride,
+                                    const kvz_pixel *ref, int ref_stride,
+                                    int size, const int *mv_x, const int *mv_y,
+                                    int num, unsigned *out)
+{
+  for (int i = 0; i < num; i++) {
+    const int fx = mv_x[i] & 3, fy = mv_y[i] & 3;
+    const kvz_pixel *r = ref + (mv_y[i] >> 2) * ref_stride + (mv_x[i] >> 2);
+    if (!fx && !fy) {
+      unsigned ssd = 0;
+      for (int y = 0; y < size; y++) {
+        for (int x = 0; x < size; x++) {
+          const int diff = org[y * org_stride + x] - r[y * ref_stride + x];
+          ssd += diff * diff;
+        }
+      }
+      out[i] = ssd >> (2 * (KVZ_BIT_DEPTH - 8));
+    } else {
+      out[i] = bilinear_ssd_generic(org, org_stride, r, ref_stride, size, fx, fy);
+    }
+  }
+}
+
+void kvz_tf_bilinear_pred_generic(kvz_pixel *dst, int dst_stride,
+                                     const kvz_pixel *ref, int ref_stride,
+                                     int width, int height,
+                                     int w00, int w10, int w01, int w11, int shift)
+{
+  const int round = 1 << (shift - 1);
+  for (int y = 0; y < height; y++) {
+    const kvz_pixel *r0 = &ref[y * ref_stride];
+    const kvz_pixel *r1 = r0 + ref_stride;
+    for (int x = 0; x < width; x++) {
+      dst[y * dst_stride + x] = (kvz_pixel)((w00 * r0[x] + w10 * r0[x + 1] +
+                                             w01 * r1[x] + w11 * r1[x + 1] + round) >> shift);
+    }
+  }
+}
+
+
+void kvz_tf_block_stats_generic(const kvz_pixel *org, int org_stride,
+                                   const kvz_pixel *pred, int pred_stride,
+                                   int width, int height, int64_t out[5])
+{
+  int64_t sum = 0, sum2 = 0, sse = 0, var_d = 0, diffsum = 0;
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      const int o = org[y * org_stride + x];
+      const int d = o - pred[y * pred_stride + x];
+      sum += o;
+      sum2 += o * o;
+      sse += d * d;
+      if (x + 1 < width && y + 1 < height) {
+        const int dr = org[y * org_stride + x + 1] - pred[y * pred_stride + x + 1];
+        const int dd = org[(y + 1) * org_stride + x] - pred[(y + 1) * pred_stride + x];
+        var_d += d * d;
+        diffsum += (dr - d) * (dr - d) + (dd - d) * (dd - d);
+      }
+    }
+  }
+  out[0] = sum;
+  out[1] = sum2;
+  out[2] = sse;
+  out[3] = var_d;
+  out[4] = diffsum;
+}
+
+
+void kvz_tf_filter_block_generic(kvz_pixel *dst, int dst_stride,
+                                    const kvz_pixel *src, int src_stride,
+                                    const kvz_pixel *const *preds, int pred_stride,
+                                    int num_refs, const float *weights,
+                                    const float *const *luts,
+                                    int width, int height, int max_val)
+{
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      const int org_val = src[y * src_stride + x];
+      float sum = (float)org_val;
+      float wsum = 1.0f;
+      for (int r = 0; r < num_refs; r++) {
+        const int ref_val = preds[r][y * pred_stride + x];
+        const float wgt = weights[r] * luts[r][ref_val - org_val];
+        sum += wgt * ref_val;
+        wsum += wgt;
+      }
+      dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5f));
+    }
+  }
+}
+
 static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
@@ -839,6 +930,10 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 
   success &= kvz_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
   success &= kvz_strategyselector_register(opaque, "bilinear_ssd", "generic", 0, &bilinear_ssd_generic);
+  success &= kvz_strategyselector_register(opaque, "bilinear_ssd_multi", "generic", 0, &kvz_bilinear_ssd_multi_generic);
+  success &= kvz_strategyselector_register(opaque, "tf_bilinear_pred", "generic", 0, &kvz_tf_bilinear_pred_generic);
+  success &= kvz_strategyselector_register(opaque, "tf_block_stats", "generic", 0, &kvz_tf_block_stats_generic);
+  success &= kvz_strategyselector_register(opaque, "tf_filter_block", "generic", 0, &kvz_tf_filter_block_generic);
 
   return success;
 }

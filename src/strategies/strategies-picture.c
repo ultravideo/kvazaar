@@ -80,6 +80,10 @@ hor_sad_func *kvz_hor_sad = 0;
 
 pixel_var_func *kvz_pixel_var = 0;
 bilinear_ssd_func *kvz_bilinear_ssd = 0;
+bilinear_ssd_multi_func *kvz_bilinear_ssd_multi = 0;
+tf_bilinear_pred_func *kvz_tf_bilinear_pred = 0;
+tf_block_stats_func *kvz_tf_block_stats = 0;
+tf_filter_block_func *kvz_tf_filter_block = 0;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {

@@ -162,6 +162,63 @@ typedef unsigned (bilinear_ssd_func)(const kvz_pixel *org, int org_stride,
                                      const kvz_pixel *ref, int ref_stride,
                                      int size, int fx, int fy);
 
+/**
+ * \brief kvz_bilinear_ssd for several quarter-pel motion vectors.
+ *
+ * ref points to the colocated block. For vector i, the block at integer
+ * offset (mv_x[i] >> 2, mv_y[i] >> 2) is interpolated with the fraction
+ * (mv_x[i] & 3, mv_y[i] & 3). Integer positions give the plain SSD (scaled
+ * to 8 bits like kvz_pixels_calc_ssd).
+ */
+typedef void (bilinear_ssd_multi_func)(const kvz_pixel *org, int org_stride,
+                                       const kvz_pixel *ref, int ref_stride,
+                                       int size, const int *mv_x, const int *mv_y,
+                                       int num, unsigned *out);
+
+/**
+ * \brief Bilinear interpolation of a block (used by the temporal filter).
+ *
+ * dst[x] = (w00 r0[x] + w10 r0[x + 1] + w01 r1[x] + w11 r1[x + 1] +
+ *           (1 << (shift - 1))) >> shift
+ * where r0 and r1 are consecutive rows of ref and the weights sum to
+ * 1 << shift (shift 1..6). The reference must have one readable column and
+ * row beyond the block.
+ */
+typedef void (tf_bilinear_pred_func)(kvz_pixel *dst, int dst_stride,
+                                     const kvz_pixel *ref, int ref_stride,
+                                     int width, int height,
+                                     int w00, int w10, int w01, int w11, int shift);
+
+/**
+ * \brief Statistics of the prediction error of a block for the temporal
+ *        filter.
+ *
+ * With d = org - pred:
+ * out[0] = sum of org, out[1] = sum of org^2, out[2] = sum of d^2,
+ * and over the pixels that have a right and a lower neighbour in the block:
+ * out[3] = sum of d^2, out[4] = sum of (d_right - d)^2 + (d_below - d)^2.
+ */
+typedef void (tf_block_stats_func)(const kvz_pixel *org, int org_stride,
+                                   const kvz_pixel *pred, int pred_stride,
+                                   int width, int height, int64_t out[5]);
+
+/**
+ * \brief Bilateral temporal filtering of a block.
+ *
+ * For each pixel, with o = src[x] and p_r = preds[r][x]:
+ *   sum = o, wsum = 1, for each r: w = weights[r] * luts[r][p_r - o],
+ *   sum += w * p_r, wsum += w;
+ *   dst[x] = CLIP(0, max_val, (int)(sum / wsum + 0.5f))
+ * evaluated in this order in single precision. luts[r] is indexed with the
+ * difference of the pixel values, from -max_val to max_val.
+ */
+typedef void (tf_filter_block_func)(kvz_pixel *dst, int dst_stride,
+                                    const kvz_pixel *src, int src_stride,
+                                    const kvz_pixel *const *preds, int pred_stride,
+                                    int num_refs, const float *weights,
+                                    const float *const *luts,
+                                    int width, int height, int max_val);
+
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;
 
@@ -202,6 +259,10 @@ extern hor_sad_func *kvz_hor_sad;
 
 extern pixel_var_func *kvz_pixel_var;
 extern bilinear_ssd_func *kvz_bilinear_ssd;
+extern bilinear_ssd_multi_func *kvz_bilinear_ssd_multi;
+extern tf_bilinear_pred_func *kvz_tf_bilinear_pred;
+extern tf_block_stats_func *kvz_tf_block_stats;
+extern tf_filter_block_func *kvz_tf_filter_block;
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
@@ -240,6 +301,10 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"hor_sad", (void**) &kvz_hor_sad}, \
   {"pixel_var", (void**) &kvz_pixel_var}, \
   {"bilinear_ssd", (void**) &kvz_bilinear_ssd}, \
+  {"bilinear_ssd_multi", (void**) &kvz_bilinear_ssd_multi}, \
+  {"tf_bilinear_pred", (void**) &kvz_tf_bilinear_pred}, \
+  {"tf_block_stats", (void**) &kvz_tf_block_stats}, \
+  {"tf_filter_block", (void**) &kvz_tf_filter_block}, \
 
 
 

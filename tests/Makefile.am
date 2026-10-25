@@ -49,6 +49,7 @@ kvazaar_tests_SOURCES = \
 	satd_tests.c \
 	satd_tests.h \
 	speed_tests.c \
+	temporal_filter_tests.c \
 	tests_main.c \
 	test_strategies.c \
 	test_strategies.h

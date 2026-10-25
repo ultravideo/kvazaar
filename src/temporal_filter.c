@@ -48,6 +48,8 @@
 #define TF_RANGE_QUARTER 8
 
 #define TF_MAX_REFS 8
+/** \brief Largest integer search range done with kvz_bilinear_ssd_multi. */
+#define TF_MAX_SEARCH_RANGE 2
 /** \brief Neighbours with a larger block error are not used for the block. */
 #define TF_MAX_BLOCK_ERROR 100
 /** \brief Maximum number of threads used for filtering one picture. */
@@ -136,8 +138,9 @@ static void plane_free(tf_plane *pl)
 static uint64_t block_error(const tf_plane *org, const tf_plane *ref, int bx, int by, int bs,
                             int mvx, int mvy, int f, uint64_t best, bool sad)
 {
-  const int ix = mvx >= 0 ? mvx / f : -((-mvx + f - 1) / f);
-  const int iy = mvy >= 0 ? mvy / f : -((-mvy + f - 1) / f);
+  // Floor division, f is 4 in all calls.
+  const int ix = f == 4 ? mvx >> 2 : (mvx >= 0 ? mvx / f : -((-mvx + f - 1) / f));
+  const int iy = f == 4 ? mvy >> 2 : (mvy >= 0 ? mvy / f : -((-mvy + f - 1) / f));
   const int fx = mvx - ix * f;
   const int fy = mvy - iy * f;
   const int w = MIN(bs, org->w - bx);
@@ -281,27 +284,63 @@ static void motion_level(const tf_plane *org, const tf_plane *ref, tf_mv *mvs, i
         range = 1;
       }
 
-      // Integer search around the best candidate.
+      // Integer search around the best candidate. On the finest level the
+      // errors of the positions around the best one are computed together.
+      const bool multi = subpel && bs == 8 && px + bs <= org->w && py + bs <= org->h;
+      const kvz_pixel *org_blk = &org->p[py * org->stride + px];
+      const kvz_pixel *ref_blk = &ref->p[py * ref->stride + px];
+      int pos_x[(2 * TF_MAX_SEARCH_RANGE + 1) * (2 * TF_MAX_SEARCH_RANGE + 1)];
+      int pos_y[(2 * TF_MAX_SEARCH_RANGE + 1) * (2 * TF_MAX_SEARCH_RANGE + 1)];
+      unsigned pos_err[(2 * TF_MAX_SEARCH_RANGE + 1) * (2 * TF_MAX_SEARCH_RANGE + 1)];
       const int cx = best.x, cy = best.y;
-      for (int dy = -range; dy <= range; dy++) {
-        for (int dx = -range; dx <= range; dx++) {
-          const int x = cx + 4 * dx, y = cy + 4 * dy;
-          if (x == cx && y == cy) continue;
-          if (abs(x) > 4 * (TF_PAD - bs - 2) || abs(y) > 4 * (TF_PAD - bs - 2)) continue;
-          const uint64_t e = block_error(org, ref, px, py, bs, x, y, f, best.err, !subpel);
-          if (e < best.err) { best.x = x; best.y = y; best.err = e; }
+      if (multi && range <= TF_MAX_SEARCH_RANGE) {
+        int np = 0;
+        for (int dy = -range; dy <= range; dy++) {
+          for (int dx = -range; dx <= range; dx++) {
+            const int x = cx + 4 * dx, y = cy + 4 * dy;
+            if (x == cx && y == cy) continue;
+            if (abs(x) > 4 * (TF_PAD - bs - 2) || abs(y) > 4 * (TF_PAD - bs - 2)) continue;
+            pos_x[np] = x;
+            pos_y[np++] = y;
+          }
+        }
+        kvz_bilinear_ssd_multi(org_blk, org->stride, ref_blk, ref->stride, bs, pos_x, pos_y, np, pos_err);
+        for (int i = 0; i < np; i++) {
+          if (pos_err[i] < best.err) { best.x = pos_x[i]; best.y = pos_y[i]; best.err = pos_err[i]; }
+        }
+      } else {
+        for (int dy = -range; dy <= range; dy++) {
+          for (int dx = -range; dx <= range; dx++) {
+            const int x = cx + 4 * dx, y = cy + 4 * dy;
+            if (x == cx && y == cy) continue;
+            if (abs(x) > 4 * (TF_PAD - bs - 2) || abs(y) > 4 * (TF_PAD - bs - 2)) continue;
+            const uint64_t e = block_error(org, ref, px, py, bs, x, y, f, best.err, !subpel);
+            if (e < best.err) { best.x = x; best.y = y; best.err = e; }
+          }
         }
       }
 
       if (subpel) {
         for (int step = 2; step >= 1; step >>= 1) {
           const int sx = best.x, sy = best.y;
+          int np = 0;
           for (int dy = -step; dy <= step; dy += step) {
             for (int dx = -step; dx <= step; dx += step) {
               if (!dx && !dy) continue;
               if (abs(sx + dx) > 4 * (TF_PAD - bs - 2) || abs(sy + dy) > 4 * (TF_PAD - bs - 2)) continue;
+              if (multi) {
+                pos_x[np] = sx + dx;
+                pos_y[np++] = sy + dy;
+                continue;
+              }
               const uint64_t e = block_error(org, ref, px, py, bs, sx + dx, sy + dy, f, best.err, false);
               if (e < best.err) { best.x = sx + dx; best.y = sy + dy; best.err = e; }
+            }
+          }
+          if (multi) {
+            kvz_bilinear_ssd_multi(org_blk, org->stride, ref_blk, ref->stride, bs, pos_x, pos_y, np, pos_err);
+            for (int i = 0; i < np; i++) {
+              if (pos_err[i] < best.err) { best.x = pos_x[i]; best.y = pos_y[i]; best.err = pos_err[i]; }
             }
           }
         }
@@ -426,6 +465,13 @@ static void tf_process_ref(tf_ctx *t, int r)
         const int round = 1 << (shift - 1);
         const int x_end = MIN(pw, bx + bw_c);
         const int y_end = MIN(ph, by + bh_c);
+        if (bx + ix > -TF_PAD + 1 && x_end + ix < rp.w + TF_PAD - 2 &&
+            by + iy >= -TF_PAD + 1 && y_end - 1 + iy <= rp.h + TF_PAD - 2) {
+          // The block and the extra column and row are inside the padding.
+          kvz_tf_bilinear_pred(&pred[by * pw + bx], pw, &rp.p[(by + iy) * rp.stride + bx + ix], rp.stride,
+                               x_end - bx, y_end - by, w00, w10, w01, w11, shift);
+          continue;
+        }
         for (int y = by; y < y_end; y++) {
           const int yy = CLIP(-TF_PAD + 1, rp.h + TF_PAD - 2, y + iy);
           const kvz_pixel *r0 = &rp.p[yy * rp.stride];
@@ -462,22 +508,9 @@ static void tf_process_ref(tf_ctx *t, int r)
     for (int bx = 0; bx < wbf; bx++) {
       const int x0 = bx * TF_BLOCK, y0 = by * TF_BLOCK;
       const int bw = MIN(TF_BLOCK, w - x0), bh = MIN(TF_BLOCK, h - y0);
-      int64_t sum = 0, sum2 = 0, sse = 0, diffsum = 0, var_d = 0;
-      for (int y = y0; y < y0 + bh; y++) {
-        for (int x = x0; x < x0 + bw; x++) {
-          const int o = orig->y[y * orig->stride + x];
-          const int d = o - pr[y * w + x];
-          sum += o;
-          sum2 += o * o;
-          sse += d * d;
-          if (x + 1 < x0 + bw && y + 1 < y0 + bh) {
-            const int dr = orig->y[y * orig->stride + x + 1] - pr[y * w + x + 1];
-            const int dd = orig->y[(y + 1) * orig->stride + x] - pr[(y + 1) * w + x];
-            var_d += d * d;
-            diffsum += (dr - d) * (dr - d) + (dd - d) * (dd - d);
-          }
-        }
-      }
+      int64_t st[5];
+      kvz_tf_block_stats(&orig->y[y0 * orig->stride + x0], orig->stride, &pr[y0 * w + x0], w, bw, bh, st);
+      const int64_t sum = st[0], sum2 = st[1], sse = st[2], var_d = st[3], diffsum = st[4];
       const int n = bw * bh;
       const double var_o = (double)sum2 - (double)sum * (double)sum / n;
       const double scale = (double)(1 << (2 * (KVZ_BIT_DEPTH - 8)));
@@ -542,20 +575,10 @@ static void tf_filter_rows(tf_ctx *t, int by_start, int by_end)
         }
         const int y_end = MIN(ph, y0 + bh_c);
         const int x_end = MIN(pw, x0 + bw_c);
-        for (int y = y0; y < y_end; y++) {
-          for (int x = x0; x < x_end; x++) {
-            const int org_val = src[y * src_stride + x];
-            float sum = (float)org_val;
-            float wsum = 1.0f;
-            for (int r = 0; r < num_refs; r++) {
-              const int ref_val = t->pred[r][c][y * pw + x];
-              const float wgt = rw[r] * rlut[r][ref_val - org_val];
-              sum += wgt * ref_val;
-              wsum += wgt;
-            }
-            dst[y * dst_stride + x] = (kvz_pixel)CLIP(0, max_val, (int)(sum / wsum + 0.5f));
-          }
-        }
+        const kvz_pixel *preds[TF_MAX_REFS];
+        for (int r = 0; r < num_refs; r++) preds[r] = &t->pred[r][c][y0 * pw + x0];
+        kvz_tf_filter_block(&dst[y0 * dst_stride + x0], dst_stride, &src[y0 * src_stride + x0], src_stride,
+                            preds, pw, num_refs, rw, rlut, x_end - x0, y_end - y0, max_val);
       }
     }
   }
