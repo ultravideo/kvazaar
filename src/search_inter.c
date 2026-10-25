@@ -1841,14 +1841,12 @@ static void search_pu_inter(encoder_state_t * const state,
   bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
   if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
-      if(cfg->rdo >= 3 && merge->unit[merge->keys[merge_key]].skipped) {
-        merge->size = 1;
-        merge->bits[0] = merge->bits[merge->keys[merge_key]];
-        merge->cost[0] = merge->cost[merge->keys[merge_key]];
-        merge->unit[0] = merge->unit[merge->keys[merge_key]];
-        merge->keys[0] = 0;
-      }
-      else if(cfg->rdo < 3) {
+      // At rd >= 3 the merge candidates already have full RD costs and they
+      // compete with the AMVP candidates in kvz_search_cu_inter, which stores
+      // the winner in the LCU. Ending the search here left the LCU holding the
+      // last evaluated candidate instead of the selected skip candidate. A
+      // skip result still ends the SMP/AMP search in search_cu.
+      if(cfg->rdo < 3) {
         // Reconstruct blocks with merge candidate.
         // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
         // and chroma exists.
