@@ -66,10 +66,14 @@ static int tf_rand(void)
 static void tf_fill(kvz_pixel *buf, int smooth)
 {
   for (int i = 0; i < TF_TEST_STRIDE * TF_TEST_STRIDE; i++) {
-    // Mostly smooth content with noise, or full range noise.
-    buf[i] = smooth ? (kvz_pixel)CLIP(0, PIXEL_MAX, 128 + (i % TF_TEST_STRIDE) * 2 - (i / TF_TEST_STRIDE) +
-                                                    tf_rand() % 21 - 10)
-                    : (kvz_pixel)(tf_rand() % (PIXEL_MAX + 1));
+    // Mostly smooth content with noise, or full range noise. CLIP evaluates
+    // its argument more than once, so draw the random number first.
+    if (smooth) {
+      const int val = 128 + (i % TF_TEST_STRIDE) * 2 - (i / TF_TEST_STRIDE) + tf_rand() % 21 - 10;
+      buf[i] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
+    } else {
+      buf[i] = (kvz_pixel)(tf_rand() % (PIXEL_MAX + 1));
+    }
   }
 }
 
@@ -155,7 +159,8 @@ TEST tf_filter_block_test(void)
       // Similar predictions in most rounds so that the weights matter.
       if (round & 4) {
         for (int i = 0; i < TF_TEST_STRIDE * TF_TEST_STRIDE; i++) {
-          tf_preds[r][i] = (kvz_pixel)CLIP(0, PIXEL_MAX, tf_org[i] + tf_rand() % 9 - 4);
+          const int val = tf_org[i] + tf_rand() % 9 - 4;
+          tf_preds[r][i] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
         }
       }
       const float sigma = (float)(20 + tf_rand() % 400);
