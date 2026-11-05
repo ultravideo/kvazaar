@@ -1605,6 +1605,31 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
 static int validate_hevc_level(kvz_config *const cfg);
 
 /**
+ * \brief Check the PU depth range of one GOP layer.
+ *
+ * Layers other than 0 may be left unset (both values -1), in which case
+ * the depths of layer 0 are used. Any other negative value, or a range
+ * where only one end is set, would bypass the range check and is rejected.
+ */
+static int validate_pu_depth_layer(const char *name, int32_t min, int32_t max,
+                                   size_t layer, int32_t lo, int32_t hi)
+{
+  if (layer > 0 && min == -1 && max == -1) return 1;
+
+  if (!WITHIN(min, lo, hi) || !WITHIN(max, lo, hi)) {
+    fprintf(stderr, "Input error: illegal value for --pu-depth-%s (%d-%d)\n",
+            name, min, max);
+    return 0;
+  }
+  if (min > max) {
+    fprintf(stderr, "Input error: %s PU depth min (%d) > max (%d)\n",
+            name, min, max);
+    return 0;
+  }
+  return 1;
+}
+
+/**
  * \brief Check that configuration is sensible.
  *
  * \param cfg   config to check
@@ -1737,35 +1762,19 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   for( size_t i = 0; i < KVZ_MAX_GOP_LAYERS; i++ )
   {
-      if( cfg->pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
-
-      if( !WITHIN( cfg->pu_depth_inter.min[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) ||
-          !WITHIN( cfg->pu_depth_inter.max[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) )
+      // Validate inter and intra depths separately. A layer that is unset
+      // for inter must not cause the intra depths of that layer to be
+      // skipped.
+      if( !validate_pu_depth_layer( "inter", cfg->pu_depth_inter.min[i],
+                                    cfg->pu_depth_inter.max[i], i,
+                                    PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) )
       {
-          fprintf( stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)\n",
-                   cfg->pu_depth_inter.min[i], cfg->pu_depth_inter.max[i] );
           error = 1;
       }
-      else if( cfg->pu_depth_inter.min[i] > cfg->pu_depth_inter.max[i] )
+      if( !validate_pu_depth_layer( "intra", cfg->pu_depth_intra.min[i],
+                                    cfg->pu_depth_intra.max[i], i,
+                                    PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) )
       {
-          fprintf( stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
-                   cfg->pu_depth_inter.min[i], cfg->pu_depth_inter.max[i] );
-          error = 1;
-      }
-
-      if( cfg->pu_depth_intra.min[i] < 0 || cfg->pu_depth_intra.max[i] < 0 ) continue;
-
-      if( !WITHIN( cfg->pu_depth_intra.min[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) ||
-          !WITHIN( cfg->pu_depth_intra.max[i], PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX ) )
-      {
-          fprintf( stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)\n",
-                   cfg->pu_depth_intra.min[i], cfg->pu_depth_intra.max[i] );
-          error = 1;
-      }
-      else if( cfg->pu_depth_intra.min[i] > cfg->pu_depth_intra.max[i] )
-      {
-          fprintf( stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
-                   cfg->pu_depth_intra.min[i], cfg->pu_depth_intra.max[i] );
           error = 1;
       }
   }
