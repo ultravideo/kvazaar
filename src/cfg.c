@@ -30,7 +30,10 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
- #define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#ifdef _MSC_VER
+ #define strtok_r strtok_s
+#endif
 #include "cfg.h"
 #include "gop.h"
 
@@ -331,9 +334,10 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
   char *key = strdup(array);
   const char delim[] = ",;:";
   char *token;
+  char *saveptr = NULL;
   int i = 0;
 
-  token = strtok(key, delim);
+  token = strtok_r(key, delim, &saveptr);
   while(token!=NULL&&i<size){
     if (!parse_uint8(token, &coeff_key[i], min, max))
     {
@@ -341,7 +345,7 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
       return 0;
     }
     i++;
-    token = strtok(NULL, delim);
+    token = strtok_r(NULL, delim, &saveptr);
   }
   if(i>=size && (token != NULL)){
     fprintf(stderr, "parsing failed : too many members.\n");
@@ -361,6 +365,7 @@ static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t 
 {
     char *list = strdup( array );
     char *token;
+    char *saveptr = NULL;
     int i = 0;
     int ptr = -1;
     int len = strlen( list );
@@ -370,7 +375,7 @@ static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t 
     if(size > 1) memset( depths_max + 1, -1, (size - 1) * sizeof( *depths_max ) );
     if(size > 1) memset( depths_min + 1, -1, (size - 1) * sizeof( *depths_min ) );
 
-    token = strtok( list, "," );
+    token = strtok_r( list, ",", &saveptr );
     while( ptr < len && list[ptr + 1] == ',' )
     {
         i++;
@@ -380,7 +385,7 @@ static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t 
         retval &= (sscanf( token, "%d-%d", &depths_min[i], &depths_max[i] ) == 2);
         ptr += (retval ? 4 : 0);
         i++;
-        token = strtok( NULL, "," );
+        token = strtok_r( NULL, ",", &saveptr );
         while(ptr < len && list[ptr + 1] == ',' ){
           i++;
           ptr++;
