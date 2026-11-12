@@ -430,9 +430,10 @@ possible.
 
 ### Range Extensions
 
-Add `-DKVZ_RANGE_EXTENSION` to CFLAGS for 4:2:2 and 4:4:4 support, there is some speed penalty to 4:2:0 just by enabling it so it's disabled by default.
-
-With CMake `-DUSE_RANGE_EXTENSION=ON` can be used.
+The 4:2:2 and 4:4:4 chroma formats (`--input-format P422` / `P444`) are always
+available, no build option is needed. The code paths that depend on the
+chroma format are specialized for 4:2:0 at compile time, so supporting the
+other formats does not slow down 4:2:0 encoding.
 
 
 ### Autotools

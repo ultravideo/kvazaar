@@ -147,34 +147,53 @@ typedef int16_t coeff_t;
 
 /* END OF CONFIG VARIABLES */
 
-#ifdef KVZ_RANGE_EXTENSION
-  //! The shift values are cached on the encoder_state (set once in
-  //! kvz_encoder_state_init) so that the hot loops load a single field from a
-  //! struct that is already in a register instead of dereferencing
-  //! state->encoder_control->cfg on every use.
-  #define SHIFT state->chroma_shift_w
-  //! use: CHROMA_SIZE = LUMA_SIZE >> SHIFT
-  #define SHIFT_W state->chroma_shift_w
-  #define SHIFT_H state->chroma_shift_h
-#else
-  #define SHIFT 1
-  #define SHIFT_W 1
-  #define SHIFT_H 1
-#endif
+//! Chroma subsampling shifts: CHROMA_SIZE = LUMA_SIZE >> SHIFT.
+//! The shift values are cached on the encoder_state (set once in
+//! kvz_encoder_state_init) so that the code loads a single field from a
+//! struct that is already in a register instead of dereferencing
+//! state->encoder_control->cfg on every use.
+#define SHIFT state->chroma_shift_w
+#define SHIFT_W state->chroma_shift_w
+#define SHIFT_H state->chroma_shift_h
 
-// When the range extension is not compiled in, the only valid chroma formats
-// are 4:0:0 and 4:2:0, so any runtime test for 4:2:2 / 4:4:4 is always false.
-// Using these macros lets the compiler eliminate the whole 4:2:2 / 4:4:4 code
-// paths (and their branch conditions) from the 4:2:0 hot loops instead of
-// evaluating them on every block. They must not be used with expressions that
-// have side effects.
-#ifdef KVZ_RANGE_EXTENSION
-  #define KVZ_IS_422(fmt) ((fmt) == KVZ_CSP_422)
-  #define KVZ_IS_444(fmt) ((fmt) == KVZ_CSP_444)
-#else
-  #define KVZ_IS_422(fmt) 0
-  #define KVZ_IS_444(fmt) 0
-#endif
+#define KVZ_IS_422(fmt) ((fmt) == KVZ_CSP_422)
+#define KVZ_IS_444(fmt) ((fmt) == KVZ_CSP_444)
+
+/**
+ * Chroma format specialization
+ *
+ * All chroma formats (4:0:0, 4:2:0, 4:2:2 and 4:4:4) are supported by the
+ * same binary, so the chroma shifts and the "is this 4:2:2 / 4:4:4" tests
+ * are runtime values. To keep the common 4:2:0 case as fast as a 4:2:0-only
+ * build would be, the body of a hot function that depends on the chroma
+ * format is written as a force-inlined function that takes the format as
+ * its last parameter (named `csp`, the function name suffixed with `_csp`),
+ * and the function itself only selects between two copies of that body:
+ *
+ *     static FORCE_INLINE int foo_csp(encoder_state_t *state, int x,
+ *                                     const enum kvz_chroma_format csp)
+ *     {
+ *       const int shift_w = KVZ_CSP_SHIFT_W(csp);
+ *       if (KVZ_IS_422(csp)) { ... }
+ *       return bar(x >> shift_w, csp); // small FORCE_INLINE helper
+ *     }
+ *
+ *     int foo(encoder_state_t *state, int x)
+ *     {
+ *       if (state->chroma_format == KVZ_CSP_420) {
+ *         return foo_csp(state, x, KVZ_CSP_420);
+ *       }
+ *       return foo_csp(state, x, (enum kvz_chroma_format)state->chroma_format);
+ *     }
+ *
+ * In the first copy csp is a compile time constant, so the compiler folds
+ * the shifts and removes the 4:2:2 / 4:4:4 paths completely. Inside a
+ * `_csp` function use `csp` instead of SHIFT_W / SHIFT_H and
+ * cfg.chroma_format, and pass it on to the inlined helpers.
+ */
+#define KVZ_CSP_SHIFT_W(csp) (((csp) == KVZ_CSP_420 || (csp) == KVZ_CSP_422) ? 1 : 0)
+#define KVZ_CSP_SHIFT_H(csp) (((csp) == KVZ_CSP_420) ? 1 : 0)
+
 //! minimum luma width & height for chroma to exist for that size
 #define MIN_C_W (4 << SHIFT_W)
 #define MIN_C_H (4 << SHIFT_H)
@@ -254,11 +273,7 @@ typedef int16_t coeff_t;
 #ifndef KVZ_VERSION
 #define KVZ_VERSION 2.3.2
 #endif
-#ifdef KVZ_RANGE_EXTENSION
-  #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION [RExt])
-#else
-  #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
-#endif
+#define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 
 //#define VERBOSE 1
@@ -274,6 +289,16 @@ typedef int16_t coeff_t;
   #pragma inline_recursion(on)
 #else /* others */
   #define INLINE inline
+#endif
+
+/* Inlining that must happen for the code to be specialized by the chroma
+ * format, see KVZ_CSP_SHIFT_W. */
+#if defined(_MSC_VER)
+  #define FORCE_INLINE __forceinline
+#elif defined(__GNUC__)
+  #define FORCE_INLINE inline __attribute__((always_inline))
+#else
+  #define FORCE_INLINE inline
 #endif
 
 // Return the next aligned address for *p. Result is at most alignment larger than p.

@@ -136,12 +136,10 @@ typedef struct
   uint8_t merged     : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx  : 3; //!< \brief merge index
   uint8_t tr_skip    : 1; //!< \brief transform skip flag
-#ifdef KVZ_RANGE_EXTENSION
   uint8_t alpha_u_s  : 1; // !< \brief cross-component prediction sign flag for U channel
   uint8_t alpha_v_s  : 1; // !< \brief cross-component prediction sign flag for V channel
   uint8_t alpha_u    : 3; // !< \brief cross-component prediction value for U channel
   uint8_t alpha_v    : 3; // !< \brief cross-component prediction value for V channel
-#endif
 
   uint16_t cbf;
 
@@ -393,11 +391,8 @@ static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
 {
   assert(width % 4 == 0 && width >= 4 && width <= 64);
   assert(x % 4 == 0 && x < width);
-  #ifdef KVZ_RANGE_EXTENSION
-    assert(y % 4 == 0 && y < 64);
-  #else
-    assert(y % 4 == 0 && y < width);
-  #endif
+  // The 4:2:2 chroma area of an LCU is 32x64, so y can exceed the width.
+  assert(y % 4 == 0 && y < 64);
 
   unsigned result = 0;
 

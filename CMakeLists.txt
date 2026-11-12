@@ -18,15 +18,6 @@ option(USE_CRYPTO "Use crypto library" OFF)
 
 option(BUILD_KVAZAAR_BINARY "Build kvazaar-bin" ON) # To build only the lib, useful for iOS-builds
 
-option(USE_RANGE_EXTENSION "Use range extension to enable 4:4:4 and 4:2:2 subsampling" OFF)
-
-if(USE_RANGE_EXTENSION)
-  add_definitions(-DKVZ_RANGE_EXTENSION)
-  message(STATUS "Range extension enabled. 4:4:4 and 4:2:2 subsampling enabled.")
-else()
-  message(STATUS "Range extension disabled. Only 4:2:0 subsampling supported.")
-endif()
-
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
 set(DEFERRED "@")
 

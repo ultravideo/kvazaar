@@ -95,13 +95,23 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
 {
   const encoder_state_t *state = info->state;
   const encoder_control_t *ctrl = info->state->encoder_control;
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
-  const int min_c_w_mask = (4 << shift_w) - 1;
-  const int min_c_h_mask = (4 << shift_h) - 1;
 
-  const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;
-  const bool is_frac_chroma = (x & min_c_w_mask) != 0 || (y & min_c_h_mask) != 0;
+  // This function is called for every MV candidate, so the common 4:2:0
+  // case is tested with constants instead of the runtime chroma shifts.
+  const bool is_frac_luma = x % 4 != 0 || y % 4 != 0;
+  bool is_frac_chroma;
+  int chroma_margin;
+  if (state->chroma_format == KVZ_CSP_420) {
+    is_frac_chroma = ((x | y) & 7) != 0;
+    chroma_margin = 2;
+  } else {
+    const int shift_w = SHIFT_W;
+    const int shift_h = SHIFT_H;
+    const int min_c_w_mask = (4 << shift_w) - 1;
+    const int min_c_h_mask = (4 << shift_h) - 1;
+    is_frac_chroma = (x & min_c_w_mask) != 0 || (y & min_c_h_mask) != 0;
+    chroma_margin = 4 >> shift_w;
+  }
 
   if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Check that the block does not reference pixels that are not final.
@@ -115,7 +125,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     } else if (is_frac_chroma) {
       // Odd chroma interpolation needs up to 4 luma pixels outside the
       // block.
-      margin = 4 >> shift_w;
+      margin = chroma_margin;
     }
 
     if (ctrl->cfg.sao_type) {
@@ -187,7 +197,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     if (is_frac_luma) {
       margin = 4 << 2;
     } else if (is_frac_chroma) {
-      margin = 4 << (2 - shift_w);
+      margin = chroma_margin << 2;
     }
   }
 

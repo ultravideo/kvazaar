@@ -300,16 +300,17 @@ int kvz_quantize_residual_trskip(
  *
  * \param early_skip if this is used for early skip, bypass IT and IQ
  */
-static void quantize_tr_residual(encoder_state_t * const state,
-                                 const color_t color,
-                                 const int32_t x,
-                                 const int32_t y,
-                                 const uint8_t depth,
-                                 cu_info_t *cur_pu,
-                                 lcu_t* lcu,
-                                 bool early_skip,
-                                 int16_t* luma_residual_cross_comp[2],
-                                 bool recon_from_coeffs)
+static FORCE_INLINE void quantize_tr_residual_csp(encoder_state_t * const state,
+                                                  const color_t color,
+                                                  const int32_t x,
+                                                  const int32_t y,
+                                                  const uint8_t depth,
+                                                  cu_info_t *cur_pu,
+                                                  lcu_t* lcu,
+                                                  bool early_skip,
+                                                  int16_t* luma_residual_cross_comp[2],
+                                                  bool recon_from_coeffs,
+                                                  const enum kvz_chroma_format csp)
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
   // For 4:2:2 the bottom sub-TU may be processed at a leaf whose own CU
@@ -318,11 +319,11 @@ static void quantize_tr_residual(encoder_state_t * const state,
   // correct CU (the parent CU for the handled-elsewhere chroma at depth 4),
   // and overriding it here would make the chroma CBF be stored on the wrong
   // CU, corrupting the reconstruction. So only override for 4:2:2.
-  if (KVZ_IS_422(cfg->chroma_format)) {
+  if (KVZ_IS_422(csp)) {
     cur_pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
-  const int32_t shift_w    = color == COLOR_Y ? 0 : SHIFT_W;
-  const int32_t shift_h    = color == COLOR_Y ? 0 : SHIFT_H;
+  const int32_t shift_w    = color == COLOR_Y ? 0 : KVZ_CSP_SHIFT_W(csp);
+  const int32_t shift_h    = color == COLOR_Y ? 0 : KVZ_CSP_SHIFT_H(csp);
   const vector2d_t lcu_px  = { SUB_SCU(x) >> shift_w, SUB_SCU(y) >> shift_h };
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
@@ -330,7 +331,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   bool handled_elsewhere = color != COLOR_Y &&
                            depth > MAX_DEPTH &&
                            (lcu_px.x % 4 != 0 || lcu_px.y % 4 != 0) &&
-                           !KVZ_IS_444(cfg->chroma_format);
+                           !KVZ_IS_444(csp);
   if (handled_elsewhere) {
     return;
   }
@@ -345,7 +346,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   }
 
   int32_t tr_width;
-  if (color == COLOR_Y || KVZ_IS_444(cfg->chroma_format)) {
+  if (color == COLOR_Y || KVZ_IS_444(csp)) {
     tr_width = LCU_WIDTH >> depth;
   } else {    
     const int chroma_depth = (depth == MAX_PU_DEPTH ? (depth - 1) : depth);
@@ -356,10 +357,10 @@ static void quantize_tr_residual(encoder_state_t * const state,
   if (color != COLOR_Y && mode == 36) {
     mode = cur_pu->intra.mode;
   }
-  if (color != COLOR_Y && KVZ_IS_422(cfg->chroma_format) && mode >= 0 && mode < 36) {
+  if (color != COLOR_Y && KVZ_IS_422(csp) && mode >= 0 && mode < 36) {
     mode = g_chroma422_intra_angle_mapping_table[mode];
   }
-  const coeff_scan_order_t scan_idx = kvz_get_scan_order(cur_pu->type, mode, depth, color, cfg->chroma_format);
+  const coeff_scan_order_t scan_idx = kvz_get_scan_order(cur_pu->type, mode, depth, color, csp);
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
   const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
@@ -401,7 +402,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
     // sub-TU chroma CBF is cbf_is_set at the signalling depth AND actual
     // coefficient presence. For the 4:2:2 depth-4 leaf the CBF is signalled
     // at the parent (non-square) level, not at depth 4, so use that depth.
-    const int sig_depth = (KVZ_IS_422(state->encoder_control->cfg.chroma_format) &&
+    const int sig_depth = (KVZ_IS_422(csp) &&
                            depth == MAX_PU_DEPTH && color != COLOR_Y) ? depth - 1 : depth;
     has_coeffs = cbf_is_set(cur_pu->cbf, sig_depth, color);
     if (has_coeffs) {
@@ -489,6 +490,21 @@ static void quantize_tr_residual(encoder_state_t * const state,
   }
 }
 
+static void quantize_tr_residual(encoder_state_t * const state, const color_t color,
+                                 const int32_t x, const int32_t y, const uint8_t depth,
+                                 cu_info_t *cur_pu, lcu_t* lcu, bool early_skip,
+                                 int16_t* luma_residual_cross_comp[2], bool recon_from_coeffs)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    quantize_tr_residual_csp(state, color, x, y, depth, cur_pu, lcu, early_skip,
+                             luma_residual_cross_comp, recon_from_coeffs, KVZ_CSP_420);
+  } else {
+    quantize_tr_residual_csp(state, color, x, y, depth, cur_pu, lcu, early_skip,
+                             luma_residual_cross_comp, recon_from_coeffs, state->chroma_format);
+  }
+}
+
 /**
  * This function calculates the residual coefficients for a region of the LCU
  * (defined by x, y and depth) and updates the reconstruction with the
@@ -506,17 +522,18 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * - lcu->cbf               coded block flags for the area
  * - lcu->cu.intra.tr_skip  tr skip flags for the area (in case of luma)
  */
-void kvz_quantize_lcu_residual(encoder_state_t * const state,
-                               const bool luma,
-                               const bool chroma,
-                               const int32_t x,
-                               const int32_t y,
-                               const uint8_t depth,
-                               cu_info_t *cur_pu,
-                               lcu_t* lcu,
-                               bool early_skip,
-                               uint8_t subtu_phase,
-                               bool recon_from_coeffs)
+static FORCE_INLINE void kvz_quantize_lcu_residual_csp(encoder_state_t * const state,
+                                                       const bool luma,
+                                                       const bool chroma,
+                                                       const int32_t x,
+                                                       const int32_t y,
+                                                       const uint8_t depth,
+                                                       cu_info_t *cur_pu,
+                                                       lcu_t* lcu,
+                                                       bool early_skip,
+                                                       uint8_t subtu_phase,
+                                                       bool recon_from_coeffs,
+                                                       const enum kvz_chroma_format csp)
 {
   const int32_t width = LCU_WIDTH >> depth;
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
@@ -544,7 +561,7 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
         cbf_clear(&cur_pu->cbf, depth, COLOR_U);
         cbf_clear(&cur_pu->cbf, depth, COLOR_V);
       }
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && subtu_phase != KVZ_SUBTU_TOP) {
+      if (KVZ_IS_422(csp) && subtu_phase != KVZ_SUBTU_TOP) {
       cu_info_t *cur_pu_bot = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y + width / 2);
       cbf_clear(&cur_pu_bot->cbf, depth, COLOR_U);
       cbf_clear(&cur_pu_bot->cbf, depth, COLOR_V);
@@ -577,7 +594,7 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
         cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_U);
         cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_V);
       }
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && subtu_phase != KVZ_SUBTU_TOP) {
+      if (KVZ_IS_422(csp) && subtu_phase != KVZ_SUBTU_TOP) {
         // The two children below the bottom sub-TU are at y + width, which for
         // CUs touching the LCU bottom edge would read past the end of the CU
         // array (cu is the last member of lcu_t). Those children belong to the
@@ -596,10 +613,14 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     }
 
   } else {
-    int16_t *luma_residual_cross_comp[2] = {
-      &state->tile->frame->luma_residual_prequant[y * state->tile->frame->width + x],
-      &state->tile->frame->luma_residual[y * state->tile->frame->width + x]
-    };
+    // Luma residual buffers for the cross-component prediction. The tool is
+    // only available for 4:4:4, the buffers do not exist for other formats.
+    int16_t *luma_residual_cross_comp[2] = { NULL, NULL };
+    if (KVZ_IS_444(csp)) {
+      const videoframe_t * const frame = state->tile->frame;
+      luma_residual_cross_comp[0] = &frame->luma_residual_prequant[y * frame->width + x];
+      luma_residual_cross_comp[1] = &frame->luma_residual[y * frame->width + x];
+    }
     // Process a leaf TU.
     if (luma && subtu_phase != KVZ_SUBTU_BOTTOM) {
       quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp, recon_from_coeffs);
@@ -609,7 +630,7 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
         quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp, recon_from_coeffs);
         quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip, luma_residual_cross_comp, recon_from_coeffs);
       }
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && subtu_phase != KVZ_SUBTU_TOP &&
+      if (KVZ_IS_422(csp) && subtu_phase != KVZ_SUBTU_TOP &&
           // The 4:2:2 depth-4 inter chroma is processed by the top block of
           // the sub-CU below (the (x, y+4) sub-CU's top handles the same 4x4
           // chroma position as this sub-CU's bottom, matching what the
@@ -628,5 +649,22 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
         quantize_tr_residual(state, COLOR_V, x, y + bot_off, depth, cur_pu_bot, lcu, early_skip, luma_residual_cross_comp, recon_from_coeffs);
       }
     }
+  }
+}
+
+// Defines kvz_quantize_lcu_residual_420 and kvz_quantize_lcu_residual_any,
+// see transform.h.
+void kvz_quantize_lcu_residual(encoder_state_t * const state, const bool luma, const bool chroma,
+                               const int32_t x, const int32_t y, const uint8_t depth,
+                               cu_info_t *cur_pu, lcu_t* lcu, bool early_skip, uint8_t subtu_phase,
+                               bool recon_from_coeffs)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    kvz_quantize_lcu_residual_csp(state, luma, chroma, x, y, depth, cur_pu, lcu, early_skip,
+                                  subtu_phase, recon_from_coeffs, KVZ_CSP_420);
+  } else {
+    kvz_quantize_lcu_residual_csp(state, luma, chroma, x, y, depth, cur_pu, lcu, early_skip,
+                                  subtu_phase, recon_from_coeffs, state->chroma_format);
   }
 }

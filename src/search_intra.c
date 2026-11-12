@@ -175,16 +175,21 @@ static void get_cost_dual(encoder_state_t * const state,
 * \param intra_mode  Intra prediction mode.
 * \param cost_treshold  RD cost at which search can be stopped.
 */
-static double search_intra_trdepth(encoder_state_t * const state,
-                                   int x_px, int y_px, int depth, int max_depth,
-                                   int intra_mode, int cost_treshold,
-                                   cu_info_t *const pred_cu,
-                                   lcu_t *const lcu)
+static double search_intra_trdepth(encoder_state_t * const state, int x_px, int y_px, int depth,
+                                   int max_depth, int intra_mode, int cost_treshold,
+                                   cu_info_t *const pred_cu, lcu_t *const lcu);
+
+static FORCE_INLINE double search_intra_trdepth_csp(encoder_state_t * const state,
+                                                    int x_px, int y_px, int depth, int max_depth,
+                                                    int intra_mode, int cost_treshold,
+                                                    cu_info_t *const pred_cu,
+                                                    lcu_t *const lcu,
+                                                    const enum kvz_chroma_format csp)
 {
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int width = LCU_WIDTH >> depth;
   const int width_c = width > TR_MIN_WIDTH ? width >> shift_w : width;
@@ -194,7 +199,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = (KVZ_IS_444(state->encoder_control->cfg.chroma_format) ? (x_px % 4 == 0 && y_px % 4 == 0) : (x_px % 8 == 0 && y_px % 8 == 0)) && state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma = (KVZ_IS_444(csp) ? (x_px % 4 == 0 && y_px % 4 == 0) : (x_px % 8 == 0 && y_px % 8 == 0)) && csp != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -281,7 +286,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // if this and any previous transform block has no chroma coefficients.
     // When searching the first block we don't actually know the real values,
     // so this will code cbf as 0 and not code the cbf at all for descendants.
-    if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+    if (csp != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
       cabac_ctx_t *ctx = &(state->search_cabac.ctx.qt_cbf_model_chroma[tr_depth]);
@@ -316,6 +321,19 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     return nosplit_cost;
   }
+}
+
+static double search_intra_trdepth(encoder_state_t * const state, int x_px, int y_px, int depth,
+                                   int max_depth, int intra_mode, int cost_treshold,
+                                   cu_info_t *const pred_cu, lcu_t *const lcu)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    return search_intra_trdepth_csp(state, x_px, y_px, depth, max_depth, intra_mode, cost_treshold,
+                                    pred_cu, lcu, KVZ_CSP_420);
+  }
+  return search_intra_trdepth_csp(state, x_px, y_px, depth, max_depth, intra_mode, cost_treshold,
+                                  pred_cu, lcu, state->chroma_format);
 }
 
 

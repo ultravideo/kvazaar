@@ -70,16 +70,18 @@ static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from
   }
 }
 
-static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+static FORCE_INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to,
+                                        const enum kvz_chroma_format csp)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
   
 
   kvz_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
                   width, width, LCU_WIDTH, LCU_WIDTH);
-  if (from->rec.chroma_format != KVZ_CSP_400) {
-    const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) || KVZ_IS_422(from->rec.chroma_format) ? 1 : 0;
-    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : 0;
+  assert(from->rec.chroma_format == csp);
+  if (csp != KVZ_CSP_400) {
+    const int chroma_shift_w = KVZ_CSP_SHIFT_W(csp);
+    const int chroma_shift_h = KVZ_CSP_SHIFT_H(csp);
     const int chroma_index = (x_local >> chroma_shift_w) + (y_local >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w);
     kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
                     width >> chroma_shift_w, width >> chroma_shift_h, LCU_WIDTH >> chroma_shift_w, LCU_WIDTH >> chroma_shift_w);
@@ -88,14 +90,16 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
   }
 }
 
-static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+static FORCE_INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to,
+                                        const enum kvz_chroma_format csp)
 {
   const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
   copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width, width);
 
-  if (from->rec.chroma_format != KVZ_CSP_400) {
-    const int chroma_shift_w = (from->rec.chroma_format == KVZ_CSP_420) || KVZ_IS_422(from->rec.chroma_format) ? 1 : 0;
-    const int chroma_shift_h = (from->rec.chroma_format == KVZ_CSP_420) ? 1 : 0;
+  assert(from->rec.chroma_format == csp);
+  if (csp != KVZ_CSP_400) {
+    const int chroma_shift_w = KVZ_CSP_SHIFT_W(csp);
+    const int chroma_shift_h = KVZ_CSP_SHIFT_H(csp);
     const int chroma_width = width >> chroma_shift_w;
     const int chroma_height = width >> chroma_shift_h;
     const int chroma_buf_width = LCU_WIDTH >> chroma_shift_w;
@@ -118,24 +122,26 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 /**
  * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree)
+static FORCE_INLINE void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree,
+                                           const enum kvz_chroma_format csp)
 {
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
+  copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], csp);
+  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], csp);
 }
 
 
 /**
  * Copy all non-reference CU data from current level to all lower levels.
  */
-static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree)
+static FORCE_INLINE void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree,
+                                             const enum kvz_chroma_format csp)
 {
   const int width = LCU_WIDTH >> depth;
   for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
     copy_cu_info  (x_local, y_local, width, &work_tree[depth], &work_tree[i]);
-    copy_cu_pixels(x_local, y_local, width, &work_tree[depth], &work_tree[i]);
+    copy_cu_pixels(x_local, y_local, width, &work_tree[depth], &work_tree[i], csp);
   }
 }
 
@@ -225,16 +231,16 @@ static void lcu_fill_cbf(lcu_t *lcu, uint32_t x_local, uint32_t y_local, uint32_
 
 
 //Calculates cost for all zero coeffs
-static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree, const int x, const int y,
-  const int depth)
+static FORCE_INLINE double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree, const int x, const int y,
+  const int depth, const enum kvz_chroma_format csp)
 {
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
   int cu_width = LCU_WIDTH >> depth;
   lcu_t *const lcu = &work_tree[depth];
 
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int min_c_w_mask = (4 << shift_w) - 1;
   const int min_c_h_mask = (4 << shift_h) - 1;
@@ -247,7 +253,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
     &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
-  if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+  if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && csp != KVZ_CSP_400) {
     ssd += KVZ_CHROMA_MULT * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       lcu_w_c, lcu_w_c, cu_width >> shift_w
@@ -258,7 +264,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
       );
   }
   // Save the pixels at a lower level of the working tree.
-  copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1]);
+  copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1], csp);
 
   return ssd;
 }
@@ -387,13 +393,14 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 }
 
 
-double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
-                             const int x_px, const int y_px, const int depth,
-                             const cu_info_t *const pred_cu,
-                             const cu_info_t* const parent_tu, lcu_t *const lcu)
+static FORCE_INLINE double kvz_cu_rd_cost_chroma_csp(const encoder_state_t *const state,
+                                                     const int x_px, const int y_px, const int depth,
+                                                     const cu_info_t *const pred_cu,
+                                                     const cu_info_t* const parent_tu, lcu_t *const lcu,
+                                                     const enum kvz_chroma_format csp)
 {
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int min_c_w_mask = (4 << shift_w) - 1;
   const int min_c_h_mask = (4 << shift_h) - 1;
@@ -452,7 +459,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     // sub-TUs. Depth 4 (MAX_PU_DEPTH) is handled across two call sites that
     // already cover the full parent chroma, so only depths <= MAX_DEPTH use
     // the rectangular SSD here.
-    if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && depth <= MAX_DEPTH) {
+    if (KVZ_IS_422(csp) && depth <= MAX_DEPTH) {
       ssd_u = kvz_pixels_calc_ssd_422(&lcu->ref.u[index], &lcu->rec.u[index],
                                       lcu_w_c, lcu_w_c, width);
       ssd_v = kvz_pixels_calc_ssd_422(&lcu->ref.v[index], &lcu->rec.v[index],
@@ -469,10 +476,10 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   if (!skip_residual_coding)
   {
     int chroma_mode = (pred_cu->intra.mode_chroma == 36) ? pred_cu->intra.mode : pred_cu->intra.mode_chroma;
-    if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && chroma_mode >= 0 && chroma_mode < 36) {
+    if (KVZ_IS_422(csp) && chroma_mode >= 0 && chroma_mode < 36) {
       chroma_mode = g_chroma422_intra_angle_mapping_table[chroma_mode];
     }
-    int8_t scan_order = kvz_get_scan_order(pred_cu->type, chroma_mode, depth, COLOR_U, state->encoder_control->cfg.chroma_format);
+    int8_t scan_order = kvz_get_scan_order(pred_cu->type, chroma_mode, depth, COLOR_U, csp);
     const int index = xy_to_zorder(lcu_w_c, lcu_px.x, lcu_px.y);
 
     if(u_is_set)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
@@ -483,12 +490,30 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   return (double)ssd * KVZ_CHROMA_MULT + bits * state->lambda;
 }
 
-static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
-                                           const int x_px, const int y_px, const int depth,
+double kvz_cu_rd_cost_chroma(const encoder_state_t *const state, const int x_px, const int y_px,
+                             const int depth, const cu_info_t *const pred_cu,
+                             const cu_info_t* const parent_tu, lcu_t *const lcu)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    return kvz_cu_rd_cost_chroma_csp(state, x_px, y_px, depth, pred_cu, parent_tu, lcu, KVZ_CSP_420);
+  }
+  return kvz_cu_rd_cost_chroma_csp(state, x_px, y_px, depth, pred_cu, parent_tu, lcu,
+                                   state->chroma_format);
+}
+
+static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state, const int x_px,
+                                           const int y_px, const int depth,
                                            const cu_info_t* const pred_cu,
-                                           const cu_info_t* const parent_tu, lcu_t* const lcu) {
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+                                           const cu_info_t* const parent_tu, lcu_t* const lcu);
+
+static FORCE_INLINE double cu_rd_cost_tr_split_accurate_csp(const encoder_state_t* const state,
+                                                            const int x_px, const int y_px, const int depth,
+                                                            const cu_info_t* const pred_cu,
+                                                            const cu_info_t* const parent_tu, lcu_t* const lcu,
+                                                            const enum kvz_chroma_format csp) {
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int min_c_w_mask = (4 << shift_w) - 1;
   const int min_c_h_mask = (4 << shift_h) - 1;
@@ -540,7 +565,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     CABAC_FBITS_UPDATE(cabac, ctx, tr_depth > 0, tr_tree_bits, "tr_split_search");
   }
 
-  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && !skip_residual_coding) {
+  if(csp != KVZ_CSP_400 && !skip_residual_coding) {
     if(tr_cu->depth == depth || cbf_is_set(tr_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_chroma[depth - tr_cu->depth]), cb_flag_u, tr_tree_bits, "cbf_cb_search");
     } 
@@ -583,7 +608,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   if(!skip_residual_coding) {
-    int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth, COLOR_Y, state->encoder_control->cfg.chroma_format);
+    int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth, COLOR_Y, csp);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
     if(cb_flag_y)
@@ -591,7 +616,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->cfg.chroma_format != KVZ_CSP_400 && (x_px & min_c_w_mask) == 0 && (y_px & min_c_h_mask) == 0) {
+  if(csp != KVZ_CSP_400 && (x_px & min_c_w_mask) == 0 && (y_px & min_c_h_mask) == 0) {
     const vector2d_t lcu_px = { x_px >> shift_w, y_px >> shift_h };
     const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + shift_w) : LCU_WIDTH >> depth;
     if (!state->encoder_control->cfg.lossless) {
@@ -604,7 +629,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       // kvz_cu_rd_cost_chroma (which already uses the rectangular SSD), so
       // applying it here too would double-count the bottom sub-TU. Only apply
       // at lower rdo levels where this is the sole chroma cost.
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && depth <= MAX_DEPTH &&
+      if (KVZ_IS_422(csp) && depth <= MAX_DEPTH &&
           state->encoder_control->cfg.rdo < 2) {
         ssd_u = kvz_pixels_calc_ssd_422(&lcu->ref.u[index], &lcu->rec.u[index],
                                         lcu_w_c, lcu_w_c, chroma_width);
@@ -621,10 +646,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
     if (!skip_residual_coding) {
       int chroma_mode = (pred_cu->intra.mode_chroma == 36) ? pred_cu->intra.mode : pred_cu->intra.mode_chroma;
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format) && chroma_mode >= 0 && chroma_mode < 36) {
+      if (KVZ_IS_422(csp) && chroma_mode >= 0 && chroma_mode < 36) {
         chroma_mode = g_chroma422_intra_angle_mapping_table[chroma_mode];
       }
-      int8_t scan_order = kvz_get_scan_order(pred_cu->type, chroma_mode, depth, COLOR_U, state->encoder_control->cfg.chroma_format);
+      int8_t scan_order = kvz_get_scan_order(pred_cu->type, chroma_mode, depth, COLOR_U, csp);
       const unsigned index = xy_to_zorder(lcu_w_c, lcu_px.x, lcu_px.y);
 
       if(cb_flag_u)coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order);
@@ -636,12 +661,27 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   return luma_ssd * KVZ_LUMA_MULT + chroma_ssd * KVZ_CHROMA_MULT + bits * state->lambda;
 }
 
+static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state, const int x_px,
+                                           const int y_px, const int depth,
+                                           const cu_info_t* const pred_cu,
+                                           const cu_info_t* const parent_tu, lcu_t* const lcu)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    return cu_rd_cost_tr_split_accurate_csp(state, x_px, y_px, depth, pred_cu, parent_tu, lcu,
+                                            KVZ_CSP_420);
+  }
+  return cu_rd_cost_tr_split_accurate_csp(state, x_px, y_px, depth, pred_cu, parent_tu, lcu,
+                                          state->chroma_format);
+}
+
 
 // Return estimate of bits used to code prediction mode of cur_cu.
-static double calc_mode_bits(const encoder_state_t *state,
-                             const lcu_t *lcu,
-                             const cu_info_t * cur_cu,
-                             int x, int y)
+static FORCE_INLINE double calc_mode_bits(const encoder_state_t *state,
+                                          const lcu_t *lcu,
+                                          const cu_info_t * cur_cu,
+                                          int x, int y,
+                                          const enum kvz_chroma_format csp)
 {
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
@@ -657,12 +697,12 @@ static double calc_mode_bits(const encoder_state_t *state,
 
   double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes);
 
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int min_c_w_mask = (4 << shift_w) - 1;
   const int min_c_h_mask = (4 << shift_h) - 1;
 
-  if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+  if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && csp != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
   }
 
@@ -732,12 +772,15 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree);
+
+static FORCE_INLINE double search_cu_csp(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree,
+                                         const enum kvz_chroma_format csp)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
+  const int shift_w = KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = KVZ_CSP_SHIFT_H(csp);
   const int min_c_w_mask = (4 << shift_w) - 1;
   const int min_c_h_mask = (4 << shift_h) - 1;
   int cu_width = LCU_WIDTH >> depth;
@@ -904,7 +947,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, lcu, false, false);
 
-      if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+      if ((x & min_c_w_mask) == 0 && (y & min_c_h_mask) == 0 && csp != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
@@ -931,12 +974,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
         kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
 
-        const bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
+        const bool has_chroma = csp != KVZ_CSP_400;
         kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
 
         if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
           //Calculate cost for zero coeffs
-          inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
+          inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth, csp) + inter_bitcost * state->lambda;
 
         }
 
@@ -963,7 +1006,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       {
         int tr_depth = depth;
         kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
-        const bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
+        const bool has_chroma = csp != KVZ_CSP_400;
         kvz_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
         for (int i = 0; i < cu_width; i += (cu_width >> (depth == 0)))
         {
@@ -1015,7 +1058,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 5), y_local& (0xff << 5))->cbf, 1, COLOR_V);
         cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local& (0xff << 6), y_local& (0xff << 6))->cbf, 0, COLOR_V);
       }
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format)) {
+      if (KVZ_IS_422(csp)) {
         int width_luma = LCU_WIDTH >> depth;
         cu_info_t *cur_cu_bot = LCU_GET_CU_AT_PX(lcu, x_local, y_local + width_luma / 2);
         if (cbf_is_set(cur_cu_bot->cbf, 4, COLOR_U) || cbf_is_set(cur_cu_bot->cbf, 3, COLOR_U)) {
@@ -1031,7 +1074,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           cbf_set(&LCU_GET_CU_AT_PX(lcu, x_local & (0xff << 6), y_local & (0xff << 6))->cbf, 0, COLOR_V);
         }
       }
-      bits += calc_mode_bits(state, lcu, cur_cu, x, y);
+      bits += calc_mode_bits(state, lcu, cur_cu, x, y, csp);
     }
     
     cost = bits * state->lambda;
@@ -1042,7 +1085,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       cost = inter_zero_coeff_cost;
 
       // Restore saved pixels from lower level of the working tree.
-      copy_cu_pixels(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
+      copy_cu_pixels(x_local, y_local, cu_width, &work_tree[depth + 1], lcu, csp);
 
       if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
         cur_cu->merged = 0;
@@ -1147,7 +1190,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         kvz_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
-        const bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
+        const bool has_chroma = csp != KVZ_CSP_400;
         const int8_t mode_chroma = has_chroma ? cur_cu->intra.mode_chroma : -1;
         kvz_intra_recon_cu(state,
                            x, y,
@@ -1155,7 +1198,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            cur_cu->intra.mode, mode_chroma,
                            NULL, lcu, false, false);
 
-        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y) + bits;
+        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, csp) + bits;
         cost += mode_bits * state->lambda;
 
         cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, cur_cu, lcu);
@@ -1168,7 +1211,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(x_local, y_local, depth, work_tree);
+      work_tree_copy_up(x_local, y_local, depth, work_tree, csp);
 #if KVZ_DEBUG
       debug_split = 1;
 #endif
@@ -1176,17 +1219,26 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
-      work_tree_copy_down(x_local, y_local, depth, work_tree);
+      work_tree_copy_down(x_local, y_local, depth, work_tree, csp);
     }
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
-    work_tree_copy_down(x_local, y_local, depth, work_tree);
+    work_tree_copy_down(x_local, y_local, depth, work_tree, csp);
   }
 
   assert(cur_cu->type != CU_NOTSET);
 
   return cost;
+}
+
+static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    return search_cu_csp(state, x, y, depth, work_tree, KVZ_CSP_420);
+  }
+  return search_cu_csp(state, x, y, depth, work_tree, state->chroma_format);
 }
 
 

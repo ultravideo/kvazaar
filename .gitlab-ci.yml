@@ -17,13 +17,12 @@ test-kvazaar: &test-template
     expire_in: 1 week
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
-    CFLAGS: '-DKVZ_RANGE_EXTENSION'
 
 test-asan:
   <<: *test-template
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
-    CFLAGS: '-fsanitize=address -DKVZ_RANGE_EXTENSION'
+    CFLAGS: '-fsanitize=address'
     # LeakSanitizer doesn't work inside the container because it requires
     # ptrace so we disable it.
     ASAN_OPTIONS: 'detect_leaks=0'
@@ -35,14 +34,14 @@ test-tsan:
   <<: *test-template
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
-    CFLAGS: '-fsanitize=thread -DKVZ_RANGE_EXTENSION'
+    CFLAGS: '-fsanitize=thread'
     # Temporarily suppress known errors or false positives.
     TSAN_OPTIONS: 'suppressions=/builds/cs/ultravideo/kvazaar/tests/tsan_suppressions.txt'
 
 test-ubsan:
   <<: *test-template
   variables:
-    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -DKVZ_RANGE_EXTENSION'
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
 
 test-valgrind:
   <<: *test-template
@@ -54,7 +53,6 @@ test-valgrind:
     KVAZAAR_OVERRIDE_calc_sao_edge_dir: generic
     KVZ_TEST_VALGRIND: 1
     KVZ_TEST_CHROMASUBSAMPLING: 1
-    CFLAGS: '-DKVZ_RANGE_EXTENSION'
 
 # TODO: If someone knows YAML better, there has to be some better way to
 # concatenate stuff into the test-template script than just manually copy
@@ -70,7 +68,7 @@ test-distcheck:
 test-10bit:
   <<: *test-template
   variables:
-    CFLAGS: '-DKVZ_BIT_DEPTH=10 -DKVZ_RANGE_EXTENSION'
+    CFLAGS: '-DKVZ_BIT_DEPTH=10'
     KVZ_TEST_CHROMASUBSAMPLING: 1
     
 #test-12bit:

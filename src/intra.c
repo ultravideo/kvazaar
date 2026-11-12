@@ -559,18 +559,19 @@ void kvz_intra_build_reference(
   }
 }
 
-static void intra_recon_tb_leaf(
+static FORCE_INLINE void intra_recon_tb_leaf_csp(
   encoder_state_t *const state,
   int x,
   int y,
   int depth,
   int8_t intra_mode,
   lcu_t *lcu,
-  color_t color)
+  color_t color,
+  const enum kvz_chroma_format csp)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
-  const int shift_w = (color == COLOR_Y) ? 0 : SHIFT_W;
-  const int shift_h = (color == COLOR_Y) ? 0 : SHIFT_H;
+  const int shift_w = (color == COLOR_Y) ? 0 : KVZ_CSP_SHIFT_W(csp);
+  const int shift_h = (color == COLOR_Y) ? 0 : KVZ_CSP_SHIFT_H(csp);
 
   int log2width = LOG2_LCU_WIDTH - depth;
   if (color != COLOR_Y && (depth < MAX_PU_DEPTH)) {
@@ -598,10 +599,10 @@ static void intra_recon_tb_leaf(
     cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x << shift_w, lcu_px.y << shift_h);
     mode = cur_cu->intra.mode;
   }
-  if (color != COLOR_Y && KVZ_IS_422(cfg->chroma_format) && mode >= 0 && mode < 36) {
+  if (color != COLOR_Y && KVZ_IS_422(csp) && mode >= 0 && mode < 36) {
     mode = g_chroma422_intra_angle_mapping_table[mode];
   }
-  kvz_intra_predict(&refs, log2width, mode, color, pred, filter_boundary, KVZ_IS_444(cfg->chroma_format));
+  kvz_intra_predict(&refs, log2width, mode, color, pred, filter_boundary, KVZ_IS_444(csp));
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;
@@ -619,6 +620,17 @@ static void intra_recon_tb_leaf(
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
 }
 
+static void intra_recon_tb_leaf(encoder_state_t *const state, int x, int y, int depth,
+                                int8_t intra_mode, lcu_t *lcu, color_t color)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    intra_recon_tb_leaf_csp(state, x, y, depth, intra_mode, lcu, color, KVZ_CSP_420);
+  } else {
+    intra_recon_tb_leaf_csp(state, x, y, depth, intra_mode, lcu, color, state->chroma_format);
+  }
+}
+
 /**
  * \brief Reconstruct an intra CU
  *
@@ -630,8 +642,9 @@ static void intra_recon_tb_leaf(
  * \param mode_chroma   intra mode for chroma, or -1 to skip chroma recon
  * \param cur_cu        pointer to the CU, or NULL to fetch CU from LCU
  * \param lcu           containing LCU
+ * \param csp           chroma format, the function is specialized by it
  */
-void kvz_intra_recon_cu(
+static FORCE_INLINE void kvz_intra_recon_cu_csp(
   encoder_state_t *const state,
   int x,
   int y,
@@ -641,7 +654,8 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   lcu_t *lcu,
   bool recon_from_coeffs,
-  bool skip_residual)
+  bool skip_residual,
+  const enum kvz_chroma_format csp)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   const int8_t width = LCU_WIDTH >> depth;
@@ -689,7 +703,7 @@ void kvz_intra_recon_cu(
     }
   } else {
     const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 && (KVZ_IS_444(state->encoder_control->cfg.chroma_format) ? (x % 4 == 0 && y % 4 == 0) : (x % 8 == 0 && y % 8 == 0));
+    const bool has_chroma = mode_chroma != -1 && (KVZ_IS_444(csp) ? (x % 4 == 0 && y % 4 == 0) : (x % 8 == 0 && y % 8 == 0));
     // Process a leaf TU. For 4:2:2 the non-square chroma TU is split into two
     // square sub-TUs that must each be reconstructed fully (pred + residual)
     // in sequence so that the bottom sub-TU's intra references see the top
@@ -699,7 +713,7 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);
     }
     if (has_chroma) {
-      if (KVZ_IS_422(state->encoder_control->cfg.chroma_format)) {
+      if (KVZ_IS_422(csp)) {
         int width_luma = LCU_WIDTH >> depth;
         // At MAX_PU_DEPTH the 4:2:2 chroma TU is a 4x4 chroma block covering
         // an 8x4 luma region; the decoder (HM) places the bottom sub-TU at
@@ -744,5 +758,19 @@ void kvz_intra_recon_cu(
         cbf_copy(&cur_tu->cbf, cur_cu->cbf, COLOR_V);
       }
     }
+  }
+}
+
+void kvz_intra_recon_cu(encoder_state_t *const state, int x, int y, int depth, int8_t mode_luma,
+                        int8_t mode_chroma, cu_info_t *cur_cu, lcu_t *lcu, bool recon_from_coeffs,
+                        bool skip_residual)
+{
+  // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
+  if (state->chroma_format == KVZ_CSP_420) {
+    kvz_intra_recon_cu_csp(state, x, y, depth, mode_luma, mode_chroma, cur_cu, lcu,
+                           recon_from_coeffs, skip_residual, KVZ_CSP_420);
+  } else {
+    kvz_intra_recon_cu_csp(state, x, y, depth, mode_luma, mode_chroma, cur_cu, lcu,
+                           recon_from_coeffs, skip_residual, state->chroma_format);
   }
 }

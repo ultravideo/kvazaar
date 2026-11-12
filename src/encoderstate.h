@@ -298,6 +298,10 @@ typedef struct encoder_state_t {
    */
   uint8_t chroma_shift_w;
   uint8_t chroma_shift_h;
+  //! rief Cached encoder_control->cfg.chroma_format (enum kvz_chroma_format).
+  //!        Tested by the functions that are specialized by the chroma
+  //!        format, see KVZ_CSP_SHIFT_W in global.h.
+  uint8_t chroma_format;
 
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element_t *lcu_order;

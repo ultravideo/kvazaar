@@ -182,7 +182,6 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 static int8_t calc_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
-  #ifdef KVZ_RANGE_EXTENSION
   uint32_t ss_xy = 0;
   uint32_t ss_xx = 0;
   for (int32_t j = 0; j < tr_width; j++) {
@@ -228,15 +227,11 @@ static int8_t calc_cross_component_prediction(encoder_state_t* const state, cu_i
   }
 
   return alpha;
-  #else
-  return 0;
-  #endif
 }
 
 static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
-  #ifdef KVZ_RANGE_EXTENSION
   int8_t alpha = (color == COLOR_V) ? cur_cu->alpha_v : cur_cu->alpha_u;
   uint8_t sign = (color == COLOR_V) ? cur_cu->alpha_v_s : cur_cu->alpha_u_s;
   if (alpha != 0) {
@@ -252,9 +247,6 @@ static int8_t recon_cross_component_prediction(encoder_state_t* const state, cu_
   }
 
   return alpha;
-  #else
-  return 0;
-  #endif
 }
 
 
@@ -268,7 +260,6 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
   coeff_t* const coeff_out, const bool allow_cross_component_prediction,
   const int width, const kvz_pixel* const ref_in)
 {
-  #ifdef KVZ_RANGE_EXTENSION
   if (!allow_cross_component_prediction) {
     return false;
   }
@@ -395,9 +386,6 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
     }
   }
   return false;
-  #else
-  return false;
-  #endif
 }
 
 
@@ -416,14 +404,20 @@ static bool cross_component_prediction_rdo_generic(encoder_state_t* const state,
 * \param early_skip if this is used for early skip, bypass IT and IQ
 *
 * \returns  Whether coeff_out contains any non-zero coefficients.
+*
+* This is a template that is instantiated twice by kvz_quantize_residual_generic:
+* with ccp_enabled == false all of the cross-component prediction code is
+* removed at compile time, so encodes that do not use the tool (everything
+* except 4:4:4 with --cross-comp-pred) do not pay for it.
 */
-int kvz_quantize_residual_generic(encoder_state_t *const state,
+static FORCE_INLINE int quantize_residual_generic_impl(encoder_state_t *const state,
   cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip, int16_t* luma_residual_cross_comp[2])
+  bool early_skip, int16_t* luma_residual_cross_comp[2],
+  const bool ccp_enabled)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -434,23 +428,20 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   assert(width <= TR_MAX_WIDTH);
   assert(width >= 2);
   
-  #ifdef KVZ_RANGE_EXTENSION
-  bool allow_cross_component_prediction = state->encoder_control->cfg.enable_cross_component_prediction && (cur_cu->tr_depth == cur_cu->depth);
+  const bool allow_cross_component_prediction = ccp_enabled && (cur_cu->tr_depth == cur_cu->depth);
 
   // When the transform RDO does not run for this block (tr_depth != depth)
   // the alpha fields may hold stale values from a candidate that was not
   // selected. Clear them so the encoder does not signal a cross-component
-  // prediction that the reconstruction never applied.
-
-  if (!allow_cross_component_prediction) {
+  // prediction that the reconstruction never applied. The alphas are only
+  // ever set when the tool is enabled, so there is nothing to clear
+  // otherwise.
+  if (ccp_enabled && !allow_cross_component_prediction) {
     cur_cu->alpha_u = 0;
     cur_cu->alpha_v = 0;
     cur_cu->alpha_u_s = 0;
     cur_cu->alpha_v_s = 0;
   }
-  #else
-  bool allow_cross_component_prediction = false;
-  #endif
 
   // Get residual. (ref_in - pred_in -> residual)
   {
@@ -462,7 +453,6 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     }
   }
   
-  #ifdef KVZ_RANGE_EXTENSION
   if (allow_cross_component_prediction) {
     // Store original residual
     if (color == COLOR_Y) {
@@ -471,9 +461,9 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
       }
     }
   }
-  #endif
 
-  if (!cross_component_prediction_rdo_generic(state, cur_cu, color, scan_order, use_trskip,
+  if (!allow_cross_component_prediction ||
+    !cross_component_prediction_rdo_generic(state, cur_cu, color, scan_order, use_trskip,
     in_stride, out_stride, pred_in, rec_out, luma_residual_cross_comp, residual,
     coeff_out, allow_cross_component_prediction, width, ref_in)) {
     // No cross-component prediction RDO done so we continue as usual, otherwise tr-quant already done
@@ -575,6 +565,24 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   }
 
   return has_coeffs;
+}
+
+int kvz_quantize_residual_generic(encoder_state_t *const state,
+  cu_info_t *const cur_cu, const int width, const color_t color,
+  const coeff_scan_order_t scan_order, const int use_trskip,
+  const int in_stride, const int out_stride,
+  const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
+  kvz_pixel *rec_out, coeff_t *coeff_out,
+  bool early_skip, int16_t* luma_residual_cross_comp[2])
+{
+  if (state->encoder_control->cfg.enable_cross_component_prediction) {
+    return quantize_residual_generic_impl(state, cur_cu, width, color, scan_order, use_trskip,
+      in_stride, out_stride, ref_in, pred_in, rec_out, coeff_out,
+      early_skip, luma_residual_cross_comp, true);
+  }
+  return quantize_residual_generic_impl(state, cur_cu, width, color, scan_order, use_trskip,
+    in_stride, out_stride, ref_in, pred_in, rec_out, coeff_out,
+    early_skip, luma_residual_cross_comp, false);
 }
 
 /**
