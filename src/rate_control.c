@@ -842,6 +842,10 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
   new_c = CLIP(+.1, 100.0, new_c);
   new_k = CLIP(-3.0, -0.001, new_k);
 
+  // The model is read by kvz_estimate_pic_lambda of a later frame, which can
+  // run in the main thread at the same time as this (bitstream writing of an
+  // earlier frame in a worker), so update it under the same lock.
+  pthread_mutex_lock(&state->frame->new_ratecontrol->ck_frame_lock);
   if(state->frame->is_irap || state->frame->num <= (4 - state->encoder_control->cfg.frame_allocation)) {
     for(int i = 1; i < 5; i++) {
       state->frame->new_ratecontrol->pic_c_para[i] = new_c;
@@ -852,6 +856,7 @@ static void update_pic_ck(encoder_state_t * const state, double bpp, double dist
     state->frame->new_ratecontrol->pic_c_para[layer] = new_c;
     state->frame->new_ratecontrol->pic_k_para[layer] = new_k;
   }
+  pthread_mutex_unlock(&state->frame->new_ratecontrol->ck_frame_lock);
 }
 
 
