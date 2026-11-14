@@ -206,8 +206,17 @@ typedef struct cu_array_t {
   int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
-cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
-const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
+static INLINE const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  assert(x_px < (unsigned)cua->width);
+  assert(y_px < (unsigned)cua->height);
+  return &cua->data[(x_px >> 2) + (y_px >> 2) * (cua->stride >> 2)];
+}
+
+static INLINE cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
+}
 
 cu_array_t * kvz_cu_array_alloc(const int width, const int height);
 cu_array_t * kvz_cu_subarray(cu_array_t *base,

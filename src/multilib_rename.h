@@ -119,8 +119,6 @@
 #define kvz_context_get_sig_ctx_inc                        KVZ_MULTILIB_NAME(kvz_context_get_sig_ctx_inc)
 #define kvz_ctx_init                                       KVZ_MULTILIB_NAME(kvz_ctx_init)
 #define kvz_cu_array_alloc                                 KVZ_MULTILIB_NAME(kvz_cu_array_alloc)
-#define kvz_cu_array_at                                    KVZ_MULTILIB_NAME(kvz_cu_array_at)
-#define kvz_cu_array_at_const                              KVZ_MULTILIB_NAME(kvz_cu_array_at_const)
 #define kvz_cu_array_copy_from_lcu                         KVZ_MULTILIB_NAME(kvz_cu_array_copy_from_lcu)
 #define kvz_cu_array_copy_ref                              KVZ_MULTILIB_NAME(kvz_cu_array_copy_ref)
 #define kvz_cu_array_copy_to_lcu                           KVZ_MULTILIB_NAME(kvz_cu_array_copy_to_lcu)
