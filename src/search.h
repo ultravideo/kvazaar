@@ -77,14 +77,16 @@ typedef struct unit_stats_map_t {
 void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
 void kvz_sort_keys_by_cost(unit_stats_map_t *__restrict map);
 
-void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
+void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf,
+                    lcu_t *work_tree);
 
 /**
  * Frame-level post-search chroma reconstruction. Rebuilds frame->rec chroma
  * from the final CU tree and retained coefficients so that it matches the
  * decoder. Luma is left untouched.
  */
-void kvz_reconstruct_lcu_chroma(encoder_state_t *state, int lcu_px_x, int lcu_px_y, const lcu_t *search_lcu);
+void kvz_reconstruct_lcu_chroma(encoder_state_t *state, int lcu_px_x, int lcu_px_y,
+                                const lcu_t *search_lcu, lcu_t *scratch_lcu);
 
 double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                            const int x_px, const int y_px, const int depth,

@@ -239,6 +239,7 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="..\..\src\videoframe.c" />
+    <ClCompile Include="..\..\src\work_tree_pool.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
     <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
     <ClInclude Include="..\..\src\encoder_state-geometry.h" />
@@ -312,6 +313,7 @@
     <ClInclude Include="..\..\src\threadwrapper\include\semaphore.h" />
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\videoframe.h" />
+    <ClInclude Include="..\..\src\work_tree_pool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

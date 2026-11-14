@@ -43,11 +43,18 @@
 #include "kvazaar.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
 
- // NOTE: u & v were originally sized with LCU_CHROMA_SIZE, so arrays are too big if chroma is subsampled
+/**
+ * \brief Pixels of an LCU
+ *
+ * The buffers are not owned by this struct. The luma buffer has
+ * LCU_LUMA_SIZE pixels and the chroma buffers are sized for chroma_format
+ * (see KVZ_LCU_CHROMA_SIZE in cu.h), or NULL for 4:0:0. The stride is
+ * LCU_WIDTH for luma and LCU_WIDTH >> chroma shift for chroma.
+ */
 typedef struct {
-  kvz_pixel y[LCU_LUMA_SIZE];
-  kvz_pixel u[LCU_LUMA_SIZE];
-  kvz_pixel v[LCU_LUMA_SIZE];
+  kvz_pixel *y;
+  kvz_pixel *u;
+  kvz_pixel *v;
   enum kvz_chroma_format chroma_format;
 } lcu_yuv_t;
 

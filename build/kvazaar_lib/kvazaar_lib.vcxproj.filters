@@ -117,6 +117,9 @@
     <ClCompile Include="..\..\src\search.c">
       <Filter>Compression</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\work_tree_pool.c">
+      <Filter>Compression</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\search_inter.c">
       <Filter>Compression</Filter>
     </ClCompile>
@@ -337,6 +340,9 @@
       <Filter>Compression</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\search.h">
+      <Filter>Compression</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\work_tree_pool.h">
       <Filter>Compression</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\search_inter.h">

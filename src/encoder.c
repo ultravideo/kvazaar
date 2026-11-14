@@ -42,6 +42,7 @@
 #include "kvz_math.h"
 #include "fast_coeff_cost.h"
 #include "rate_control.h"
+#include "work_tree_pool.h"
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
@@ -242,6 +243,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
   if (!encoder->threadqueue) {
     fprintf(stderr, "Could not initialize threadqueue.\n");
+    goto init_failed;
+  }
+
+  // With no worker threads the LCUs are searched in the main thread.
+  encoder->work_tree_pool = kvz_work_tree_pool_alloc(encoder->cfg.chroma_format,
+                                                     MAX(1, encoder->cfg.threads));
+  if (!encoder->work_tree_pool) {
+    fprintf(stderr, "Could not allocate the search work trees.\n");
     goto init_failed;
   }
 
@@ -646,6 +655,10 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   kvz_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
+
+  // Freed after the threadqueue, so that no thread is using it.
+  kvz_work_tree_pool_free(encoder->work_tree_pool);
+  encoder->work_tree_pool = NULL;
 
   if(encoder->cfg.fastrd_sampling_on || encoder->cfg.fastrd_accuracy_check_on)
   {

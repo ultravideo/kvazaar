@@ -293,18 +293,26 @@ typedef struct {
 
  \endverbatim
  */
-typedef ALIGNED(8) struct {
-  coeff_t y[LCU_LUMA_SIZE];
-  coeff_t u[LCU_LUMA_SIZE];
-  coeff_t v[LCU_LUMA_SIZE];
+typedef struct {
+  coeff_t *y; //!< LCU_LUMA_SIZE coefficients
+  coeff_t *u; //!< KVZ_LCU_CHROMA_SIZE(csp) coefficients, NULL for 4:0:0
+  coeff_t *v; //!< KVZ_LCU_CHROMA_SIZE(csp) coefficients, NULL for 4:0:0
 } lcu_coeff_t;
 
 
+/**
+ * \brief Data of an LCU used in the search
+ *
+ * The pixel and coefficient buffers are not part of the struct. They are
+ * allocated for the exact chroma format in use, usually from the work tree
+ * pool (see work_tree_pool.h), so a plain struct assignment does not copy
+ * them.
+ */
 typedef struct {
   lcu_ref_px_t top_ref;  //!< Reference pixels from adjacent LCUs.
   lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
-  lcu_yuv_t ref; //!< LCU reference pixels
-  lcu_yuv_t rec; //!< LCU reconstructed pixels
+  lcu_yuv_t ref; //!< LCU reference pixels, read-only in the search and shared by the work tree
+  lcu_yuv_t rec; //!< LCU reconstructed pixels, KVZ_LCU_CHROMA_REC_SIZE(csp) chroma pixels
   /**
    * We get the coefficients as a byproduct of doing reconstruction during the
    * search. It might be more efficient to recalculate the final coefficients
@@ -342,10 +350,6 @@ typedef struct {
 
 /**
  * \brief Number of pixels or coefficients in one chroma component of an LCU
- *
- * The u and v buffers of lcu_t are sized for 4:4:4, but only the first
- * KVZ_LCU_CHROMA_SIZE(csp) elements are used with chroma format csp, so
- * only those need to be initialized or copied.
  */
 #define KVZ_LCU_CHROMA_SIZE(csp) \
   ((csp) == KVZ_CSP_400 ? 0 : (LCU_LUMA_SIZE >> (KVZ_CSP_SHIFT_W(csp) + KVZ_CSP_SHIFT_H(csp))))

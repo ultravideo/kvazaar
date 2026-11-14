@@ -118,6 +118,8 @@ libkvazaar_la_SOURCES = \
 	transform.h \
 	videoframe.c \
 	videoframe.h \
+	work_tree_pool.c \
+	work_tree_pool.h \
 	strategies/generic/dct-generic.c \
 	strategies/generic/dct-generic.h \
 	strategies/generic/intra-generic.c \

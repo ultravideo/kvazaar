@@ -122,6 +122,9 @@ typedef struct encoder_control_t
 
   threadqueue_queue_t *threadqueue;
 
+  //! Work trees for the LCU searches, one for each thread.
+  struct kvz_work_tree_pool *work_tree_pool;
+
   //! Target average bits per picture.
   double target_avg_bppic;
 

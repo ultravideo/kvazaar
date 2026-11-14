@@ -161,39 +161,36 @@ static void copy_lcu_chroma_to_frame_rec(const encoder_state_t * const state,
  * The coefficients must be COPIED: the recon-from-coeffs quantize path
  * dequantizes its coefficient buffer in place, and the search's final
  * coefficients are still needed for the bitstream coding (state->coeff).
+ *
+ * \param search_lcu   depth 0 of the search work tree
+ * \param scratch_lcu  another lcu_t of the same work tree, which is
+ *                     overwritten (except for the shared source pixels,
+ *                     which are not used)
  */
 void kvz_reconstruct_lcu_chroma(encoder_state_t * const state,
                                 const int lcu_px_x, const int lcu_px_y,
-                                const lcu_t *search_lcu)
+                                const lcu_t *search_lcu, lcu_t *scratch_lcu)
 {
   const videoframe_t * const frame = state->tile->frame;
 
   const enum kvz_chroma_format csp = state->encoder_control->cfg.chroma_format;
   const int chroma_size = KVZ_LCU_CHROMA_SIZE(csp);
+  if (chroma_size == 0) return;
 
-  // Only initialize the parts of the buffers that the chroma format uses.
-  // The buffers are sized for 4:4:4.
-  lcu_t lcu;
-  FILL(lcu.cu, 0);
-  lcu.rec.chroma_format = csp;
-  lcu.ref.chroma_format = csp;
-  FILL_ARRAY(lcu.ref.y, 0, LCU_LUMA_SIZE);
-  FILL_ARRAY(lcu.rec.y, 0, LCU_LUMA_SIZE);
-  memcpy(lcu.coeff.y, search_lcu->coeff.y, LCU_LUMA_SIZE * sizeof(coeff_t));
-  if (chroma_size > 0) {
-    FILL_ARRAY(lcu.ref.u, 0, chroma_size);
-    FILL_ARRAY(lcu.ref.v, 0, chroma_size);
-    FILL_ARRAY(lcu.rec.u, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
-    FILL_ARRAY(lcu.rec.v, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
-    memcpy(lcu.coeff.u, search_lcu->coeff.u, chroma_size * sizeof(coeff_t));
-    memcpy(lcu.coeff.v, search_lcu->coeff.v, chroma_size * sizeof(coeff_t));
-  }
-  memcpy(&lcu.top_ref, &search_lcu->top_ref, sizeof(lcu.top_ref));
-  memcpy(&lcu.left_ref, &search_lcu->left_ref, sizeof(lcu.left_ref));
+  // Only the chroma is reconstructed, so only the chroma buffers need to be
+  // initialized.
+  lcu_t *const lcu = scratch_lcu;
+  FILL(lcu->cu, 0);
+  FILL_ARRAY(lcu->rec.u, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
+  FILL_ARRAY(lcu->rec.v, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
+  memcpy(lcu->coeff.u, search_lcu->coeff.u, chroma_size * sizeof(coeff_t));
+  memcpy(lcu->coeff.v, search_lcu->coeff.v, chroma_size * sizeof(coeff_t));
+  lcu->top_ref  = search_lcu->top_ref;
+  lcu->left_ref = search_lcu->left_ref;
 
   // Load the final CU tree for this LCU.
-  kvz_cu_array_copy_to_lcu(&lcu, lcu_px_x, lcu_px_y, frame->cu_array);
+  kvz_cu_array_copy_to_lcu(lcu, lcu_px_x, lcu_px_y, frame->cu_array);
 
-  reconstruct_coding_tree_chroma(state, lcu_px_x, lcu_px_y, 0, &lcu);
-  copy_lcu_chroma_to_frame_rec(state, lcu_px_x, lcu_px_y, &lcu);
+  reconstruct_coding_tree_chroma(state, lcu_px_x, lcu_px_y, 0, lcu);
+  copy_lcu_chroma_to_frame_rec(state, lcu_px_x, lcu_px_y, lcu);
 }

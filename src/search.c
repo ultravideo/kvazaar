@@ -1249,10 +1249,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  *
- * Only the parts of the pixel and coefficient buffers that are used by the
- * chroma format are touched. The buffers are sized for 4:4:4, so clearing
- * the whole lcu_t would write almost twice the necessary amount of memory
- * for 4:2:0.
+ * The pixel and coefficient buffers are allocated for the chroma format in
+ * use (see work_tree_pool.h), so the chroma buffers are cleared and copied
+ * with the size given by KVZ_LCU_CHROMA_SIZE and KVZ_LCU_CHROMA_REC_SIZE.
  */
 static void init_lcu_t(const encoder_state_t * const state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
@@ -1389,26 +1388,23 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 /**
  * Copy the initial state of the work tree from depth 0 to a deeper level.
  *
- * Only the parts of the buffers that are used by the chroma format are
- * copied, see init_lcu_t.
+ * The source pixels (ref) are shared by all the depths of the work tree, so
+ * they are not copied.
  */
 static void copy_lcu_t_init(lcu_t *to, const lcu_t *from, const enum kvz_chroma_format csp)
 {
   const int chroma_size = KVZ_LCU_CHROMA_SIZE(csp);
   const int chroma_rec_size = KVZ_LCU_CHROMA_REC_SIZE(csp);
 
+  assert(to->ref.y == from->ref.y);
+
   to->top_ref  = from->top_ref;
   to->left_ref = from->left_ref;
   memcpy(to->cu, from->cu, sizeof(to->cu));
 
-  to->ref.chroma_format = from->ref.chroma_format;
-  to->rec.chroma_format = from->rec.chroma_format;
-  memcpy(to->ref.y,   from->ref.y,   LCU_LUMA_SIZE * sizeof(kvz_pixel));
   memcpy(to->rec.y,   from->rec.y,   LCU_LUMA_SIZE * sizeof(kvz_pixel));
   memcpy(to->coeff.y, from->coeff.y, LCU_LUMA_SIZE * sizeof(coeff_t));
   if (chroma_size > 0) {
-    memcpy(to->ref.u,   from->ref.u,   chroma_size * sizeof(kvz_pixel));
-    memcpy(to->ref.v,   from->ref.v,   chroma_size * sizeof(kvz_pixel));
     memcpy(to->rec.u,   from->rec.u,   chroma_rec_size * sizeof(kvz_pixel));
     memcpy(to->rec.v,   from->rec.v,   chroma_rec_size * sizeof(kvz_pixel));
     memcpy(to->coeff.u, from->coeff.u, chroma_size * sizeof(coeff_t));
@@ -1452,13 +1448,14 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
 /**
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
+ * - The coefficients of the best mode are left in work_tree[0].coeff.
+ *
+ * \param work_tree  KVZ_WORK_TREE_SIZE lcu_t structs from the work tree pool
  */
-void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
+void kvz_search_lcu(encoder_state_t * const state, const int x, const int y,
+                    const yuv_t * const hor_buf, const yuv_t * const ver_buf,
+                    lcu_t * const work_tree)
 {
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
-  const int lcu_w_c = LCU_WIDTH >> shift_w;
-  const int lcu_h_c = LCU_WIDTH >> shift_h;
   memcpy(&state->search_cabac, &state->cabac, sizeof(cabac_data_t));
   state->search_cabac.only_count = 1;
   assert(x % LCU_WIDTH == 0);
@@ -1468,7 +1465,6 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // will use these as temporary storage for predictions before making
   // a decision on which to use, and they get updated during the search
   // process.
-  lcu_t work_tree[MAX_PU_DEPTH + 1];
   init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
   assert(work_tree[0].rec.chroma_format == state->encoder_control->cfg.chroma_format);
   assert(work_tree[0].ref.chroma_format == state->encoder_control->cfg.chroma_format);
@@ -1503,16 +1499,11 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // captured pre-deblock (recdata_to_bufs), matching the decoder. The
   // worker's normal per-LCU deblock/SAO then filters the corrected chroma,
   // so no frame-level reconstruction pass is needed.
+  // The deeper levels of the work tree are not needed anymore, so one of
+  // them is used as the scratch LCU of the reconstruction.
   if (KVZ_IS_422(state->encoder_control->cfg.chroma_format)) {
     const int qp_save = state->qp;
-    kvz_reconstruct_lcu_chroma(state, x, y, &work_tree[0]);
+    kvz_reconstruct_lcu_chroma(state, x, y, &work_tree[0], &work_tree[1]);
     state->qp = qp_save;
-  }
-
-  // Copy coeffs to encoder state.
-  copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH, LCU_WIDTH);
-  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
-    copy_coeffs(work_tree[0].coeff.u, state->coeff->u, lcu_w_c, lcu_h_c);
-    copy_coeffs(work_tree[0].coeff.v, state->coeff->v, lcu_w_c, lcu_h_c);
   }
 }

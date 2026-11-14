@@ -52,6 +52,7 @@
 #include "search.h"
 #include "tables.h"
 #include "threadqueue.h"
+#include "work_tree_pool.h"
 
 #include "strategies/strategies-picture.h"
 
@@ -671,14 +672,20 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       assert(0);
   }
 
-  // No need to clear the coefficients: kvz_search_lcu overwrites the whole
-  // area used by the chroma format with the (zero initialized) coefficient
-  // buffer of the search.
-  lcu_coeff_t coeff;
-  state->coeff = &coeff;
+  // The search leaves the final coefficients of the LCU in depth 0 of the
+  // work tree, and the coding tree is encoded from there, so the work tree
+  // is kept until the LCU has been written.
+  lcu_t *const work_tree = kvz_work_tree_pool_get(encoder->work_tree_pool);
+  if (!work_tree) {
+    fprintf(stderr, "Failed to allocate the search work tree.\n");
+    assert(0);
+    return;
+  }
+  state->coeff = &work_tree[0].coeff;
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
-  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
+  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search,
+                 work_tree);
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
@@ -717,6 +724,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   // Coeffs are not needed anymore.
   state->coeff = NULL;
+  kvz_work_tree_pool_put(encoder->work_tree_pool, work_tree);
 
   bool end_of_slice_segment_flag;
   if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
