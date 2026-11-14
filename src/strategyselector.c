@@ -578,6 +578,21 @@ static void set_hardware_flags(int32_t cpuid, uint8_t logging) {
   }
 #endif //COMPILE_INTEL
 
+#if COMPILE_ARM64
+  // Advanced SIMD (NEON) is part of the AArch64 base architecture.
+  kvz_g_hardware_flags.arm_flags.neon = COMPILE_ARM_NEON ? 1 : 0;
+
+  if (logging) {
+    fprintf(stderr, "Compiled: ARM64, flags:");
+#if COMPILE_ARM_NEON
+    fprintf(stderr, " NEON");
+#endif
+    fprintf(stderr, "\nDetected: ARM64, flags:");
+    if (kvz_g_hardware_flags.arm_flags.neon) fprintf(stderr, " NEON");
+    fprintf(stderr, "\n");
+  }
+#endif //COMPILE_ARM64
+
 #if COMPILE_POWERPC
   if (cpuid) {
     kvz_g_hardware_flags.powerpc_flags.altivec = altivec_available();

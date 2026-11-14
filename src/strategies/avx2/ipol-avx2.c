@@ -137,6 +137,9 @@ static void kvz_eight_tap_filter_ver_16bit_1x8_avx2(int8_t *filter, int16_t *dat
 
   sum_lo = _mm_srai_epi32(sum_lo, shift2);
   sum_hi = _mm_srai_epi32(sum_hi, shift2);
+  // Only used by the block filters: store sum >> 6 as int16 like generic.
+  sum_lo = _mm_srai_epi32(_mm_slli_epi32(sum_lo, 16), 16);
+  sum_hi = _mm_srai_epi32(_mm_slli_epi32(sum_hi, 16), 16);
 
   __m128i offset = _mm_set1_epi32(wp_offset1);
   sum_lo = _mm_add_epi32(sum_lo, offset);
@@ -175,6 +178,28 @@ static void kvz_ipol_8tap_hor_px_im_avx2(int8_t *filter,
   int x_offset = -KVZ_LUMA_FILTER_OFFSET;
 
   kvz_pixel *top_left = src + src_stride * y_offset + x_offset;
+
+  if (filter == kvz_g_luma_filter[0]) {
+    // Filter row 0 is a single tap of 64 at position 3: the sample shifted
+    // left by 6. Rows and store widths follow the general loops below.
+    for (int yy = 0; yy < height + KVZ_EXT_PADDING_LUMA; yy += 2) {
+      for (int r = 0; r < 2; ++r) {
+        const kvz_pixel *in = top_left + src_stride * (yy + r) + 3;
+        int16_t *out = dst + (yy + r) * dst_stride;
+        int xx = 0;
+        for (; xx + 7 < width; xx += 8) {
+          _mm_storeu_si128((__m128i *)(out + xx),
+                           _mm_slli_epi16(_mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)(in + xx))), 6));
+        }
+        if (xx < width) {
+          uint32_t px;
+          memcpy(&px, in + xx, 4);
+          _mm_storel_epi64((__m128i *)(out + xx), _mm_slli_epi16(_mm_cvtepu8_epi16(_mm_cvtsi32_si128((int)px)), 6));
+        }
+      }
+    }
+    return;
+  }
 
   int y = 0;
   int x = 0;
@@ -245,14 +270,41 @@ static void kvz_ipol_8tap_hor_px_im_avx2(int8_t *filter,
   }
 }
 
+// wrap16: store sum >> 6 as int16 before rounding, like the generic block
+// filters (int16_t sample = ... >> shift2). The generic sample functions keep
+// 32 bits, so they pass 0. Only the half-pel diagonal can exceed int16.
 static void kvz_ipol_8tap_ver_im_px_avx2(int8_t *filter,
   int width,
   int height,
   int16_t *src,
   int16_t src_stride,
   kvz_pixel *dst,
-  int16_t dst_stride)
+  int16_t dst_stride,
+  int wrap16)
 {
+  if (filter == kvz_g_luma_filter[0]) {
+    // Filter row 0 is a single tap of 64 at position 3: (64 * h) >> 6 == h,
+    // with or without the int16 store, so the result is clip((h + 32) >> 6).
+    // Rows are written in pairs like the general loop below.
+    const __m128i offset = _mm_set1_epi16(32);
+    for (int y = 0; y < height; y += 2) {
+      for (int r = 0; r < 2; ++r) {
+        const int16_t *in = src + (y + r + 3) * src_stride;
+        kvz_pixel *out = dst + (y + r) * dst_stride;
+        int x = 0;
+        for (; x + 7 < width; x += 8) {
+          __m128i v = _mm_srai_epi16(_mm_add_epi16(_mm_loadu_si128((const __m128i *)(in + x)), offset), 6);
+          _mm_storel_epi64((__m128i *)(out + x), _mm_packus_epi16(v, v));
+        }
+        for (; x + 3 < width; x += 4) {
+          __m128i v = _mm_srai_epi16(_mm_add_epi16(_mm_loadl_epi64((const __m128i *)(in + x)), offset), 6);
+          *(uint32_t *)(out + x) = (uint32_t)_mm_cvtsi128_si32(_mm_packus_epi16(v, v));
+        }
+      }
+    }
+    return;
+  }
+
   // Interpolation filter shifts
   int32_t shift2 = 6;
 
@@ -324,6 +376,7 @@ static void kvz_ipol_8tap_ver_im_px_avx2(int8_t *filter,
       __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
       __m256i sum = _mm256_add_epi32(sum0123, sum4567);
       sum = _mm256_srai_epi32(sum, shift2);
+      if (wrap16) sum = _mm256_srai_epi32(_mm256_slli_epi32(sum, 16), 16);
       sum = _mm256_add_epi32(sum, _mm256_set1_epi32(wp_offset1));
       sum = _mm256_srai_epi32(sum, wp_shift1);
       sum = _mm256_packs_epi32(sum, sum);
@@ -410,7 +463,10 @@ int16_t dst_stride)
       __m256i sum0123 = _mm256_add_epi32(dot01, dot23);
       __m256i sum4567 = _mm256_add_epi32(dot45, dot67);
       __m256i sum = _mm256_add_epi32(sum0123, sum4567);
-      sum = _mm256_srai_epi32(sum, shift2); // TODO: -8192 offsetting for extreme values
+      sum = _mm256_srai_epi32(sum, shift2);
+      // Generic assigns the 32-bit value to an int16_t, which wraps on extreme
+      // input. Wrap the same way so the saturating pack below is exact.
+      sum = _mm256_srai_epi32(_mm256_slli_epi32(sum, 16), 16);
       sum = _mm256_packs_epi32(sum, sum);
 
       int16_t *dst_addr0 = &dst[(y + 0) * dst_stride + x];
@@ -500,7 +556,11 @@ static void kvz_ipol_4tap_ver_im_px_avx2(int8_t *filter,
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t*)filter);
+  // A 4-tap filter row is 4 bytes: load only those (the upper half of the
+  // widened vector is not used).
+  int32_t filter_4b;
+  memcpy(&filter_4b, filter, sizeof(filter_4b));
+  __m128i weights_8b = _mm_set1_epi32(filter_4b);
   __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
   __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
   __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
@@ -569,7 +629,11 @@ static void kvz_ipol_4tap_ver_im_hi_avx2(int8_t *filter,
 {
   const int shift2 = 6;
 
-  __m128i weights_8b = _mm_set1_epi64x(*(uint64_t *)filter);
+  // A 4-tap filter row is 4 bytes: load only those (the upper half of the
+  // widened vector is not used).
+  int32_t filter_4b;
+  memcpy(&filter_4b, filter, sizeof(filter_4b));
+  __m128i weights_8b = _mm_set1_epi32(filter_4b);
   __m256i weights_16b = _mm256_cvtepi8_epi16(weights_8b);
   __m256i all_w01 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(0, 0, 0, 0));
   __m256i all_w23 = _mm256_shuffle_epi32(weights_16b, _MM_SHUFFLE(1, 1, 1, 1));
@@ -704,7 +768,7 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Right
   int16_t *im = &hor_pos2[hor_stride];
   kvz_pixel *dst = out_r;
-  kvz_ipol_8tap_ver_im_px_avx2(fir0, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(fir0, width, height, im, hor_stride, dst, dst_stride, 1);
 
   // Left
   // Copy from the right filtered block and filter the extra column
@@ -721,7 +785,7 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Top
   im = hor_pos0;
   dst = out_t;
-  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride, 1);
 
   // Bottom
   // Copy what can be copied from the top filtered values.
@@ -774,7 +838,7 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Top-Right
   int16_t *im = hor_pos2;
   kvz_pixel *dst = out_tr;
-  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(fir2, width, height, im, hor_stride, dst, dst_stride, 1);
 
   // Top-left
   // Copy from the top-right filtered block and filter the extra column
@@ -903,7 +967,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Filter block and then filter column and align if neccessary
   int16_t *im = &hor_pos_l[sample_off_y * hor_stride];
   kvz_pixel *dst = out_l;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_l, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_l, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -926,7 +990,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   // Filter block and then filter column and align if neccessary
   im = &hor_pos_r[sample_off_y * hor_stride];
   dst = out_r;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_r, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_r, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -952,7 +1016,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   im = &hor_hpel_pos[off_y_fir_t * hor_stride];
   dst = out_t;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!sample_off_x) {
     for (y = 0; y < height; ++y) {
@@ -976,7 +1040,7 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
 
   im = &hor_hpel_pos[off_y_fir_b * hor_stride];
   dst = out_b;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!sample_off_x) {
     for (y = 0; y < height; ++y) {
@@ -1047,7 +1111,7 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Filter block and then filter column and align if neccessary
   int16_t *im = &hor_pos_l[off_y_fir_t * hor_stride];
   kvz_pixel *dst = out_tl;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -1071,7 +1135,7 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
 
   im = &hor_pos_r[off_y_fir_t * hor_stride];
   dst = out_tr;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_t, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -1094,7 +1158,7 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Filter block and then filter column and align if neccessary
   im = &hor_pos_l[off_y_fir_b * hor_stride];
   dst = out_bl;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_l) {
     for (y = 0; y < height; ++y) {
@@ -1117,7 +1181,7 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   // Filter block and then filter column and align if neccessary
   im = &hor_pos_r[off_y_fir_b * hor_stride];
   dst = out_br;
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir_b, width, height, im, hor_stride, dst, dst_stride, 1);
 
   if (!off_x_fir_r) {
     for (y = 0; y < height; ++y) {
@@ -1158,7 +1222,7 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   int16_t hor_stride = LCU_WIDTH;
 
   kvz_ipol_8tap_hor_px_im_avx2(hor_fir, width, height, src, src_stride, hor_intermediate, hor_stride);
-  kvz_ipol_8tap_ver_im_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
+  kvz_ipol_8tap_ver_im_px_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride, 0);
 }
 
 

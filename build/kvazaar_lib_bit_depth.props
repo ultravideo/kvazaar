@@ -26,8 +26,18 @@
     <ClCompile Include="$(KvzSrcDir)*.c" Exclude="$(KvzSrcDir)encmain.c;$(KvzSrcDir)cli.c;$(KvzSrcDir)yuv_io.c" />
     <ClCompile Include="$(KvzSrcDir)extras\libmd5.c" />
     <ClCompile Include="$(KvzSrcDir)strategies\**\*.c" Exclude="$(KvzSrcDir)strategies\avx2\*.c" />
+    <ClCompile Include="$(KvzSrcDir)strategies\**\*.cpp" Exclude="$(KvzSrcDir)strategies\avx2\*.cpp">
+      <CompileAs>CompileAsCpp</CompileAs>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
     <ClCompile Include="$(KvzSrcDir)strategies\avx2\*.c">
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <!-- SIMD strategies written in C++17, see strategies-cpp.h. -->
+    <ClCompile Include="$(KvzSrcDir)strategies\avx2\*.cpp">
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ClInclude Include="$(KvzSrcDir)multilib_rename.h" />
   </ItemGroup>

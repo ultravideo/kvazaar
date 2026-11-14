@@ -37,6 +37,7 @@
 #include "strategies/generic/picture-generic.h"
 #include "strategies/sse2/picture-sse2.h"
 #include "strategies/sse41/picture-sse41.h"
+#include "strategies/neon/picture-neon.h"
 #include "strategyselector.h"
 
 
@@ -94,6 +95,9 @@ int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   }
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_picture_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_picture_neon(opaque, bitdepth);
   }
   if (kvz_g_hardware_flags.powerpc_flags.altivec) {
     success &= kvz_strategy_register_picture_altivec(opaque, bitdepth);

@@ -31,6 +31,9 @@
     <Filter Include="Optimization\strategies\altivec">
       <UniqueIdentifier>{770e42cd-56bc-4377-af83-c14872722ed2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Optimization\strategies\neon">
+      <UniqueIdentifier>{37b1f053-0068-4e89-926c-42ce5ec15dc1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Optimization\strategies\avx2">
       <UniqueIdentifier>{4ffb5d27-c5bb-44d5-a935-fa93066a259e}</UniqueIdentifier>
     </Filter>
@@ -75,10 +78,10 @@
     <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c">
       <Filter>Optimization\strategies\sse2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\dct-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\dct-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\dct-generic.c">
@@ -111,7 +114,7 @@
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c">
       <Filter>Optimization\strategies\generic</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.c">
+    <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.cpp">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\search.c">
@@ -375,11 +378,53 @@
     <ClInclude Include="..\..\src\strategies\strategies-picture.h">
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-cpp.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\strategies\strategies-quant.h">
       <Filter>Optimization\strategies</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h">
       <Filter>Optimization\strategies\sse41</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\src\strategies\neon\dct-neon.cpp">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\neon\intra-neon.cpp">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\neon\ipol-neon.cpp">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\neon\picture-neon.cpp">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\neon\quant-neon.c">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\neon\sao-neon.c">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\src\strategies\neon\neon-common.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\dct-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\intra-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\ipol-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\picture-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\quant-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\neon\sao-neon.h">
+      <Filter>Optimization\strategies\neon</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\sse2\picture-sse2.h">
       <Filter>Optimization\strategies\sse2</Filter>

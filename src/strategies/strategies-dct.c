@@ -34,6 +34,7 @@
 
 #include "avx2/dct-avx2.h"
 #include "generic/dct-generic.h"
+#include "strategies/neon/dct-neon.h"
 #include "strategyselector.h"
 
 
@@ -60,6 +61,9 @@ int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {
 
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_dct_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_dct_neon(opaque, bitdepth);
   }
 
   return success;

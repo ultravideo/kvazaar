@@ -19,6 +19,7 @@ include_HEADERS = \
 noinst_LTLIBRARIES = \
 	libaltivec.la \
 	libavx2.la \
+	libneon.la \
 	libsse2.la \
 	libsse41.la
 
@@ -170,14 +171,15 @@ KVZ_ALTIVEC_SOURCES = \
 	strategies/altivec/picture-altivec.h
 
 KVZ_AVX2_SOURCES = \
+	strategies/strategies-cpp.h \
 	strategies/avx2/avx2_common_functions.h \
-	strategies/avx2/dct-avx2.c \
+	strategies/avx2/dct-avx2.cpp \
 	strategies/avx2/dct-avx2.h \
-	strategies/avx2/intra-avx2.c \
+	strategies/avx2/intra-avx2.cpp \
 	strategies/avx2/intra-avx2.h \
 	strategies/avx2/ipol-avx2.c \
 	strategies/avx2/ipol-avx2.h \
-	strategies/avx2/picture-avx2.c \
+	strategies/avx2/picture-avx2.cpp \
 	strategies/avx2/picture-avx2.h \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h \
@@ -187,6 +189,22 @@ KVZ_AVX2_SOURCES = \
 	strategies/avx2/encode_coding_tree-avx2.c \
 	strategies/avx2/encode_coding_tree-avx2.h
 
+KVZ_NEON_SOURCES = \
+	strategies/strategies-cpp.h \
+	strategies/neon/neon-common.h \
+	strategies/neon/dct-neon.cpp \
+	strategies/neon/dct-neon.h \
+	strategies/neon/intra-neon.cpp \
+	strategies/neon/intra-neon.h \
+	strategies/neon/ipol-neon.cpp \
+	strategies/neon/ipol-neon.h \
+	strategies/neon/picture-neon.cpp \
+	strategies/neon/picture-neon.h \
+	strategies/neon/quant-neon.c \
+	strategies/neon/quant-neon.h \
+	strategies/neon/sao-neon.c \
+	strategies/neon/sao-neon.h
+
 KVZ_SSE2_SOURCES = \
 	strategies/sse2/picture-sse2.c \
 	strategies/sse2/picture-sse2.h
@@ -195,6 +213,13 @@ KVZ_SSE41_SOURCES = \
 	strategies/sse41/picture-sse41.c \
 	strategies/sse41/picture-sse41.h \
 	strategies/sse41/reg_sad_pow2_widths-sse41.h
+
+# Flags for SIMD strategies written in C++ (see strategies/strategies-cpp.h).
+# They use templates only: no exceptions, RTTI or C++ runtime, so the library
+# is still linked as C. Symbols are hidden like in the C code.
+KVZ_STRATEGY_CXXFLAGS = $(AM_CXXFLAGS) -std=c++17 -fno-exceptions -fno-rtti -fvisibility=hidden \
+	-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -ftree-vectorize \
+	-I$(srcdir) -I$(srcdir)/extras
 
 if HAVE_PPC
 if HAVE_ALTIVEC
@@ -228,6 +253,7 @@ libkvazaar_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS) $(KVZ_MULTILIB_CPPFLAGS)
 libkvazaar_la_LIBADD = \
 	libaltivec.la \
 	libavx2.la \
+	libneon.la \
 	libsse2.la \
 	libsse41.la
 
@@ -253,6 +279,13 @@ libaltivec_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
 libavx2_la_SOURCES = $(KVZ_AVX2_SOURCES)
 libavx2_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
 libavx2_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
+libavx2_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS) $(KVZ_AVX2_CFLAGS)
+
+# The AArch64 NEON strategies need no extra compiler flags: NEON is part of
+# the AArch64 baseline. On other architectures they compile to nothing.
+libneon_la_SOURCES = $(KVZ_NEON_SOURCES)
+libneon_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
+libneon_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS)
 
 libsse2_la_SOURCES = $(KVZ_SSE2_SOURCES)
 libsse2_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
@@ -273,6 +306,7 @@ noinst_LTLIBRARIES += \
 	libkvazaar_10bit.la \
 	libaltivec_10bit.la \
 	libavx2_10bit.la \
+	libneon_10bit.la \
 	libsse2_10bit.la \
 	libsse41_10bit.la
 libkvazaar_la_LIBADD += libkvazaar_10bit.la
@@ -283,6 +317,7 @@ libkvazaar_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
 libkvazaar_10bit_la_LIBADD = \
 	libaltivec_10bit.la \
 	libavx2_10bit.la \
+	libneon_10bit.la \
 	libsse2_10bit.la \
 	libsse41_10bit.la
 
@@ -293,6 +328,11 @@ libaltivec_10bit_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
 libavx2_10bit_la_SOURCES = $(KVZ_AVX2_SOURCES)
 libavx2_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
 libavx2_10bit_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
+libavx2_10bit_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS) $(KVZ_AVX2_CFLAGS)
+
+libneon_10bit_la_SOURCES = $(KVZ_NEON_SOURCES)
+libneon_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libneon_10bit_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS)
 
 libsse2_10bit_la_SOURCES = $(KVZ_SSE2_SOURCES)
 libsse2_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
@@ -309,6 +349,7 @@ noinst_LTLIBRARIES += \
 	libkvazaar_12bit.la \
 	libaltivec_12bit.la \
 	libavx2_12bit.la \
+	libneon_12bit.la \
 	libsse2_12bit.la \
 	libsse41_12bit.la
 libkvazaar_la_LIBADD += libkvazaar_12bit.la
@@ -319,6 +360,7 @@ libkvazaar_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
 libkvazaar_12bit_la_LIBADD = \
 	libaltivec_12bit.la \
 	libavx2_12bit.la \
+	libneon_12bit.la \
 	libsse2_12bit.la \
 	libsse41_12bit.la
 
@@ -329,6 +371,11 @@ libaltivec_12bit_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
 libavx2_12bit_la_SOURCES = $(KVZ_AVX2_SOURCES)
 libavx2_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
 libavx2_12bit_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
+libavx2_12bit_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS) $(KVZ_AVX2_CFLAGS)
+
+libneon_12bit_la_SOURCES = $(KVZ_NEON_SOURCES)
+libneon_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libneon_12bit_la_CXXFLAGS = $(KVZ_STRATEGY_CXXFLAGS)
 
 libsse2_12bit_la_SOURCES = $(KVZ_SSE2_SOURCES)
 libsse2_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)

@@ -33,6 +33,7 @@
 #include "strategies/strategies-sao.h"
 #include "strategies/avx2/sao-avx2.h"
 #include "strategies/generic/sao-generic.h"
+#include "strategies/neon/sao-neon.h"
 #include "strategyselector.h"
 
 
@@ -50,6 +51,9 @@ int kvz_strategy_register_sao(void* opaque, uint8_t bitdepth) {
 
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_sao_avx2(opaque, bitdepth);
+  }
+  if (kvz_g_hardware_flags.arm_flags.neon) {
+    success &= kvz_strategy_register_sao_neon(opaque, bitdepth);
   }
 
   return success;

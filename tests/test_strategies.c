@@ -33,6 +33,9 @@
 #include "test_strategies.h"
 
 #include "src/strategyselector.h"
+#include "src/strategies/strategies-intra.h"
+#include "src/strategies/strategies-ipol.h"
+#include "src/strategies/strategies-sao.h"
 
 
 strategy_list_t strategies;
@@ -60,6 +63,21 @@ void init_test_strategies()
 
   if (!kvz_strategy_register_quant(&strategies, KVZ_BIT_DEPTH)) {
     fprintf(stderr, "strategy_register_quant failed!\n");
+    return;
+  }
+
+  if (!kvz_strategy_register_intra(&strategies, KVZ_BIT_DEPTH)) {
+    fprintf(stderr, "strategy_register_intra failed!\n");
+    return;
+  }
+
+  if (!kvz_strategy_register_sao(&strategies, KVZ_BIT_DEPTH)) {
+    fprintf(stderr, "strategy_register_sao failed!\n");
+    return;
+  }
+
+  if (!kvz_strategy_register_ipol(&strategies, KVZ_BIT_DEPTH)) {
+    fprintf(stderr, "strategy_register_ipol failed!\n");
     return;
   }
 }

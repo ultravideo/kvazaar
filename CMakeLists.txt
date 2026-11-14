@@ -136,9 +136,21 @@ file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
 list(REMOVE_ITEM LIB_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
 
 # Add also all the strategies
-file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c")
+file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c" "src/strategies/*.cpp")
+
+# SIMD strategies written in C++17 use templates for compile-time specialization
+# only (see src/strategies/strategies-cpp.h): no exceptions, RTTI or C++ runtime.
+file(GLOB_RECURSE LIB_SOURCES_STRATEGIES_CPP RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.cpp")
+if(MSVC)
+  set_property(SOURCE ${LIB_SOURCES_STRATEGIES_CPP} APPEND PROPERTY COMPILE_OPTIONS "/std:c++17")
+else()
+  set_property(SOURCE ${LIB_SOURCES_STRATEGIES_CPP} APPEND PROPERTY COMPILE_OPTIONS "-std=c++17;-fno-exceptions;-fno-rtti")
+endif()
 
 list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
+
+# The AArch64 NEON strategies (src/strategies/neon) are picked up by the glob
+# above and need no extra compiler flags: NEON is part of the AArch64 baseline.
 
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
@@ -216,6 +228,12 @@ else()
   
 endif()
 
+# The C++ strategy files need no C++ runtime, so link the library as C to avoid
+# a libstdc++ dependency. MSVC and the Crypto++ build do use the runtime.
+if(NOT MSVC AND NOT USE_CRYPTO)
+  set_target_properties(kvazaar PROPERTIES LINKER_LANGUAGE C)
+endif()
+
 # Bit depths
 #
 # The lowest bit depth of KVZ_BIT_DEPTHS is the default one, compiled as
@@ -228,8 +246,10 @@ if(CMAKE_C_FLAGS MATCHES "-DKVZ_BIT_DEPTH=([0-9]+)")
   # Old way of selecting a single bit depth.
   set(KVZ_BIT_DEPTHS ${CMAKE_MATCH_1})
   message(WARNING "-DKVZ_BIT_DEPTH in CMAKE_C_FLAGS is deprecated, use -DKVZ_BIT_DEPTHS=${KVZ_BIT_DEPTHS} instead.")
-  string(REGEX REPLACE "-DKVZ_BIT_DEPTH=[0-9]+" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 endif()
+# The bit depth is given to the C and the C++ sources by the targets below.
+string(REGEX REPLACE "-DKVZ_BIT_DEPTH=[0-9]+" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+string(REGEX REPLACE "-DKVZ_BIT_DEPTH=[0-9]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 list(REMOVE_DUPLICATES KVZ_BIT_DEPTHS)
 list(SORT KVZ_BIT_DEPTHS COMPARE NATURAL)
 foreach(depth IN LISTS KVZ_BIT_DEPTHS)
@@ -255,7 +275,7 @@ target_include_directories(kvazaar PUBLIC src)
 target_include_directories(kvazaar PUBLIC src/extras)
 target_include_directories(kvazaar PUBLIC src/strategies)
 
-file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
+file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c" "src/strategies/avx2/*.cpp")
 file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
@@ -371,7 +391,7 @@ file(GLOB SOURCE_GROUP_CONSTRAINT RELATIVE ${PROJECT_SOURCE_DIR} "src/constraint
 file(GLOB SOURCE_GROUP_CONTROL RELATIVE ${PROJECT_SOURCE_DIR} "src/cfg.*" "src/encoder.*" "src/encoder_state-c*" "src/encoder_state-g*" "src/encoderstate*" "src/gop.*" "src/input_frame_buffer.*" "src/kvazaar*" "src/rate_control.*" "src/mip_data.h")
 file(GLOB SOURCE_GROUP_DATA_STRUCTURES RELATIVE ${PROJECT_SOURCE_DIR} "src/cu.*" "src/image.*" "src/imagelist.*" "src/videoframe.*")
 file(GLOB SOURCE_GROUP_EXTRAS RELATIVE ${PROJECT_SOURCE_DIR} "src/extras/*.h" "src/extras/*.c")
-file(GLOB_RECURSE SOURCE_GROUP_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.h" "src/strategies/*.c")
+file(GLOB_RECURSE SOURCE_GROUP_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.h" "src/strategies/*.c" "src/strategies/*.cpp")
 file(GLOB SOURCE_GROUP_RECON RELATIVE ${PROJECT_SOURCE_DIR} "src/alf.*" "src/filter.*" "src/inter.*" "src/intra.*" "src/reshape.*" "src/sao.*" "src/scalinglist.*" "src/tables.*" "src/transform.*")
 file(GLOB SOURCE_GROUP_THREADING RELATIVE ${PROJECT_SOURCE_DIR} "src/threadqueue.*" "src/threads.*")
 file(GLOB_RECURSE SOURCE_GROUP_THREADWRAPPER RELATIVE ${PROJECT_SOURCE_DIR} "src/threadwrapper/*.cpp" "src/threadwrapper/*.h")
