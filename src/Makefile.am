@@ -222,7 +222,7 @@ KVZ_SSE41_SOURCES = \
 # They use templates only: no exceptions, RTTI or C++ runtime, so the library
 # is still linked as C. Symbols are hidden like in the C code.
 KVZ_STRATEGY_CXXFLAGS = $(AM_CXXFLAGS) -std=c++17 -fno-exceptions -fno-rtti -fvisibility=hidden \
-	-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -ftree-vectorize \
+	-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -ftree-vectorize $(KVZ_FP_CFLAGS) \
 	-I$(srcdir) -I$(srcdir)/extras
 
 if HAVE_PPC

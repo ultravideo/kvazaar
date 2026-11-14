@@ -12,6 +12,16 @@ VERSION ${KVAZAAR_VERSION_MAJOR}.${KVAZAAR_VERSION_MINOR}.${KVAZAAR_VERSION_REVI
 
 option(BUILD_SHARED_LIBS "Build using shared kvazaar library" ON)
 
+# Do not fuse floating point multiplications and additions (FMA). The
+# encoder decisions (RD costs, rate control, lookahead, temporal filter)
+# use floating point, and fusing changes their rounding, so AArch64 (where
+# GCC fuses by default) and x86-64 with FMA would code different bitstreams
+# than x86-64 without it. MSVC does not fuse under /fp:precise, see also
+# global.h.
+if(NOT MSVC)
+  add_compile_options(-ffp-contract=off)
+endif()
+
 option(BUILD_TESTS "Build tests" ON)
 
 option(USE_CRYPTO "Use crypto library" OFF)

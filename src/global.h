@@ -446,6 +446,18 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 #  define COMPILE_ARM_NEON 0
 #endif
 
+// Do not fuse floating point multiplications and additions (FMA) into one
+// rounding. The encoder decisions (RD costs, rate control, lookahead,
+// temporal filter) use floating point, and fusing would make the output
+// depend on the platform and the compiler. GCC does not support the
+// standard pragma, so the GCC and Clang builds also use -ffp-contract=off
+// (CMakeLists.txt, configure.ac).
+#if defined(_MSC_VER) && !defined(__clang__)
+#  pragma fp_contract(off)
+#elif defined(__clang__)
+#  pragma STDC FP_CONTRACT OFF
+#endif
+
 // Min & max delta QP limits based on bit depth
 #define KVZ_QP_DELTA_MIN -(26 + 3 * (KVZ_BIT_DEPTH - 8))
 #define KVZ_QP_DELTA_MAX 25 + 3 * (KVZ_BIT_DEPTH - 8)

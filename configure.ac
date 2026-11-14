@@ -78,6 +78,14 @@ AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
 KVZ_CFLAGS="-Wall -Wextra -Wvla -Wno-sign-compare -Wno-unused-parameter -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
+
+# Do not fuse floating point multiplications and additions (FMA). The
+# encoder decisions use floating point, and fusing changes their rounding,
+# so AArch64 (where GCC fuses by default) and x86-64 with FMA would code
+# different bitstreams than x86-64 without it.
+AX_CHECK_COMPILE_FLAG([-ffp-contract=off], [KVZ_FP_CFLAGS="-ffp-contract=off"], [KVZ_FP_CFLAGS=""])
+AC_SUBST([KVZ_FP_CFLAGS])
+KVZ_CFLAGS="$KVZ_CFLAGS $KVZ_FP_CFLAGS"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
 CFLAGS="-DKVZ_VERSION_MAJOR=$kvz_pjt_ver_major -DKVZ_VERSION_MINOR=$kvz_pjt_ver_minor -DKVZ_VERSION_REVISION=$kvz_pjt_ver_revision $CFLAGS"
 
