@@ -597,10 +597,6 @@ void kvz_inter_recon_cu(const encoder_state_t * const state,
                         bool predict_luma,
                         bool predict_chroma)
 {
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
-  const int lcu_w_c = LCU_WIDTH >> shift_w;
-  const int lcu_h_c = LCU_WIDTH >> shift_h;
   cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   const int num_pu = kvz_part_mode_num_parts[cu->part_size];
   for (int i = 0; i < num_pu; ++i) {

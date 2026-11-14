@@ -280,7 +280,6 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   const int shift_w = SHIFT_W;
   const int shift_h = SHIFT_H;
   const int lcu_w_c = LCU_WIDTH >> shift_w;
-  const int lcu_h_c = LCU_WIDTH >> shift_h;
   const int sao_buf_width_c = 1 + (SAO_DELAY_PX >> shift_w) + lcu_w_c;
 
 

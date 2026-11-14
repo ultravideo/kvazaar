@@ -348,7 +348,6 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   assert(x_px % 8 == 0 && y_px % 8 == 0);
 
   const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
 
   const unsigned width = MAX(LCU_WIDTH >> (depth + shift_w), TR_MIN_WIDTH);
   // NOTE: see 766

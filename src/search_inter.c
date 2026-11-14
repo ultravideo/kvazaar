@@ -1666,9 +1666,6 @@ static void search_pu_inter(encoder_state_t * const state,
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
   const videoframe_t * const frame = state->tile->frame;
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
-  const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int width_cu = LCU_WIDTH >> depth;
   const int x = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
   const int y = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);

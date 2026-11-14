@@ -285,12 +285,6 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                            const cu_info_t *const pred_cu,
                            const cu_info_t* const parent_tu, lcu_t *const lcu)
 {
-  const int shift_w = SHIFT_W;
-  const int shift_h = SHIFT_H;
-  const int lcu_w_c = LCU_WIDTH >> shift_w;
-  const int min_c_w_mask = (4 << shift_w) - 1;
-  const int min_c_h_mask = (4 << shift_h) - 1;
-
   const int width = LCU_WIDTH >> depth;
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && parent_tu->cbf == 0);
 
