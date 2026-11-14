@@ -131,6 +131,7 @@ static const struct option long_options[] = {
   { "rdoq-skip",                no_argument, NULL, 0 },
   { "no-rdoq-skip",             no_argument, NULL, 0 },
   { "input-bitdepth",     required_argument, NULL, 0 },
+  { "output-bitdepth",    required_argument, NULL, 0 },
   { "input-format",       required_argument, NULL, 0 },
   { "implicit-rdpcm",           no_argument, NULL, 0 },
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
@@ -318,6 +319,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       goto done;
     } else if (!strcmp(name, "loop-input")) {
       opts->loop_input = true;
+    } else if (!strcmp(name, "output-bitdepth")) {
+      // Handled by cmdline_select_bitdepth, which selects the API.
     } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
@@ -368,6 +371,82 @@ done:
 }
 
 
+//! Bit depths that the library may support, in increasing order.
+static const int supported_bitdepths[] = { 8, 10, 12 };
+#define NUM_SUPPORTED_BITDEPTHS (int)(sizeof(supported_bitdepths) / sizeof(supported_bitdepths[0]))
+
+
+static void print_bitdepths(FILE *file)
+{
+  for (int i = 0; i < NUM_SUPPORTED_BITDEPTHS; i++) {
+    if (kvz_api_get(supported_bitdepths[i])) {
+      fprintf(file, " %d", supported_bitdepths[i]);
+    }
+  }
+}
+
+
+/**
+ * \brief Select the bit depth to encode with.
+ *
+ * The library can support several bit depths and kvz_api_get returns a
+ * different API for each of them, so the bit depth has to be known before
+ * the rest of the options can be parsed.
+ *
+ * The bit depth given with --output-bitdepth is used if the library
+ * supports it. Otherwise the lowest supported bit depth that is at least
+ * the --input-bitdepth is used, or the highest supported one if there is
+ * no such bit depth.
+ *
+ * \return the bit depth, or 0 if the requested bit depth is not supported
+ */
+int cmdline_select_bitdepth(int argc, char *argv[])
+{
+  int input_bitdepth = 8;
+  int output_bitdepth = 0;
+
+  // Only look for the bit depth options here. Invalid options are reported
+  // by cmdline_opts_parse.
+  const int saved_opterr = opterr;
+  opterr = 0;
+  for (optind = 0;;) {
+    int long_options_index = -1;
+    const int c = getopt_long(argc, argv, short_options, long_options, &long_options_index);
+    if (c == -1) break;
+    if (long_options_index < 0) continue;
+
+    const char* name = long_options[long_options_index].name;
+    if (!strcmp(name, "input-bitdepth")) {
+      input_bitdepth = atoi(optarg);
+    } else if (!strcmp(name, "output-bitdepth")) {
+      output_bitdepth = atoi(optarg);
+      if (output_bitdepth <= 0) output_bitdepth = -1;
+    }
+  }
+  opterr = saved_opterr;
+  optind = 0;
+
+  if (output_bitdepth != 0) {
+    if (output_bitdepth < 0 || !kvz_api_get(output_bitdepth)) {
+      fprintf(stderr, "Input error: invalid output-bitdepth, supported bit depths are:");
+      print_bitdepths(stderr);
+      fprintf(stderr, "\n");
+      return 0;
+    }
+    return output_bitdepth;
+  }
+
+  int highest = 0;
+  for (int i = 0; i < NUM_SUPPORTED_BITDEPTHS; i++) {
+    const int bitdepth = supported_bitdepths[i];
+    if (!kvz_api_get(bitdepth)) continue;
+    if (bitdepth >= input_bitdepth) return bitdepth;
+    highest = bitdepth;
+  }
+  return highest;
+}
+
+
 /**
  * \brief Deallocate a cmdline_opts_t structure.
  */
@@ -399,6 +478,9 @@ void print_version(void)
     "Kvazaar %s [%s] %s\n"
     "Kvazaar license: 3-clause BSD\n",
     kvz_get_version_string(), kvz_get_compiler_string(), kvz_get_compile_date_string());
+  fprintf(stdout, "Bit depths:");
+  print_bitdepths(stdout);
+  fprintf(stdout, "\n");
 }
 
 
@@ -435,6 +517,11 @@ void print_help(void)
     "                                   - bff: Bottom field first\n"
     "      --input-format <string> : P420, P422, P444 or P400 [P420]\n"
     "      --input-bitdepth <int> : 8-16 [8]\n"
+    "      --output-bitdepth <int> : Bit depth to encode with [auto]\n"
+    "                                   - auto: Lowest bit depth that is at\n"
+    "                                     least the input bit depth.\n"
+    "                                   - See --version for the bit depths\n"
+    "                                     that are compiled in.\n"
     "      --loop-input           : Re-read input file forever.\n"
     "      --input-file-format <string> : Input file format [auto]\n"
     "                                    - auto: Check the file ending for format\n"

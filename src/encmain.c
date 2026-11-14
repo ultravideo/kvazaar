@@ -108,19 +108,34 @@ static unsigned get_padding(unsigned width_or_height){
  * \brief Value that is printed instead of PSNR when SSE is zero.
  */
 static const double MAX_PSNR = 999.99;
-static const double MAX_SQUARED_ERROR = (double)PIXEL_MAX * (double)PIXEL_MAX;
+
+/**
+ * \brief Read a sample of a picture with the given bit depth.
+ *
+ * The CLI is compiled once for all the bit depths that the library supports,
+ * so the samples are not accessed through kvz_pixel.
+ */
+static INLINE int32_t get_sample(const kvz_pixel *buf, int32_t i, int bitdepth)
+{
+  return bitdepth > 8 ? ((const uint16_t *)buf)[i] : ((const uint8_t *)buf)[i];
+}
 
 /**
  * \brief Calculates image PSNR value
  *
- * \param src   source picture
- * \param rec   reconstructed picture
- * \prama psnr  returns the PSNR
+ * \param src       source picture
+ * \param rec       reconstructed picture
+ * \param bitdepth  bit depth of the pictures
+ * \param psnr      returns the PSNR
  */
 static void compute_psnr(const kvz_picture *const src,
                          const kvz_picture *const rec,
+                         const int bitdepth,
                          double psnr[3])
 {
+  const double max_value = (double)((1 << bitdepth) - 1);
+  const double max_squared_error = max_value * max_value;
+
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 
@@ -137,7 +152,8 @@ static void compute_psnr(const kvz_picture *const src,
       num_pixels >>= (chroma_shift_w + chroma_shift_h);
     }
     for (int32_t i = 0; i < num_pixels; ++i) {
-      const int32_t error = src->data[c][i] - rec->data[c][i];
+      const int32_t error = get_sample(src->data[c], i, bitdepth) -
+                            get_sample(rec->data[c], i, bitdepth);
       sse[c] += error * error;
     }
 
@@ -145,7 +161,7 @@ static void compute_psnr(const kvz_picture *const src,
     if (sse[c] == 0.0) {
       psnr[c] = MAX_PSNR;
     } else {
-      psnr[c] = 10.0 * log10(num_pixels * MAX_SQUARED_ERROR / sse[c]);
+      psnr[c] = 10.0 * log10(num_pixels * max_squared_error / sse[c]);
     }
   }
 }
@@ -160,6 +176,7 @@ typedef struct {
   const kvz_api *api;
   const cmdline_opts_t *opts;
   const encoder_control_t *encoder;
+  const int bitdepth;
   const uint8_t padding_x;
   const uint8_t padding_y;
 
@@ -221,7 +238,7 @@ static void* input_read_thread(void* in_args)
                                     args->opts->config->width,
                                     args->opts->config->height,
                                     args->encoder->cfg.input_bitdepth,
-                                    args->encoder->bitdepth,
+                                    args->bitdepth,
                                     frame_in, args->opts->config->file_format);
     if (!read_success) {
       // reading failed
@@ -240,7 +257,7 @@ static void* input_read_thread(void* in_args)
                                           args->opts->config->width,
                                           args->opts->config->height,
                                           args->encoder->cfg.input_bitdepth,
-                                          args->encoder->bitdepth,
+                                          args->bitdepth,
                                           frame_in, args->opts->config->file_format);
           if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
@@ -303,7 +320,8 @@ void output_recon_pictures(const kvz_api *const api,
                            int *buffer_size,
                            uint64_t *next_pts,
                            unsigned width,
-                           unsigned height)
+                           unsigned height,
+                           int bitdepth)
 {
   bool picture_written;
   do {
@@ -313,7 +331,7 @@ void output_recon_pictures(const kvz_api *const api,
       kvz_picture *pic = buffer[i];
       if (pic->pts == *next_pts) {
         // Output the picture and remove it.
-        if (!yuv_io_write(recout, pic, width, height)) {
+        if (!yuv_io_write(recout, pic, width, height, bitdepth)) {
           fprintf(stderr, "Failed to write reconstructed picture!\n");
         }
         api->picture_free(pic);
@@ -531,7 +549,15 @@ int main(int argc, char *argv[])
 
   CHECKPOINTS_INIT();
 
-  const kvz_api * const api = kvz_api_get(8);
+  // The output bit depth selects the API, so it is needed before the rest of
+  // the options can be parsed.
+  const int bitdepth = cmdline_select_bitdepth(argc, argv);
+  if (!bitdepth) {
+    print_usage();
+    goto exit_failure;
+  }
+  const kvz_api * const api = kvz_api_get(bitdepth);
+  assert(api);
 
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
@@ -599,6 +625,8 @@ int main(int argc, char *argv[])
     fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
            encoder->in.width, encoder->in.height,
            encoder->in.real_width, encoder->in.real_height);
+    fprintf(stderr, "  Bit depth: %d (input=%d)\n",
+           bitdepth, opts->config->input_bitdepth);
   }
 
   if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height, opts->config->file_format)) {
@@ -642,6 +670,7 @@ int main(int argc, char *argv[])
       .api = api,
       .opts = opts,
       .encoder = encoder,
+      .bitdepth = bitdepth,
       .padding_x = padding_x,
       .padding_y = padding_y,
 
@@ -759,7 +788,7 @@ int main(int argc, char *argv[])
         if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE && encoder->cfg.enable_logging_output) {
           // Do not compute PSNR for interlaced frames, because img_rec does not contain
           // the deinterlaced frame yet.
-          compute_psnr(img_src, img_rec, frame_psnr);
+          compute_psnr(img_src, img_rec, bitdepth, frame_psnr);
         }
 
         if (recout) {
@@ -778,7 +807,8 @@ int main(int argc, char *argv[])
                                 &recon_buffer_size,
                                 &next_recon_pts,
                                 opts->config->width,
-                                opts->config->height);
+                                opts->config->height,
+                                bitdepth);
         }
 
         qp_sum      += info_out.qp;

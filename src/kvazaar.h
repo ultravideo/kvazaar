@@ -849,6 +849,19 @@ typedef struct kvz_api {
 } kvz_api;
 
 
+/**
+ * \brief Return the API for a bit depth.
+ *
+ * The library can be compiled with support for several bit depths (8, 10
+ * and 12 by default). The pixels of the pictures used with the API of a bit
+ * depth larger than 8 are 16 bits wide (uint16_t), while kvz_pixel is
+ * defined by KVZ_BIT_DEPTH of the application, so an application using
+ * several bit depths has to access the pixels accordingly.
+ *
+ * \param bit_depth  bit depth of the encoded video
+ * \return           the API, or NULL if the library does not support the bit
+ *                   depth
+ */
 KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 
 

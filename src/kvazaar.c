@@ -397,7 +397,8 @@ kvazaar_field_encoding_adapter_failure:
 }
 
 
-static const kvz_api kvz_8bit_api = {
+//! The API for the bit depth that this file is compiled with (KVZ_BIT_DEPTH).
+static const kvz_api kvz_api_impl = {
   .config_alloc = kvz_config_alloc,
   .config_init = kvz_config_init,
   .config_destroy = kvz_config_destroy,
@@ -423,12 +424,15 @@ extern const kvz_api * kvz_10bit_api_get(int bit_depth);
 
 const kvz_api * kvz_api_get(int bit_depth)
 {
+  if (bit_depth == KVZ_BIT_DEPTH) {
+    return &kvz_api_impl;
+  }
 #ifdef KVZ_MULTILIB_10BIT
   if (bit_depth == 10) {
     return kvz_10bit_api_get(10);
   }
 #endif
-  return &kvz_8bit_api;
+  return NULL;
 }
 
 

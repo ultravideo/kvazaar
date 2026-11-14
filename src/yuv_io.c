@@ -39,59 +39,70 @@
 
 #include "yuv_io.h"
 
-static void fill_after_frame(unsigned height, unsigned array_width,
-                             unsigned array_height, kvz_pixel *data)
+/*
+ * The CLI is compiled once for all the bit depths that the library supports,
+ * so the samples of the pictures are accessed with the sample size of the
+ * bit depth in use (1 byte for 8-bit, 2 bytes otherwise) instead of
+ * kvz_pixel.
+ */
+
+static unsigned bytes_per_sample(unsigned bitdepth)
 {
-  kvz_pixel* p = data + height * array_width;
-  kvz_pixel* end = data + array_width * array_height;
+  return bitdepth > 8 ? 2 : 1;
+}
+
+
+static void fill_after_frame(unsigned height, unsigned array_width,
+                             unsigned array_height, unsigned sample_bytes,
+                             void *data)
+{
+  const size_t line_bytes = (size_t)array_width * sample_bytes;
+  uint8_t* p = (uint8_t*)data + height * line_bytes;
+  uint8_t* end = (uint8_t*)data + array_height * line_bytes;
 
   while (p < end) {
     // Fill the line by copying the line above.
-    memcpy(p, p - array_width, array_width);
-    p += array_width;
+    memcpy(p, p - line_bytes, line_bytes);
+    p += line_bytes;
   }
 }
 
 
 static int read_and_fill_frame_data(FILE *file,
-                                    unsigned width, unsigned height, unsigned bytes_per_sample,
-                                    unsigned array_width, kvz_pixel *data)
+                                    unsigned width, unsigned height, unsigned in_sample_bytes,
+                                    unsigned array_width, unsigned out_sample_bytes,
+                                    void *data)
 {
+  unsigned i;
+  // If the input has 1 byte per sample and the picture 2 (8-bit input coded
+  // with a higher bit depth), the lines are read with 1 byte per sample and
+  // spread out to 2 bytes per sample later on.
+  const unsigned sample_bytes = MIN(in_sample_bytes, out_sample_bytes);
 
-  unsigned   i;
-  // Handle separately the case where we use KVZ_BIT_DEPTH 10+ but the input is 8-bit.
-  if (bytes_per_sample != sizeof(kvz_pixel)) {
+  if (sample_bytes == 1) {
     uint8_t* p = (uint8_t*)data;
     uint8_t* end = (uint8_t*)data + array_width * height;
-    uint8_t  fill_char;
     while (p < end) {
       // Read the beginning of the line from input.
-      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      if (width != fread(p, 1, width, file)) return 0;
       // Fill the rest with the last pixel value.
-      // Fill the rest with the last pixel value.
-      fill_char = p[width - 1];
-
+      const uint8_t fill_char = p[width - 1];
       for (i = width; i < array_width; ++i) {
         p[i] = fill_char;
       }
-
       p += array_width;
     }
-  }
-  else {
-    kvz_pixel* p = data;
-    kvz_pixel* end = data + array_width * height;
-    kvz_pixel  fill_char;
+  } else {
+    uint16_t* p = (uint16_t*)data;
+    uint16_t* end = (uint16_t*)data + array_width * height;
     while (p < end) {
       // Read the beginning of the line from input.
-      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      if (width != fread(p, 2, width, file)) return 0;
       // Fill the rest with the last pixel value.
-      fill_char = p[width - 1];
-
+      const uint16_t fill_char = p[width - 1];
       for (i = width; i < array_width; ++i) {
         p[i] = fill_char;
       }
-
       p += array_width;
     }
   }
@@ -99,7 +110,7 @@ static int read_and_fill_frame_data(FILE *file,
 }
 
 
-static void swap_16b_buffer_bytes(kvz_pixel* input, int size)
+static void swap_16b_buffer_bytes(uint16_t* input, int size)
 {
   for (int i = 0; i < size; ++i) {
     input[i] = ((input[i] & 0xff) << 8) + ((input[i] & 0xff00) >> 8);
@@ -107,32 +118,31 @@ static void swap_16b_buffer_bytes(kvz_pixel* input, int size)
 }
 
 
-static void shift_to_bitdepth(kvz_pixel* input, int size, int from_bitdepth, int to_bitdepth)
+static void shift_to_bitdepth(uint16_t* input, int size, int from_bitdepth, int to_bitdepth)
 {
   int shift = to_bitdepth - from_bitdepth;
-  kvz_pixel bitdepth_mask = (1 << from_bitdepth) - 1;
+  uint16_t bitdepth_mask = (1 << from_bitdepth) - 1;
 
   for (int i = 0; i < size; ++i) {
     // Shifting by a negative number is undefined.
     if (shift > 0) {
       input[i] = (input[i] & bitdepth_mask) << shift;
     } else {
-      input[i] = (input[i] & bitdepth_mask) >> shift;
+      input[i] = (input[i] & bitdepth_mask) >> -shift;
     }
   }
 }
 
 
 // Shift and copy 1-byte aligned samples to 2-byte aligned array
-static void shift_to_bitdepth_and_spread(kvz_pixel *input,
+static void shift_to_bitdepth_and_spread(uint16_t *input,
                                          int size,
                                          int from_bitdepth,
                                          int to_bitdepth)
 {
-  assert(sizeof(kvz_pixel) > 1);
   int shift = to_bitdepth - from_bitdepth;
   unsigned char *byte_buf = (unsigned char *)input;
-  kvz_pixel bitdepth_mask = (1 << from_bitdepth) - 1;
+  uint16_t bitdepth_mask = (1 << from_bitdepth) - 1;
   
   // Starting from the back of the 1-byte samples, copy each sample to it's
   // place in the 2-byte per sample array, overwriting the bytes that have
@@ -145,7 +155,7 @@ static void shift_to_bitdepth_and_spread(kvz_pixel *input,
     if (shift > 0) {
       input[i] = (byte_buf[i] & bitdepth_mask) << shift;
     } else {
-      input[i] = (byte_buf[i] & bitdepth_mask) >> shift;
+      input[i] = (byte_buf[i] & bitdepth_mask) >> -shift;
     }
   }
 }
@@ -164,9 +174,9 @@ static bool machine_is_big_endian()
 }
 
 
-static void mask_to_bitdepth(kvz_pixel *buf, unsigned length, unsigned bitdepth)
+static void mask_to_bitdepth(uint16_t *buf, unsigned length, unsigned bitdepth)
 {
-  kvz_pixel bitdepth_mask = (1 << bitdepth) - 1;
+  uint16_t bitdepth_mask = (1 << bitdepth) - 1;
   for (int i = 0; i < length; ++i) {
     buf[i] = buf[i] & bitdepth_mask;
   }
@@ -177,11 +187,16 @@ static int yuv_io_read_plane(
     FILE* file,
     unsigned in_width, unsigned in_height, unsigned in_bitdepth,
     unsigned out_width, unsigned out_height, unsigned out_bitdepth,
-    kvz_pixel *out_buf)
+    void *out_buf)
 {
-  unsigned bytes_per_sample = in_bitdepth > 8 ? 2 : 1;
-  unsigned buf_bytes = in_width * in_height * bytes_per_sample;
+  const unsigned in_sample_bytes = bytes_per_sample(in_bitdepth);
+  const unsigned out_sample_bytes = bytes_per_sample(out_bitdepth);
+  unsigned buf_bytes = in_width * in_height * in_sample_bytes;
   unsigned out_length = out_width * out_height;
+
+  // The library refuses input with more bits than the output bit depth if
+  // the output is 8-bit, so there is always room for the input samples.
+  assert(in_sample_bytes <= out_sample_bytes);
 
   if (in_width == out_width) {
     // No need to extend pixels.
@@ -189,12 +204,14 @@ static int yuv_io_read_plane(
     if (fread(out_buf, pixel_size, buf_bytes, file) != buf_bytes)  return 0;
   } else {
     // Need to copy pixels to fill the image in horizontal direction.
-    if (!read_and_fill_frame_data(file, in_width, in_height, bytes_per_sample, out_width, out_buf)) return 0;
+    if (!read_and_fill_frame_data(file, in_width, in_height, in_sample_bytes,
+                                  out_width, out_sample_bytes, out_buf)) return 0;
   }
 
   if (in_height != out_height) {
-    // Need to copy pixels to fill the image in vertical direction.
-    fill_after_frame(in_height, out_width, out_height, out_buf);
+    // Need to copy pixels to fill the image in vertical direction. The
+    // lines have the input sample size at this point.
+    fill_after_frame(in_height, out_width, out_height, in_sample_bytes, out_buf);
   }
 
   if (in_bitdepth > 8) {
@@ -361,27 +378,34 @@ int yuv_io_seek(FILE* file, unsigned frames,
  * \param img            image to output
  * \param output_width   width of the output in pixels
  * \param output_height  height of the output in pixels
+ * \param bitdepth       bit depth of the image
  *
  * \return              1 on success, 0 on failure
  */
 int yuv_io_write(FILE* file,
                 const kvz_picture *img,
-                unsigned output_width, unsigned output_height)
+                unsigned output_width, unsigned output_height,
+                unsigned bitdepth)
 {
+  const unsigned sample_bytes = bytes_per_sample(bitdepth);
   const int width = img->width;
+  const uint8_t *y_buf = (const uint8_t *)img->y;
   for (int y = 0; y < output_height; ++y) {
-    fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
+    fwrite(&y_buf[(size_t)y * width * sample_bytes], sample_bytes, output_width, file);
     // TODO: Check that fwrite succeeded.
   }
 
   if (img->chroma_format != KVZ_CSP_400) {
     const uint8_t chroma_shift_w = img->chroma_format == 0 || img->chroma_format == 3 ? 0 : 1;
     const uint8_t chroma_shift_h = img->chroma_format == 1 ? 1 : 0;
+    const size_t stride_bytes = (size_t)(width >> chroma_shift_w) * sample_bytes;
+    const uint8_t *u_buf = (const uint8_t *)img->u;
+    const uint8_t *v_buf = (const uint8_t *)img->v;
     for (int y = 0; y < (output_height >> chroma_shift_h); ++y) {
-      fwrite(&img->u[y * (width >> chroma_shift_w)], sizeof(*img->u), output_width >> chroma_shift_w, file);
+      fwrite(&u_buf[y * stride_bytes], sample_bytes, output_width >> chroma_shift_w, file);
     }
     for (int y = 0; y < (output_height >> chroma_shift_h); ++y) {
-      fwrite(&img->v[y * (width >> chroma_shift_w)], sizeof(*img->v), output_width >> chroma_shift_w, file);
+      fwrite(&v_buf[y * stride_bytes], sample_bytes, output_width >> chroma_shift_w, file);
     }
   }
 

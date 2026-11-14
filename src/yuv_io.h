@@ -54,6 +54,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
 
 int yuv_io_write(FILE* file,
                 const kvz_picture *img,
-                unsigned output_width, unsigned output_height);
+                unsigned output_width, unsigned output_height,
+                unsigned bitdepth);
 
 #endif // YUV_IO_H_

@@ -60,6 +60,7 @@ typedef struct cmdline_opts_t {
   bool loop_input;
 } cmdline_opts_t;
 
+int cmdline_select_bitdepth(int argc, char *argv[]);
 cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);
 void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
 
