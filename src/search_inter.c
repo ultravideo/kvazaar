@@ -413,28 +413,24 @@ static int select_mv_cand(const encoder_state_t *state,
     return 0;
   }
 
-  double (*mvd_coding_cost)(const encoder_state_t * const state,
-                              const cabac_data_t*,
-                              int32_t, int32_t);
-  if (state->encoder_control->cfg.mv_rdo) {
-    mvd_coding_cost = kvz_get_mvd_coding_cost_cabac;
-  } else {
-    mvd_coding_cost = get_mvd_coding_cost;
-  }
-
-  double cand1_cost = mvd_coding_cost(
-      state, &state->cabac,
-      mv_x - mv_cand[0][0],
-      mv_y - mv_cand[0][1]);
+  // Call the functions directly rather than through a function pointer so
+  // that get_mvd_coding_cost can be inlined.
+  const bool mv_rdo = state->encoder_control->cfg.mv_rdo;
+  const int32_t mvd1_x = mv_x - mv_cand[0][0];
+  const int32_t mvd1_y = mv_y - mv_cand[0][1];
+  double cand1_cost = mv_rdo ?
+    kvz_get_mvd_coding_cost_cabac(state, &state->cabac, mvd1_x, mvd1_y) :
+    get_mvd_coding_cost(state, &state->cabac, mvd1_x, mvd1_y);
 
   double cand2_cost;
   if (same_cand) {
     cand2_cost = cand1_cost;
   } else {
-    cand2_cost = mvd_coding_cost(
-      state, &state->cabac,
-      mv_x - mv_cand[1][0],
-      mv_y - mv_cand[1][1]);
+    const int32_t mvd2_x = mv_x - mv_cand[1][0];
+    const int32_t mvd2_y = mv_y - mv_cand[1][1];
+    cand2_cost = mv_rdo ?
+      kvz_get_mvd_coding_cost_cabac(state, &state->cabac, mvd2_x, mvd2_y) :
+      get_mvd_coding_cost(state, &state->cabac, mvd2_x, mvd2_y);
   }
 
   if (cost_out) {

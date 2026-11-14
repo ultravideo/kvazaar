@@ -52,9 +52,49 @@ int32_t kvz_context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, 
 
 uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
 
+/**
+ * \brief Context derivation process of coeff_abs_significant_flag
+ * \param pattern_sig_ctx pattern for current coefficient group
+ * \param scan_idx pixel scan type in use
+ * \param pos_x column of current scan position
+ * \param pos_y row of current scan position
+ * \param block_type log2 value of block size if square block, or 4 otherwise
+ * \param width width of the block
+ * \param texture_type texture type (TEXT_LUMA...)
+ * \returns ctx_inc for current scan position
+ */
+static INLINE int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int32_t pos_x,
+                                int32_t pos_y, int32_t block_type, int8_t texture_type)
+{
+  static const int32_t ctx_ind_map[16] =
+  {
+    0, 1, 4, 5,
+    2, 3, 4, 5,
+    6, 6, 8, 8,
+    7, 7, 8, 8
+  };
 
-int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
-                                int32_t pos_y,int32_t block_type, int8_t texture_type);
+  int32_t cnt,offset,pos_x_in_subset,pos_y_in_subset;
+
+  if (pos_x + pos_y == 0) return 0;
+
+  if (block_type == 2) return ctx_ind_map[4 * pos_y + pos_x];
+
+  offset = (block_type == 3) ? ((scan_idx == SCAN_DIAG) ? 9 : 9 + ((texture_type == 0) ? 6 : 0)) : ((texture_type == 0) ? 21 : 12);
+  pos_x_in_subset = pos_x - ((pos_x>>2)<<2);
+  pos_y_in_subset = pos_y - ((pos_y>>2)<<2);
+
+  if (pattern_sig_ctx == 0) {
+    cnt = (pos_x_in_subset + pos_y_in_subset <= 2) ? ((pos_x_in_subset + pos_y_in_subset==0) ? 2 : 1) : 0;
+  } else if (pattern_sig_ctx==1) {
+    cnt = (pos_y_in_subset <= 1) ? ((pos_y_in_subset == 0) ? 2 : 1) : 0;
+  } else if (pattern_sig_ctx==2) {
+    cnt = (pos_x_in_subset <= 1) ? ((pos_x_in_subset == 0) ? 2 : 1) : 0;
+  } else {
+    cnt = 2;
+  }
+  return (( texture_type == 0 && ((pos_x>>2) + (pos_y>>2)) > 0 ) ? 3 : 0) + offset + cnt;
+}
 
 #define CNU 154
 

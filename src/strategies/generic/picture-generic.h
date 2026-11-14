@@ -43,13 +43,17 @@
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 
-// Function to clip int16_t to pixel. (0-255 or 0-1023)
-// Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value);
+// Clip int16_t to the pixel range (0..PIXEL_MAX).
+static INLINE kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value)
+{
+  return (kvz_pixel)CLIP(0, PIXEL_MAX, value);
+}
 
-// Function to clip int32_t to pixel. (0-255 or 0-1023)
-// Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+// Clip int32_t to the pixel range (0..PIXEL_MAX).
+static INLINE kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value)
+{
+  return (kvz_pixel)CLIP(0, PIXEL_MAX, value);
+}
 
 unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
                                        const int32_t     stride1,

@@ -45,5 +45,18 @@ else()
   target_link_libraries(kvazaar_tests PUBLIC ${EXTRA_LIBS})
 endif()
 
-target_link_libraries(kvazaar_tests PUBLIC kvazaar)
-
+if(BUILD_SHARED_LIBS)
+  # The tests use internal functions, which the shared library does not
+  # export, so link them to a static archive of the same objects. An archive
+  # rather than the objects themselves, because some tests include library
+  # sources (e.g. inter.c) and replace those objects.
+  add_library(kvazaar_tests_lib STATIC)
+  target_link_libraries(kvazaar_tests_lib PUBLIC kvazaar_objects)
+  foreach(depth_target IN LISTS KVZ_EXTRA_BIT_DEPTH_TARGETS)
+    target_sources(kvazaar_tests_lib PRIVATE $<TARGET_OBJECTS:${depth_target}>)
+  endforeach()
+  set_target_properties(kvazaar_tests_lib PROPERTIES LINKER_LANGUAGE C)
+  target_link_libraries(kvazaar_tests PUBLIC kvazaar_tests_lib)
+else()
+  target_link_libraries(kvazaar_tests PUBLIC kvazaar)
+endif()

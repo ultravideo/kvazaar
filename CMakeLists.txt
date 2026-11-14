@@ -226,12 +226,24 @@ if (USE_CRYPTO)
 
 endif ()
 
+# The library sources are compiled into an object library, which the tests
+# also use (see tests/CMakeLists.txt). Like with autotools, only the public
+# API (KVZ_PUBLIC) is visible outside of the shared library, so the compiler
+# can inline the internal functions and call them directly instead of through
+# the PLT.
+add_library(kvazaar_objects OBJECT ${LIB_SOURCES})
+set_target_properties(kvazaar_objects PROPERTIES
+  POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS}
+  C_VISIBILITY_PRESET hidden
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON)
+
 if(BUILD_SHARED_LIBS)
   list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_LIBDIR}" "./" "../lib" )
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-  add_library(kvazaar SHARED ${LIB_SOURCES})
+  add_library(kvazaar SHARED)
 else()
-  add_library(kvazaar STATIC ${LIB_SOURCES})
+  add_library(kvazaar STATIC)
   if(MSVC) # Fix a linking problem with visual studio when the library is the same name as the binary
     set_target_properties(kvazaar PROPERTIES OUTPUT_NAME libkvazaar)
   endif()
@@ -240,8 +252,11 @@ endif()
 
 # The C++ strategy files need no C++ runtime, so link the library as C to avoid
 # a libstdc++ dependency. MSVC and the Crypto++ build do use the runtime.
+# The library has no sources of its own, so set the language in both cases.
 if(NOT MSVC AND NOT USE_CRYPTO)
   set_target_properties(kvazaar PROPERTIES LINKER_LANGUAGE C)
+else()
+  set_target_properties(kvazaar PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 
 # Bit depths
@@ -276,14 +291,18 @@ set(KVZ_EXTRA_BIT_DEPTHS ${KVZ_BIT_DEPTHS})
 list(REMOVE_AT KVZ_EXTRA_BIT_DEPTHS 0)
 message(STATUS "Bit depths: ${KVZ_BIT_DEPTHS}")
 
-target_compile_definitions(kvazaar PUBLIC KVZ_BIT_DEPTH=${KVZ_DEFAULT_BIT_DEPTH})
-target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR})
-target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR})
-target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
+# Only the objects linked directly are added to a target, so kvazaar gets
+# the objects and the targets linking to kvazaar the usage requirements.
+target_link_libraries(kvazaar PUBLIC kvazaar_objects)
 
-target_include_directories(kvazaar PUBLIC src)
-target_include_directories(kvazaar PUBLIC src/extras)
-target_include_directories(kvazaar PUBLIC src/strategies)
+target_compile_definitions(kvazaar_objects PUBLIC KVZ_BIT_DEPTH=${KVZ_DEFAULT_BIT_DEPTH})
+target_compile_definitions(kvazaar_objects PUBLIC KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR})
+target_compile_definitions(kvazaar_objects PUBLIC KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR})
+target_compile_definitions(kvazaar_objects PUBLIC KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
+
+target_include_directories(kvazaar_objects PUBLIC src)
+target_include_directories(kvazaar_objects PUBLIC src/extras)
+target_include_directories(kvazaar_objects PUBLIC src/strategies)
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c" "src/strategies/avx2/*.cpp")
 file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
@@ -321,7 +340,7 @@ endif()
 list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
 
 if(MSVC)
-  target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
+  target_include_directories(kvazaar_objects PUBLIC src/threadwrapper/include)
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
   endif()
@@ -345,7 +364,7 @@ else()
   if(NOT ANDROID AND NOT EMSCRIPTEN)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
-    target_link_libraries(kvazaar PUBLIC Threads::Threads)
+    target_link_libraries(kvazaar_objects PUBLIC Threads::Threads)
   endif()
 
   include(CheckLibraryExists)
@@ -359,7 +378,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} ${CMAKE_BINARY_DIR}/lib/libcryptopp.a)
   endif ()
 
-  target_link_libraries(kvazaar PUBLIC ${EXTRA_LIBS})
+  target_link_libraries(kvazaar_objects PUBLIC ${EXTRA_LIBS})
   if(BUILD_KVAZAAR_BINARY)
     target_link_libraries(kvazaar-bin PUBLIC ${EXTRA_LIBS} )
   endif()
@@ -369,7 +388,11 @@ endif()
 foreach(depth IN LISTS KVZ_EXTRA_BIT_DEPTHS)
   set(depth_target kvazaar_${depth}bit)
   add_library(${depth_target} OBJECT ${LIB_SOURCES_BIT_DEPTH})
-  set_target_properties(${depth_target} PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+  set_target_properties(${depth_target} PROPERTIES
+    POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS}
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON)
   target_compile_definitions(${depth_target} PRIVATE
     KVZ_BIT_DEPTH=${depth}
     KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR}
@@ -386,8 +409,9 @@ foreach(depth IN LISTS KVZ_EXTRA_BIT_DEPTHS)
     endif()
   endif()
 
-  target_compile_definitions(kvazaar PRIVATE KVZ_MULTILIB_${depth}BIT)
+  target_compile_definitions(kvazaar_objects PRIVATE KVZ_MULTILIB_${depth}BIT)
   target_sources(kvazaar PRIVATE $<TARGET_OBJECTS:${depth_target}>)
+  list(APPEND KVZ_EXTRA_BIT_DEPTH_TARGETS ${depth_target})
 endforeach()
 
 
