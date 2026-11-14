@@ -21,6 +21,11 @@ Usage:
     ./configure --with-bit-depths=8 --disable-shared && make
     tools/gen_multilib_rename.py src/.libs/libkvazaar.a
 
+Some files only define symbols on some architectures, so pass the
+libraries of all of them, e.g. an x86-64 and an AArch64 build (GNU nm reads
+the object files of other architectures):
+    tools/gen_multilib_rename.py build-symbols/libkvazaar.a build-symbols-arm64/libkvazaar.a
+
 Use --check to only check that the header is up to date.
 """
 

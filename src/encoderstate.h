@@ -109,6 +109,35 @@ typedef struct encoder_state_config_frame_t {
   int32_t irap_poc;  /*!< \brief POC of the associated IRAP picture */
 
   /**
+   * \brief Frame starts a new coded video sequence (set by the input buffer).
+   *
+   * True for the first frame and for frames following a scene cut.
+   */
+  bool new_segment;
+
+  /** \brief Frame number (coding order) of the first frame of the segment. */
+  int32_t segment_start;
+
+  /** \brief Lookahead analysis results for the frame, NULL if not available. */
+  struct kvz_la_result *la;
+
+  /** \brief Adaptive GOP: number of IRAP pictures coded so far. */
+  int32_t agop_irap_count;
+  /** \brief Adaptive GOP: frame number of the latest IRAP picture. */
+  int32_t agop_irap_num;
+
+  /** \brief ABR rate control: the frame has not been accounted yet. */
+  bool abr_pending;
+  /** \brief ABR rate control: quantizer scale used for the frame. */
+  double abr_qscale;
+  /** \brief ABR rate control: complexity of the frame for the bits model. */
+  double abr_cost;
+  /** \brief ABR rate control: expected bits of the frame. */
+  double abr_expected_bits;
+  /** \brief ABR rate control: bits model class of the frame. */
+  int abr_class;
+
+  /**
    * \brief Frame-level quantization parameter
    *
    * \see encoder_state_t::qp
@@ -179,6 +208,12 @@ typedef struct encoder_state_config_frame_t {
   * \brief Calculated adaptive QP offset for each LCU.
   */
   double *aq_offsets;
+
+  /**
+  * \brief Adaptive QP offset for each 32x32 block (CU-tree with 32x32
+  *        quantization groups).
+  */
+  double *aq_offsets32;
 
   int8_t max_qp_delta_depth;
 
@@ -323,6 +358,8 @@ typedef struct encoder_state_t {
   double lambda_sqrt;
   //! \brief Quantization parameter for the current LCU
   int8_t qp;
+  //! \brief QP of the current LCU before the adaptive QP offsets
+  int8_t qp_base;
 
   /**
    * \brief Whether a QP delta value must be coded for the current LCU.

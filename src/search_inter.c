@@ -42,6 +42,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "kvazaar.h"
+#include "lookahead.h"
 #include "rdo.h"
 #include "search.h"
 #include "strategies/strategies-ipol.h"
@@ -84,6 +85,12 @@ typedef struct {
    *        NULL for arbitrary-width blocks
    */
   optimized_sad_func_ptr_t optimized_sad;
+
+  /**
+   * \brief Starting point from the lookahead motion (integer pixels)
+   */
+  vector2d_t la_mv;
+  bool la_mv_valid;
 
 } inter_search_info_t;
 
@@ -351,6 +358,13 @@ static void select_starting_point(inter_search_info_t *info,
   // Check mv_in if it's not one of the merge candidates.
   if ((extra_mv.x != 0 || extra_mv.y != 0) && !mv_in_merge(info, extra_mv)) {
     check_mv_cost(info, extra_mv.x, extra_mv.y, best_cost, best_bits, best_mv);
+  }
+
+  // Check the motion found by the lookahead.
+  if (info->la_mv_valid && (info->la_mv.x != 0 || info->la_mv.y != 0) &&
+      (info->la_mv.x != extra_mv.x || info->la_mv.y != extra_mv.y) &&
+      !mv_in_merge(info, info->la_mv)) {
+    check_mv_cost(info, info->la_mv.x, info->la_mv.y, best_cost, best_bits, best_mv);
   }
 
   // Go through candidates
@@ -1381,6 +1395,45 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     }
   }
 
+  // Starting point from the lookahead: the low resolution motion of the
+  // block scaled to the distance of the reference picture.
+  info->la_mv_valid = false;
+  const kvz_la_result *la = info->state->frame->la;
+  if (la) {
+    const int32_t dist = info->state->frame->poc -
+      info->state->frame->ref->pocs[info->state->frame->ref_LX[ref_list][LX_idx]];
+    const int16_t *fields = dist > 0 ? la->past_mvs : la->future_mvs;
+    const int num = dist > 0 ? la->num_past_mvs : la->num_future_mvs;
+    if (fields && dist != 0) {
+      // Follow the motion of the block picture by picture. Past fields
+      // point from picture (this - k) to (this - k - 1), future fields from
+      // picture (this + k + 1) to (this + k), so the latter are subtracted.
+      const int steps = abs(dist);
+      const int sign = dist > 0 ? 1 : -1;
+      const int n = la->mv_bw * la->mv_bh * 2;
+      int sx = 0, sy = 0;
+      int last_x = 0, last_y = 0;
+      for (int k = 0; k < steps; k++) {
+        if (k >= num) {
+          // Beyond the available fields: continue with the last motion.
+          sx += last_x * (steps - k);
+          sy += last_y * (steps - k);
+          break;
+        }
+        const int bx = CLIP(0, la->mv_bw - 1, (mid_x + sx) >> 4);
+        const int by = CLIP(0, la->mv_bh - 1, (mid_y + sy) >> 4);
+        const int16_t *mv = &fields[(size_t)k * n + 2 * (bx + by * la->mv_bw)];
+        last_x = sign * mv[0];
+        last_y = sign * mv[1];
+        sx += last_x;
+        sy += last_y;
+      }
+      info->la_mv.x = sx;
+      info->la_mv.y = sy;
+      info->la_mv_valid = true;
+    }
+  }
+
   int search_range = 32;
   switch (cfg->ime_algorithm) {
     case KVZ_IME_FULL64: search_range = 64; break;
@@ -1795,14 +1848,12 @@ static void search_pu_inter(encoder_state_t * const state,
   bool has_chroma = state->encoder_control->cfg.chroma_format != KVZ_CSP_400;
   if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
-      if(cfg->rdo >= 3 && merge->unit[merge->keys[merge_key]].skipped) {
-        merge->size = 1;
-        merge->bits[0] = merge->bits[merge->keys[merge_key]];
-        merge->cost[0] = merge->cost[merge->keys[merge_key]];
-        merge->unit[0] = merge->unit[merge->keys[merge_key]];
-        merge->keys[0] = 0;
-      }
-      else if(cfg->rdo < 3) {
+      // At rd >= 3 the merge candidates already have full RD costs and they
+      // compete with the AMVP candidates in kvz_search_cu_inter, which stores
+      // the winner in the LCU. Ending the search here left the LCU holding the
+      // last evaluated candidate instead of the selected skip candidate. A
+      // skip result still ends the SMP/AMP search in search_cu.
+      if(cfg->rdo < 3) {
         // Reconstruct blocks with merge candidate.
         // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
         // and chroma exists.

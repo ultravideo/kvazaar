@@ -65,6 +65,21 @@ typedef struct kvz_rc_data {
 
   int smoothing_window;
 
+  // Lookahead ABR state, accessed only from the API thread.
+  //! Bits model bits = k * complexity / qscale for each GOP position, the
+  //! last entry is for intra pictures.
+  double abr_k[KVZ_MAX_GOP_LENGTH + 1];
+  int abr_k_count[KVZ_MAX_GOP_LENGTH + 1];
+  double abr_total_bits;  //!< bits of the accounted frames
+  int64_t abr_frames;     //!< number of accounted frames
+  double abr_rate_factor; //!< rate factor of the current GOP
+  double abr_key_est;     //!< expected bits of an intra picture at rate factor 1
+  double abr_inflight_bits;   //!< expected bits of the frames being coded
+  int64_t abr_inflight_frames; //!< number of frames being coded
+  double vbv_fill;        //!< VBV buffer fullness after the accounted frames
+  bool vbv_init_done;
+  double vbv_qp_increase; //!< QP increase applied by the VBV to the previous frame
+
   FILE* dist_file;
   FILE* bits_file;
   FILE* qp_file;
@@ -82,5 +97,14 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos);
 void kvz_update_after_picture(encoder_state_t * const state);
 void kvz_estimate_pic_lambda(encoder_state_t * const state);
+void kvz_set_picture_qp_abr(encoder_state_t * const state);
+
+/**
+ * \brief Set the QP and lambda of a 32x32 quantization group.
+ *
+ * Used with --cutree-qg32 when the search enters a 32x32 CU.
+ * \param x, y  position of the block in pixels relative to the tile
+ */
+void kvz_set_qg_qp_lambda(encoder_state_t * const state, int x, int y);
 
 #endif // RATE_CONTROL_H_

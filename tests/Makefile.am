@@ -5,6 +5,7 @@ TESTS = $(check_PROGRAMS) \
     test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
+    test_lookahead.sh \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \
@@ -23,6 +24,7 @@ EXTRA_DIST = \
     test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
+    test_lookahead.sh \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \
@@ -53,6 +55,7 @@ kvazaar_tests_SOURCES = \
 	satd_tests.c \
 	satd_tests.h \
 	speed_tests.c \
+	temporal_filter_tests.c \
 	tests_main.c \
 	test_strategies.c \
 	test_strategies.h

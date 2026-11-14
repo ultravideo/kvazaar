@@ -245,6 +245,7 @@ enum kvz_rc_algorithm
   KVZ_NO_RC = 0,
   KVZ_LAMBDA = 1,
   KVZ_OBA = 2,
+  KVZ_ABR = 3, //!< Lookahead complexity based average bitrate
 };
 
 enum kvz_file_format
@@ -510,6 +511,42 @@ typedef struct kvz_config
 
   uint8_t enable_cross_component_prediction; //!< \brief Enable cross-component prediction (4:4:4).
 
+  /** \brief Number of frames analysed ahead of the encoding. 0 disables the lookahead. */
+  int32_t lookahead;
+
+  /** \brief Constant rate factor. Negative value disables CRF. */
+  double crf;
+
+  /** \brief Quantizer curve compression factor for CRF and lookahead based
+   *         bit allocation, 0.0 (constant bitrate) .. 1.0 (constant QP). */
+  double qcomp;
+
+  /** \brief CU-tree temporal QP adaptation. -1: auto (on with lookahead). */
+  int8_t cutree;
+
+  /** \brief CU-tree QP offset strength. Negative: auto, 3.75 * (1 - qcomp). */
+  double cutree_strength;
+
+  /** \brief Scene cut detection threshold 0..100. 0 disables, -1: auto. */
+  int32_t scenecut;
+
+  /** \brief VBV maximum rate in bits per second, 0 disables VBV. */
+  int32_t vbv_maxrate;
+  /** \brief VBV buffer size in bits. */
+  int32_t vbv_bufsize;
+  /** \brief Initial VBV buffer fullness as a fraction of the buffer size. */
+  double vbv_init;
+
+  /** \brief Motion compensated temporal pre-filter of the key pictures. */
+  int8_t mctf;
+
+  /** \brief CU-tree QP offsets for 32x32 quantization groups (experimental). -1: auto (off). */
+  int8_t cutree_qg32;
+
+  /** \brief Adaptive GOP: the lookahead chooses the length of each random
+   *         access mini-GOP and places the periodic key pictures. */
+  int8_t adaptive_gop;
+
 } kvz_config;
 
 /**
@@ -559,6 +596,8 @@ typedef struct kvz_picture {
     int height;
     int8_t *roi_array;
   } roi;
+
+  int8_t gop_layer; //!< \brief GOP layer of a reconstructed picture (adaptive GOP).
 
 } kvz_picture;
 

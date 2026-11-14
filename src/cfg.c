@@ -202,6 +202,19 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->enable_cross_component_prediction = 0;
 
+  cfg->lookahead = 0;
+  cfg->crf = -1.0;
+  cfg->qcomp = 0.6;
+  cfg->cutree = -1;
+  cfg->cutree_strength = -1.0;
+  cfg->scenecut = -1;
+  cfg->vbv_maxrate = 0;
+  cfg->vbv_bufsize = 0;
+  cfg->vbv_init = 0.9;
+  cfg->mctf = 0;
+  cfg->cutree_qg32 = -1;
+  cfg->adaptive_gop = 0;
+
   return 1;
 }
 
@@ -490,7 +503,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
-  static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
+  static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", "abr", NULL };
 
   static const char * const file_format_names[] = {"auto", "y4m", "yuv", NULL};
 
@@ -501,7 +514,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "1-2",
         "me", "hexbs",
-        "gop", "8",
+        "gop", "16",
         "ref", "1",
         "bipred", "1",
         "deblock", "0:0",
@@ -529,7 +542,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "1-2",
         "me", "hexbs",
-        "gop", "8",
+        "gop", "16",
         "ref", "1",
         "bipred", "1",
         "deblock", "0:0",
@@ -557,7 +570,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "1-3",
         "me", "hexbs",
-        "gop", "8",
+        "gop", "16",
         "ref", "1",
         "bipred", "1",
         "deblock", "0:0",
@@ -585,7 +598,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "2-3",
         "pu-depth-inter", "1-3",
         "me", "hexbs",
-        "gop", "8",
+        "gop", "16",
         "ref", "1",
         "bipred", "1",
         "deblock", "0:0",
@@ -613,7 +626,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "1-3",
         "pu-depth-inter", "1-3",
         "me", "hexbs",
-        "gop", "8",
+        "gop", "16",
         "ref", "2",
         "bipred", "1",
         "deblock", "0:0",
@@ -1406,10 +1419,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("rc-algorithm") {
     int8_t rc_algorithm = 0;
     if (!parse_enum(value, rc_algorithm_names, &rc_algorithm)) {
-      fprintf(stderr, "Invalid rate control algorithm %s. Valid values include %s, %s, and %s\n", value, 
+      fprintf(stderr, "Invalid rate control algorithm %s. Valid values include %s, %s, %s and %s\n", value,
         rc_algorithm_names[0],
         rc_algorithm_names[1],
-        rc_algorithm_names[2]);
+        rc_algorithm_names[2],
+        rc_algorithm_names[3]);
       return 0;
     }
     cfg->rc_algorithm = rc_algorithm;
@@ -1448,6 +1462,42 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("enable-logging") {
     cfg->enable_logging_output = atobool(value);
+  }
+  else if OPT("lookahead") {
+    cfg->lookahead = atoi(value);
+  }
+  else if OPT("crf") {
+    cfg->crf = atof(value);
+  }
+  else if OPT("qcomp") {
+    cfg->qcomp = atof(value);
+  }
+  else if OPT("cutree") {
+    cfg->cutree = (int8_t)atobool(value);
+  }
+  else if OPT("cutree-strength") {
+    cfg->cutree_strength = atof(value);
+  }
+  else if OPT("scenecut") {
+    cfg->scenecut = atoi(value);
+  }
+  else if OPT("vbv-maxrate") {
+    cfg->vbv_maxrate = atoi(value);
+  }
+  else if OPT("vbv-bufsize") {
+    cfg->vbv_bufsize = atoi(value);
+  }
+  else if OPT("vbv-init") {
+    cfg->vbv_init = atof(value);
+  }
+  else if OPT("mctf") {
+    cfg->mctf = (int8_t)atobool(value);
+  }
+  else if OPT("cutree-qg32") {
+    cfg->cutree_qg32 = (int8_t)atobool(value);
+  }
+  else if OPT("adaptive-gop") {
+    cfg->adaptive_gop = (int8_t)atobool(value);
   }
   else if OPT("cross-comp-pred") {
     cfg->enable_cross_component_prediction = atobool(value);
@@ -1620,6 +1670,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->gop_len &&
       cfg->intra_period > 1 &&
       !cfg->gop_lowdelay &&
+      !cfg->adaptive_gop &&
       cfg->intra_period % cfg->gop_len != 0)
   {
     fprintf(stderr,
@@ -1792,6 +1843,46 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
+    error = 1;
+  }
+
+  if (cfg->lookahead < 0 || cfg->lookahead > 250) {
+    fprintf(stderr, "Input error: --lookahead must be in range 0..250\n");
+    error = 1;
+  }
+
+  if (cfg->crf >= 0 && cfg->crf > 51) {
+    fprintf(stderr, "Input error: --crf must be in range 0..51\n");
+    error = 1;
+  }
+
+  if (cfg->crf >= 0 && cfg->target_bitrate > 0) {
+    fprintf(stderr, "Input error: --crf and --bitrate can not be used together\n");
+    error = 1;
+  }
+
+  if (cfg->qcomp < 0.0 || cfg->qcomp > 1.0) {
+    fprintf(stderr, "Input error: --qcomp must be in range 0.0..1.0\n");
+    error = 1;
+  }
+
+  if ((cfg->vbv_maxrate > 0) != (cfg->vbv_bufsize > 0) || cfg->vbv_maxrate < 0 || cfg->vbv_bufsize < 0) {
+    fprintf(stderr, "Input error: --vbv-maxrate and --vbv-bufsize must be given together\n");
+    error = 1;
+  }
+
+  if (cfg->vbv_maxrate > 0 && cfg->crf < 0 && !(cfg->target_bitrate > 0 && cfg->rc_algorithm == KVZ_ABR)) {
+    fprintf(stderr, "Input error: VBV requires --crf or --rc-algorithm abr\n");
+    error = 1;
+  }
+
+  if (cfg->vbv_init <= 0.0 || cfg->vbv_init > 1.0) {
+    fprintf(stderr, "Input error: --vbv-init must be in range (0.0, 1.0]\n");
+    error = 1;
+  }
+
+  if (cfg->scenecut > 100) {
+    fprintf(stderr, "Input error: --scenecut must be in range 0..100\n");
     error = 1;
   }
 

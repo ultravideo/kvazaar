@@ -128,6 +128,8 @@
     <ClCompile Include="..\..\src\extras\crypto.cpp" />
     <ClCompile Include="..\..\src\extras\libmd5.c" />
     <ClCompile Include="..\..\src\input_frame_buffer.c" />
+    <ClCompile Include="..\..\src\lookahead.c" />
+    <ClCompile Include="..\..\src\temporal_filter.c" />
     <ClCompile Include="..\..\src\kvazaar.c" />
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
@@ -322,6 +324,8 @@
     <ClCompile Include="..\..\src\threadqueue.c" />
     <ClCompile Include="..\..\src\transform.c" />
     <ClInclude Include="..\..\src\input_frame_buffer.h" />
+    <ClInclude Include="..\..\src\lookahead.h" />
+    <ClInclude Include="..\..\src\temporal_filter.h" />
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
     <ClInclude Include="..\..\src\kvz_math.h" />
     <ClInclude Include="..\..\src\ml_intra_cu_depth_pred.h" />

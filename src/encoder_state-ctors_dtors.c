@@ -47,6 +47,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"
+#include "lookahead.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -68,6 +69,17 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->rc_beta = -1.367;
   state->frame->icost = 0;
 
+  state->frame->new_segment = false;
+  state->frame->segment_start = 0;
+  state->frame->la = NULL;
+  state->frame->agop_irap_count = 0;
+  state->frame->agop_irap_num = 0;
+  state->frame->abr_pending = false;
+  state->frame->abr_qscale = 0.0;
+  state->frame->abr_cost = 0.0;
+  state->frame->abr_class = 0;
+  state->frame->abr_expected_bits = 0.0;
+
   // Reset max_qp_delta_depth here, was causing problems when headers are requested before input is fed in
   state->frame->max_qp_delta_depth = 0;
 
@@ -75,6 +87,10 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
   state->frame->lcu_stats = calloc(num_lcus, sizeof(lcu_stats_t));
   state->frame->aq_offsets = MALLOC(double, num_lcus);
+  state->frame->aq_offsets32 = calloc(CEILDIV(encoder->in.width, 32) * CEILDIV(encoder->in.height, 32), sizeof(double));
+  if (encoder->cfg.cutree_qg32) {
+    state->frame->max_qp_delta_depth = 1;
+  }
 
   for (int y = 0; y < encoder->in.height_in_lcu; y++) {
     for (int x = 0; x < encoder->in.width_in_lcu; x++) {
@@ -109,6 +125,9 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
+  FREE_POINTER(state->frame->aq_offsets32);
+  kvz_lookahead_free_result(state->frame->la);
+  state->frame->la = NULL;
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 

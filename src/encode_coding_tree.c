@@ -291,6 +291,91 @@ static void encode_transform_coeff(encoder_state_t * const state, int32_t x, int
                                    uint8_t parent_coeff_v);
 
 /**
+ * \brief Whether encode_transform_coeff would code any transform unit
+ * (and thus cu_qp_delta) in the transform tree.
+ *
+ * Mirrors the chroma CBF derivation of encode_transform_coeff for 4:2:2
+ * without writing anything. The CBFs in the CU array can be stale for 4:2:2
+ * chroma and the bottom sub-TU CBF is stored in a different CU array entry,
+ * so the CU array alone does not tell what the decoder will see.
+ */
+static bool tu_tree_coded_422(const encoder_state_t * const state,
+                              int32_t x, int32_t y, int32_t depth, int8_t tr_depth,
+                              uint8_t parent_coeff_u, uint8_t parent_coeff_v)
+{
+  const videoframe_t * const frame = state->tile->frame;
+  const int shift_w = SHIFT_W;
+  const int shift_h = SHIFT_H;
+  const int min_c_w_mask = (4 << shift_w) - 1;
+  const int min_c_h_mask = (4 << shift_h) - 1;
+
+  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x & ~min_c_w_mask, y & ~min_c_h_mask);
+  const int8_t split = (cur_cu->tr_depth > depth);
+
+  const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
+
+  const int width_luma = LCU_WIDTH >> depth;
+  const int x_local = (x % LCU_WIDTH) >> shift_w;
+  const int y_local = (y % LCU_WIDTH) >> shift_h;
+  const int width_c = LCU_WIDTH >> (depth + shift_w);
+  const int buf_h = LCU_WIDTH >> shift_h;
+
+  int sig_u, sig_v;
+  if (depth == MAX_PU_DEPTH) {
+    sig_u = parent_coeff_u;
+    sig_v = parent_coeff_v;
+  } else {
+    const cu_info_t *cur_pu_bot = kvz_cu_array_at_const(frame->cu_array, x, y + width_luma / 2);
+    if (!split || depth >= 3) {
+      sig_u = (cbf_is_set(cur_pu->cbf, depth, COLOR_U) &&
+               chroma_block_has_coeffs(state, x_local, y_local, width_c, COLOR_U)) ||
+              ((y_local + width_c < buf_h) && cbf_is_set(cur_pu_bot->cbf, depth, COLOR_U) &&
+               chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_U));
+      sig_v = (cbf_is_set(cur_pu->cbf, depth, COLOR_V) &&
+               chroma_block_has_coeffs(state, x_local, y_local, width_c, COLOR_V)) ||
+              ((y_local + width_c < buf_h) && cbf_is_set(cur_pu_bot->cbf, depth, COLOR_V) &&
+               chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_V));
+    } else {
+      sig_u = cbf_is_set(cur_cu->cbf, depth, COLOR_U) || cbf_is_set(cur_pu_bot->cbf, depth, COLOR_U) ||
+              chroma_block_has_coeffs(state, x_local, y_local, width_c, COLOR_U) ||
+              ((y_local + width_c < buf_h) && chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_U));
+      sig_v = cbf_is_set(cur_cu->cbf, depth, COLOR_V) || cbf_is_set(cur_pu_bot->cbf, depth, COLOR_V) ||
+              chroma_block_has_coeffs(state, x_local, y_local, width_c, COLOR_V) ||
+              ((y_local + width_c < buf_h) && chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_V));
+    }
+    if (!(tr_depth == 0 || parent_coeff_u)) sig_u = 0;
+    if (!(tr_depth == 0 || parent_coeff_v)) sig_v = 0;
+  }
+
+  if (split) {
+    const int offset = LCU_WIDTH >> (depth + 1);
+    return tu_tree_coded_422(state, x,          y,          depth + 1, tr_depth + 1, sig_u, sig_v) ||
+           tu_tree_coded_422(state, x + offset, y,          depth + 1, tr_depth + 1, sig_u, sig_v) ||
+           tu_tree_coded_422(state, x,          y + offset, depth + 1, tr_depth + 1, sig_u, sig_v) ||
+           tu_tree_coded_422(state, x + offset, y + offset, depth + 1, tr_depth + 1, sig_u, sig_v);
+  }
+  return cb_flag_y || sig_u || sig_v ||
+         (depth == MAX_PU_DEPTH && (parent_coeff_u || parent_coeff_v));
+}
+
+
+bool kvz_cu_has_coded_residual(const encoder_state_t * const state, int x, int y, int depth)
+{
+  const cu_info_t *cu = kvz_cu_array_at_const(state->tile->frame->cu_array, x, y);
+  if (cu->type == CU_INTER && cu->skipped) return false;
+  // Inter CUs code the transform tree only when rqt_root_cbf is set, which
+  // is derived from the CBF of the CU (the reconstruction follows the same
+  // rule).
+  if (!cbf_is_set_any(cu->cbf, depth)) {
+    if (cu->type == CU_INTER || !KVZ_IS_422(state->encoder_control->cfg.chroma_format)) return false;
+  }
+  if (!KVZ_IS_422(state->encoder_control->cfg.chroma_format)) return true;
+  return tu_tree_coded_422(state, x, y, depth, 0, 0, 0);
+}
+
+
+/**
  * \param encoder
  * \param x_pu            Prediction units' x coordinate.
  * \param y_pu            Prediction units' y coordinate.
@@ -378,6 +463,27 @@ static FORCE_INLINE void encode_transform_coeff_csp(encoder_state_t * const stat
     CABAC_BIN(cabac, split, "split_transform_flag");
   }
 
+  // Chroma CBFs as seen by the decoder. For 4:2:2 the leaf level signals the
+  // CBF of each square sub-TU from the actual coefficients, so the combined
+  // flags above (which may include a stale CU-array CBF) can differ from
+  // what the decoder parses. Everything that depends on the chroma CBFs
+  // after this point (children, cbf_luma presence, cu_qp_delta presence)
+  // must use the signalled values.
+  int sig_u = cb_flag_u;
+  int sig_v = cb_flag_v;
+  const bool is_422 = KVZ_IS_422(state->encoder_control->cfg.chroma_format);
+  if (is_422) {
+    if (depth == MAX_PU_DEPTH) {
+      // 4x4 luma: the chroma CBFs come from the parent level.
+      sig_u = parent_coeff_u;
+      sig_v = parent_coeff_v;
+    } else {
+      // Not present means zero.
+      if (!(tr_depth == 0 || parent_coeff_u)) sig_u = 0;
+      if (!(tr_depth == 0 || parent_coeff_v)) sig_v = 0;
+    }
+  }
+
   // Chroma cb flags are not signaled when one of the following:
   // - transform size is 4 (2x2 chroma transform doesn't exist)
   // - they have already been signaled to 0 previously
@@ -400,6 +506,7 @@ static FORCE_INLINE void encode_transform_coeff_csp(encoder_state_t * const stat
                          chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_U);
         CABAC_BIN(cabac, cb_flag_u0, "cbf_cb");
         CABAC_BIN(cabac, cb_flag_u1, "cbf_cb");
+        sig_u = cb_flag_u0 || cb_flag_u1;
       } else {
         CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
       }
@@ -418,6 +525,7 @@ static FORCE_INLINE void encode_transform_coeff_csp(encoder_state_t * const stat
                          chroma_block_has_coeffs(state, x_local, y_local + width_c, width_c, COLOR_V);
         CABAC_BIN(cabac, cb_flag_v0, "cbf_cr");
         CABAC_BIN(cabac, cb_flag_v1, "cbf_cr");
+        sig_v = cb_flag_v0 || cb_flag_v1;
       } else {
         CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
       }
@@ -428,11 +536,16 @@ static FORCE_INLINE void encode_transform_coeff_csp(encoder_state_t * const stat
     uint8_t offset = LCU_WIDTH >> (depth + 1);
     int x2 = x + offset;
     int y2 = y + offset;
-    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, sig_u, sig_v);
+    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, sig_u, sig_v);
+    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, sig_u, sig_v);
+    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, sig_u, sig_v);
     return;
+  }
+
+  if (is_422) {
+    cb_flag_u = sig_u;
+    cb_flag_v = sig_v;
   }
 
   // Luma coded block flag is signaled when one of the following:

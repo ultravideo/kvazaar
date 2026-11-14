@@ -73,6 +73,11 @@ struct kvz_encoder {
 
   unsigned frames_started;
   unsigned frames_done;
+
+  /** \brief The input buffer is being drained for a scene cut. */
+  bool scenecut_pending;
+  /** \brief The input buffer has been restarted for the next scene cut picture. */
+  bool scenecut_ready;
 };
 
 #endif // KVAZAAR_INTERNAL_H_

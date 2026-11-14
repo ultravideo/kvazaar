@@ -31,6 +31,7 @@
  ****************************************************************************/
 
 #include "search.h"
+#include "rate_control.h"
 
 #include <limits.h>
 #include <string.h>
@@ -1226,13 +1227,34 @@ static FORCE_INLINE double search_cu_csp(encoder_state_t * const state, int x, i
   return cost;
 }
 
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+static double search_cu_body(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
 {
   // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
   if (state->chroma_format == KVZ_CSP_420) {
     return search_cu_csp(state, x, y, depth, work_tree, KVZ_CSP_420);
   }
   return search_cu_csp(state, x, y, depth, work_tree, state->chroma_format);
+}
+
+
+/**
+ * \brief Search a CU. With 32x32 quantization groups the QP and lambda of
+ *        the group are used for the 32x32 CUs and their sub-CUs.
+ */
+static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+{
+  if (depth != 1 || state->frame->max_qp_delta_depth != 1 || !state->encoder_control->cfg.cutree_qg32) {
+    return search_cu_body(state, x, y, depth, work_tree);
+  }
+  const int8_t qp = state->qp;
+  const double lambda = state->lambda;
+  const double lambda_sqrt = state->lambda_sqrt;
+  kvz_set_qg_qp_lambda(state, x, y);
+  const double cost = search_cu_body(state, x, y, depth, work_tree);
+  state->qp = qp;
+  state->lambda = lambda;
+  state->lambda_sqrt = lambda_sqrt;
+  return cost;
 }
 
 
@@ -1418,6 +1440,31 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
 
   // Copy non-reference CUs to picture.
   kvz_cu_array_copy_from_lcu(state->tile->frame->cu_array, x_px, y_px, lcu);
+
+  // Inter CUs without a coded residual (skipped, or rqt_root_cbf 0 in the
+  // CBF of the top-left entry, which is what the bitstream writer uses) can
+  // carry stale per-TU CBFs from rejected candidates, e.g. from the --rd 2
+  // cost of a candidate whose residual was dropped afterwards. Clear them so
+  // that the CU QPs (set_cu_qps: no cu_qp_delta -> predicted QP) and the
+  // deblocking boundary strengths match the decoder.
+  {
+    cu_array_t *const cua = state->tile->frame->cu_array;
+    const int x_end = MIN(x_px + LCU_WIDTH, state->tile->frame->width);
+    const int y_end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
+    for (int y = y_px; y < y_end; y += SCU_WIDTH) {
+      for (int x = x_px; x < x_end; x += SCU_WIDTH) {
+        cu_info_t *scu = kvz_cu_array_at(cua, x, y);
+        if (scu->type != CU_INTER || scu->cbf == 0) continue;
+        const int cu_width = LCU_WIDTH >> scu->depth;
+        // Raster order visits the top-left entry of a CU first, so a cleared
+        // top-left entry keeps the rest of the CU cleared too.
+        const cu_info_t *cu = kvz_cu_array_at_const(cua, x & ~(cu_width - 1), y & ~(cu_width - 1));
+        if (cu->skipped || !cbf_is_set_any(cu->cbf, cu->depth)) {
+          scu->cbf = 0;
+        }
+      }
+    }
+  }
 
   // Copy pixels to picture.
   {

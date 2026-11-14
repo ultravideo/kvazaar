@@ -45,6 +45,29 @@ void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
   input_buffer->num_out = 0;
   input_buffer->delay = 0;
   input_buffer->gop_skipped = 0;
+  input_buffer->segments = 0;
+  input_buffer->last_dts = 0;
+}
+
+
+void kvz_input_frame_buffer_restart(input_frame_buffer_t *input_buffer)
+{
+  assert(input_buffer->num_in == input_buffer->num_out);
+  for (int i = 0; i < 3 * KVZ_MAX_GOP_LENGTH; i++) {
+    assert(input_buffer->pic_buffer[i] == NULL);
+  }
+  FILL(input_buffer->pts_buffer, 0);
+  input_buffer->num_in = 0;
+  input_buffer->num_out = 0;
+  input_buffer->delay = 0;
+  input_buffer->gop_skipped = 0;
+  input_buffer->segments++;
+}
+
+
+bool kvz_input_frame_buffer_pending(const input_frame_buffer_t *input_buffer)
+{
+  return input_buffer->num_in > input_buffer->num_out;
 }
 
 /**
@@ -78,6 +101,17 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Check for closed gop, we need an extra frame in the buffer in this case
   if (!cfg->open_gop && cfg->intra_period > 0 && cfg->gop_len > 0) is_closed_gop = true;
 
+  if (cfg->adaptive_gop) {
+    // The lookahead releases the pictures in coding order and sets the
+    // DTS. The GOP structure comes with the lookahead results.
+    if (img_in == NULL) return NULL;
+    state->frame->gop_offset = 0;
+    state->frame->new_segment = buf->num_out == 0;
+    buf->num_in++;
+    buf->num_out++;
+    return kvz_image_copy_ref(img_in);
+  }
+
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
     // No reordering of output pictures necessary.
 
@@ -85,6 +119,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
     img_in->dts = img_in->pts;
     state->frame->gop_offset = 0;
+    state->frame->new_segment = buf->num_out == 0;
     if (cfg->gop_len > 0) {
       // Using a low delay GOP structure.
       uint64_t frame_num = buf->num_out;
@@ -149,11 +184,14 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Number of the next output picture in the GOP.
   int gop_offset;
 
+  bool new_segment = false;
+
   if (buf->num_out == 0) {
     // Output the first frame.
     idx_out = -1;
     dts_out = buf->pts_buffer[gop_buf_size - 1] + buf->delay;
     gop_offset = 0; // highest quality picture
+    new_segment = true;
 
   } else if(first_done) {
     gop_offset = (buf->num_out - 1) % cfg->gop_len;
@@ -207,9 +245,15 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
   kvz_picture* next_pic = buf->pic_buffer[buf_idx];
   assert(next_pic != NULL);
+  if (buf->segments > 0 && dts_out <= buf->last_dts) {
+    // Keep the DTS increasing over segment boundaries.
+    dts_out = buf->last_dts + 1;
+  }
+  buf->last_dts = dts_out;
   next_pic->dts = dts_out;
   buf->pic_buffer[buf_idx] = NULL;
   state->frame->gop_offset = gop_offset;
+  state->frame->new_segment = new_segment;
 
   buf->num_out++;
   return next_pic;

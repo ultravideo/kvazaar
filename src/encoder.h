@@ -151,9 +151,15 @@ typedef struct encoder_control_t
 
   int32_t poc_lsb_bits;
 
+  /** \brief Maximum mini-GOP length with --adaptive-gop, otherwise gop_len. */
+  int32_t agop_max_len;
+
   fast_coeff_table_t fast_coeff_table;
 
   struct kvz_rc_data *rc_data;
+
+  //! Lookahead, NULL if not used. Accessed only from the API thread.
+  struct kvz_lookahead *lookahead;
 
 } encoder_control_t;
 

@@ -33,6 +33,21 @@
     <ClCompile Include="..\..\tests\speed_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\intra_pred_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tests\ipol_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tests\sao_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tests\strategy_diff_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tests\temporal_filter_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\test_strategies.c">
       <Filter>Source Files</Filter>
     </ClCompile>

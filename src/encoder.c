@@ -43,6 +43,7 @@
 #include "fast_coeff_cost.h"
 #include "rate_control.h"
 #include "work_tree_pool.h"
+#include "lookahead.h"
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
@@ -238,6 +239,76 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     if (encoder->cfg.owf % 2 == 1) {
       encoder->cfg.owf += 1;
     }
+  }
+
+  // Resolve the lookahead related automatic settings.
+  {
+    kvz_config *const c = &encoder->cfg;
+    if (c->mctf && (c->gop_len < 8 || c->gop_lowdelay || c->intra_period == 1)) {
+      fprintf(stderr, "--mctf requires a random access GOP of length 8 or 16, disabling it.\n");
+      c->mctf = 0;
+    }
+    if (c->adaptive_gop && (c->gop_lowdelay || (c->gop_len != 8 && c->gop_len != 16) ||
+                            c->intra_period == 1)) {
+      fprintf(stderr, "--adaptive-gop requires a random access GOP of length 8 or 16, disabling it.\n");
+      c->adaptive_gop = 0;
+    }
+    if (c->adaptive_gop && c->target_bitrate > 0 && c->rc_algorithm != KVZ_ABR) {
+      fprintf(stderr, "--adaptive-gop supports only the abr rate control, disabling it.\n");
+      c->adaptive_gop = 0;
+    }
+    const bool explicit_tools = c->crf >= 0 || c->cutree > 0 || c->scenecut > 0 || c->mctf ||
+                                c->adaptive_gop ||
+                                (c->target_bitrate > 0 && c->rc_algorithm == KVZ_ABR);
+    if (c->lookahead == 0 && explicit_tools) {
+      c->lookahead = 20;
+      if (cfg->enable_logging_output) fprintf(stderr, "--lookahead set to %d.\n", c->lookahead);
+    }
+    if (c->lookahead > 0 && c->source_scan_type != KVZ_INTERLACING_NONE) {
+      fprintf(stderr, "Lookahead is not supported with interlaced coding, disabling it.\n");
+      c->lookahead = 0;
+    }
+    if (c->lookahead == 0) {
+      if (c->crf >= 0 || c->rc_algorithm == KVZ_ABR) {
+        fprintf(stderr, "CRF and ABR rate control require the lookahead.\n");
+        goto init_failed;
+      }
+      c->cutree = 0;
+      c->scenecut = 0;
+      c->mctf = 0;
+      c->cutree_qg32 = 0;
+      c->adaptive_gop = 0;
+    } else {
+      if (c->mctf && c->lookahead < 3) {
+        // The temporal filter needs the two following pictures.
+        c->lookahead = 3;
+      }
+      if (c->cutree < 0) c->cutree = 1;
+      if (c->scenecut < 0) c->scenecut = 40;
+      if (c->cutree_strength < 0) c->cutree_strength = 3.75 * (1.0 - c->qcomp);
+      if (c->cutree_qg32 < 0) c->cutree_qg32 = 0;
+      if (c->cutree <= 0) c->cutree_qg32 = 0;
+    }
+  }
+
+  encoder->agop_max_len = encoder->cfg.gop_len;
+  if (encoder->cfg.adaptive_gop) {
+    // Mini-GOPs up to twice the length of the GOP table.
+    encoder->agop_max_len = MIN(KVZ_MAX_GOP_LENGTH, 2 * encoder->cfg.gop_len);
+    encoder->poc_lsb_bits = MAX(4, kvz_math_ceil_log2(encoder->agop_max_len * 2 + 1));
+
+    // Settings of the anchor and of the middle picture of the mini-GOPs
+    // longer than the GOP table, after the table entries. The middle
+    // picture uses the settings of the anchor of the table. The anchor is
+    // referenced over longer distances and by more pictures, so it gets a
+    // lower QP.
+    kvz_gop_config *gop = encoder->cfg.gop;
+    const int len = encoder->cfg.gop_len;
+    gop[len] = gop[0];
+    gop[len].poc_offset = len;
+    gop[len + 1] = gop[0];
+    gop[len + 1].poc_offset = 2 * len;
+    gop[len + 1].qp_offset -= 3;
   }
 
   encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
@@ -610,11 +681,20 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     memcpy(encoder->cfg.optional_key, cfg->optional_key, 16);
   }
 
-  if (encoder->cfg.target_bitrate > 0 && cfg->rc_algorithm != KVZ_NO_RC)
+  if ((encoder->cfg.target_bitrate > 0 && cfg->rc_algorithm != KVZ_NO_RC) ||
+      encoder->cfg.vbv_maxrate > 0)
   {
     encoder->rc_data = kvz_get_rc_data(encoder);
     if (!encoder->rc_data) {
       fprintf(stderr, "Failed to initialize rate control.\n");
+      goto init_failed;
+    }
+  }
+
+  if (encoder->cfg.lookahead > 0) {
+    encoder->lookahead = kvz_lookahead_alloc(encoder);
+    if (!encoder->lookahead) {
+      fprintf(stderr, "Failed to initialize lookahead.\n");
       goto init_failed;
     }
   }
@@ -632,6 +712,9 @@ init_failed:
 void kvz_encoder_control_free(encoder_control_t *const encoder)
 {
   if (!encoder) return;
+
+  kvz_lookahead_free(encoder->lookahead);
+  encoder->lookahead = NULL;
 
   //Slices
   FREE_POINTER(encoder->slice_addresses_in_ts);

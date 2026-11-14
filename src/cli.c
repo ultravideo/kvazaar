@@ -179,6 +179,23 @@ static const struct option long_options[] = {
   { "no-fast-bipred",           no_argument, NULL, 0 },
   { "enable-logging",           no_argument, NULL, 0 },
   { "no-enable-logging",        no_argument, NULL, 0 },
+  { "lookahead",          required_argument, NULL, 0 },
+  { "crf",                required_argument, NULL, 0 },
+  { "qcomp",              required_argument, NULL, 0 },
+  { "cutree",                   no_argument, NULL, 0 },
+  { "no-cutree",                no_argument, NULL, 0 },
+  { "cutree-strength",    required_argument, NULL, 0 },
+  { "scenecut",           required_argument, NULL, 0 },
+  { "no-scenecut",              no_argument, NULL, 0 },
+  { "vbv-maxrate",        required_argument, NULL, 0 },
+  { "vbv-bufsize",        required_argument, NULL, 0 },
+  { "vbv-init",           required_argument, NULL, 0 },
+  { "mctf",                     no_argument, NULL, 0 },
+  { "cutree-qg32",              no_argument, NULL, 0 },
+  { "no-cutree-qg32",           no_argument, NULL, 0 },
+  { "no-mctf",                  no_argument, NULL, 0 },
+  { "adaptive-gop",             no_argument, NULL, 0 },
+  { "no-adaptive-gop",          no_argument, NULL, 0 },
   { "cross-comp-pred",          no_argument, NULL, 0 },
   { "no-cross-comp-pred",       no_argument, NULL, 0 },
   {0, 0, 0, 0}
@@ -594,6 +611,9 @@ void print_help(void)
     "                                   - lambda: rate control from:\n"
     "                                     DOI: 10.1109/TIP.2014.2336550 \n"
     "                                   - oba: DOI: 10.1109/TCSVT.2016.2589878\n"
+    "                                   - abr: frame QP from the lookahead\n"
+    "                                     complexity, adjusted to reach the\n"
+    "                                     bitrate. Enables the lookahead.\n"
     "      --(no-)intra-bits      : Use Hadamard cost based allocation for intra\n"
     "                               frames. Default on for gop 8 and off for lp-gop\n"
     "      --(no-)clip-neighbour  : On oba based rate control whether to clip \n"
@@ -634,6 +654,41 @@ void print_help(void)
     "      --(no-)vaq <integer>   : Enable variance adaptive quantization with given\n"
     "                               strength, in range 1..20. Recommended: 5.\n"
     "                               [disabled]\n"
+    "      --crf <float>          : Constant rate factor, 0..51. Selects the\n"
+    "                               frame QP from the frame complexity measured\n"
+    "                               by the lookahead. Enables the lookahead.\n"
+    "                               [disabled]\n"
+    "      --lookahead <integer>  : Number of frames analysed ahead of encoding,\n"
+    "                               0..250. Used for CRF, CU-tree, scene cut\n"
+    "                               detection and bitrate allocation. Adds\n"
+    "                               latency. [0, 20 with --crf]\n"
+    "      --qcomp <float>        : QP curve compression for CRF and lookahead\n"
+    "                               bit allocation, 0.0..1.0. [0.6]\n"
+    "      --(no-)cutree          : Temporal QP adaptation by propagating block\n"
+    "                               importance through the lookahead.\n"
+    "                               [enabled with lookahead]\n"
+    "      --cutree-strength <float>: CU-tree QP offset strength.\n"
+    "                               [3.75 * (1 - qcomp)]\n"
+    "      --(no-)cutree-qg32     : CU-tree QP for 32x32 blocks instead of\n"
+    "                               64x64 (experimental). [disabled]\n"
+    "      --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.\n"
+    "                               Inserts an IDR picture at scene changes.\n"
+    "                               [40 with lookahead]\n"
+    "      --vbv-maxrate <integer>: VBV maximum bitrate in bits per second for\n"
+    "                               --crf and --rc-algorithm abr. [disabled]\n"
+    "      --vbv-bufsize <integer>: VBV buffer size in bits. [disabled]\n"
+    "      --vbv-init <float>     : Initial VBV buffer fullness. [0.9]\n"
+    "      --(no-)mctf            : Motion compensated temporal filtering of\n"
+    "                               the GOP key pictures before coding (random\n"
+    "                               access GOP). Enables the lookahead.\n"
+    "                               [disabled]\n"
+    "      --(no-)adaptive-gop    : The lookahead chooses the length of each\n"
+    "                               random access mini-GOP (1..2 * --gop), places\n"
+    "                               the periodic intra pictures at mini-GOP\n"
+    "                               anchors (--period is the maximum distance)\n"
+    "                               and does not treat flashes as scene cuts.\n"
+    "                               Enables the lookahead, adds 2 * --gop\n"
+    "                               pictures of latency. [disabled]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

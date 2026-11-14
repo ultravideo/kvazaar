@@ -48,6 +48,8 @@
 #include "filter.h"
 #include "image.h"
 #include "rate_control.h"
+#include "lookahead.h"
+#include "kvz_math.h"
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
@@ -614,7 +616,12 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   } else {
     bool cbf_found = *prev_qp >= 0;
 
-    if (cu->tr_depth > depth) {
+    if (KVZ_IS_422(state->encoder_control->cfg.chroma_format)) {
+      // The 4:2:2 chroma CBFs in the CU array do not tell reliably whether
+      // a residual (and thus cu_qp_delta) is coded, use the same derivation
+      // as the bitstream writer.
+      cbf_found = cbf_found || kvz_cu_has_coded_residual(state, x, y, depth);
+    } else if (cu->tr_depth > depth) {
       // The CU is split into smaller transform units. Check whether coded
       // block flag is set for any of the TUs.
       const int tu_width = LCU_WIDTH >> cu->tr_depth;
@@ -662,6 +669,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   switch (encoder->cfg.rc_algorithm) {
     case KVZ_NO_RC:
     case KVZ_LAMBDA:
+    case KVZ_ABR:
       kvz_set_lcu_lambda_and_qp(state, lcu->position);
       break;
     case KVZ_OBA:
@@ -903,10 +911,20 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
              ref_state->frame->slicetype == KVZ_SLICE_I &&
              ref_state->frame->num != 0){
 
-            while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
-              ref_state = ref_state->previous_encoder_state;
+            const encoder_state_t *search_state = ref_state;
+            bool found = false;
+            for (int s = 0; s <= state->encoder_control->cfg.owf; s++) {
+              if (search_state->frame->poc == state->frame->poc - state->encoder_control->cfg.gop_len) {
+                found = true;
+                break;
+              }
+              search_state = search_state->previous_encoder_state;
             }
-            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+            // The picture is not found after an IDR in the middle of the
+            // sequence (scene cut).
+            if (found) {
+              kvz_threadqueue_job_dep_add(job[0], search_state->tile->wf_jobs[dep_lcu->id]);
+            }
           }
         }
 
@@ -1147,10 +1165,101 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
 }
 
 /**
+ * \brief Adaptive GOP: remove the references that are no longer used.
+ *
+ * A picture inside a mini-GOP keeps the pictures at the ends of the
+ * enclosing intervals of the hierarchy. An anchor keeps the pictures of the
+ * lowest GOP layers, nearest first, as many as the anchor of the GOP table.
+ */
+static void agop_remove_refs(encoder_state_t *state)
+{
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  const kvz_la_result *la = state->frame->la;
+  image_list_t *list = state->frame->ref;
+  const int32_t poc = state->frame->poc;
+  const int32_t irap_poc = state->frame->irap_poc;
+
+  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL ||
+      state->frame->pictype == KVZ_NAL_IDR_N_LP) {
+    while (list->used_size > 0) kvz_image_list_rem(list, list->used_size - 1);
+    return;
+  }
+
+  bool keep[MAX_REF_PIC_COUNT + 16] = { false };
+  const int num = list->used_size;
+  for (int i = 0; i < num; i++) {
+    const int32_t ref_poc = list->pocs[i];
+    // Trailing pictures cannot refer to pictures preceding the IRAP.
+    keep[i] = !(ref_poc < irap_poc && irap_poc < poc);
+  }
+
+  if (la->gop_pos == la->gop_size) {
+    const int max_refs = MAX(1, cfg->gop[state->frame->gop_offset].ref_neg_count);
+    bool chosen[MAX_REF_PIC_COUNT + 16] = { false };
+    for (int n = 0; n < max_refs; n++) {
+      int best = -1;
+      for (int i = 0; i < num; i++) {
+        if (!keep[i] || chosen[i]) continue;
+        if (best < 0) {
+          best = i;
+          continue;
+        }
+        const int layer = list->images[i]->gop_layer;
+        const int best_layer = list->images[best]->gop_layer;
+        const int dist = abs(poc - list->pocs[i]);
+        const int best_dist = abs(poc - list->pocs[best]);
+        if (layer < best_layer || (layer == best_layer && dist < best_dist)) best = i;
+      }
+      if (best < 0) break;
+      chosen[best] = true;
+    }
+    for (int i = 0; i < num; i++) keep[i] = chosen[i];
+  } else {
+    // The start of the mini-GOP is the furthest listed picture in the past.
+    int32_t start_poc = poc;
+    for (int r = 0; r < la->gop_num_refs; r++) {
+      start_poc = MIN(start_poc, poc + la->gop_refs[r]);
+    }
+    int older = -1;
+    for (int i = 0; i < num; i++) {
+      bool listed = false;
+      for (int r = 0; r < la->gop_num_refs; r++) {
+        if (list->pocs[i] == poc + la->gop_refs[r]) listed = true;
+      }
+      if (keep[i] && !listed && list->pocs[i] < start_poc) {
+        // Prefer the pictures of the two lowest layers.
+        const bool low = list->images[i]->gop_layer <= 2;
+        const bool older_low = older >= 0 && list->images[older]->gop_layer <= 2;
+        if (older < 0 || (low && !older_low) ||
+            (low == older_low && list->pocs[i] > list->pocs[older])) {
+          older = i;
+        }
+      }
+      keep[i] = keep[i] && listed;
+    }
+    // As in the GOP tables, a picture preceding the mini-GOP is kept while
+    // the number of references stays below log2(GOP) + 1.
+    if (older >= 0 && la->gop_num_refs < (int)kvz_math_floor_log2(cfg->gop_len) + 1) {
+      keep[older] = true;
+    }
+  }
+
+  for (int i = num - 1; i >= 0; i--) {
+    if (!keep[i]) kvz_image_list_rem(list, i);
+  }
+}
+
+
+/**
  * \brief Remove any references that should no longer be used.
  */
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
+
+  if (encoder->cfg.adaptive_gop && state->frame->la && state->frame->la->gop_size > 0) {
+    agop_remove_refs(state);
+    return;
+  }
 
   int neg_refs = encoder->cfg.gop[state->frame->gop_offset].ref_neg_count;
   int pos_refs = encoder->cfg.gop[state->frame->gop_offset].ref_pos_count;
@@ -1248,10 +1357,26 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   int intra_group = 0;
   int intra_offset = 0;
 
-  if (state->encoder_control->cfg.intra_period) {
+  const kvz_la_result *la = state->frame->la;
+  if (state->encoder_control->cfg.adaptive_gop && la && la->gop_size > 0) {
+    // IRAP pictures are counted in coding order. The offset is the number
+    // of pictures since the latest IRAP picture.
+    if (state->frame->new_segment || la->gop_key) {
+      state->frame->agop_irap_count++;
+      state->frame->agop_irap_num = frame_number;
+    }
+    intra_group = state->frame->agop_irap_count;
+    intra_offset = frame_number - state->frame->agop_irap_num;
+    state->tile->frame->rec->gop_layer =
+      state->encoder_control->cfg.gop[state->frame->gop_offset].layer;
+  } else if (state->encoder_control->cfg.intra_period) {
+    // Intra periods restart at each new segment (scene cut).
+    int segment_frame = frame_number - state->frame->segment_start;
     int offset = state->encoder_control->cfg.gop_len > 0 ? state->encoder_control->cfg.gop_len - 1 : 0;
-    intra_group = (frame_number + offset) / state->encoder_control->cfg.intra_period;
-    intra_offset = (frame_number + offset) % state->encoder_control->cfg.intra_period;
+    intra_group = (segment_frame + offset) / state->encoder_control->cfg.intra_period;
+    intra_offset = (segment_frame + offset) % state->encoder_control->cfg.intra_period;
+    // Make the groups of different segments distinct.
+    intra_group += state->frame->segment_start;
   }
 
   state->tile->frame->source->intra_group = intra_group;
@@ -1469,6 +1594,22 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   const kvz_config * const cfg = &state->encoder_control->cfg;
 
+  if (state->frame->new_segment) {
+    state->frame->segment_start = state->frame->num;
+  }
+
+  // Lookahead analysis results for the frame.
+  kvz_lookahead_free_result(state->frame->la);
+  state->frame->la = kvz_lookahead_take_result(state->encoder_control->lookahead, frame);
+
+  if (cfg->adaptive_gop && state->frame->la && state->frame->la->gop_size > 0) {
+    const kvz_la_result *la = state->frame->la;
+    // A non-reference (flash) picture uses the settings of the highest layer.
+    state->frame->gop_offset = (int8_t)kvz_lookahead_gop_template(cfg, la->gop_size,
+                                                                 la->gop_nonref ? 1 : la->gop_pos,
+                                                                 la->gop_nonref ? 1 : la->gop_span);
+  }
+
   encoder_set_source_picture(state, frame);
 
   assert(!state->tile->frame->cu_array);
@@ -1498,6 +1639,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     const int shift_w = SHIFT_W;
     const int shift_h = SHIFT_H;
     const int lcu_w_c = LCU_WIDTH >> shift_w;
+    const int lcu_h_c = LCU_WIDTH >> shift_h;
     double d = cfg->vaq * 0.1; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
@@ -1550,18 +1692,20 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           int32_t c_stride = state->tile->frame->source->stride_c;
           kvz_pixel chromau_tmp[LCU_LUMA_SIZE];
           kvz_pixel chromav_tmp[LCU_LUMA_SIZE];
+          // The chroma block of an LCU is not square with 4:2:2.
           int lcu_chroma_width = lcu_w_c;
+          int lcu_chroma_height = lcu_h_c;
           int c_pxl_x = x * lcu_chroma_width;
-          int c_pxl_y = y * lcu_chroma_width;
+          int c_pxl_y = y * lcu_chroma_height;
           int c_x_max = MIN(c_pxl_x + lcu_chroma_width, frame->width_c) - c_pxl_x;
-          int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height_c) - c_pxl_y;
+          int c_y_max = MIN(c_pxl_y + lcu_chroma_height, frame->height_c) - c_pxl_y;
 
           if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
             kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
             kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
           }
           else {
-            for (int y = 0; y < lcu_chroma_width; y++) {
+            for (int y = 0; y < lcu_chroma_height; y++) {
               for (int x = 0; x < lcu_chroma_width; x++) {
                 int src_y = CLIP(0, (frame->height_c) - 1, c_pxl_y + y);
                 int src_x = CLIP(0, (frame->width_c) - 1, c_pxl_x + x);
@@ -1581,7 +1725,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
   // Variance adaptive quantization - END
 
-  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq) {
+  if (cfg->cutree_qg32 && !frame->roi.roi_array) {
+    state->frame->max_qp_delta_depth = 1;
+  } else if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq || cfg->cutree > 0) {
     state->frame->max_qp_delta_depth = 0;
   } else {
     state->frame->max_qp_delta_depth = -1;
@@ -1603,12 +1749,26 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   if (owf == 0) previous = state;
   state->frame->previous_layer_state = previous;
+
+  // Frame number relative to the start of the current segment. A new segment
+  // starts with an IDR picture at the beginning of the sequence and at scene
+  // cuts detected by the lookahead.
+  const int32_t segment_num = state->frame->num - state->frame->segment_start;
+
   // Set POC.
-  if (state->frame->num == 0) {
+  const kvz_la_result *agop = cfg->adaptive_gop && state->frame->la &&
+                              state->frame->la->gop_size > 0 ? state->frame->la : NULL;
+  if (agop) {
+    // Adaptive GOP: the structure comes from the lookahead.
+    state->frame->poc = segment_num == 0 ? 0 : agop->gop_poc;
+    kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+    is_closed_normal_gop = true;
+    state->frame->is_irap = segment_num == 0 || agop->gop_key;
+  } else if (segment_num == 0) {
     state->frame->poc = 0;
   } else if (cfg->gop_len && !cfg->gop_lowdelay) {
 
-    int32_t framenum = state->frame->num - 1;
+    int32_t framenum = segment_num - 1;
     // Handle closed GOP
     // Closed GOP structure has an extra IDR between the GOPs
     if (cfg->intra_period > 0 && !cfg->open_gop) {
@@ -1632,13 +1792,15 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else if (cfg->intra_period > 0) {
-    state->frame->poc = state->frame->num % cfg->intra_period;
+    state->frame->poc = segment_num % cfg->intra_period;
   } else {
-    state->frame->poc = state->frame->num;
+    state->frame->poc = segment_num;
   }
 
   // Check whether the frame is a keyframe or not.
-  if (state->frame->num == 0 || state->frame->poc == 0) {
+  if (agop) {
+    // Set above.
+  } else if (segment_num == 0 || state->frame->poc == 0) {
     state->frame->is_irap = true;
   } else if(!is_closed_normal_gop) { // In closed-GOP IDR frames are poc==0 so skip this check
     state->frame->is_irap =
@@ -1651,7 +1813,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Set pictype.
   if (state->frame->is_irap) {
-    if (state->frame->num == 0 ||
+    if (segment_num == 0 ||
         cfg->intra_period == 1 ||
         cfg->gop_len == 0 ||
         cfg->gop_lowdelay ||
@@ -1679,6 +1841,47 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->frame->slicetype = KVZ_SLICE_P;
   }
 
+  // CU-tree QP offsets from the lookahead.
+  if (cfg->cutree > 0) {
+    const int num_lcus = state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu;
+    if (!cfg->vaq) {
+      for (int i = 0; i < num_lcus; i++) state->frame->aq_offsets[i] = 0.0;
+    }
+    // Pictures that are not used for reference do not propagate anything.
+    const bool is_ref = cfg->gop_len == 0 || state->frame->is_irap ||
+                        cfg->gop[state->frame->gop_offset].is_ref;
+    if (state->frame->la && state->frame->la->ctu_offsets && is_ref) {
+      for (int i = 0; i < num_lcus; i++) {
+        state->frame->aq_offsets[i] += state->frame->la->ctu_offsets[i];
+      }
+    }
+    if (cfg->cutree_qg32) {
+      // 32x32 offsets: the variance AQ of the LCU plus the CU-tree offset of
+      // the block.
+      const int w32 = CEILDIV(state->encoder_control->in.width, 32);
+      const int h32 = CEILDIV(state->encoder_control->in.height, 32);
+      const int w_lcu = state->encoder_control->in.width_in_lcu;
+      const double *qg = (state->frame->la && is_ref) ? state->frame->la->qg_offsets : NULL;
+      for (int y = 0; y < h32; y++) {
+        for (int x = 0; x < w32; x++) {
+          const int lcu = (x >> 1) + (y >> 1) * w_lcu;
+          double off = 0.0;
+          if (cfg->vaq) {
+            off = state->frame->aq_offsets[lcu] - (qg && state->frame->la->ctu_offsets ? state->frame->la->ctu_offsets[lcu] : 0.0);
+          }
+          double q = qg ? qg[x + y * w32] : 0.0;
+          if (qg && state->frame->la->ctu_offsets) {
+            // Halfway between the CTU and the 32x32 offset, the plain 32x32
+            // offsets were too noisy.
+            const double ctu = state->frame->la->ctu_offsets[lcu];
+            q = ctu + 0.5 * (q - ctu);
+          }
+          state->frame->aq_offsets32[x + y * w32] = off + q;
+        }
+      }
+    }
+  }
+
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
     normalize_lcu_weights(state);
   }
@@ -1691,6 +1894,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       break;
     case KVZ_OBA:
       kvz_estimate_pic_lambda(state);
+      break;
+    case KVZ_ABR:
+      kvz_set_picture_qp_abr(state);
       break;
     default:
       assert(0);
@@ -1821,6 +2027,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
+      prev_state->frame->is_irap ||
       encoder->cfg.gop[prev_state->frame->gop_offset].is_ref) {
 
     // Store current list of POCs for use in TMVP derivation
@@ -1851,6 +2058,9 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->num = prev_state->frame->num + 1;
   state->frame->poc = prev_state->frame->poc + 1;
   state->frame->irap_poc = prev_state->frame->irap_poc;
+  state->frame->segment_start = prev_state->frame->segment_start;
+  state->frame->agop_irap_count = prev_state->frame->agop_irap_count;
+  state->frame->agop_irap_num = prev_state->frame->agop_irap_num;
 
   state->frame->prepared = 1;
 

@@ -62,6 +62,25 @@ void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
                                         const int orig_stride,
                                         unsigned costs[4]);
 
+// Temporal filter functions, also used for the cases the SIMD versions do
+// not handle.
+void kvz_bilinear_ssd_multi_generic(const kvz_pixel *org, int org_stride,
+                                    const kvz_pixel *ref, int ref_stride,
+                                    int size, const int *mv_x, const int *mv_y,
+                                    int num, unsigned *out);
+void kvz_tf_bilinear_pred_generic(kvz_pixel *dst, int dst_stride,
+                                  const kvz_pixel *ref, int ref_stride,
+                                  int width, int height,
+                                  int w00, int w10, int w01, int w11, int shift);
+void kvz_tf_block_stats_generic(const kvz_pixel *org, int org_stride,
+                                const kvz_pixel *pred, int pred_stride,
+                                int width, int height, int64_t out[5]);
+void kvz_tf_filter_block_generic(kvz_pixel *dst, int dst_stride,
+                                 const kvz_pixel *src, int src_stride,
+                                 const kvz_pixel *const *preds, int pred_stride,
+                                 int num_refs, const float *weights,
+                                 const float *const *luts,
+                                 int width, int height, int max_val);
 
 
 #endif //STRATEGIES_PICTURE_GENERIC_H_

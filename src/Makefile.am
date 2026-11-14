@@ -86,6 +86,8 @@ KVZ_LIB_SOURCES = \
 	imagelist.h \
 	input_frame_buffer.c \
 	input_frame_buffer.h \
+	lookahead.c \
+	lookahead.h \
 	inter.c \
 	inter.h \
 	intra.c \
@@ -115,6 +117,8 @@ KVZ_LIB_SOURCES = \
 	sei.h \
 	tables.c \
 	tables.h \
+	temporal_filter.c \
+	temporal_filter.h \
 	threadqueue.c \
 	threadqueue.h \
 	threads.h \
