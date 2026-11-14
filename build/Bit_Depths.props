@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The bit depths compiled into kvazaar_lib.
+
+  kvazaar_lib is the default 8-bit encoder. The additional bit depths are
+  built by the kvazaar_lib_10bit and kvazaar_lib_12bit projects and linked
+  into kvazaar_lib, whose kvz_api_get returns their APIs. Set a property to
+  false here, or on the msbuild command line (/p:KvzMultilib12bit=false), to
+  leave the bit depth out.
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <KvzMultilib10bit Condition="'$(KvzMultilib10bit)'==''">true</KvzMultilib10bit>
+    <KvzMultilib12bit Condition="'$(KvzMultilib12bit)'==''">true</KvzMultilib12bit>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(KvzMultilib10bit)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>KVZ_MULTILIB_10BIT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(KvzMultilib12bit)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>KVZ_MULTILIB_12BIT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ProjectReference>
+      <!-- Put the libraries of the referenced bit depths into kvazaar_lib.lib. -->
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)kvazaar_lib_10bit\kvazaar_lib_10bit.vcxproj" Condition="'$(KvzMultilib10bit)'=='true'">
+      <Project>{578f3c99-187f-49ed-a82a-f73942e8114f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)kvazaar_lib_12bit\kvazaar_lib_12bit.vcxproj" Condition="'$(KvzMultilib12bit)'=='true'">
+      <Project>{b6ae080d-6399-4b02-92b0-a4ee8711fff6}</Project>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

@@ -315,5 +315,6 @@
     <ClInclude Include="..\..\src\videoframe.h" />
     <ClInclude Include="..\..\src\work_tree_pool.h" />
   </ItemGroup>
+  <Import Project="..\Bit_Depths.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

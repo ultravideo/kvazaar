@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Common part of the kvazaar_lib_<n>bit projects, which compile the sources
+  of kvazaar_lib for an additional bit depth $(KvzBitDepth).
+
+  multilib_rename.h is included in every file, so that the external symbols
+  get the bit depth as a suffix (e.g. kvz_api_get becomes kvz_api_get_10bit)
+  and do not collide with the default 8-bit ones. kvazaar_lib links these
+  libraries in (see Bit_Depths.props).
+
+  The sources are listed with wildcards, so new source files are picked up
+  automatically. The platform support code (getopt, pthread wrapper) and the
+  encryption code do not depend on the bit depth and are only in kvazaar_lib.
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <KvzSrcDir>$(MSBuildThisFileDirectory)..\src\</KvzSrcDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>KVZ_BIT_DEPTH=$(KvzBitDepth);KVZ_VERSION_MAJOR=2;KVZ_VERSION_MINOR=3;KVZ_VERSION_REVISION=2;KVZ_COMPILER_STRING="VS2015";KVZ_COMPILE_DATE="2026-01-20";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>$(KvzSrcDir)multilib_rename.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(KvzSrcDir)*.c" Exclude="$(KvzSrcDir)encmain.c;$(KvzSrcDir)cli.c;$(KvzSrcDir)yuv_io.c" />
+    <ClCompile Include="$(KvzSrcDir)extras\libmd5.c" />
+    <ClCompile Include="$(KvzSrcDir)strategies\**\*.c" Exclude="$(KvzSrcDir)strategies\avx2\*.c" />
+    <ClCompile Include="$(KvzSrcDir)strategies\avx2\*.c">
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <ClInclude Include="$(KvzSrcDir)multilib_rename.h" />
+  </ItemGroup>
+</Project>
