@@ -168,11 +168,26 @@ void kvz_reconstruct_lcu_chroma(encoder_state_t * const state,
 {
   const videoframe_t * const frame = state->tile->frame;
 
+  const enum kvz_chroma_format csp = state->encoder_control->cfg.chroma_format;
+  const int chroma_size = KVZ_LCU_CHROMA_SIZE(csp);
+
+  // Only initialize the parts of the buffers that the chroma format uses.
+  // The buffers are sized for 4:4:4.
   lcu_t lcu;
-  FILL(lcu, 0);
-  lcu.rec.chroma_format = state->encoder_control->cfg.chroma_format;
-  lcu.ref.chroma_format = state->encoder_control->cfg.chroma_format;
-  lcu.coeff = search_lcu->coeff;
+  FILL(lcu.cu, 0);
+  lcu.rec.chroma_format = csp;
+  lcu.ref.chroma_format = csp;
+  FILL_ARRAY(lcu.ref.y, 0, LCU_LUMA_SIZE);
+  FILL_ARRAY(lcu.rec.y, 0, LCU_LUMA_SIZE);
+  memcpy(lcu.coeff.y, search_lcu->coeff.y, LCU_LUMA_SIZE * sizeof(coeff_t));
+  if (chroma_size > 0) {
+    FILL_ARRAY(lcu.ref.u, 0, chroma_size);
+    FILL_ARRAY(lcu.ref.v, 0, chroma_size);
+    FILL_ARRAY(lcu.rec.u, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
+    FILL_ARRAY(lcu.rec.v, 0, KVZ_LCU_CHROMA_REC_SIZE(csp));
+    memcpy(lcu.coeff.u, search_lcu->coeff.u, chroma_size * sizeof(coeff_t));
+    memcpy(lcu.coeff.v, search_lcu->coeff.v, chroma_size * sizeof(coeff_t));
+  }
   memcpy(&lcu.top_ref, &search_lcu->top_ref, sizeof(lcu.top_ref));
   memcpy(&lcu.left_ref, &search_lcu->left_ref, sizeof(lcu.left_ref));
 

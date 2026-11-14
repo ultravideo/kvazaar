@@ -1244,22 +1244,46 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
 /**
  * Initialize lcu_t for search.
+ * - Zero the CU array, the reconstruction and the coefficients.
  * - Copy reference CUs.
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
+ *
+ * Only the parts of the pixel and coefficient buffers that are used by the
+ * chroma format are touched. The buffers are sized for 4:4:4, so clearing
+ * the whole lcu_t would write almost twice the necessary amount of memory
+ * for 4:2:0.
  */
 static void init_lcu_t(const encoder_state_t * const state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
   const videoframe_t * const frame = state->tile->frame;
+  const enum kvz_chroma_format csp = state->encoder_control->cfg.chroma_format;
   const int shift_w = SHIFT_W;
   const int shift_h = SHIFT_H;
   const int lcu_w_c = LCU_WIDTH >> shift_w;
   const int lcu_h_c = LCU_WIDTH >> shift_h;
+  const int chroma_size = KVZ_LCU_CHROMA_SIZE(csp);
+  const int chroma_rec_size = KVZ_LCU_CHROMA_REC_SIZE(csp);
 
-  FILL(*lcu, 0);
-  
-  lcu->rec.chroma_format = state->encoder_control->cfg.chroma_format;
-  lcu->ref.chroma_format = state->encoder_control->cfg.chroma_format;
+  FILL(lcu->top_ref, 0);
+  FILL(lcu->left_ref, 0);
+  FILL(lcu->cu, 0);
+
+  // Zero the reconstruction and the coefficients. Coefficient positions not
+  // written by the search (e.g. 4:2:2 sub-TU areas with no residual) must
+  // read as zero, because the 4:2:2 chroma CBF signalling derives the sub-TU
+  // CBF from the actual coefficients.
+  FILL_ARRAY(lcu->rec.y, 0, LCU_LUMA_SIZE);
+  FILL_ARRAY(lcu->coeff.y, 0, LCU_LUMA_SIZE);
+  if (chroma_size > 0) {
+    FILL_ARRAY(lcu->rec.u, 0, chroma_rec_size);
+    FILL_ARRAY(lcu->rec.v, 0, chroma_rec_size);
+    FILL_ARRAY(lcu->coeff.u, 0, chroma_size);
+    FILL_ARRAY(lcu->coeff.v, 0, chroma_size);
+  }
+
+  lcu->rec.chroma_format = csp;
+  lcu->ref.chroma_format = csp;
 
   // Copy reference cu_info structs from neighbouring LCUs.
 
@@ -1340,6 +1364,16 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     int x_max_c = x_max >> shift_w;
     int y_max_c = y_max >> shift_h;
 
+    if (x_max < LCU_WIDTH || y_max < LCU_WIDTH) {
+      // The LCU is only partially inside the frame. Zero the area outside
+      // the frame so that it is deterministic.
+      FILL_ARRAY(lcu->ref.y, 0, LCU_LUMA_SIZE);
+      if (chroma_size > 0) {
+        FILL_ARRAY(lcu->ref.u, 0, chroma_size);
+        FILL_ARRAY(lcu->ref.v, 0, chroma_size);
+      }
+    }
+
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
     if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
@@ -1348,6 +1382,37 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       kvz_pixels_blit(&frame->source->v[x_c + y_c * (frame->source->stride_c)], lcu->ref.v,
                       x_max_c, y_max_c, frame->source->stride_c, lcu_w_c);
     }
+  }
+}
+
+
+/**
+ * Copy the initial state of the work tree from depth 0 to a deeper level.
+ *
+ * Only the parts of the buffers that are used by the chroma format are
+ * copied, see init_lcu_t.
+ */
+static void copy_lcu_t_init(lcu_t *to, const lcu_t *from, const enum kvz_chroma_format csp)
+{
+  const int chroma_size = KVZ_LCU_CHROMA_SIZE(csp);
+  const int chroma_rec_size = KVZ_LCU_CHROMA_REC_SIZE(csp);
+
+  to->top_ref  = from->top_ref;
+  to->left_ref = from->left_ref;
+  memcpy(to->cu, from->cu, sizeof(to->cu));
+
+  to->ref.chroma_format = from->ref.chroma_format;
+  to->rec.chroma_format = from->rec.chroma_format;
+  memcpy(to->ref.y,   from->ref.y,   LCU_LUMA_SIZE * sizeof(kvz_pixel));
+  memcpy(to->rec.y,   from->rec.y,   LCU_LUMA_SIZE * sizeof(kvz_pixel));
+  memcpy(to->coeff.y, from->coeff.y, LCU_LUMA_SIZE * sizeof(coeff_t));
+  if (chroma_size > 0) {
+    memcpy(to->ref.u,   from->ref.u,   chroma_size * sizeof(kvz_pixel));
+    memcpy(to->ref.v,   from->ref.v,   chroma_size * sizeof(kvz_pixel));
+    memcpy(to->rec.u,   from->rec.u,   chroma_rec_size * sizeof(kvz_pixel));
+    memcpy(to->rec.v,   from->rec.v,   chroma_rec_size * sizeof(kvz_pixel));
+    memcpy(to->coeff.u, from->coeff.u, chroma_size * sizeof(coeff_t));
+    memcpy(to->coeff.v, from->coeff.v, chroma_size * sizeof(coeff_t));
   }
 }
 
@@ -1407,15 +1472,8 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
   assert(work_tree[0].rec.chroma_format == state->encoder_control->cfg.chroma_format);
   assert(work_tree[0].ref.chroma_format == state->encoder_control->cfg.chroma_format);
-  // Zero the coefficient buffers so that positions not written by the search
-  // (e.g. 4:2:2 sub-TU areas with no residual) are deterministic: the 4:2:2
-  // chroma CBF signalling derives the sub-TU CBF from the actual coefficients,
-  // so unwritten positions must read as zero.
-  FILL_ARRAY(work_tree[0].coeff.y, 0, LCU_LUMA_SIZE);
-  FILL_ARRAY(work_tree[0].coeff.u, 0, LCU_LUMA_SIZE);
-  FILL_ARRAY(work_tree[0].coeff.v, 0, LCU_LUMA_SIZE);
   for (int depth = 1; depth <= MAX_PU_DEPTH; ++depth) {
-    work_tree[depth] = work_tree[0];
+    copy_lcu_t_init(&work_tree[depth], &work_tree[0], state->encoder_control->cfg.chroma_format);
   }
 
   // If the ML depth prediction is enabled, 
@@ -1453,6 +1511,8 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // Copy coeffs to encoder state.
   copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH, LCU_WIDTH);
-  copy_coeffs(work_tree[0].coeff.u, state->coeff->u, lcu_w_c, lcu_h_c);
-  copy_coeffs(work_tree[0].coeff.v, state->coeff->v, lcu_w_c, lcu_h_c);
+  if (state->encoder_control->cfg.chroma_format != KVZ_CSP_400) {
+    copy_coeffs(work_tree[0].coeff.u, state->coeff->u, lcu_w_c, lcu_h_c);
+    copy_coeffs(work_tree[0].coeff.v, state->coeff->v, lcu_w_c, lcu_h_c);
+  }
 }

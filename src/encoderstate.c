@@ -671,11 +671,10 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       assert(0);
   }
 
+  // No need to clear the coefficients: kvz_search_lcu overwrites the whole
+  // area used by the chroma format with the (zero initialized) coefficient
+  // buffer of the search.
   lcu_coeff_t coeff;
-  // Zero so that coefficient positions not written by the search (e.g. 4:2:2
-  // sub-TU areas with no residual) are deterministic: the 4:2:2 chroma CBF
-  // signalling derives the sub-TU CBF from the actual coefficients.
-  FILL(coeff, 0);
   state->coeff = &coeff;
 
   //This part doesn't write to bitstream, it's only search, deblock and sao

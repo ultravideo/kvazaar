@@ -340,6 +340,27 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
+/**
+ * \brief Number of pixels or coefficients in one chroma component of an LCU
+ *
+ * The u and v buffers of lcu_t are sized for 4:4:4, but only the first
+ * KVZ_LCU_CHROMA_SIZE(csp) elements are used with chroma format csp, so
+ * only those need to be initialized or copied.
+ */
+#define KVZ_LCU_CHROMA_SIZE(csp) \
+  ((csp) == KVZ_CSP_400 ? 0 : (LCU_LUMA_SIZE >> (KVZ_CSP_SHIFT_W(csp) + KVZ_CSP_SHIFT_H(csp))))
+
+/**
+ * \brief Size of the chroma reconstruction buffers of an LCU, including padding
+ *
+ * For 4:2:2 the search reconstructs the bottom chroma sub-TU of a 4x4 chroma
+ * TU at MAX_PU_DEPTH at half of the TU height below the top sub-TU, so the
+ * left reference of the bottom sub-TU extends up to two rows below the LCU.
+ * Those two rows must exist and read as zero.
+ */
+#define KVZ_LCU_CHROMA_REC_SIZE(csp) \
+  (KVZ_LCU_CHROMA_SIZE(csp) + (KVZ_IS_422(csp) ? 2 * (LCU_WIDTH >> 1) : 0))
+
 void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
 void kvz_cu_array_copy_to_lcu(lcu_t *dst, int dst_x, int dst_y, const cu_array_t *src);
 
