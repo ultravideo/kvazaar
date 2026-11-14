@@ -16,7 +16,9 @@ option(BUILD_TESTS "Build tests" ON)
 
 option(USE_CRYPTO "Use crypto library" OFF)
 
-option(COMPILE_10BIT "Compile kvazaar with 10-bit support" ON)
+# The library contains an encoder for each of these bit depths, see the
+# "Bit depths" section below.
+set(KVZ_BIT_DEPTHS "8;10;12" CACHE STRING "Bit depths to compile into kvazaar (8, 10 and/or 12)")
 
 option(BUILD_KVAZAAR_BINARY "Build kvazaar-bin" ON) # To build only the lib, useful for iOS-builds
 
@@ -138,10 +140,13 @@ file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/str
 
 list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 
-set(LIB_SOURCES_MULTILIB ${LIB_SOURCES})
-
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
+
+# Sources that are compiled for every bit depth. The platform support code
+# and the C++ encryption code added below do not depend on the bit depth
+# and are only compiled once.
+set(LIB_SOURCES_BIT_DEPTH ${LIB_SOURCES})
 
 add_definitions(-DKVZ_DLL_EXPORTS)
 
@@ -211,6 +216,37 @@ else()
   
 endif()
 
+# Bit depths
+#
+# The lowest bit depth of KVZ_BIT_DEPTHS is the default one, compiled as
+# usual. The others are compiled into object libraries whose external
+# symbols are renamed by force including src/multilib_rename.h (e.g.
+# kvz_api_get becomes kvz_api_get_10bit), and linked into the same library.
+# kvz_api_get of the default bit depth returns the API of the others.
+string(REPLACE "," ";" KVZ_BIT_DEPTHS "${KVZ_BIT_DEPTHS}")
+if(CMAKE_C_FLAGS MATCHES "-DKVZ_BIT_DEPTH=([0-9]+)")
+  # Old way of selecting a single bit depth.
+  set(KVZ_BIT_DEPTHS ${CMAKE_MATCH_1})
+  message(WARNING "-DKVZ_BIT_DEPTH in CMAKE_C_FLAGS is deprecated, use -DKVZ_BIT_DEPTHS=${KVZ_BIT_DEPTHS} instead.")
+  string(REGEX REPLACE "-DKVZ_BIT_DEPTH=[0-9]+" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+endif()
+list(REMOVE_DUPLICATES KVZ_BIT_DEPTHS)
+list(SORT KVZ_BIT_DEPTHS COMPARE NATURAL)
+foreach(depth IN LISTS KVZ_BIT_DEPTHS)
+  if(NOT depth MATCHES "^(8|10|12)$")
+    message(FATAL_ERROR "Unsupported bit depth in KVZ_BIT_DEPTHS: ${depth}. Supported bit depths are 8, 10 and 12.")
+  endif()
+endforeach()
+list(LENGTH KVZ_BIT_DEPTHS num_bit_depths)
+if(num_bit_depths EQUAL 0)
+  message(FATAL_ERROR "KVZ_BIT_DEPTHS is empty.")
+endif()
+list(GET KVZ_BIT_DEPTHS 0 KVZ_DEFAULT_BIT_DEPTH)
+set(KVZ_EXTRA_BIT_DEPTHS ${KVZ_BIT_DEPTHS})
+list(REMOVE_AT KVZ_EXTRA_BIT_DEPTHS 0)
+message(STATUS "Bit depths: ${KVZ_BIT_DEPTHS}")
+
+target_compile_definitions(kvazaar PUBLIC KVZ_BIT_DEPTH=${KVZ_DEFAULT_BIT_DEPTH})
 target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR})
 target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR})
 target_compile_definitions(kvazaar PUBLIC KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
@@ -253,32 +289,6 @@ if(BUILD_KVAZAAR_BINARY)
 endif()
 
 list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
-
-# --- MULTILIB LOGIC START ---
-if(COMPILE_10BIT)
-  # Use OBJECT library to ensure code is merged
-  add_library(kvazaar_10bit OBJECT ${LIB_SOURCES_MULTILIB})
-  
-  # Ensure PIC matches the main library (crucial if main library is SHARED)
-  set_target_properties(kvazaar_10bit PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
-
-  target_include_directories(kvazaar_10bit PUBLIC src)
-  target_include_directories(kvazaar_10bit PUBLIC src/extras)
-  target_include_directories(kvazaar_10bit PUBLIC src/strategies)
-  if(MSVC)
-    target_include_directories(kvazaar_10bit PUBLIC src/threadwrapper/include)
-  endif()
-
-  target_compile_definitions(kvazaar_10bit PRIVATE KVZ_BIT_DEPTH=10 KVZ_RENAME_EXPORTS=10bit_)
-  target_compile_definitions(kvazaar PRIVATE KVZ_MULTILIB_10BIT)
-  if(BUILD_KVAZAAR_BINARY)
-    target_compile_definitions(kvazaar-bin PRIVATE KVZ_MULTILIB_10BIT)
-  endif()
-
-  # Inject the 10-bit object files directly into the main kvazaar target
-  target_sources(kvazaar PRIVATE $<TARGET_OBJECTS:kvazaar_10bit>)
-endif()
-# --- MULTILIB LOGIC END ---
 
 if(MSVC)
   target_include_directories(kvazaar PUBLIC src/threadwrapper/include)
@@ -326,6 +336,31 @@ else()
 endif()
 
 
+foreach(depth IN LISTS KVZ_EXTRA_BIT_DEPTHS)
+  set(depth_target kvazaar_${depth}bit)
+  add_library(${depth_target} OBJECT ${LIB_SOURCES_BIT_DEPTH})
+  set_target_properties(${depth_target} PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+  target_compile_definitions(${depth_target} PRIVATE
+    KVZ_BIT_DEPTH=${depth}
+    KVZ_VERSION_MAJOR=${KVAZAAR_VERSION_MAJOR}
+    KVZ_VERSION_MINOR=${KVAZAAR_VERSION_MINOR}
+    KVZ_VERSION_REVISION=${KVAZAAR_VERSION_REVISION})
+  target_include_directories(${depth_target} PRIVATE src src/extras src/strategies)
+  if(MSVC)
+    target_include_directories(${depth_target} PRIVATE src/threadwrapper/include)
+    target_compile_options(${depth_target} PRIVATE "/FI${PROJECT_SOURCE_DIR}/src/multilib_rename.h")
+  else()
+    target_compile_options(${depth_target} PRIVATE -include "${PROJECT_SOURCE_DIR}/src/multilib_rename.h")
+    if(TARGET Threads::Threads)
+      target_link_libraries(${depth_target} PRIVATE Threads::Threads)
+    endif()
+  endif()
+
+  target_compile_definitions(kvazaar PRIVATE KVZ_MULTILIB_${depth}BIT)
+  target_sources(kvazaar PRIVATE $<TARGET_OBJECTS:${depth_target}>)
+endforeach()
+
+
 # Source grouping
 
 # Some basic structuring of the files based on previous visual studio project files
@@ -340,7 +375,7 @@ file(GLOB_RECURSE SOURCE_GROUP_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/st
 file(GLOB SOURCE_GROUP_RECON RELATIVE ${PROJECT_SOURCE_DIR} "src/alf.*" "src/filter.*" "src/inter.*" "src/intra.*" "src/reshape.*" "src/sao.*" "src/scalinglist.*" "src/tables.*" "src/transform.*")
 file(GLOB SOURCE_GROUP_THREADING RELATIVE ${PROJECT_SOURCE_DIR} "src/threadqueue.*" "src/threads.*")
 file(GLOB_RECURSE SOURCE_GROUP_THREADWRAPPER RELATIVE ${PROJECT_SOURCE_DIR} "src/threadwrapper/*.cpp" "src/threadwrapper/*.h")
-file(GLOB SOURCE_GROUP_TOPLEVEL RELATIVE ${PROJECT_SOURCE_DIR} "src/debug.*" "src/global.h" "src/version.h" "src/kvz_math.h" "src/checkpoint.*")
+file(GLOB SOURCE_GROUP_TOPLEVEL RELATIVE ${PROJECT_SOURCE_DIR} "src/debug.*" "src/global.h" "src/version.h" "src/kvz_math.h" "src/checkpoint.*" "src/multilib_rename.h")
 
 source_group( "Bitstream" FILES  ${SOURCE_GROUP_BITSTREAM})
 source_group( "CABAC" FILES ${SOURCE_GROUP_CABAC})

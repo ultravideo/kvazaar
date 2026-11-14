@@ -46,7 +46,11 @@
 extern "C" {
 #endif
 
-#if defined(KVZ_DLL_EXPORTS)
+#if defined(KVZ_MULTILIB_RENAME)
+  // An additional bit depth of a library with several bit depths, whose
+  // renamed symbols are not exported (see multilib_rename.h).
+  #define KVZ_PUBLIC
+#elif defined(KVZ_DLL_EXPORTS)
   #if !defined(PIC)
     // Building static kvazaar library.
     #define KVZ_PUBLIC

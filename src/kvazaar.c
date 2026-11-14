@@ -417,8 +417,13 @@ static const kvz_api kvz_api_impl = {
   .picture_alloc_csp = kvz_image_alloc,
 };
 
+// The kvz_api_get functions of the additional bit depths compiled into the
+// same library, renamed by multilib_rename.h.
 #ifdef KVZ_MULTILIB_10BIT
-extern const kvz_api * kvz_10bit_api_get(int bit_depth);
+const kvz_api * kvz_api_get_10bit(int bit_depth);
+#endif
+#ifdef KVZ_MULTILIB_12BIT
+const kvz_api * kvz_api_get_12bit(int bit_depth);
 #endif
 
 
@@ -429,7 +434,12 @@ const kvz_api * kvz_api_get(int bit_depth)
   }
 #ifdef KVZ_MULTILIB_10BIT
   if (bit_depth == 10) {
-    return kvz_10bit_api_get(10);
+    return kvz_api_get_10bit(bit_depth);
+  }
+#endif
+#ifdef KVZ_MULTILIB_12BIT
+  if (bit_depth == 12) {
+    return kvz_api_get_12bit(bit_depth);
   }
 #endif
   return NULL;
