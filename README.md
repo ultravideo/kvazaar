@@ -44,7 +44,7 @@ http://ultravideo.fi/#encoder for more information.
 
 The mandatory parameters are input and output. If the resolution of the input file is not in the filename, or when pipe is used, the input resolution must also be given: ```--input-res=1920x1080```.
 
-The default input format is 8-bit yuv420p for 8-bit and yuv420p10le for 10-bit. Input format and bitdepth can be selected with ```--input-format``` and ```--input-bitdepth```.
+The default input format is 8-bit yuv420p. Input format and bitdepth can be selected with ```--input-format``` and ```--input-bitdepth```. By default the video is coded with the lowest bit depth that is at least the input bit depth, ```--output-bitdepth``` selects it explicitly. The supported bit depths are listed by ```--version```.
 
 Speed and compression quality can be selected with ```--preset```, or by setting the options manually.
 
@@ -80,6 +80,11 @@ Input:
                                    - bff: Bottom field first
       --input-format <string> : P420, P422, P444 or P400 [P420]
       --input-bitdepth <int> : 8-16 [8]
+      --output-bitdepth <int> : Bit depth to encode with [auto]
+                                   - auto: Lowest bit depth that is at
+                                     least the input bit depth.
+                                   - See --version for the bit depths
+                                     that are compiled in.
       --loop-input           : Re-read input file forever.
       --input-file-format <string> : Input file format [auto]
                                     - auto: Check the file ending for format
@@ -434,6 +439,32 @@ The 4:2:2 and 4:4:4 chroma formats (`--input-format P422` / `P444`) are always
 available, no build option is needed. The code paths that depend on the
 chroma format are specialized for 4:2:0 at compile time, so supporting the
 other formats does not slow down 4:2:0 encoding.
+
+### Bit depths
+
+By default the library and the `kvazaar` binary support 8, 10 and 12-bit
+encoding. Each bit depth is compiled from the same sources with a different
+`KVZ_BIT_DEPTH`, and the external symbols of the higher bit depths are
+renamed by [src/multilib_rename.h](src/multilib_rename.h) (e.g.
+`kvz_api_get_10bit`) so that they can be linked into the same library.
+`kvz_api_get(bit_depth)` returns the API of a bit depth, or NULL if it is
+not compiled in.
+
+The bit depths are selected with
+- Autotools: `./configure --with-bit-depths=8,10,12`
+- CMake: `cmake -DKVZ_BIT_DEPTHS="8;10;12"`
+- Visual Studio: `KvzMultilib10bit` and `KvzMultilib12bit` in
+  build/Bit_Depths.props
+
+The old way of building a single bit depth, `-DKVZ_BIT_DEPTH=10` in
+`CFLAGS`, still works. Only one bit depth makes the library smaller and
+compiles faster.
+
+src/multilib_rename.h is generated with
+[tools/gen_multilib_rename.py](tools/gen_multilib_rename.py) from the
+symbols of a single bit depth static library. It has to be regenerated when
+external functions or variables are added or removed, otherwise linking
+fails with multiple definitions.
 
 
 ### Autotools

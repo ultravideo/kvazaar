@@ -14,7 +14,8 @@ TESTS = $(check_PROGRAMS) \
     test_weird_shapes.sh \
     test_pu_depth_constraints.sh \
     test_chroma_subsampling.sh \
-    test_chroma_subsampling_422.sh
+    test_chroma_subsampling_422.sh \
+    test_multilib.sh
 
 EXTRA_DIST = \
     test_external_symbols.sh \
@@ -32,6 +33,7 @@ EXTRA_DIST = \
     test_pu_depth_constraints.sh \
     test_chroma_subsampling.sh \
     test_chroma_subsampling_422.sh \
+    test_multilib.sh \
     util.sh \
     CMakeLists.txt
 

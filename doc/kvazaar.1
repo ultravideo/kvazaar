@@ -49,6 +49,13 @@ P420, P422, P444 or P400 [P420]
 \fB\-\-input\-bitdepth <int>
 8\-16 [8]
 .TP
+\fB\-\-output\-bitdepth <int>
+Bit depth to encode with [auto]
+    \- auto: Lowest bit depth that is at
+      least the input bit depth.
+    \- See \-\-version for the bit depths
+      that are compiled in.
+.TP
 \fB\-\-loop\-input          
 Re\-read input file forever.
 .TP
