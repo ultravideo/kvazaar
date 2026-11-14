@@ -50,6 +50,7 @@ kvazaar_tests_SOURCES = \
 	tests_main.c \
 	test_strategies.c \
 	test_strategies.h
+kvazaar_tests_CPPFLAGS = -DKVZ_BIT_DEPTH=$(KVZ_DEFAULT_BIT_DEPTH)
 kvazaar_tests_CFLAGS = -I$(srcdir) -I$(top_srcdir) -I$(top_srcdir)/src
 kvazaar_tests_LDFLAGS = -static $(top_builddir)/src/libkvazaar.la $(LIBS)
 

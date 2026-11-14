@@ -103,6 +103,50 @@ AS_IF([test "x$with_cryptopp" = "xyes"],
 )
 
 AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
+
+# Bit depths
+#
+# The library contains an encoder for each bit depth. The lowest one is the
+# default and the others are compiled with their external symbols renamed
+# (see src/multilib_rename.h).
+AC_ARG_WITH([bit-depths],
+    AS_HELP_STRING([--with-bit-depths=LIST],
+        [Comma separated list of the bit depths to compile in, from 8, 10 and 12 @<:@8,10,12@:>@]),
+    [], [with_bit_depths=default])
+
+# The old way of selecting a single bit depth was CFLAGS=-DKVZ_BIT_DEPTH=<n>.
+legacy_bit_depth=`echo " $CFLAGS $CPPFLAGS " | sed -n 's/.* -DKVZ_BIT_DEPTH=\(@<:@0-9@:>@*\) .*/\1/p'`
+AS_IF([test "x$legacy_bit_depth" != "x"], [
+  AS_IF([test "x$with_bit_depths" = "xdefault"], [
+    AC_MSG_WARN([-DKVZ_BIT_DEPTH in CFLAGS is deprecated, use --with-bit-depths=$legacy_bit_depth])
+    with_bit_depths="$legacy_bit_depth"
+  ], [test "x$with_bit_depths" != "x$legacy_bit_depth"], [
+    AC_MSG_ERROR([-DKVZ_BIT_DEPTH in CFLAGS conflicts with --with-bit-depths=$with_bit_depths])
+  ])
+])
+AS_IF([test "x$with_bit_depths" = "xdefault" -o "x$with_bit_depths" = "xyes"], [with_bit_depths="8,10,12"])
+
+KVZ_DEFAULT_BIT_DEPTH=""
+KVZ_MULTILIB_CPPFLAGS=""
+multilib_10bit="no"
+multilib_12bit="no"
+for bit_depth in `echo "$with_bit_depths" | tr ',' '\n' | sort -n -u`; do
+  AS_CASE([$bit_depth],
+          [8|10|12], [],
+          [AC_MSG_ERROR([unsupported bit depth $bit_depth, the supported bit depths are 8, 10 and 12])])
+  AS_IF([test "x$KVZ_DEFAULT_BIT_DEPTH" = "x"], [
+    KVZ_DEFAULT_BIT_DEPTH="$bit_depth"
+  ], [
+    KVZ_MULTILIB_CPPFLAGS="$KVZ_MULTILIB_CPPFLAGS -DKVZ_MULTILIB_${bit_depth}BIT"
+    eval "multilib_${bit_depth}bit=yes"
+  ])
+done
+AS_IF([test "x$KVZ_DEFAULT_BIT_DEPTH" = "x"], [AC_MSG_ERROR([no bit depths given with --with-bit-depths])])
+AC_MSG_NOTICE([default bit depth: $KVZ_DEFAULT_BIT_DEPTH, additional bit depths: 10-bit $multilib_10bit, 12-bit $multilib_12bit])
+AC_SUBST([KVZ_DEFAULT_BIT_DEPTH])
+AC_SUBST([KVZ_MULTILIB_CPPFLAGS])
+AM_CONDITIONAL([KVZ_MULTILIB_10BIT], [test "x$multilib_10bit" = "xyes"])
+AM_CONDITIONAL([KVZ_MULTILIB_12BIT], [test "x$multilib_12bit" = "xyes"])
 CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
 LIBS="$LIBS $cryptopp_LIBS"
 

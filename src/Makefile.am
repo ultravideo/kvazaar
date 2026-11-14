@@ -43,7 +43,10 @@ kvazaar_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 endif
 
-libkvazaar_la_SOURCES = \
+# Sources of the library that are compiled for every bit depth. The SIMD
+# sources are in separate libraries because they need their own flags.
+KVZ_LIB_SOURCES = \
+	multilib_rename.h \
 	bitstream.c \
 	bitstream.h \
 	cabac.c \
@@ -162,7 +165,65 @@ libkvazaar_la_SOURCES = \
 	extras/libmd5.h \
 	extras/crypto.h
 
-libkvazaar_la_CFLAGS =
+KVZ_ALTIVEC_SOURCES = \
+	strategies/altivec/picture-altivec.c \
+	strategies/altivec/picture-altivec.h
+
+KVZ_AVX2_SOURCES = \
+	strategies/avx2/avx2_common_functions.h \
+	strategies/avx2/dct-avx2.c \
+	strategies/avx2/dct-avx2.h \
+	strategies/avx2/intra-avx2.c \
+	strategies/avx2/intra-avx2.h \
+	strategies/avx2/ipol-avx2.c \
+	strategies/avx2/ipol-avx2.h \
+	strategies/avx2/picture-avx2.c \
+	strategies/avx2/picture-avx2.h \
+	strategies/avx2/quant-avx2.c \
+	strategies/avx2/quant-avx2.h \
+	strategies/avx2/reg_sad_pow2_widths-avx2.h \
+	strategies/avx2/sao-avx2.c \
+	strategies/avx2/sao-avx2.h \
+	strategies/avx2/encode_coding_tree-avx2.c \
+	strategies/avx2/encode_coding_tree-avx2.h
+
+KVZ_SSE2_SOURCES = \
+	strategies/sse2/picture-sse2.c \
+	strategies/sse2/picture-sse2.h
+
+KVZ_SSE41_SOURCES = \
+	strategies/sse41/picture-sse41.c \
+	strategies/sse41/picture-sse41.h \
+	strategies/sse41/reg_sad_pow2_widths-sse41.h
+
+if HAVE_PPC
+if HAVE_ALTIVEC
+KVZ_ALTIVEC_CFLAGS = -maltivec
+endif
+endif #HAVE_PPC
+
+if HAVE_X86
+if HAVE_AVX2_GCC
+KVZ_AVX2_CFLAGS = -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2
+endif
+if HAVE_AVX2_CLANG
+KVZ_AVX2_CFLAGS = -mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2
+endif
+if HAVE_SSE4_1
+KVZ_SSE41_CFLAGS = -msse4.1
+endif
+if HAVE_SSE2
+KVZ_SSE2_CFLAGS = -msse2
+endif
+endif #HAVE_X86
+
+# The default bit depth (the lowest one given to configure --with-bit-depths)
+# is compiled as usual and its kvz_api_get returns the APIs of the others
+# (KVZ_MULTILIB_<n>BIT).
+KVZ_DEFAULT_CPPFLAGS = -DKVZ_BIT_DEPTH=$(KVZ_DEFAULT_BIT_DEPTH)
+
+libkvazaar_la_SOURCES = $(KVZ_LIB_SOURCES)
+libkvazaar_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS) $(KVZ_MULTILIB_CPPFLAGS)
 
 libkvazaar_la_LIBADD = \
 	libaltivec.la \
@@ -185,59 +246,94 @@ libkvazaar_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(libkvazaar_la_LDFLAGS) $(LDFLAGS) -o $@
 endif
 
-libaltivec_la_SOURCES = \
-	strategies/altivec/picture-altivec.c \
-	strategies/altivec/picture-altivec.h
+libaltivec_la_SOURCES = $(KVZ_ALTIVEC_SOURCES)
+libaltivec_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
+libaltivec_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
 
-libavx2_la_SOURCES = \
-	strategies/avx2/avx2_common_functions.h \
-	strategies/avx2/dct-avx2.c \
-	strategies/avx2/dct-avx2.h \
-	strategies/avx2/intra-avx2.c \
-	strategies/avx2/intra-avx2.h \
-	strategies/avx2/ipol-avx2.c \
-	strategies/avx2/ipol-avx2.h \
-	strategies/avx2/picture-avx2.c \
-	strategies/avx2/picture-avx2.h \
-	strategies/avx2/quant-avx2.c \
-	strategies/avx2/quant-avx2.h \
-	strategies/avx2/reg_sad_pow2_widths-avx2.h \
-	strategies/avx2/sao-avx2.c \
-	strategies/avx2/sao-avx2.h \
-	strategies/avx2/encode_coding_tree-avx2.c \
-	strategies/avx2/encode_coding_tree-avx2.h
+libavx2_la_SOURCES = $(KVZ_AVX2_SOURCES)
+libavx2_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
+libavx2_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
 
-libsse2_la_SOURCES = \
-	strategies/sse2/picture-sse2.c \
-	strategies/sse2/picture-sse2.h
+libsse2_la_SOURCES = $(KVZ_SSE2_SOURCES)
+libsse2_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
+libsse2_la_CFLAGS = $(KVZ_SSE2_CFLAGS)
 
-libsse41_la_SOURCES = \
-	strategies/sse41/picture-sse41.c \
-	strategies/sse41/picture-sse41.h \
-	strategies/sse41/reg_sad_pow2_widths-sse41.h
+libsse41_la_SOURCES = $(KVZ_SSE41_SOURCES)
+libsse41_la_CPPFLAGS = $(KVZ_DEFAULT_CPPFLAGS)
+libsse41_la_CFLAGS = $(KVZ_SSE41_CFLAGS)
 
-if HAVE_PPC
+# Each additional bit depth is a copy of the library compiled with
+# KVZ_BIT_DEPTH set and multilib_rename.h included in every file, which
+# renames the external symbols (e.g. kvz_api_get -> kvz_api_get_10bit).
 
-if HAVE_ALTIVEC
-libaltivec_la_CFLAGS = -maltivec
+KVZ_10BIT_CPPFLAGS = -DKVZ_BIT_DEPTH=10 -include $(srcdir)/multilib_rename.h
+
+if KVZ_MULTILIB_10BIT
+noinst_LTLIBRARIES += \
+	libkvazaar_10bit.la \
+	libaltivec_10bit.la \
+	libavx2_10bit.la \
+	libsse2_10bit.la \
+	libsse41_10bit.la
+libkvazaar_la_LIBADD += libkvazaar_10bit.la
 endif
 
-endif #HAVE_PPC
+libkvazaar_10bit_la_SOURCES = $(KVZ_LIB_SOURCES)
+libkvazaar_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libkvazaar_10bit_la_LIBADD = \
+	libaltivec_10bit.la \
+	libavx2_10bit.la \
+	libsse2_10bit.la \
+	libsse41_10bit.la
 
-if HAVE_X86
+libaltivec_10bit_la_SOURCES = $(KVZ_ALTIVEC_SOURCES)
+libaltivec_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libaltivec_10bit_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
 
-if HAVE_AVX2_GCC
-libavx2_la_CFLAGS = -mavx2 -mbmi -mabm -mpopcnt -mlzcnt -mbmi2
-endif
-if HAVE_AVX2_CLANG
-libavx2_la_CFLAGS = -mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2
-endif
-if HAVE_SSE4_1
-libsse41_la_CFLAGS = -msse4.1
-endif
-if HAVE_SSE2
-libsse2_la_CFLAGS = -msse2
-endif
-endif #HAVE_X86
+libavx2_10bit_la_SOURCES = $(KVZ_AVX2_SOURCES)
+libavx2_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libavx2_10bit_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
 
+libsse2_10bit_la_SOURCES = $(KVZ_SSE2_SOURCES)
+libsse2_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libsse2_10bit_la_CFLAGS = $(KVZ_SSE2_CFLAGS)
 
+libsse41_10bit_la_SOURCES = $(KVZ_SSE41_SOURCES)
+libsse41_10bit_la_CPPFLAGS = $(KVZ_10BIT_CPPFLAGS)
+libsse41_10bit_la_CFLAGS = $(KVZ_SSE41_CFLAGS)
+
+KVZ_12BIT_CPPFLAGS = -DKVZ_BIT_DEPTH=12 -include $(srcdir)/multilib_rename.h
+
+if KVZ_MULTILIB_12BIT
+noinst_LTLIBRARIES += \
+	libkvazaar_12bit.la \
+	libaltivec_12bit.la \
+	libavx2_12bit.la \
+	libsse2_12bit.la \
+	libsse41_12bit.la
+libkvazaar_la_LIBADD += libkvazaar_12bit.la
+endif
+
+libkvazaar_12bit_la_SOURCES = $(KVZ_LIB_SOURCES)
+libkvazaar_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libkvazaar_12bit_la_LIBADD = \
+	libaltivec_12bit.la \
+	libavx2_12bit.la \
+	libsse2_12bit.la \
+	libsse41_12bit.la
+
+libaltivec_12bit_la_SOURCES = $(KVZ_ALTIVEC_SOURCES)
+libaltivec_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libaltivec_12bit_la_CFLAGS = $(KVZ_ALTIVEC_CFLAGS)
+
+libavx2_12bit_la_SOURCES = $(KVZ_AVX2_SOURCES)
+libavx2_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libavx2_12bit_la_CFLAGS = $(KVZ_AVX2_CFLAGS)
+
+libsse2_12bit_la_SOURCES = $(KVZ_SSE2_SOURCES)
+libsse2_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libsse2_12bit_la_CFLAGS = $(KVZ_SSE2_CFLAGS)
+
+libsse41_12bit_la_SOURCES = $(KVZ_SSE41_SOURCES)
+libsse41_12bit_la_CPPFLAGS = $(KVZ_12BIT_CPPFLAGS)
+libsse41_12bit_la_CFLAGS = $(KVZ_SSE41_CFLAGS)
