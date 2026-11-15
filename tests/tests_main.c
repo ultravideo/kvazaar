@@ -49,6 +49,7 @@ extern SUITE(strategy_diff_tests);
 extern SUITE(temporal_filter_tests);
 
 extern SUITE(coeff_sum_tests);
+extern SUITE(simd_quant_tests);
 extern SUITE(mv_cand_tests);
 extern SUITE(inter_recon_bipred_tests);
 
@@ -77,6 +78,7 @@ int main(int argc, char **argv)
 #endif //KVZ_BIT_DEPTH == 8
 
   RUN_SUITE(coeff_sum_tests);
+  RUN_SUITE(simd_quant_tests);
   RUN_SUITE(temporal_filter_tests);
 
   RUN_SUITE(mv_cand_tests);
