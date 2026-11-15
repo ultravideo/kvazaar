@@ -1413,6 +1413,472 @@ void kvz_intra_pred_filtered_dc_avx2(
 } // namespace
 
 #endif //KVZ_BIT_DEPTH == 8
+
+#if KVZ_BIT_DEPTH > 8
+
+/*
+ * 10 and 12-bit intra prediction. kvz_pixel is uint16_t and the samples are
+ * at most PIXEL_MAX (4095 at 12-bit), so the samples and their differences
+ * fit int16 lanes. Bit-exact with the generic implementation.
+ */
+namespace {
+
+constexpr int8_t hbd_modedisp2sampledisp[9] = { 0, 2, 5, 9, 13, 17, 21, 26, 32 };
+constexpr int16_t hbd_modedisp2invsampledisp[9] = { 0, 4096, 1638, 910, 630, 482, 390, 315, 256 }; // (256 * 32) / sampledisp
+
+constexpr int hbd_log2(int w) { return w == 4 ? 2 : w == 8 ? 3 : w == 16 ? 4 : 5; }
+
+KVZ_FORCE_INLINE __m128i load64(const kvz_pixel *p)
+{
+  return _mm_loadl_epi64((const __m128i *)p);
+}
+
+KVZ_FORCE_INLINE int64_t load64_scalar(const kvz_pixel *p)
+{
+  int64_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+// Replicates a 16-bit value to the four 16-bit parts of a 64-bit integer.
+KVZ_FORCE_INLINE int64_t rep4x16(int v)
+{
+  return (int64_t)v * 0x0001000100010001LL;
+}
+
+/*
+ * One step of the angular interpolation, for each 16-bit lane:
+ *   ((32 - f) * a + f * b + 16) >> 5 == a + (((b - a) * f + 16) >> 5),
+ * because 32 * a is a multiple of 32. With wf = f << 10, mulhrs computes
+ * ((b - a) * f * 1024 + 16384) >> 15 == ((b - a) * f + 16) >> 5 from the full
+ * 32-bit product. |b - a| <= 4095 and f << 10 <= 31744 fit int16. A fraction
+ * of 0 gives a.
+ */
+KVZ_FORCE_INLINE __m256i angular_interp(__m256i a, __m256i b, __m256i wf)
+{
+  return _mm256_add_epi16(a, _mm256_mulhrs_epi16(_mm256_sub_epi16(b, a), wf));
+}
+
+/*
+ * Rows y = 0 .. W-1 of a vertical-orientation angular prediction from ref
+ * (indexed from block index 0) into buf (W x W). Row y uses the offset
+ * ((y + 1) * sample_disp) >> 5 and the fraction ((y + 1) * sample_disp) & 31.
+ * Reads ref[d .. d + W], which for |sample_disp| < 32 is inside the reference
+ * also for rows with a zero fraction (index at most W - 1 + 26 + 1 < 2 * W
+ * for W = 32, and the same holds for smaller W).
+ */
+template <int W>
+KVZ_FORCE_INLINE void angular_rows(const kvz_pixel *ref, int sample_disp, kvz_pixel *buf)
+{
+  if constexpr (W == 4) {
+    int d[4], f[4];
+    for (int y = 0; y < 4; ++y) {
+      const int pos = (y + 1) * sample_disp;
+      d[y] = pos >> 5;
+      f[y] = pos & 31;
+    }
+    const __m256i a = _mm256_setr_epi64x(load64_scalar(ref + d[0]), load64_scalar(ref + d[1]),
+                                         load64_scalar(ref + d[2]), load64_scalar(ref + d[3]));
+    const __m256i b = _mm256_setr_epi64x(load64_scalar(ref + d[0] + 1), load64_scalar(ref + d[1] + 1),
+                                         load64_scalar(ref + d[2] + 1), load64_scalar(ref + d[3] + 1));
+    const __m256i wf = _mm256_setr_epi64x(rep4x16(f[0] << 10), rep4x16(f[1] << 10),
+                                          rep4x16(f[2] << 10), rep4x16(f[3] << 10));
+    _mm256_storeu_si256((__m256i *)buf, angular_interp(a, b, wf));
+  } else if constexpr (W == 8) {
+    // Two rows per vector.
+    for (int y = 0; y < 8; y += 2) {
+      const int pos0 = (y + 1) * sample_disp;
+      const int pos1 = (y + 2) * sample_disp;
+      const kvz_pixel *r0 = ref + (pos0 >> 5);
+      const kvz_pixel *r1 = ref + (pos1 >> 5);
+      const __m256i a = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((const __m128i *)r0)),
+                                                _mm_loadu_si128((const __m128i *)r1), 1);
+      const __m256i b = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((const __m128i *)(r0 + 1))),
+                                                _mm_loadu_si128((const __m128i *)(r1 + 1)), 1);
+      const __m256i wf = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_set1_epi16((int16_t)((pos0 & 31) << 10))),
+                                                 _mm_set1_epi16((int16_t)((pos1 & 31) << 10)), 1);
+      _mm256_storeu_si256((__m256i *)&buf[y * 8], angular_interp(a, b, wf));
+    }
+  } else {
+    for (int y = 0; y < W; ++y) {
+      const int pos = (y + 1) * sample_disp;
+      const kvz_pixel *r = ref + (pos >> 5);
+      const __m256i wf = _mm256_set1_epi16((int16_t)((pos & 31) << 10));
+      KVZ_UNROLL
+      for (int x = 0; x < W; x += 16) {
+        const __m256i a = _mm256_loadu_si256((const __m256i *)(r + x));
+        const __m256i b = _mm256_loadu_si256((const __m256i *)(r + x + 1));
+        _mm256_storeu_si256((__m256i *)&buf[y * W + x], angular_interp(a, b, wf));
+      }
+    }
+  }
+}
+
+// Row y is ref[y + 1 ...] (step 1) or ref[-(y + 1) ...] (step -1), for the
+// modes with a whole-sample displacement of +-32.
+template <int W>
+KVZ_FORCE_INLINE void copy_rows(const kvz_pixel *ref, int step, kvz_pixel *buf)
+{
+  for (int y = 0; y < W; ++y) {
+    const kvz_pixel *r = ref + (y + 1) * step;
+    if constexpr (W == 4) {
+      _mm_storel_epi64((__m128i *)&buf[y * 4], load64(r));
+    } else if constexpr (W == 8) {
+      _mm_storeu_si128((__m128i *)&buf[y * 8], _mm_loadu_si128((const __m128i *)r));
+    } else {
+      KVZ_UNROLL
+      for (int x = 0; x < W; x += 16) {
+        _mm256_storeu_si256((__m256i *)&buf[y * W + x], _mm256_loadu_si256((const __m256i *)(r + x)));
+      }
+    }
+  }
+}
+
+// dst[x][y] = src[y][x] for an 8x8 block of 16-bit samples.
+KVZ_FORCE_INLINE void transpose8x8_epi16(const kvz_pixel *src, int src_stride, kvz_pixel *dst, int dst_stride)
+{
+  __m128i r[8];
+  for (int i = 0; i < 8; ++i) r[i] = _mm_loadu_si128((const __m128i *)(src + i * src_stride));
+  const __m128i t0 = _mm_unpacklo_epi16(r[0], r[1]);
+  const __m128i t1 = _mm_unpackhi_epi16(r[0], r[1]);
+  const __m128i t2 = _mm_unpacklo_epi16(r[2], r[3]);
+  const __m128i t3 = _mm_unpackhi_epi16(r[2], r[3]);
+  const __m128i t4 = _mm_unpacklo_epi16(r[4], r[5]);
+  const __m128i t5 = _mm_unpackhi_epi16(r[4], r[5]);
+  const __m128i t6 = _mm_unpacklo_epi16(r[6], r[7]);
+  const __m128i t7 = _mm_unpackhi_epi16(r[6], r[7]);
+  const __m128i u0 = _mm_unpacklo_epi32(t0, t2);
+  const __m128i u1 = _mm_unpackhi_epi32(t0, t2);
+  const __m128i u2 = _mm_unpacklo_epi32(t1, t3);
+  const __m128i u3 = _mm_unpackhi_epi32(t1, t3);
+  const __m128i u4 = _mm_unpacklo_epi32(t4, t6);
+  const __m128i u5 = _mm_unpackhi_epi32(t4, t6);
+  const __m128i u6 = _mm_unpacklo_epi32(t5, t7);
+  const __m128i u7 = _mm_unpackhi_epi32(t5, t7);
+  _mm_storeu_si128((__m128i *)(dst + 0 * dst_stride), _mm_unpacklo_epi64(u0, u4));
+  _mm_storeu_si128((__m128i *)(dst + 1 * dst_stride), _mm_unpackhi_epi64(u0, u4));
+  _mm_storeu_si128((__m128i *)(dst + 2 * dst_stride), _mm_unpacklo_epi64(u1, u5));
+  _mm_storeu_si128((__m128i *)(dst + 3 * dst_stride), _mm_unpackhi_epi64(u1, u5));
+  _mm_storeu_si128((__m128i *)(dst + 4 * dst_stride), _mm_unpacklo_epi64(u2, u6));
+  _mm_storeu_si128((__m128i *)(dst + 5 * dst_stride), _mm_unpackhi_epi64(u2, u6));
+  _mm_storeu_si128((__m128i *)(dst + 6 * dst_stride), _mm_unpacklo_epi64(u3, u7));
+  _mm_storeu_si128((__m128i *)(dst + 7 * dst_stride), _mm_unpackhi_epi64(u3, u7));
+}
+
+// dst[x * W + y] = src[y * W + x] for a W x W block.
+template <int W>
+KVZ_FORCE_INLINE void transpose_block(const kvz_pixel *src, kvz_pixel *dst)
+{
+  if constexpr (W == 4) {
+    const __m128i a = _mm_loadu_si128((const __m128i *)src);       // rows 0, 1
+    const __m128i b = _mm_loadu_si128((const __m128i *)(src + 8)); // rows 2, 3
+    const __m128i t0 = _mm_unpacklo_epi16(a, b);
+    const __m128i t1 = _mm_unpackhi_epi16(a, b);
+    _mm_storeu_si128((__m128i *)dst, _mm_unpacklo_epi16(t0, t1));
+    _mm_storeu_si128((__m128i *)(dst + 8), _mm_unpackhi_epi16(t0, t1));
+  } else {
+    for (int by = 0; by < W; by += 8) {
+      for (int bx = 0; bx < W; bx += 8) {
+        transpose8x8_epi16(src + by * W + bx, W, dst + bx * W + by, W);
+      }
+    }
+  }
+}
+
+template <int W>
+void angular_pred_hbd_w(const int_fast8_t intra_mode,
+                        const kvz_pixel *const in_ref_above,
+                        const kvz_pixel *const in_ref_left,
+                        kvz_pixel *const dst)
+{
+  // Whether to swap references to always project on the left reference row.
+  const bool vertical_mode = intra_mode >= 18;
+  // Modes distance to horizontal or vertical mode.
+  const int mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
+  // Sample displacement per column in fractions of 32.
+  const int sample_disp = (mode_disp < 0 ? -1 : 1) * hbd_modedisp2sampledisp[abs(mode_disp)];
+
+  // Temporary buffer for modes 11-25, indices from -W to W-1.
+  ALIGNED(32) kvz_pixel tmp_ref[2 * W];
+  const kvz_pixel *ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
+
+  if (sample_disp == 0) {
+    // Pure vertical or horizontal mode.
+    if (vertical_mode) {
+      copy_rows<W>(ref_main, 0, dst);
+    } else {
+      for (int y = 0; y < W; ++y) {
+        if constexpr (W == 4) {
+          _mm_storel_epi64((__m128i *)&dst[y * 4], _mm_set1_epi16((int16_t)ref_main[y]));
+        } else if constexpr (W == 8) {
+          _mm_storeu_si128((__m128i *)&dst[y * 8], _mm_set1_epi16((int16_t)ref_main[y]));
+        } else {
+          const __m256i v = _mm256_set1_epi16((int16_t)ref_main[y]);
+          KVZ_UNROLL
+          for (int x = 0; x < W; x += 16) _mm256_storeu_si256((__m256i *)&dst[y * W + x], v);
+        }
+      }
+    }
+    return;
+  }
+
+  if (sample_disp < 0) {
+    // Negative sample_disp means both references are needed. Copy indices
+    // -1 .. W-1 of the main reference to the later half of tmp_ref, so there
+    // is room for negative indices.
+    const kvz_pixel *ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+    memcpy(&tmp_ref[W - 1], ref_main - 1, (W + 1) * sizeof(kvz_pixel));
+    ref_main = tmp_ref + W;
+
+    // Extend the side reference to the negative indices of main reference.
+    int col_sample_disp = 128; // rounding for the ">> 8"
+    const int inv_abs_sample_disp = hbd_modedisp2invsampledisp[abs(mode_disp)];
+    const int most_negative_index = (W * sample_disp) >> 5;
+    for (int x = -2; x >= most_negative_index; --x) {
+      col_sample_disp += inv_abs_sample_disp;
+      const int side_index = col_sample_disp >> 8;
+      tmp_ref[x + W] = ref_side[side_index - 1];
+    }
+  }
+
+  // Horizontal modes are computed in the vertical orientation and transposed.
+  ALIGNED(32) kvz_pixel tmp_out[W * W];
+  kvz_pixel *const buf = vertical_mode ? dst : tmp_out;
+
+  if (sample_disp == 32 || sample_disp == -32) {
+    // Whole-sample displacement: plain copies. The interpolation would read
+    // one sample past the reference for sample_disp == 32.
+    copy_rows<W>(ref_main, sample_disp >> 5, buf);
+  } else {
+    angular_rows<W>(ref_main, sample_disp, buf);
+  }
+
+  if (!vertical_mode) {
+    transpose_block<W>(tmp_out, dst);
+  }
+}
+
+void angular_pred_hbd_avx2(const int_fast8_t log2_width,
+                           const int_fast8_t intra_mode,
+                           const kvz_pixel *const in_ref_above,
+                           const kvz_pixel *const in_ref_left,
+                           kvz_pixel *const dst)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  assert(intra_mode >= 2 && intra_mode <= 34);
+  switch (log2_width) {
+    case 2: angular_pred_hbd_w<4>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 3: angular_pred_hbd_w<8>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 4: angular_pred_hbd_w<16>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    default: angular_pred_hbd_w<32>(intra_mode, in_ref_above, in_ref_left, dst); break;
+  }
+}
+
+/*
+ * Planar prediction:
+ *   dst = ((W-1-x) * left[y] + (x+1) * tr + (W-1-y) * top[x] + (y+1) * bl + W) >> (log2(W) + 1)
+ * All terms are non-negative. When the largest sum, 2 * W * PIXEL_MAX + W,
+ * fits 16 bits (W <= 8, or W <= 32 at 10-bit) the arithmetic is done modulo
+ * 2^16 in 16-bit lanes, which is exact for the final sum. Otherwise the sums
+ * are computed in 32-bit lanes with madd.
+ */
+template <int W>
+void planar_hbd_w(const kvz_pixel *const ref_top, const kvz_pixel *const ref_left, kvz_pixel *const dst)
+{
+  constexpr int kLog2 = hbd_log2(W);
+  constexpr bool kFits16 = 2 * W * PIXEL_MAX + W <= 0xFFFF;
+  const int top_right = ref_top[W + 1];
+  const int bottom_left = ref_left[W + 1];
+
+  if constexpr (W == 4) {
+    static_assert(kFits16, "planar 4x4 fits 16 bits");
+    // The whole block in one vector: lane i is x = i & 3, y = i >> 2.
+    const __m256i wx = _mm256_setr_epi16(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0);
+    const __m256i x1 = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
+    const __m256i wy = _mm256_setr_epi16(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+    const __m256i y1 = _mm256_setr_epi16(1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4);
+    const __m256i top = _mm256_set1_epi64x(load64_scalar(ref_top + 1));
+    const __m256i left = _mm256_setr_epi64x(rep4x16(ref_left[1]), rep4x16(ref_left[2]),
+                                            rep4x16(ref_left[3]), rep4x16(ref_left[4]));
+    __m256i sum = _mm256_add_epi16(_mm256_mullo_epi16(wx, left), _mm256_mullo_epi16(x1, _mm256_set1_epi16((int16_t)top_right)));
+    sum = _mm256_add_epi16(sum, _mm256_mullo_epi16(wy, top));
+    sum = _mm256_add_epi16(sum, _mm256_mullo_epi16(y1, _mm256_set1_epi16((int16_t)bottom_left)));
+    sum = _mm256_add_epi16(sum, _mm256_set1_epi16(4));
+    _mm256_storeu_si256((__m256i *)dst, _mm256_srli_epi16(sum, 3));
+  } else if constexpr (W == 8) {
+    static_assert(kFits16, "planar 8x8 fits 16 bits");
+    // The vertical term is updated per row as ver += bl - top[x], starting
+    // from W * top[x].
+    const __m128i top = _mm_loadu_si128((const __m128i *)(ref_top + 1));
+    const __m128i x1 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+    const __m128i wx = _mm_sub_epi16(_mm_set1_epi16(W), x1);
+    const __m128i hor_const = _mm_add_epi16(_mm_mullo_epi16(x1, _mm_set1_epi16((int16_t)top_right)), _mm_set1_epi16(W));
+    const __m128i ver_step = _mm_sub_epi16(_mm_set1_epi16((int16_t)bottom_left), top);
+    __m128i ver = _mm_slli_epi16(top, kLog2);
+    for (int y = 0; y < W; ++y) {
+      ver = _mm_add_epi16(ver, ver_step);
+      const __m128i hor = _mm_add_epi16(_mm_mullo_epi16(wx, _mm_set1_epi16((int16_t)ref_left[y + 1])), hor_const);
+      _mm_storeu_si128((__m128i *)&dst[y * W], _mm_srli_epi16(_mm_add_epi16(ver, hor), kLog2 + 1));
+    }
+  } else if constexpr (kFits16) {
+    constexpr int kVecs = W / 16;
+    __m256i ver[kVecs], ver_step[kVecs], wx[kVecs], hor_const[kVecs];
+    KVZ_UNROLL
+    for (int i = 0; i < kVecs; ++i) {
+      const __m256i top = _mm256_loadu_si256((const __m256i *)(ref_top + 1 + 16 * i));
+      const __m256i x1 = _mm256_add_epi16(_mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+                                          _mm256_set1_epi16((int16_t)(16 * i)));
+      wx[i] = _mm256_sub_epi16(_mm256_set1_epi16(W), x1);
+      hor_const[i] = _mm256_add_epi16(_mm256_mullo_epi16(x1, _mm256_set1_epi16((int16_t)top_right)), _mm256_set1_epi16(W));
+      ver_step[i] = _mm256_sub_epi16(_mm256_set1_epi16((int16_t)bottom_left), top);
+      ver[i] = _mm256_slli_epi16(top, kLog2);
+    }
+    for (int y = 0; y < W; ++y) {
+      const __m256i left = _mm256_set1_epi16((int16_t)ref_left[y + 1]);
+      KVZ_UNROLL
+      for (int i = 0; i < kVecs; ++i) {
+        ver[i] = _mm256_add_epi16(ver[i], ver_step[i]);
+        const __m256i hor = _mm256_add_epi16(_mm256_mullo_epi16(wx[i], left), hor_const[i]);
+        _mm256_storeu_si256((__m256i *)&dst[y * W + 16 * i], _mm256_srli_epi16(_mm256_add_epi16(ver[i], hor), kLog2 + 1));
+      }
+    }
+  } else {
+    // 32-bit lanes. For each group of 16 columns, "lo" holds columns 0-3 and
+    // 8-11 and "hi" columns 4-7 and 12-15 (the unpack order), so packus_epi32
+    // puts the results back in column order. The horizontal term is
+    // madd((left, tr), (W-1-x, x+1)).
+    constexpr int kGroups = W / 16;
+    const __m256i zero = _mm256_setzero_si256();
+    __m256i wpair_lo[kGroups], wpair_hi[kGroups], ver_lo[kGroups], ver_hi[kGroups], step_lo[kGroups], step_hi[kGroups];
+    KVZ_UNROLL
+    for (int g = 0; g < kGroups; ++g) {
+      const __m256i x = _mm256_add_epi16(_mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+                                         _mm256_set1_epi16((int16_t)(16 * g)));
+      const __m256i wx = _mm256_sub_epi16(_mm256_set1_epi16(W - 1), x);
+      const __m256i x1 = _mm256_add_epi16(x, _mm256_set1_epi16(1));
+      wpair_lo[g] = _mm256_unpacklo_epi16(wx, x1);
+      wpair_hi[g] = _mm256_unpackhi_epi16(wx, x1);
+      const __m256i top = _mm256_loadu_si256((const __m256i *)(ref_top + 1 + 16 * g));
+      const __m256i top_lo = _mm256_unpacklo_epi16(top, zero);
+      const __m256i top_hi = _mm256_unpackhi_epi16(top, zero);
+      // W * top[x] + W (rounding), updated per row by bl - top[x].
+      ver_lo[g] = _mm256_add_epi32(_mm256_slli_epi32(top_lo, kLog2), _mm256_set1_epi32(W));
+      ver_hi[g] = _mm256_add_epi32(_mm256_slli_epi32(top_hi, kLog2), _mm256_set1_epi32(W));
+      step_lo[g] = _mm256_sub_epi32(_mm256_set1_epi32(bottom_left), top_lo);
+      step_hi[g] = _mm256_sub_epi32(_mm256_set1_epi32(bottom_left), top_hi);
+    }
+    for (int y = 0; y < W; ++y) {
+      const __m256i left_tr = _mm256_set1_epi32(ref_left[y + 1] | (top_right << 16));
+      KVZ_UNROLL
+      for (int g = 0; g < kGroups; ++g) {
+        ver_lo[g] = _mm256_add_epi32(ver_lo[g], step_lo[g]);
+        ver_hi[g] = _mm256_add_epi32(ver_hi[g], step_hi[g]);
+        const __m256i lo = _mm256_srli_epi32(_mm256_add_epi32(_mm256_madd_epi16(left_tr, wpair_lo[g]), ver_lo[g]), kLog2 + 1);
+        const __m256i hi = _mm256_srli_epi32(_mm256_add_epi32(_mm256_madd_epi16(left_tr, wpair_hi[g]), ver_hi[g]), kLog2 + 1);
+        _mm256_storeu_si256((__m256i *)&dst[y * W + 16 * g], _mm256_packus_epi32(lo, hi));
+      }
+    }
+  }
+}
+
+void intra_pred_planar_hbd_avx2(const int_fast8_t log2_width,
+                                const kvz_pixel *const ref_top,
+                                const kvz_pixel *const ref_left,
+                                kvz_pixel *const dst)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  switch (log2_width) {
+    case 2: planar_hbd_w<4>(ref_top, ref_left, dst); break;
+    case 3: planar_hbd_w<8>(ref_top, ref_left, dst); break;
+    case 4: planar_hbd_w<16>(ref_top, ref_left, dst); break;
+    default: planar_hbd_w<32>(ref_top, ref_left, dst); break;
+  }
+}
+
+KVZ_FORCE_INLINE int hsum_epi32_128(__m128i v)
+{
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2)));
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(2, 3, 0, 1)));
+  return _mm_cvtsi128_si32(v);
+}
+
+/*
+ * DC prediction with the edge filter. The sum of the 2 * W references is at
+ * most 64 * 4095, so it is accumulated in 32-bit lanes (top[x] + left[x] fits
+ * 16 bits). The filtered edge (ref + 3 * dc + 2) is at most 16382.
+ */
+template <int W>
+void filtered_dc_hbd_w(const kvz_pixel *const ref_top, const kvz_pixel *const ref_left, kvz_pixel *const out_block)
+{
+  constexpr int kLog2 = hbd_log2(W);
+  const kvz_pixel *const top = ref_top + 1;
+  const kvz_pixel *const left = ref_left + 1;
+
+  int sum;
+  if constexpr (W == 4) {
+    const __m128i v = _mm_madd_epi16(_mm_add_epi16(load64(top), load64(left)), _mm_set1_epi16(1));
+    sum = hsum_epi32_128(v);
+  } else if constexpr (W == 8) {
+    const __m128i v = _mm_add_epi16(_mm_loadu_si128((const __m128i *)top), _mm_loadu_si128((const __m128i *)left));
+    sum = hsum_epi32_128(_mm_madd_epi16(v, _mm_set1_epi16(1)));
+  } else {
+    __m256i acc = _mm256_setzero_si256();
+    KVZ_UNROLL
+    for (int i = 0; i < W; i += 16) {
+      const __m256i v = _mm256_add_epi16(_mm256_loadu_si256((const __m256i *)(top + i)),
+                                         _mm256_loadu_si256((const __m256i *)(left + i)));
+      acc = _mm256_add_epi32(acc, _mm256_madd_epi16(v, _mm256_set1_epi16(1)));
+    }
+    sum = hsum_epi32_128(_mm_add_epi32(_mm256_castsi256_si128(acc), _mm256_extracti128_si256(acc, 1)));
+  }
+  const int dc_val = (sum + W) >> (kLog2 + 1);
+
+  // Fill the block with the DC value. W * W is a multiple of 16.
+  const __m256i fill = _mm256_set1_epi16((int16_t)dc_val);
+  for (int i = 0; i < W * W; i += 16) {
+    _mm256_storeu_si256((__m256i *)(out_block + i), fill);
+  }
+
+  // Top row: (top[x] + 3 * dc + 2) >> 2.
+  const int bias = 3 * dc_val + 2;
+  if constexpr (W == 4) {
+    _mm_storel_epi64((__m128i *)out_block, _mm_srli_epi16(_mm_add_epi16(load64(top), _mm_set1_epi16((int16_t)bias)), 2));
+  } else if constexpr (W == 8) {
+    _mm_storeu_si128((__m128i *)out_block,
+                     _mm_srli_epi16(_mm_add_epi16(_mm_loadu_si128((const __m128i *)top), _mm_set1_epi16((int16_t)bias)), 2));
+  } else {
+    const __m256i vbias = _mm256_set1_epi16((int16_t)bias);
+    KVZ_UNROLL
+    for (int x = 0; x < W; x += 16) {
+      _mm256_storeu_si256((__m256i *)(out_block + x),
+                          _mm256_srli_epi16(_mm256_add_epi16(_mm256_loadu_si256((const __m256i *)(top + x)), vbias), 2));
+    }
+  }
+  // Left column, same filter.
+  for (int y = 1; y < W; ++y) {
+    out_block[y * W] = (kvz_pixel)((left[y] + bias) >> 2);
+  }
+  // Top-left corner with ([1 2 1] / 4).
+  out_block[0] = (kvz_pixel)((left[0] + 2 * dc_val + top[0] + 2) >> 2);
+}
+
+void intra_pred_filtered_dc_hbd_avx2(const int_fast8_t log2_width,
+                                     const kvz_pixel *const ref_top,
+                                     const kvz_pixel *const ref_left,
+                                     kvz_pixel *const out_block)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  switch (log2_width) {
+    case 2: filtered_dc_hbd_w<4>(ref_top, ref_left, out_block); break;
+    case 3: filtered_dc_hbd_w<8>(ref_top, ref_left, out_block); break;
+    case 4: filtered_dc_hbd_w<16>(ref_top, ref_left, out_block); break;
+    default: filtered_dc_hbd_w<32>(ref_top, ref_left, out_block); break;
+  }
+}
+
+} // namespace
+
+#endif // KVZ_BIT_DEPTH > 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
@@ -1426,6 +1892,13 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, KVZ_STRATEGY_FPTR(kvz_intra_pred_filtered_dc_avx2));
   }
 #endif //KVZ_BIT_DEPTH == 8
+#if KVZ_BIT_DEPTH > 8
+  if (bitdepth == KVZ_BIT_DEPTH) {
+    success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, KVZ_STRATEGY_FPTR(angular_pred_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, KVZ_STRATEGY_FPTR(intra_pred_planar_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, KVZ_STRATEGY_FPTR(intra_pred_filtered_dc_hbd_avx2));
+  }
+#endif // KVZ_BIT_DEPTH > 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }
