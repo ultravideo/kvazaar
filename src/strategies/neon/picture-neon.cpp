@@ -42,6 +42,481 @@ extern "C" {
 #include "strategyselector.h"
 }
 
+#if COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
+
+// In a namespace of their own to keep the names apart from the other
+// high bit depth functions of this file.
+namespace {
+namespace hbd_sad {
+
+/*
+ * NEON versions of the SAD, SSD, variance and bi-prediction functions for
+ * 10 and 12-bit pixels (kvz_pixel = uint16_t). Every function except
+ * pixel_var computes exactly the same result as the generic version.
+ *
+ * SAD sums are accumulated with vaba into unsigned 16-bit lanes, which take
+ * kHbdSadAdds absolute differences before they are flushed into 32-bit lanes.
+ */
+constexpr int kHbdSadAdds = 65535 / PIXEL_MAX;
+static_assert(kHbdSadAdds >= 16, "SAD accumulation needs at least 16 additions per lane");
+
+// Two 4-pixel rows in one vector.
+KVZ_FORCE_INLINE uint16x8_t hbd_load_2x4(const kvz_pixel *p, unsigned stride)
+{
+  return vcombine_u16(vld1_u16(p), vld1_u16(p + stride));
+}
+
+// One 4-pixel row in the low half of a vector, zeros in the high half.
+KVZ_FORCE_INLINE uint16x8_t hbd_load_1x4(const kvz_pixel *p)
+{
+  return vcombine_u16(vld1_u16(p), vdup_n_u16(0));
+}
+
+/*
+ * SAD of a W-wide block. 8-pixel parts are loaded one row at a time, a
+ * 4-pixel part as a row pair. Narrow blocks use separate accumulators for
+ * even and odd rows to shorten the vaba dependency chains. Only the pixels
+ * of the block are read.
+ */
+template <int W>
+uint32_t reg_sad_hbd_w(const kvz_pixel *const data1, const kvz_pixel *const data2,
+                       const int32_t height, const uint32_t stride1, const uint32_t stride2)
+{
+  static_assert(W > 0 && W % 4 == 0 && W <= 64, "unsupported width");
+  constexpr int k8 = W / 8;                    // 8-pixel parts per row
+  constexpr bool k4 = (W & 4) != 0;            // 4-pixel part at x = W - 4
+  constexpr int kSplit = k8 <= 2 ? 2 : 1;      // accumulators per 8-pixel column
+  constexpr int kAcc = k8 > 0 ? k8 * kSplit : 1;
+  // Additions to a lane per row pair: 2 / kSplit for the 8-pixel parts, 1
+  // for the 4-pixel part.
+  constexpr int kRows = 2 * (kHbdSadAdds / (2 / kSplit));
+
+  uint32x4_t total = vdupq_n_u32(0);
+  int y = 0;
+  while (y < height) {
+    const int y_end = height - y < kRows ? height : y + kRows;
+    uint16x8_t acc[kAcc];
+    uint16x8_t acc4 = vdupq_n_u16(0);
+    KVZ_UNROLL
+    for (int i = 0; i < kAcc; ++i) {
+      acc[i] = vdupq_n_u16(0);
+    }
+    for (; y + 2 <= y_end; y += 2) {
+      const kvz_pixel *a = data1 + y * stride1;
+      const kvz_pixel *b = data2 + y * stride2;
+      KVZ_UNROLL
+      for (int i = 0; i < k8; ++i) {
+        acc[i * kSplit] = vabaq_u16(acc[i * kSplit], vld1q_u16(a + 8 * i), vld1q_u16(b + 8 * i));
+        acc[i * kSplit + kSplit - 1] = vabaq_u16(acc[i * kSplit + kSplit - 1],
+                                                 vld1q_u16(a + stride1 + 8 * i),
+                                                 vld1q_u16(b + stride2 + 8 * i));
+      }
+      if constexpr (k4) {
+        acc4 = vabaq_u16(acc4, hbd_load_2x4(a + W - 4, stride1), hbd_load_2x4(b + W - 4, stride2));
+      }
+    }
+    if (y < y_end) {
+      // Last row of an odd height.
+      const kvz_pixel *a = data1 + y * stride1;
+      const kvz_pixel *b = data2 + y * stride2;
+      KVZ_UNROLL
+      for (int i = 0; i < k8; ++i) {
+        acc[i * kSplit] = vabaq_u16(acc[i * kSplit], vld1q_u16(a + 8 * i), vld1q_u16(b + 8 * i));
+      }
+      if constexpr (k4) {
+        acc4 = vabaq_u16(acc4, hbd_load_1x4(a + W - 4), hbd_load_1x4(b + W - 4));
+      }
+      ++y;
+    }
+    if constexpr (k8 > 0) {
+      KVZ_UNROLL
+      for (int i = 0; i < kAcc; ++i) {
+        total = vpadalq_u16(total, acc[i]);
+      }
+    }
+    if constexpr (k4) {
+      total = vpadalq_u16(total, acc4);
+    }
+  }
+  return vaddvq_u32(total);
+}
+
+uint32_t reg_sad_hbd_w0(const kvz_pixel *const, const kvz_pixel *const,
+                        const int32_t, const uint32_t, const uint32_t)
+{
+  return 0;
+}
+
+/*
+ * SAD of a block of any width. With kHor, every row of data1 is compared
+ * with the single pixel data2[y * stride2] (hor_sad). The absolute
+ * differences are widened to 32 bits right away.
+ */
+template <bool kHor>
+uint32_t sad_hbd_any(const kvz_pixel *data1, const kvz_pixel *data2,
+                     int width, int height, unsigned stride1, unsigned stride2)
+{
+  uint32x4_t acc = vdupq_n_u32(0);
+  uint32_t tail = 0;
+  for (int y = 0; y < height; ++y) {
+    const kvz_pixel *a = data1 + y * stride1;
+    const kvz_pixel *b = data2 + y * stride2;
+    const uint16x8_t ref8 = vdupq_n_u16(kHor ? b[0] : 0);
+    int x = 0;
+    for (; x + 8 <= width; x += 8) {
+      acc = vpadalq_u16(acc, vabdq_u16(vld1q_u16(a + x), kHor ? ref8 : vld1q_u16(b + x)));
+    }
+    if (x + 4 <= width) {
+      acc = vaddw_u16(acc, vabd_u16(vld1_u16(a + x), kHor ? vget_low_u16(ref8) : vld1_u16(b + x)));
+      x += 4;
+    }
+    for (; x < width; ++x) {
+      tail += abs((int)a[x] - (int)(kHor ? b[0] : b[x]));
+    }
+  }
+  return vaddvq_u32(acc) + tail;
+}
+
+uint32_t reg_sad_hbd_neon(const kvz_pixel *const data1, const kvz_pixel *const data2,
+                          const int width, const int height,
+                          const unsigned stride1, const unsigned stride2)
+{
+  switch (width) {
+    case 0:  return 0;
+    case 4:  return reg_sad_hbd_w<4>(data1, data2, height, stride1, stride2);
+    case 8:  return reg_sad_hbd_w<8>(data1, data2, height, stride1, stride2);
+    case 12: return reg_sad_hbd_w<12>(data1, data2, height, stride1, stride2);
+    case 16: return reg_sad_hbd_w<16>(data1, data2, height, stride1, stride2);
+    case 24: return reg_sad_hbd_w<24>(data1, data2, height, stride1, stride2);
+    case 32: return reg_sad_hbd_w<32>(data1, data2, height, stride1, stride2);
+    case 48: return reg_sad_hbd_w<48>(data1, data2, height, stride1, stride2);
+    case 64: return reg_sad_hbd_w<64>(data1, data2, height, stride1, stride2);
+    default: return sad_hbd_any<false>(data1, data2, width, height, stride1, stride2);
+  }
+}
+
+optimized_sad_func_ptr_t get_optimized_sad_hbd_neon(int32_t width)
+{
+  switch (width) {
+    case 0:  return reg_sad_hbd_w0;
+    case 4:  return reg_sad_hbd_w<4>;
+    case 8:  return reg_sad_hbd_w<8>;
+    case 12: return reg_sad_hbd_w<12>;
+    case 16: return reg_sad_hbd_w<16>;
+    case 24: return reg_sad_hbd_w<24>;
+    case 32: return reg_sad_hbd_w<32>;
+    case 48: return reg_sad_hbd_w<48>;
+    case 64: return reg_sad_hbd_w<64>;
+    default: return NULL;
+  }
+}
+
+template <int N>
+unsigned sad_nxn_hbd_neon(const kvz_pixel *block1, const kvz_pixel *block2)
+{
+  return reg_sad_hbd_w<N>(block1, block2, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+}
+
+template <int N>
+void sad_nxn_dual_hbd_neon(const pred_buffer preds, const kvz_pixel *const orig,
+                           unsigned /* num_modes */, unsigned *costs_out)
+{
+  costs_out[0] = reg_sad_hbd_w<N>(preds[0], orig, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+  costs_out[1] = reg_sad_hbd_w<N>(preds[1], orig, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+}
+
+// The reference row is the same for every row of the block.
+uint32_t ver_sad_hbd_neon(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                          int32_t width, int32_t height, uint32_t stride)
+{
+  return reg_sad_hbd_neon(pic_data, ref_data, width, height, stride, 0);
+}
+
+uint32_t hor_sad_hbd_neon(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                          int32_t width, int32_t height, uint32_t pic_stride,
+                          uint32_t ref_stride, uint32_t left, uint32_t right)
+{
+  uint32_t result = 0;
+  if (left) {
+    result += sad_hbd_any<true>(pic_data, ref_data + left, left, height, pic_stride, ref_stride);
+    result += reg_sad_hbd_neon(pic_data + left, ref_data + left, width - left,
+                               height, pic_stride, ref_stride);
+  } else if (right) {
+    result += reg_sad_hbd_neon(pic_data, ref_data, width - right,
+                               height, pic_stride, ref_stride);
+    result += sad_hbd_any<true>(pic_data + width - right, ref_data + width - right - 1,
+                                right, height, pic_stride, ref_stride);
+  } else {
+    result += reg_sad_hbd_neon(pic_data, ref_data, width, height, pic_stride, ref_stride);
+  }
+  return result;
+}
+
+/*
+ * SSD of a W x W block. The squares of the low and high half of a vector go
+ * to the same 32-bit lanes, so a vector adds at most 2 * PIXEL_MAX^2 to a
+ * lane; the lanes are moved to 64-bit lanes before they could overflow.
+ */
+constexpr uint32_t kHbdSsdAdds = 0xFFFFFFFFu / (2u * PIXEL_MAX * PIXEL_MAX);
+
+KVZ_FORCE_INLINE uint32x4_t hbd_sqdiff_acc(uint32x4_t acc, uint16x8_t a, uint16x8_t b)
+{
+  const uint16x8_t d = vabdq_u16(a, b);
+  acc = vmlal_u16(acc, vget_low_u16(d), vget_low_u16(d));
+  return vmlal_high_u16(acc, d, d);
+}
+
+template <int W>
+unsigned pixels_calc_ssd_hbd_w(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                               const int ref_stride, const int rec_stride)
+{
+  // Rows per vector and vectors per row.
+  constexpr int kRowsPerVec = W >= 8 ? 1 : 2;
+  constexpr int kVecsPerRow = W >= 8 ? W / 8 : 1;
+  constexpr int kRowsPerFlush = (int)(kHbdSsdAdds / kVecsPerRow) * kRowsPerVec;
+  static_assert(kRowsPerFlush >= kRowsPerVec, "SSD accumulation overflows");
+
+  uint64x2_t acc64 = vdupq_n_u64(0);
+  for (int y0 = 0; y0 < W; y0 += kRowsPerFlush) {
+    const int y1 = W - y0 < kRowsPerFlush ? W : y0 + kRowsPerFlush;
+    uint32x4_t acc = vdupq_n_u32(0);
+    for (int y = y0; y < y1; y += kRowsPerVec) {
+      const kvz_pixel *a = ref + y * ref_stride;
+      const kvz_pixel *b = rec + y * rec_stride;
+      if constexpr (W == 4) {
+        acc = hbd_sqdiff_acc(acc, hbd_load_2x4(a, ref_stride), hbd_load_2x4(b, rec_stride));
+      } else {
+        KVZ_UNROLL
+        for (int i = 0; i < kVecsPerRow; ++i) {
+          acc = hbd_sqdiff_acc(acc, vld1q_u16(a + 8 * i), vld1q_u16(b + 8 * i));
+        }
+      }
+    }
+    acc64 = vpadalq_u32(acc64, acc);
+  }
+  const uint64_t ssd = vaddvq_u64(acc64);
+  return (unsigned)(ssd >> (2 * (KVZ_BIT_DEPTH - 8)));
+}
+
+unsigned pixels_calc_ssd_hbd_neon(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                                  const int ref_stride, const int rec_stride, const int width)
+{
+  switch (width) {
+    case 4:  return pixels_calc_ssd_hbd_w<4>(ref, rec, ref_stride, rec_stride);
+    case 8:  return pixels_calc_ssd_hbd_w<8>(ref, rec, ref_stride, rec_stride);
+    case 16: return pixels_calc_ssd_hbd_w<16>(ref, rec, ref_stride, rec_stride);
+    case 32: return pixels_calc_ssd_hbd_w<32>(ref, rec, ref_stride, rec_stride);
+    case 64: return pixels_calc_ssd_hbd_w<64>(ref, rec, ref_stride, rec_stride);
+    default: break;
+  }
+  uint64_t ssd = 0;
+  for (int y = 0; y < width; ++y) {
+    for (int x = 0; x < width; ++x) {
+      const int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
+      ssd += (uint32_t)(diff * diff);
+    }
+  }
+  return (unsigned)(ssd >> (2 * (KVZ_BIT_DEPTH - 8)));
+}
+
+/*
+ * Bi-prediction average. The generic code computes
+ * clip((s0 + s1 + offset) >> shift) with shift = 15 - KVZ_BIT_DEPTH,
+ * offset = 1 << (shift - 1) and samples s0, s1 at 14-bit precision.
+ * - Two pixels: s = p << (shift - 1), so the result is (p0 + p1 + 1) >> 1,
+ *   which is vrhadd and needs no clipping.
+ * - Otherwise the sum is computed with a saturating 16-bit addition and
+ *   rounded with vrshr, which does not overflow. When the sum saturates to
+ *   INT16_MAX, the result is at least 32767 >> shift = PIXEL_MAX, which is
+ *   also what clipping the exact result gives; a sum saturated to INT16_MIN
+ *   gives a negative result, which clips to 0 like the exact one.
+ */
+constexpr int kBipredShift = 15 - KVZ_BIT_DEPTH;
+static_assert((32767 >> kBipredShift) == PIXEL_MAX, "saturation must clip to PIXEL_MAX");
+
+enum { BIPRED_PX_PX, BIPRED_IM_IM, BIPRED_PX_IM };
+
+template <int MODE>
+KVZ_FORCE_INLINE uint16x8_t bipred_hbd_combine(uint16x8_t a, uint16x8_t b)
+{
+  if constexpr (MODE == BIPRED_PX_PX) {
+    return vrhaddq_u16(a, b);
+  } else {
+    if constexpr (MODE == BIPRED_PX_IM) {
+      a = vshlq_n_u16(a, 14 - KVZ_BIT_DEPTH);
+    }
+    int16x8_t s = vqaddq_s16(vreinterpretq_s16_u16(a), vreinterpretq_s16_u16(b));
+    s = vrshrq_n_s16(s, kBipredShift);
+    s = vminq_s16(vmaxq_s16(s, vdupq_n_s16(0)), vdupq_n_s16(PIXEL_MAX));
+    return vreinterpretq_u16_s16(s);
+  }
+}
+
+template <int MODE>
+KVZ_FORCE_INLINE uint16x4_t bipred_hbd_combine(uint16x4_t a, uint16x4_t b)
+{
+  if constexpr (MODE == BIPRED_PX_PX) {
+    return vrhadd_u16(a, b);
+  } else {
+    if constexpr (MODE == BIPRED_PX_IM) {
+      a = vshl_n_u16(a, 14 - KVZ_BIT_DEPTH);
+    }
+    int16x4_t s = vqadd_s16(vreinterpret_s16_u16(a), vreinterpret_s16_u16(b));
+    s = vrshr_n_s16(s, kBipredShift);
+    s = vmin_s16(vmax_s16(s, vdup_n_s16(0)), vdup_n_s16(PIXEL_MAX));
+    return vreinterpret_u16_s16(s);
+  }
+}
+
+// The generic formula for one pixel.
+template <int MODE, typename T0, typename T1>
+KVZ_FORCE_INLINE kvz_pixel bipred_hbd_scalar(T0 a, T1 b)
+{
+  const int32_t offset = 1 << (kBipredShift - 1);
+  const int16_t s0 = MODE == BIPRED_IM_IM ? (int16_t)a : (int16_t)(a << (14 - KVZ_BIT_DEPTH));
+  const int16_t s1 = MODE == BIPRED_PX_PX ? (int16_t)(b << (14 - KVZ_BIT_DEPTH)) : (int16_t)b;
+  return (kvz_pixel)CLIP(0, PIXEL_MAX, (s0 + s1 + offset) >> kBipredShift);
+}
+
+/*
+ * src0 and src1 are w x h blocks with a stride of w. The 4-pixel wide blocks
+ * are processed two rows (8 contiguous source samples) at a time.
+ */
+template <int MODE, typename T0, typename T1>
+void bipred_average_hbd_block(kvz_pixel *dst, const T0 *src0, const T1 *src1,
+                              unsigned w, unsigned h, unsigned dst_stride)
+{
+  const uint16_t *s0 = (const uint16_t *)src0;
+  const uint16_t *s1 = (const uint16_t *)src1;
+  unsigned y = 0;
+  if (w == 4) {
+    for (; y + 2 <= h; y += 2) {
+      const uint16x8_t r = bipred_hbd_combine<MODE>(vld1q_u16(s0 + 4 * y), vld1q_u16(s1 + 4 * y));
+      vst1_u16(dst + y * dst_stride, vget_low_u16(r));
+      vst1_u16(dst + (y + 1) * dst_stride, vget_high_u16(r));
+    }
+  }
+  for (; y < h; ++y) {
+    const uint16_t *a = s0 + y * w;
+    const uint16_t *b = s1 + y * w;
+    kvz_pixel *d = dst + y * dst_stride;
+    unsigned x = 0;
+    for (; x + 8 <= w; x += 8) {
+      vst1q_u16(d + x, bipred_hbd_combine<MODE>(vld1q_u16(a + x), vld1q_u16(b + x)));
+    }
+    if (x + 4 <= w) {
+      vst1_u16(d + x, bipred_hbd_combine<MODE>(vld1_u16(a + x), vld1_u16(b + x)));
+      x += 4;
+    }
+    for (; x < w; ++x) {
+      d[x] = bipred_hbd_scalar<MODE>(src0[y * w + x], src1[y * w + x]);
+    }
+  }
+}
+
+void bipred_average_hbd_neon(lcu_t *const lcu,
+                             const yuv_t *const px_L0,
+                             const yuv_t *const px_L1,
+                             const yuv_im_t *const im_L0,
+                             const yuv_im_t *const im_L1,
+                             const unsigned pu_x,
+                             const unsigned pu_y,
+                             const unsigned pu_w,
+                             const unsigned pu_h,
+                             const unsigned im_flags_L0,
+                             const unsigned im_flags_L1,
+                             const bool predict_luma,
+                             const bool predict_chroma,
+                             const uint8_t chroma_shift_w,
+                             const uint8_t chroma_shift_h)
+{
+  if (predict_luma) {
+    const unsigned pb_offset = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
+    kvz_pixel *dst = lcu->rec.y + pb_offset;
+
+    if (!(im_flags_L0 & 1) && !(im_flags_L1 & 1)) {
+      bipred_average_hbd_block<BIPRED_PX_PX>(dst, px_L0->y, px_L1->y, pu_w, pu_h, LCU_WIDTH);
+    } else if ((im_flags_L0 & 1) && (im_flags_L1 & 1)) {
+      bipred_average_hbd_block<BIPRED_IM_IM>(dst, im_L0->y, im_L1->y, pu_w, pu_h, LCU_WIDTH);
+    } else {
+      const kvz_pixel    *src_px = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      const kvz_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
+      bipred_average_hbd_block<BIPRED_PX_IM>(dst, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
+    }
+  }
+  if (predict_chroma) {
+    const unsigned pb_offset = ((SUB_SCU(pu_y) >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w)) +
+                               (SUB_SCU(pu_x) >> chroma_shift_w);
+    const unsigned pb_w = pu_w >> chroma_shift_w;
+    const unsigned pb_h = pu_h >> chroma_shift_h;
+    const unsigned stride = LCU_WIDTH >> chroma_shift_w;
+
+    if (!(im_flags_L0 & 2) && !(im_flags_L1 & 2)) {
+      bipred_average_hbd_block<BIPRED_PX_PX>(lcu->rec.u + pb_offset, px_L0->u, px_L1->u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_PX_PX>(lcu->rec.v + pb_offset, px_L0->v, px_L1->v, pb_w, pb_h, stride);
+    } else if ((im_flags_L0 & 2) && (im_flags_L1 & 2)) {
+      bipred_average_hbd_block<BIPRED_IM_IM>(lcu->rec.u + pb_offset, im_L0->u, im_L1->u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_IM_IM>(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, stride);
+    } else {
+      const kvz_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      const kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
+      const kvz_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      const kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
+      bipred_average_hbd_block<BIPRED_PX_IM>(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_PX_IM>(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, stride);
+    }
+  }
+}
+
+/*
+ * Variance as (n * sum(x^2) - sum(x)^2) / n^2. The sums are exact. The
+ * numerator is computed exactly in 64 bits when it fits, otherwise in double;
+ * either way the result agrees with the generic two-pass loop to within its
+ * rounding error.
+ */
+double pixel_var_hbd_neon(const kvz_pixel *arr, const uint32_t len)
+{
+  // A 32-bit lane of the squares takes at most 2 * PIXEL_MAX^2 per vector.
+  constexpr uint32_t kBlock = 8 * (kHbdSsdAdds < 1024 ? kHbdSsdAdds : 1024);
+  uint64x2_t sum64 = vdupq_n_u64(0);
+  uint64x2_t sq64 = vdupq_n_u64(0);
+  uint32_t i = 0;
+  while (i + 8 <= len) {
+    const uint32_t end = len - i < kBlock ? i + ((len - i) & ~7u) : i + kBlock;
+    uint32x4_t sum32 = vdupq_n_u32(0);
+    uint32x4_t sq32 = vdupq_n_u32(0);
+    for (; i < end; i += 8) {
+      const uint16x8_t v = vld1q_u16(arr + i);
+      sum32 = vpadalq_u16(sum32, v);
+      sq32 = vmlal_u16(sq32, vget_low_u16(v), vget_low_u16(v));
+      sq32 = vmlal_high_u16(sq32, v, v);
+    }
+    sum64 = vpadalq_u32(sum64, sum32);
+    sq64 = vpadalq_u32(sq64, sq32);
+  }
+  uint64_t sum = vaddvq_u64(sum64);
+  uint64_t sumsq = vaddvq_u64(sq64);
+  for (; i < len; ++i) {
+    sum += arr[i];
+    sumsq += (uint32_t)arr[i] * arr[i];
+  }
+
+  const double n = (double)len;
+  if (len <= 65536) {
+    // len * sumsq <= 2^16 * 2^16 * PIXEL_MAX^2 < 2^64.
+    const uint64_t num = (uint64_t)len * sumsq - sum * sum;
+    return (double)num / (n * n);
+  }
+  const double mean = (double)sum / n;
+  const double var = ((double)sumsq - mean * (double)sum) / n;
+  return var < 0 ? 0 : var;
+}
+
+} // namespace hbd_sad
+} // namespace
+
+#endif // COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
+
 #if COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
 
 namespace {
@@ -849,6 +1324,27 @@ static double pixel_var_neon(const kvz_pixel *arr, const uint32_t len)
 int kvz_strategy_register_picture_neon(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
+#if COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
+  if (bitdepth == KVZ_BIT_DEPTH) {
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::reg_sad_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "sad_4x4", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_neon<64>));
+    success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_neon<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_neon<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_neon<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_neon<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_neon<64>));
+    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::pixels_calc_ssd_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "bipred_average", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::bipred_average_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::get_optimized_sad_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "ver_sad", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::ver_sad_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "hor_sad", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::hor_sad_hbd_neon));
+    success &= kvz_strategyselector_register(opaque, "pixel_var", "neon", 40, KVZ_STRATEGY_FPTR(hbd_sad::pixel_var_hbd_neon));
+  }
+#endif // COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
 #if COMPILE_ARM_NEON && KVZ_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "reg_sad", "neon", 40, KVZ_STRATEGY_FPTR(reg_sad_neon));
