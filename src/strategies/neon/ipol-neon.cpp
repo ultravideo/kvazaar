@@ -1354,14 +1354,23 @@ void copy_rows(const kvz_pixel *src, kvz_pixel *dst, int width, int height, int 
  * A quarter-pel block of the block filters: the vertical filter over the
  * horizontal intermediate rows starting at im. When shift is set, output
  * column x comes from intermediate column x - 1 and column 0 from the first
- * column buffer col. The vertical pass then reads column -1 (the end of the
- * previous row or buffer) for column 0, which is overwritten.
+ * column buffer col. Filtering from im - 1 would read column -1, which is not
+ * part of the intermediate (and before the buffer for the first row), so the
+ * block is filtered unshifted and copied shifted by one column instead.
  */
 void qpel_block(const int8_t *filter, const int16_t *im, const int16_t *col, int shift,
                 int width, int height, kvz_pixel *dst)
 {
-  ver_pass(filter, 8, width, height, im - shift, LCU_WIDTH, px16(dst), LCU_WIDTH, VER_PX);
-  if (shift) col_filter(filter, col, height, dst, LCU_WIDTH);
+  if (!shift) {
+    ver_pass(filter, 8, width, height, im, LCU_WIDTH, px16(dst), LCU_WIDTH, VER_PX);
+    return;
+  }
+  // copy_shifted reads one sample before each row of the source.
+  alignas(16) kvz_pixel tmp[LCU_LUMA_SIZE + 8];
+  kvz_pixel *const unshifted = tmp + 8;
+  ver_pass(filter, 8, width, height, im, LCU_WIDTH, px16(unshifted), LCU_WIDTH, VER_PX);
+  copy_shifted(unshifted, dst, width, height, LCU_WIDTH);
+  col_filter(filter, col, height, dst, LCU_WIDTH);
 }
 
 void filter_hpel_blocks_hor_ver_luma_neon(const encoder_control_t *encoder,

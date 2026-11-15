@@ -1837,8 +1837,20 @@ static void hbd_copy_rows(const kvz_pixel *src, kvz_pixel *dst, int width, int h
 static void hbd_qpel_block_avx2(const int8_t *filter, const int16_t *im, const int16_t *col,
                                 int shift, int width, int height, kvz_pixel *dst)
 {
-  hbd_ver_pass_avx2(filter, 8, width, height, im - shift, LCU_WIDTH, dst, NULL, LCU_WIDTH, HBD_VER_PX);
-  if (shift) hbd_col_filter_avx2(filter, col, height, dst, LCU_WIDTH);
+  if (!shift) {
+    hbd_ver_pass_avx2(filter, 8, width, height, im, LCU_WIDTH, dst, NULL, LCU_WIDTH, HBD_VER_PX);
+    return;
+  }
+  // Output column x comes from intermediate column x - 1 and column 0 from
+  // the first column buffer. Filtering from im - 1 would read column -1,
+  // which is not part of the intermediate (and before the buffer for the
+  // first row), so filter unshifted and copy shifted by one column instead.
+  // hbd_copy_shifted reads one sample before each row of the source.
+  ALIGNED(32) kvz_pixel tmp[LCU_LUMA_SIZE + 16];
+  kvz_pixel *const unshifted = tmp + 16;
+  hbd_ver_pass_avx2(filter, 8, width, height, im, LCU_WIDTH, unshifted, NULL, LCU_WIDTH, HBD_VER_PX);
+  hbd_copy_shifted(unshifted, dst, width, height, LCU_WIDTH);
+  hbd_col_filter_avx2(filter, col, height, dst, LCU_WIDTH);
 }
 
 static void hbd_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t *encoder,
