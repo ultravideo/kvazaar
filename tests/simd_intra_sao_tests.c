@@ -448,6 +448,53 @@ static int run_sao_reconstruct_color(void)
   return 1;
 }
 
+// The original kvz_calc_sao_offset_array, which went through every value.
+static void sao_offset_array_reference(const sao_info_t *sao, int *offset, color_t color_i)
+{
+  const int32_t values = 1 << KVZ_BIT_DEPTH;
+  const int32_t shift = KVZ_BIT_DEPTH - 5;
+  const int32_t band_pos = (color_i == COLOR_V) ? 1 : 0;
+  const int32_t cur_bp = sao->band_position[band_pos];
+  for (int32_t val = 0; val < values; val++) {
+    const int32_t cb_minus_cbp = (val >> shift) - cur_bp;
+    if (cb_minus_cbp >= 0 && cb_minus_cbp <= 3) {
+      const int32_t val_unclipped = val + sao->offsets[cb_minus_cbp + 1 + 5 * band_pos];
+      offset[val] = CLIP(0, values - 1, val_unclipped);
+    } else {
+      offset[val] = val;
+    }
+  }
+}
+
+TEST test_sao_offset_array(void)
+{
+  static int ref[1 << KVZ_BIT_DEPTH];
+  static int out[1 << KVZ_BIT_DEPTH];
+  static const color_t colors[3] = { COLOR_Y, COLOR_U, COLOR_V };
+  for (int ci = 0; ci < 3; ++ci) {
+    for (int bp = 0; bp < 32; ++bp) {
+      for (int kind = 0; kind < 7; ++kind) {
+        sao_info_t sao;
+        memset(&sao, 0, sizeof(sao));
+        sao.type = SAO_TYPE_BAND;
+        sao.band_position[0] = bp;
+        sao.band_position[1] = 31 - bp;
+        for (int k = 0; k < NUM_SAO_EDGE_CATEGORIES * 2; ++k) {
+          sao.offsets[k] = kind < 5 ? rnd_offset(kind) : (int)(rnd() % 20001) - 10000;
+        }
+        sao_offset_array_reference(&sao, ref, colors[ci]);
+        memset(out, 0x5A, sizeof(out));
+        kvz_calc_sao_offset_array(&enc, &sao, out, colors[ci]);
+        if (memcmp(ref, out, sizeof(ref)) != 0) {
+          printf("\n    kvz_calc_sao_offset_array mismatch color=%d band_pos=%d kind=%d\n", ci, bp, kind);
+          FAILm("mismatch");
+        }
+      }
+    }
+  }
+  PASS();
+}
+
 TEST test_sao_edge_ddistortion(void)
 {
   ASSERT(run_edge_ddistortion());
@@ -478,6 +525,8 @@ SUITE(simd_intra_sao_tests)
   enc.bitdepth = KVZ_BIT_DEPTH;
   memset(&st, 0, sizeof(st));
   st.encoder_control = &enc;
+
+  RUN_TEST(test_sao_offset_array);
 
   for (volatile int i = 0; i < strategies.count; ++i) {
     const strategy_t *s = &strategies.strategies[i];

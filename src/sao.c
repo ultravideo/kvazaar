@@ -179,24 +179,28 @@ static double sao_mode_bits_band(const encoder_state_t * const state,
 // format (an array of YMM vectors).
 void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
-  int32_t val;
   const int32_t values = (1<<encoder->bitdepth);
   const int32_t shift = encoder->bitdepth-5;
   const int32_t band_pos = (color_i == COLOR_V) ? 1 : 0;
   const int32_t cur_bp   = sao->band_position[band_pos];
 
-  // Loop through all intensity values and construct an offset array
-  for (val = 0; val < values; val++) {
-    int32_t cur_band     = val >> shift;
-    int32_t cb_minus_cbp = cur_band - cur_bp;
+  // Intensity values outside the four bands starting at cur_bp are unchanged.
+  // This loop has no branches, so the compiler can vectorize it.
+  for (int32_t val = 0; val < values; val++) {
+    offset[val] = val;
+  }
 
-    if (cb_minus_cbp >= 0 && cb_minus_cbp <= 3) {
-      uint32_t offset_id    = cb_minus_cbp + 1 + 5 * band_pos;
-      int32_t val_unclipped = val + sao->offsets[offset_id];
+  // Only the values of the (at most) four bands with an offset differ from
+  // the identity, which is 1/8 of the table.
+  for (int32_t cb_minus_cbp = 0; cb_minus_cbp <= 3; cb_minus_cbp++) {
+    const int32_t cur_band = cur_bp + cb_minus_cbp;
+    if (cur_band < 0 || cur_band >= 32) continue;
+
+    const int32_t sao_offset = sao->offsets[cb_minus_cbp + 1 + 5 * band_pos];
+    const int32_t band_end = (cur_band + 1) << shift;
+    for (int32_t val = cur_band << shift; val < band_end; val++) {
+      const int32_t val_unclipped = val + sao_offset;
       offset[val] = CLIP(0, values - 1, val_unclipped);
-
-    } else {
-      offset[val] = val;
     }
   }
 }
