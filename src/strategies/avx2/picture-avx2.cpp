@@ -1963,7 +1963,8 @@ void satd_8bit_ ## n ## x ## n ## _dual_avx2( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  kvz_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (n), &preds[1][row + x], (n), &orig[row + x], (n), &sum1, &sum2); \
+  /* Plain pointers: the 32x32 rows of pred_buffer are too small for 64x64. */ \
+  kvz_satd_8bit_8x8_general_dual_avx2((const kvz_pixel *)preds[0] + row + x, (n), (const kvz_pixel *)preds[1] + row + x, (n), &orig[row + x], (n), &sum1, &sum2); \
   satds_out[0] += sum1; \
   satds_out[1] += sum2; \
     } \

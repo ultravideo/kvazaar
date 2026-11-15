@@ -326,12 +326,15 @@ static cost_pixel_nxn_multi_func satd_64x64_dual_generic;
 static void satd_ ## n ## x ## n ## _dual_generic( \
   const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
 { \
+  /* Plain pointers: the 32x32 rows of pred_buffer are too small for 64x64. */ \
+  const kvz_pixel *const pred0 = preds[0]; \
+  const kvz_pixel *const pred1 = preds[1]; \
   unsigned x, y; \
   unsigned sum = 0; \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_8x8_subblock_generic(&preds[0][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&pred0[row + x], (n), &orig[row + x], (n)); \
   } \
   } \
   costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
@@ -340,7 +343,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_8x8_subblock_generic(&preds[1][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&pred1[row + x], (n), &orig[row + x], (n)); \
   } \
   } \
   costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
@@ -458,16 +461,19 @@ static cost_pixel_nxn_multi_func sad_64x64_dual_generic;
 static void sad_ ##  n ## x ## n ## _dual_generic( \
   const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
 { \
+  /* Plain pointers: the 32x32 rows of pred_buffer are too small for 64x64. */ \
+  const kvz_pixel *const pred0 = preds[0]; \
+  const kvz_pixel *const pred1 = preds[1]; \
   unsigned i; \
   unsigned sum = 0; \
   for (i = 0; i < (n)*(n); ++i) { \
-  sum += abs(preds[0][i] - orig[i]); \
+  sum += abs(pred0[i] - orig[i]); \
   } \
   costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
   \
   sum = 0; \
   for (i = 0; i < (n)*(n); ++i) { \
-  sum += abs(preds[1][i] - orig[i]); \
+  sum += abs(pred1[i] - orig[i]); \
   } \
   costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
 }

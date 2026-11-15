@@ -621,7 +621,8 @@ void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
       for (n = 0; n < width * height; n++) {
         // Clip to avoid possible overflow in following shift left operation
         coeff_q   = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
-        coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
+        // Multiply: a left shift of a negative value is undefined.
+        coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q * (1 << (qp_scaled / 6 - shift)));
       }
     }
   } else {
