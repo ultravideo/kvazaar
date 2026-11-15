@@ -44,8 +44,8 @@ extern SUITE(dct_tests);
 extern SUITE(ipol_tests);
 extern SUITE(intra_pred_tests);
 extern SUITE(sao_tests);
-extern SUITE(strategy_diff_tests);
 #endif //KVZ_BIT_DEPTH == 8
+extern SUITE(strategy_diff_tests);
 extern SUITE(temporal_filter_tests);
 extern SUITE(simd_sad_tests);
 extern SUITE(simd_satd_tests);
@@ -70,7 +70,6 @@ int main(int argc, char **argv)
   RUN_SUITE(ipol_tests);
   RUN_SUITE(intra_pred_tests);
   RUN_SUITE(sao_tests);
-  RUN_SUITE(strategy_diff_tests);
 
   if (greatest_info.suite_filter &&
       greatest_name_match("speed", greatest_info.suite_filter))
@@ -81,6 +80,7 @@ int main(int argc, char **argv)
   printf("10-bit tests are not yet supported\n");
 #endif //KVZ_BIT_DEPTH == 8
 
+  RUN_SUITE(strategy_diff_tests);
   RUN_SUITE(simd_intra_sao_tests);
   RUN_SUITE(coeff_sum_tests);
   RUN_SUITE(simd_quant_tests);
