@@ -35,8 +35,9 @@
  * \file
  * AArch64 NEON implementation of intra prediction (angular, planar, filtered DC).
  *
- * Bit-exact with the generic implementation for 8-bit video. The block width
- * is a template parameter, so every loop has a constant trip count and the
+ * Bit-exact with the generic implementation for 8, 10 and 12-bit video. The
+ * 10 and 12-bit versions work on 16-bit lanes. The block width is a template
+ * parameter, so every loop has a constant trip count and the
  * narrowing shifts that depend on the width can be immediates.
  */
 
@@ -395,6 +396,386 @@ int kvz_strategy_register_intra_neon(void* opaque, uint8_t bitdepth)
   bool success = true;
 
   if (bitdepth == 8) {
+    success &= kvz_strategyselector_register(opaque, "angular_pred", "neon", 40, KVZ_STRATEGY_FPTR(angular_pred_neon));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "neon", 40, KVZ_STRATEGY_FPTR(intra_pred_planar_neon));
+    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "neon", 40, KVZ_STRATEGY_FPTR(intra_pred_filtered_dc_neon));
+  }
+
+  return success;
+}
+
+#elif COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
+
+/*
+ * 10 and 12-bit intra prediction. kvz_pixel is uint16_t and the samples are
+ * at most PIXEL_MAX (4095 at 12-bit), so the samples and their differences
+ * fit int16 lanes. Bit-exact with the generic implementation.
+ */
+namespace {
+
+constexpr int8_t modedisp2sampledisp[9] = { 0, 2, 5, 9, 13, 17, 21, 26, 32 };
+constexpr int16_t modedisp2invsampledisp[9] = { 0, 4096, 1638, 910, 630, 482, 390, 315, 256 }; // (256 * 32) / sampledisp
+
+constexpr int log2_of(int w) { return w == 4 ? 2 : w == 8 ? 3 : w == 16 ? 4 : 5; }
+
+/*
+ * One step of the angular interpolation, for each 16-bit lane:
+ *   ((32 - f) * a + f * b + 16) >> 5 == a + (((b - a) * f + 16) >> 5),
+ * because 32 * a is a multiple of 32. With wf = f << 10, vqrdmulh computes
+ * (2 * (b - a) * f * 1024 + 32768) >> 16 == ((b - a) * f + 16) >> 5 from the
+ * full product (it saturates only for -32768 * -32768). |b - a| <= 4095 and
+ * f << 10 <= 31744 fit int16. A fraction of 0 gives a.
+ */
+inline uint16x8_t angular_interp(uint16x8_t a, uint16x8_t b, int16x8_t wf)
+{
+  const int16x8_t d = vreinterpretq_s16_u16(vsubq_u16(b, a));
+  return vaddq_u16(a, vreinterpretq_u16_s16(vqrdmulhq_s16(d, wf)));
+}
+
+/*
+ * Rows y = 0 .. W-1 of a vertical-orientation angular prediction from ref
+ * (indexed from block index 0) into buf (W x W). Row y uses the offset
+ * ((y + 1) * sample_disp) >> 5 and the fraction ((y + 1) * sample_disp) & 31.
+ * Reads ref[d .. d + W], which for |sample_disp| < 32 is inside the reference
+ * also for rows with a zero fraction.
+ */
+template <int W>
+inline void angular_rows(const kvz_pixel *ref, int sample_disp, kvz_pixel *buf)
+{
+  if constexpr (W == 4) {
+    // Two rows per vector.
+    for (int y = 0; y < 4; y += 2) {
+      const int pos0 = (y + 1) * sample_disp;
+      const int pos1 = (y + 2) * sample_disp;
+      const kvz_pixel *r0 = ref + (pos0 >> 5);
+      const kvz_pixel *r1 = ref + (pos1 >> 5);
+      const uint16x8_t a = vcombine_u16(vld1_u16(r0), vld1_u16(r1));
+      const uint16x8_t b = vcombine_u16(vld1_u16(r0 + 1), vld1_u16(r1 + 1));
+      const int16x8_t wf = vcombine_s16(vdup_n_s16((int16_t)((pos0 & 31) << 10)),
+                                        vdup_n_s16((int16_t)((pos1 & 31) << 10)));
+      vst1q_u16(&buf[y * 4], angular_interp(a, b, wf));
+    }
+  } else {
+    for (int y = 0; y < W; ++y) {
+      const int pos = (y + 1) * sample_disp;
+      const kvz_pixel *r = ref + (pos >> 5);
+      const int16x8_t wf = vdupq_n_s16((int16_t)((pos & 31) << 10));
+      for (int x = 0; x < W; x += 8) {
+        vst1q_u16(&buf[y * W + x], angular_interp(vld1q_u16(r + x), vld1q_u16(r + x + 1), wf));
+      }
+    }
+  }
+}
+
+// Row y is ref + (y + 1) * step, for the modes with a whole-sample
+// displacement of +-32 (step +-1) and pure vertical (step 0).
+template <int W>
+inline void copy_rows(const kvz_pixel *ref, int step, kvz_pixel *buf)
+{
+  for (int y = 0; y < W; ++y) {
+    const kvz_pixel *r = ref + (y + 1) * step;
+    if constexpr (W == 4) {
+      vst1_u16(&buf[y * 4], vld1_u16(r));
+    } else {
+      for (int x = 0; x < W; x += 8) vst1q_u16(&buf[y * W + x], vld1q_u16(r + x));
+    }
+  }
+}
+
+// dst[x][y] = src[y][x] for an 8x8 block of 16-bit samples.
+inline void transpose8x8_u16(const kvz_pixel *src, int src_stride, kvz_pixel *dst, int dst_stride)
+{
+  uint16x8_t r[8];
+  for (int i = 0; i < 8; ++i) r[i] = vld1q_u16(src + i * src_stride);
+  const uint16x8x2_t t0 = vtrnq_u16(r[0], r[1]);
+  const uint16x8x2_t t1 = vtrnq_u16(r[2], r[3]);
+  const uint16x8x2_t t2 = vtrnq_u16(r[4], r[5]);
+  const uint16x8x2_t t3 = vtrnq_u16(r[6], r[7]);
+  // Columns 0/4 and 2/6 of rows 0-3 and 4-7.
+  const uint32x4x2_t u0 = vtrnq_u32(vreinterpretq_u32_u16(t0.val[0]), vreinterpretq_u32_u16(t1.val[0]));
+  const uint32x4x2_t u2 = vtrnq_u32(vreinterpretq_u32_u16(t2.val[0]), vreinterpretq_u32_u16(t3.val[0]));
+  // Columns 1/5 and 3/7.
+  const uint32x4x2_t u1 = vtrnq_u32(vreinterpretq_u32_u16(t0.val[1]), vreinterpretq_u32_u16(t1.val[1]));
+  const uint32x4x2_t u3 = vtrnq_u32(vreinterpretq_u32_u16(t2.val[1]), vreinterpretq_u32_u16(t3.val[1]));
+  const uint64x2_t c04a = vreinterpretq_u64_u32(u0.val[0]), c04b = vreinterpretq_u64_u32(u2.val[0]);
+  const uint64x2_t c26a = vreinterpretq_u64_u32(u0.val[1]), c26b = vreinterpretq_u64_u32(u2.val[1]);
+  const uint64x2_t c15a = vreinterpretq_u64_u32(u1.val[0]), c15b = vreinterpretq_u64_u32(u3.val[0]);
+  const uint64x2_t c37a = vreinterpretq_u64_u32(u1.val[1]), c37b = vreinterpretq_u64_u32(u3.val[1]);
+  vst1q_u16(dst + 0 * dst_stride, vreinterpretq_u16_u64(vtrn1q_u64(c04a, c04b)));
+  vst1q_u16(dst + 1 * dst_stride, vreinterpretq_u16_u64(vtrn1q_u64(c15a, c15b)));
+  vst1q_u16(dst + 2 * dst_stride, vreinterpretq_u16_u64(vtrn1q_u64(c26a, c26b)));
+  vst1q_u16(dst + 3 * dst_stride, vreinterpretq_u16_u64(vtrn1q_u64(c37a, c37b)));
+  vst1q_u16(dst + 4 * dst_stride, vreinterpretq_u16_u64(vtrn2q_u64(c04a, c04b)));
+  vst1q_u16(dst + 5 * dst_stride, vreinterpretq_u16_u64(vtrn2q_u64(c15a, c15b)));
+  vst1q_u16(dst + 6 * dst_stride, vreinterpretq_u16_u64(vtrn2q_u64(c26a, c26b)));
+  vst1q_u16(dst + 7 * dst_stride, vreinterpretq_u16_u64(vtrn2q_u64(c37a, c37b)));
+}
+
+// dst[x * W + y] = src[y * W + x] for a W x W block.
+template <int W>
+inline void transpose_block(const kvz_pixel *src, kvz_pixel *dst)
+{
+  if constexpr (W == 4) {
+    // De-interleaving by 4 gives the columns.
+    const uint16x4x4_t c = vld4_u16(src);
+    vst1_u16(dst + 0, c.val[0]);
+    vst1_u16(dst + 4, c.val[1]);
+    vst1_u16(dst + 8, c.val[2]);
+    vst1_u16(dst + 12, c.val[3]);
+  } else {
+    for (int by = 0; by < W; by += 8) {
+      for (int bx = 0; bx < W; bx += 8) {
+        transpose8x8_u16(src + by * W + bx, W, dst + bx * W + by, W);
+      }
+    }
+  }
+}
+
+template <int W>
+void angular_pred_w(const int_fast8_t intra_mode,
+                    const kvz_pixel *const in_ref_above,
+                    const kvz_pixel *const in_ref_left,
+                    kvz_pixel *const dst)
+{
+  // Whether to swap references to always project on the left reference row.
+  const bool vertical_mode = intra_mode >= 18;
+  // Modes distance to horizontal or vertical mode.
+  const int mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
+  // Sample displacement per column in fractions of 32.
+  const int sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+
+  // Temporary buffer for modes 11-25, indices from -W to W-1.
+  kvz_pixel tmp_ref[2 * W];
+  const kvz_pixel *ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
+
+  if (sample_disp == 0) {
+    // Pure vertical or horizontal mode.
+    if (vertical_mode) {
+      copy_rows<W>(ref_main, 0, dst);
+    } else {
+      for (int y = 0; y < W; ++y) {
+        if constexpr (W == 4) {
+          vst1_u16(&dst[y * 4], vdup_n_u16(ref_main[y]));
+        } else {
+          const uint16x8_t v = vdupq_n_u16(ref_main[y]);
+          for (int x = 0; x < W; x += 8) vst1q_u16(&dst[y * W + x], v);
+        }
+      }
+    }
+    return;
+  }
+
+  if (sample_disp < 0) {
+    // Negative sample_disp means both references are needed. Copy indices
+    // -1 .. W-1 of the main reference to the later half of tmp_ref, so there
+    // is room for negative indices.
+    const kvz_pixel *ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+    memcpy(&tmp_ref[W - 1], ref_main - 1, (W + 1) * sizeof(kvz_pixel));
+    ref_main = tmp_ref + W;
+
+    // Extend the side reference to the negative indices of main reference.
+    int col_sample_disp = 128; // rounding for the ">> 8"
+    const int inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
+    const int most_negative_index = (W * sample_disp) >> 5;
+    for (int x = -2; x >= most_negative_index; --x) {
+      col_sample_disp += inv_abs_sample_disp;
+      const int side_index = col_sample_disp >> 8;
+      tmp_ref[x + W] = ref_side[side_index - 1];
+    }
+  }
+
+  // Horizontal modes are computed in the vertical orientation and transposed.
+  kvz_pixel tmp_out[W * W];
+  kvz_pixel *const buf = vertical_mode ? dst : tmp_out;
+
+  if (sample_disp == 32 || sample_disp == -32) {
+    // Whole-sample displacement: plain copies. The interpolation would read
+    // one sample past the reference for sample_disp == 32.
+    copy_rows<W>(ref_main, sample_disp >> 5, buf);
+  } else {
+    angular_rows<W>(ref_main, sample_disp, buf);
+  }
+
+  if (!vertical_mode) {
+    transpose_block<W>(tmp_out, dst);
+  }
+}
+
+/*
+ * Planar: out = ((W-1-x) * left[y] + (x+1) * top_right + (W-1-y) * top[x]
+ *                + (y+1) * bottom_left + W) >> (log2(W) + 1).
+ * All terms are non-negative. When the largest sum, 2 * W * PIXEL_MAX + W,
+ * fits 16 bits (W <= 8, or all sizes at 10-bit) the arithmetic is done
+ * modulo 2^16 in 16-bit lanes, which is exact for the final sum. Otherwise
+ * the sums are accumulated in 32-bit lanes with widening multiplies.
+ */
+template <int W>
+void planar_w(const kvz_pixel *const ref_top, const kvz_pixel *const ref_left, kvz_pixel *const dst)
+{
+  constexpr int kShift = log2_of(W) + 1;
+  constexpr bool kFits16 = 2 * W * PIXEL_MAX + W <= 0xFFFF;
+  const uint16_t top_right = ref_top[W + 1];
+  const uint16_t bottom_left = ref_left[W + 1];
+
+  if constexpr (W == 4) {
+    static_assert(kFits16, "planar 4x4 fits 16 bits");
+    // Two rows per vector: lanes 0-3 are row y, lanes 4-7 are row y + 1.
+    static const uint16_t a_tab[8] = { 3, 2, 1, 0, 3, 2, 1, 0 };   // W - 1 - x
+    static const uint16_t b_tab[8] = { 1, 2, 3, 4, 1, 2, 3, 4 };   // x + 1
+    const uint16x8_t a = vld1q_u16(a_tab), b = vld1q_u16(b_tab);
+    const uint16x4_t t4 = vld1_u16(ref_top + 1);
+    const uint16x8_t top = vcombine_u16(t4, t4);
+    const uint16x8_t base = vmlaq_u16(vdupq_n_u16(W), b, vdupq_n_u16(top_right));   // (x + 1) * top_right + W
+    for (int y = 0; y < 4; y += 2) {
+      const uint16x8_t left = vcombine_u16(vdup_n_u16(ref_left[y + 1]), vdup_n_u16(ref_left[y + 2]));
+      const uint16x8_t wy = vcombine_u16(vdup_n_u16(W - 1 - y), vdup_n_u16(W - 2 - y));
+      const uint16x8_t bl = vcombine_u16(vdup_n_u16((uint16_t)((y + 1) * bottom_left)),
+                                         vdup_n_u16((uint16_t)((y + 2) * bottom_left)));
+      uint16x8_t acc = vaddq_u16(base, bl);
+      acc = vmlaq_u16(acc, a, left);
+      acc = vmlaq_u16(acc, wy, top);
+      vst1q_u16(&dst[y * 4], vshrq_n_u16(acc, kShift));
+    }
+  } else {
+    static const uint16_t iota[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+    // Per-column vectors: a = W - 1 - x, top[x], x + 1.
+    uint16x8_t a[W / 8], top[W / 8], x1[W / 8];
+    for (int c = 0; c < W / 8; ++c) {
+      const uint16x8_t x = vaddq_u16(vld1q_u16(iota), vdupq_n_u16((uint16_t)(8 * c)));
+      a[c] = vsubq_u16(vdupq_n_u16(W - 1), x);
+      x1[c] = vaddq_u16(x, vdupq_n_u16(1));
+      top[c] = vld1q_u16(ref_top + 1 + 8 * c);
+    }
+    if constexpr (kFits16) {
+      uint16x8_t base[W / 8];
+      for (int c = 0; c < W / 8; ++c) {
+        base[c] = vmlaq_n_u16(vdupq_n_u16(W), x1[c], top_right);   // (x + 1) * top_right + W
+      }
+      for (int y = 0; y < W; ++y) {
+        const uint16_t left = ref_left[y + 1];
+        const uint16_t wy = (uint16_t)(W - 1 - y);
+        const uint16x8_t bl = vdupq_n_u16((uint16_t)((y + 1) * bottom_left));
+        for (int c = 0; c < W / 8; ++c) {
+          uint16x8_t acc = vaddq_u16(base[c], bl);
+          acc = vmlaq_n_u16(acc, a[c], left);
+          acc = vmlaq_n_u16(acc, top[c], wy);
+          vst1q_u16(&dst[y * W + 8 * c], vshrq_n_u16(acc, kShift));
+        }
+      }
+    } else {
+      // (x + 1) * top_right + W in 32-bit lanes, low and high halves.
+      uint32x4_t base_lo[W / 8], base_hi[W / 8];
+      for (int c = 0; c < W / 8; ++c) {
+        base_lo[c] = vmlal_n_u16(vdupq_n_u32(W), vget_low_u16(x1[c]), top_right);
+        base_hi[c] = vmlal_high_n_u16(vdupq_n_u32(W), x1[c], top_right);
+      }
+      for (int y = 0; y < W; ++y) {
+        const uint16_t left = ref_left[y + 1];
+        const uint16_t wy = (uint16_t)(W - 1 - y);
+        const uint32x4_t bl = vdupq_n_u32((uint32_t)((y + 1) * bottom_left));
+        for (int c = 0; c < W / 8; ++c) {
+          uint32x4_t lo = vaddq_u32(base_lo[c], bl);
+          uint32x4_t hi = vaddq_u32(base_hi[c], bl);
+          lo = vmlal_n_u16(lo, vget_low_u16(a[c]), left);
+          hi = vmlal_high_n_u16(hi, a[c], left);
+          lo = vmlal_n_u16(lo, vget_low_u16(top[c]), wy);
+          hi = vmlal_high_n_u16(hi, top[c], wy);
+          vst1q_u16(&dst[y * W + 8 * c], vcombine_u16(vshrn_n_u32(lo, kShift), vshrn_n_u32(hi, kShift)));
+        }
+      }
+    }
+  }
+}
+
+/*
+ * DC prediction with the edge filter. top[x] + left[x] fits 16 bits and the
+ * sum of all 2 * W references (at most 64 * 4095) is accumulated in 32-bit
+ * lanes. The filtered edge (ref + 3 * dc + 2) is at most 16382.
+ */
+template <int W>
+void filtered_dc_w(const kvz_pixel *const ref_top, const kvz_pixel *const ref_left, kvz_pixel *const out_block)
+{
+  constexpr int kShift = log2_of(W) + 1;
+  const kvz_pixel *const top = ref_top + 1;
+  const kvz_pixel *const left = ref_left + 1;
+
+  uint32_t sum;
+  if constexpr (W == 4) {
+    sum = vaddlv_u16(vadd_u16(vld1_u16(top), vld1_u16(left)));
+  } else {
+    uint32x4_t acc = vdupq_n_u32(0);
+    for (int i = 0; i < W; i += 8) {
+      acc = vpadalq_u16(acc, vaddq_u16(vld1q_u16(top + i), vld1q_u16(left + i)));
+    }
+    sum = vaddvq_u32(acc);
+  }
+  const int dc_val = (int)((sum + W) >> kShift);
+
+  // Fill the block with the DC value. W * W is a multiple of 8.
+  const uint16x8_t fill = vdupq_n_u16((uint16_t)dc_val);
+  for (int i = 0; i < W * W; i += 8) {
+    vst1q_u16(out_block + i, fill);
+  }
+
+  // Top row: (top[x] + 3 * dc + 2) >> 2.
+  const int bias = 3 * dc_val + 2;
+  if constexpr (W == 4) {
+    vst1_u16(out_block, vshr_n_u16(vadd_u16(vld1_u16(top), vdup_n_u16((uint16_t)bias)), 2));
+  } else {
+    const uint16x8_t vbias = vdupq_n_u16((uint16_t)bias);
+    for (int x = 0; x < W; x += 8) {
+      vst1q_u16(out_block + x, vshrq_n_u16(vaddq_u16(vld1q_u16(top + x), vbias), 2));
+    }
+  }
+  // Left column, same filter.
+  for (int y = 1; y < W; ++y) {
+    out_block[y * W] = (kvz_pixel)((left[y] + bias) >> 2);
+  }
+  // Top-left corner with ([1 2 1] / 4).
+  out_block[0] = (kvz_pixel)((left[0] + 2 * dc_val + top[0] + 2) >> 2);
+}
+
+void angular_pred_neon(const int_fast8_t log2_width, const int_fast8_t intra_mode,
+                       const kvz_pixel *const in_ref_above, const kvz_pixel *const in_ref_left,
+                       kvz_pixel *const dst)
+{
+  switch (log2_width) {
+    case 2: angular_pred_w<4>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 3: angular_pred_w<8>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    case 4: angular_pred_w<16>(intra_mode, in_ref_above, in_ref_left, dst); break;
+    default: angular_pred_w<32>(intra_mode, in_ref_above, in_ref_left, dst); break;
+  }
+}
+
+void intra_pred_planar_neon(const int_fast8_t log2_width, const kvz_pixel *const ref_top,
+                            const kvz_pixel *const ref_left, kvz_pixel *const dst)
+{
+  switch (log2_width) {
+    case 2: planar_w<4>(ref_top, ref_left, dst); break;
+    case 3: planar_w<8>(ref_top, ref_left, dst); break;
+    case 4: planar_w<16>(ref_top, ref_left, dst); break;
+    default: planar_w<32>(ref_top, ref_left, dst); break;
+  }
+}
+
+void intra_pred_filtered_dc_neon(const int_fast8_t log2_width, const kvz_pixel *const ref_top,
+                                 const kvz_pixel *const ref_left, kvz_pixel *const out_block)
+{
+  switch (log2_width) {
+    case 2: filtered_dc_w<4>(ref_top, ref_left, out_block); break;
+    case 3: filtered_dc_w<8>(ref_top, ref_left, out_block); break;
+    case 4: filtered_dc_w<16>(ref_top, ref_left, out_block); break;
+    default: filtered_dc_w<32>(ref_top, ref_left, out_block); break;
+  }
+}
+
+} // namespace
+
+int kvz_strategy_register_intra_neon(void* opaque, uint8_t bitdepth)
+{
+  bool success = true;
+
+  if (bitdepth == KVZ_BIT_DEPTH) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "neon", 40, KVZ_STRATEGY_FPTR(angular_pred_neon));
     success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "neon", 40, KVZ_STRATEGY_FPTR(intra_pred_planar_neon));
     success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "neon", 40, KVZ_STRATEGY_FPTR(intra_pred_filtered_dc_neon));
