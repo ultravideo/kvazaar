@@ -514,6 +514,13 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
 #undef LOG2_SCAN_SET_SIZE
 }
 
+/*
+ * Residual and reconstruction of a width x width block. For 8-bit pixels the
+ * pixels are widened to 16 bits; for 10 and 12-bit pixels they are already
+ * 16-bit. Like the generic code the residual and the sum of the residual and
+ * the prediction wrap to int16 before the reconstruction is clipped to
+ * [0, PIXEL_MAX].
+ */
 #if KVZ_BIT_DEPTH == 8
 
 static INLINE __m128i get_residual_4x1_avx2(const uint8_t *a_in, const uint8_t *b_in){
@@ -619,6 +626,94 @@ static FORCE_INLINE void get_quantized_recon_avx2(int16_t *residual, const uint8
   }
 }
 
+#else // KVZ_BIT_DEPTH > 8
+
+static FORCE_INLINE void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in, int16_t *residual, int width, int in_stride)
+{
+  switch (width) {
+    case 4:
+      for (int y = 0; y < 4; ++y) {
+        const __m128i a = _mm_loadl_epi64((const __m128i *)&ref_in[y * in_stride]);
+        const __m128i b = _mm_loadl_epi64((const __m128i *)&pred_in[y * in_stride]);
+        _mm_storel_epi64((__m128i *)&residual[y * 4], _mm_sub_epi16(a, b));
+      }
+      break;
+    case 8:
+      for (int y = 0; y < 8; ++y) {
+        const __m128i a = _mm_loadu_si128((const __m128i *)&ref_in[y * in_stride]);
+        const __m128i b = _mm_loadu_si128((const __m128i *)&pred_in[y * in_stride]);
+        _mm_storeu_si128((__m128i *)&residual[y * 8], _mm_sub_epi16(a, b));
+      }
+      break;
+    default:
+      if (width % 16 == 0) {
+        for (int y = 0; y < width; ++y) {
+          for (int x = 0; x < width; x += 16) {
+            const __m256i a = _mm256_loadu_si256((const __m256i *)&ref_in[x + y * in_stride]);
+            const __m256i b = _mm256_loadu_si256((const __m256i *)&pred_in[x + y * in_stride]);
+            _mm256_storeu_si256((__m256i *)&residual[x + y * width], _mm256_sub_epi16(a, b));
+          }
+        }
+      } else {
+        for (int y = 0; y < width; ++y) {
+          for (int x = 0; x < width; ++x) {
+            residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+          }
+        }
+      }
+      break;
+  }
+}
+
+static FORCE_INLINE void get_quantized_recon_avx2(int16_t *residual, const kvz_pixel *pred_in, int in_stride, kvz_pixel *rec_out, int out_stride, int width)
+{
+  const __m256i zero = _mm256_setzero_si256();
+  const __m256i max = _mm256_set1_epi16(PIXEL_MAX);
+  switch (width) {
+    case 4:
+      for (int y = 0; y < 4; ++y) {
+        const __m128i res = _mm_loadl_epi64((const __m128i *)&residual[y * 4]);
+        const __m128i pred = _mm_loadl_epi64((const __m128i *)&pred_in[y * in_stride]);
+        __m128i rec = _mm_add_epi16(res, pred);
+        rec = _mm_min_epi16(_mm_max_epi16(rec, _mm256_castsi256_si128(zero)), _mm256_castsi256_si128(max));
+        _mm_storel_epi64((__m128i *)&rec_out[y * out_stride], rec);
+      }
+      break;
+    case 8:
+      for (int y = 0; y < 8; ++y) {
+        const __m128i res = _mm_loadu_si128((const __m128i *)&residual[y * 8]);
+        const __m128i pred = _mm_loadu_si128((const __m128i *)&pred_in[y * in_stride]);
+        __m128i rec = _mm_add_epi16(res, pred);
+        rec = _mm_min_epi16(_mm_max_epi16(rec, _mm256_castsi256_si128(zero)), _mm256_castsi256_si128(max));
+        _mm_storeu_si128((__m128i *)&rec_out[y * out_stride], rec);
+      }
+      break;
+    default:
+      if (width % 16 == 0) {
+        for (int y = 0; y < width; ++y) {
+          for (int x = 0; x < width; x += 16) {
+            const __m256i res = _mm256_loadu_si256((const __m256i *)&residual[x + y * width]);
+            const __m256i pred = _mm256_loadu_si256((const __m256i *)&pred_in[x + y * in_stride]);
+            __m256i rec = _mm256_add_epi16(res, pred);
+            rec = _mm256_min_epi16(_mm256_max_epi16(rec, zero), max);
+            _mm256_storeu_si256((__m256i *)&rec_out[x + y * out_stride], rec);
+          }
+        }
+      } else {
+        for (int y = 0; y < width; ++y) {
+          for (int x = 0; x < width; ++x) {
+            int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
+            rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
+          }
+        }
+      }
+      break;
+  }
+}
+
+#endif // KVZ_BIT_DEPTH == 8
+
+
 
 static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
@@ -640,6 +735,7 @@ static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state,
       }
     }
   } else {
+#if KVZ_BIT_DEPTH == 8
     for (int32_t j = 0; j < tr_width; j++) {
       for (int32_t i = 0; i < tr_width; i += 16) {
         __m256i luma_res_v = _mm256_loadu_si256((__m256i const*)(luma_residual + i + j * luma_stride));
@@ -655,6 +751,30 @@ static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state,
     
     ss_xx += hsum32_8x32i(v_ss_xx);
     ss_xy += hsum32_8x32i(v_ss_xy);
+#else
+    // With 12-bit residuals the sums of a 32x32 block do not fit in 32 bits,
+    // so the 32-bit sums of each row are accumulated in 64-bit lanes.
+    for (int32_t j = 0; j < tr_width; j++) {
+      __m256i row_xx = _mm256_setzero_si256();
+      __m256i row_xy = _mm256_setzero_si256();
+      for (int32_t i = 0; i < tr_width; i += 16) {
+        __m256i luma_res_v = _mm256_loadu_si256((__m256i const*)(luma_residual + i + j * luma_stride));
+        __m256i chroma_res_v = _mm256_loadu_si256((__m256i const*)(chroma_residual + i + j * chroma_stride));
+        row_xx = _mm256_add_epi32(row_xx, _mm256_madd_epi16(luma_res_v, luma_res_v));
+        row_xy = _mm256_add_epi32(row_xy, _mm256_madd_epi16(luma_res_v, chroma_res_v));
+      }
+      v_ss_xx = _mm256_add_epi64(v_ss_xx, _mm256_cvtepi32_epi64(_mm256_castsi256_si128(row_xx)));
+      v_ss_xx = _mm256_add_epi64(v_ss_xx, _mm256_cvtepi32_epi64(_mm256_extracti128_si256(row_xx, 1)));
+      v_ss_xy = _mm256_add_epi64(v_ss_xy, _mm256_cvtepi32_epi64(_mm256_castsi256_si128(row_xy)));
+      v_ss_xy = _mm256_add_epi64(v_ss_xy, _mm256_cvtepi32_epi64(_mm256_extracti128_si256(row_xy, 1)));
+    }
+
+    int64_t sums[2][4];
+    _mm256_storeu_si256((__m256i *)sums[0], v_ss_xx);
+    _mm256_storeu_si256((__m256i *)sums[1], v_ss_xy);
+    ss_xx += sums[0][0] + sums[0][1] + sums[0][2] + sums[0][3];
+    ss_xy += sums[1][0] + sums[1][1] + sums[1][2] + sums[1][3];
+#endif
   }
 
   int8_t alpha = 0;
@@ -786,10 +906,10 @@ static bool cross_component_prediction_rdo_avx2(encoder_state_t *const state,
   cu_info_t *const cur_cu, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
-  const uint8_t *const pred_in, uint8_t *const rec_out,
+  const kvz_pixel *const pred_in, kvz_pixel *const rec_out,
   int16_t *const luma_residual_cross_comp[2], int16_t* const residual,
   coeff_t *const coeff_out, const bool allow_cross_component_prediction,
-  const int width, const uint8_t* const ref_in)
+  const int width, const kvz_pixel* const ref_in)
 {
   if (!allow_cross_component_prediction) {
     return false;
@@ -940,8 +1060,8 @@ static FORCE_INLINE int quantize_residual_avx2_impl(encoder_state_t *const state
   cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
-  const uint8_t *const ref_in, const uint8_t *const pred_in,
-  uint8_t *rec_out, coeff_t *coeff_out,
+  const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
+  kvz_pixel *rec_out, coeff_t *coeff_out,
   bool early_skip, int16_t* luma_residual_cross_comp[2],
   const bool ccp_enabled)
 {
@@ -1073,8 +1193,8 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   cu_info_t *const cur_cu, const int width, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
-  const uint8_t *const ref_in, const uint8_t *const pred_in,
-  uint8_t *rec_out, coeff_t *coeff_out,
+  const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
+  kvz_pixel *rec_out, coeff_t *coeff_out,
   bool early_skip, int16_t* luma_residual_cross_comp[2])
 {
   if (state->encoder_control->cfg.enable_cross_component_prediction) {
@@ -1148,8 +1268,6 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
     }
   }
 }
-
-#endif // KVZ_BIT_DEPTH == 8
 
 static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
 {
@@ -1255,13 +1373,15 @@ static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
 
     __m256i level_double = _mm256_loadu_si256((__m256i const*)coef_array);
 
-    __m256i abs_level_double = _mm256_abs_epi16(level_double);
-
-    __m256i levels_mul_q_low = _mm256_mullo_epi16(abs_level_double, q);
-    __m256i levels_mul_q_high = _mm256_mulhi_epi16(abs_level_double, q);
+    // abs(level) * q is computed as level * q with the sign of level removed:
+    // the signed 16-bit multiply cannot take abs(-32768) = 32768 as an input.
+    __m256i levels_mul_q_low = _mm256_mullo_epi16(level_double, q);
+    __m256i levels_mul_q_high = _mm256_mulhi_epi16(level_double, q);
 
     __m256i levels_mul_0 = _mm256_unpacklo_epi16(levels_mul_q_low, levels_mul_q_high);
     __m256i levels_mul_1 = _mm256_unpackhi_epi16(levels_mul_q_low, levels_mul_q_high);
+    levels_mul_0 = _mm256_sign_epi32(levels_mul_0, _mm256_unpacklo_epi16(level_double, level_double));
+    levels_mul_1 = _mm256_sign_epi32(levels_mul_1, _mm256_unpackhi_epi16(level_double, level_double));
 
     __m256i min_mask = _mm256_cmpgt_epi32(min_q_bits, levels_mul_0);
     levels_mul_0 = _mm256_blendv_epi8(min_q_bits, levels_mul_0, min_mask);
@@ -1304,12 +1424,12 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
   bool success = true;
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
-#if KVZ_BIT_DEPTH == 8
-  if (bitdepth == 8) {
+  // The residual and reconstruction are compiled for the pixel type of
+  // KVZ_BIT_DEPTH, the bitdepth the encoder always uses.
+  if (bitdepth == KVZ_BIT_DEPTH) {
     success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
     success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
   }
-#endif // KVZ_BIT_DEPTH == 8
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
   success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);

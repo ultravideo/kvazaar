@@ -48,10 +48,15 @@
  *   Output rounding saturates like the generic CLIP.
  * - Inputs are transposed in 4x4 blocks on load (forward) or on store
  *   (inverse); for 4x4 transforms vld4/vst4 do the transpose.
- * - The strategies are registered for 8-bit only, so every pass shift is a
+ * - The strategies are registered only for the bitdepth the encoder is built
+ *   for (the encoder always passes KVZ_BIT_DEPTH), so every pass shift is a
  *   compile-time constant (template parameter) and the rounding shift and
  *   narrowing of each output fuse into one vrshrn_n (wrapping, forward) or
  *   vqrshrn_n (saturating, inverse) instruction.
+ * - The arithmetic does not depend on the bit depth: the forward passes are
+ *   exact in 32 bits for any int16 input and the inverse passes for any int16
+ *   coefficients, like the int32 arithmetic of the generic code. Only the
+ *   first forward and the second inverse shift change with the bit depth.
  */
 
 #include "strategies/strategies-cpp.h"
@@ -77,12 +82,12 @@ namespace {
 
 typedef int32x4_t v4;
 
-// Pass shifts for 8-bit input (kvz_g_convert_to_bit[N] is log2(N) - 2).
+// Pass shifts of dct-generic.c for KVZ_BIT_DEPTH (kvz_g_convert_to_bit[N] is log2(N) - 2).
 template <int N> constexpr int log2_minus2() { return N == 4 ? 0 : N == 8 ? 1 : N == 16 ? 2 : 3; }
-template <int N> constexpr int kFwdShift1 = log2_minus2<N>() + 1;
+template <int N> constexpr int kFwdShift1 = log2_minus2<N>() + 1 + (KVZ_BIT_DEPTH - 8);
 template <int N> constexpr int kFwdShift2 = log2_minus2<N>() + 8;
 constexpr int kInvShift1 = 7;
-constexpr int kInvShift2 = 12;
+constexpr int kInvShift2 = 12 - (KVZ_BIT_DEPTH - 8);
 
 // 32-bit copies of the forward basis, so a row segment loads as a coefficient vector.
 int32_t t4[4][4], t8[8][8], t16[16][16], t32[32][32];
@@ -460,7 +465,7 @@ template <> struct Dct<32> {
 template <int N>
 void dct_nxn_neon(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  (void)bitdepth; // registered for 8-bit only
+  (void)bitdepth; // registered for KVZ_BIT_DEPTH only
   int16_t tmp[N * N];
   fwd_pass<N, Dct<N>::template fwd<kFwdShift1<N>>>(input, tmp);
   fwd_pass<N, Dct<N>::template fwd<kFwdShift2<N>>>(tmp, output);
@@ -502,7 +507,9 @@ int kvz_strategy_register_dct_neon(void* opaque, uint8_t bitdepth)
   bool success = true;
 
 #if COMPILE_ARM_NEON
-  if (bitdepth == 8) {
+  // The pass shifts are compile-time constants for KVZ_BIT_DEPTH, which is the
+  // bitdepth the encoder always uses.
+  if (bitdepth == KVZ_BIT_DEPTH) {
     init_tables();
     success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "neon", 40, KVZ_STRATEGY_FPTR(fast_forward_dst_4x4_neon));
     success &= kvz_strategyselector_register(opaque, "dct_4x4", "neon", 40, KVZ_STRATEGY_FPTR(dct_nxn_neon<4>));

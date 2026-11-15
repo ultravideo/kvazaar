@@ -54,6 +54,9 @@
     <ClCompile Include="..\..\tests\simd_intra_sao_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\simd_quant_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\strategy_diff_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
