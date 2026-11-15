@@ -878,6 +878,15 @@ static void satd_any_size_quad_hbd_neon(int width, int height,
                                         const kvz_pixel *orig, const int orig_stride,
                                         unsigned /* num_modes */, unsigned *costs_out, int8_t * /* valid */)
 {
+  // The generic quad SATD used to count the 4-high first row twice and to skip
+  // the last 4 rows when the height is not a multiple of 8; satd_any_size
+  // handles those sizes correctly.
+  if (height % 8 != 0) {
+    for (int i = 0; i < 4; i++) {
+      costs_out[i] = satd_any_size_hbd_neon(width, height, preds[i], stride, orig, orig_stride);
+    }
+    return;
+  }
   unsigned sums[4] = { 0 };
   const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };
   const kvz_pixel *orig_ptr = orig;
@@ -1794,6 +1803,15 @@ static void satd_any_size_quad_neon(int width, int height,
                                     const kvz_pixel *orig, const int orig_stride,
                                     unsigned num_modes, unsigned *costs_out, int8_t *valid)
 {
+  // The generic quad SATD used to count the 4-high first row twice and to skip
+  // the last 4 rows when the height is not a multiple of 8; satd_any_size
+  // handles those sizes correctly.
+  if (height % 8 != 0) {
+    for (int i = 0; i < 4; i++) {
+      costs_out[i] = satd_any_size_neon(width, height, preds[i], stride, orig, orig_stride);
+    }
+    return;
+  }
   unsigned sums[4] = { 0 };
   const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };
   const kvz_pixel *orig_ptr = orig;

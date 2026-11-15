@@ -1065,6 +1065,15 @@ static void satd_any_size_quad_hbd_avx2(int width, int height,
                                         const kvz_pixel *orig, const int orig_stride,
                                         unsigned /* num_modes */, unsigned *costs_out, int8_t * /* valid */)
 {
+  // The generic quad SATD used to count the 4-high first row twice and to skip
+  // the last 4 rows when the height is not a multiple of 8; satd_any_size
+  // handles those sizes correctly.
+  if (height % 8 != 0) {
+    for (int i = 0; i < 4; i++) {
+      costs_out[i] = satd_any_size_hbd_avx2(width, height, preds[i], stride, orig, orig_stride);
+    }
+    return;
+  }
   if (width == height) {
     switch (width) {
       case  8: satd_quad_square_hbd_avx2< 8>(preds, stride, orig, orig_stride, costs_out); return;
@@ -2027,6 +2036,13 @@ void satd_quad_square_avx2(const kvz_pixel *const *preds, const int stride,
       unsigned *costs_out, \
       int8_t *valid) \
   { \
+    /* Heights that are not multiples of 8 as satd_any_size (see the HBD version). */ \
+    if (height % 8 != 0) { \
+      for (int i = 0; i < num_parallel_blocks; i++) { \
+        costs_out[i] = satd_any_size_8bit_avx2(width, height, preds[i], stride, orig, orig_stride); \
+      } \
+      return; \
+    } \
     if (num_parallel_blocks == 4 && width == height) { \
       switch (width) { \
         case  8: satd_quad_square_avx2< 8>(preds, stride, orig, orig_stride, costs_out); return; \

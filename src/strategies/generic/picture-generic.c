@@ -373,49 +373,38 @@ SATD_DUAL_NXN(64, kvz_pixel)
     const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
     const kvz_pixel *orig_ptr = orig; \
     costs_out[0] = 0; costs_out[1] = 0; costs_out[2] = 0; costs_out[3] = 0; \
-    const int width_mod_8 = width % 8; \
-    if (width_mod_8 != 0) { \
-      const kvz_pixel *pred_ptrs_tmp[4] = { preds[0], preds[1], preds[2], preds[3] };\
+    /* Like SATD_ANY_SIZE: a 4-wide first column, a 4-high first row of the */ \
+    /* remaining columns and 8x8 blocks for the rest. */ \
+    if (width % 8 != 0) { \
       /* Process the first column using 4x4 blocks. */ \
       for (int y = 0; y < height; y += 4) { \
-        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs_tmp, stride, &orig[y*orig_stride], orig_stride, sums); \
-        for(int blk = 0; blk < num_parallel_blocks; ++blk){ pred_ptrs_tmp[blk] += 4*stride; costs_out[blk] += sums[blk]; }\
+        const kvz_pixel *pred_ptrs_tmp[4] = { pred_ptrs[0] + y * stride, pred_ptrs[1] + y * stride, \
+                                              pred_ptrs[2] + y * stride, pred_ptrs[3] + y * stride }; \
+        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs_tmp, stride, &orig_ptr[y * orig_stride], orig_stride, sums); \
+        for (int blk = 0; blk < num_parallel_blocks; ++blk) { costs_out[blk] += sums[blk]; } \
       } \
-      for(int blk = 0; blk < num_parallel_blocks; ++blk){\
-        pred_ptrs[blk] += 4; \
-      }\
+      for (int blk = 0; blk < num_parallel_blocks; ++blk) { pred_ptrs[blk] += 4; } \
+      orig_ptr += 4; \
       width -= 4; \
     } \
     if (height % 8 != 0) { \
-      const kvz_pixel *pred_ptrs_tmp[4] = { preds[0], preds[1], preds[2], preds[3] };\
       /* Process the first row using 4x4 blocks. */ \
-      for (int x = 0; x < width; x += 4 ) { \
+      for (int x = 0; x < width; x += 4) { \
+        const kvz_pixel *pred_ptrs_tmp[4] = { pred_ptrs[0] + x, pred_ptrs[1] + x, pred_ptrs[2] + x, pred_ptrs[3] + x }; \
         kvz_satd_4x4_subblock_ ## suffix(pred_ptrs_tmp, stride, &orig_ptr[x], orig_stride, sums); \
-        for(int blk = 0; blk < num_parallel_blocks; ++blk){ pred_ptrs_tmp[blk] += 4;  costs_out[blk] += sums[blk]; }\
+        for (int blk = 0; blk < num_parallel_blocks; ++blk) { costs_out[blk] += sums[blk]; } \
       } \
-      for(int blk = 0; blk < num_parallel_blocks; ++blk){\
-        pred_ptrs[blk] += 4 * stride; \
-      }\
+      for (int blk = 0; blk < num_parallel_blocks; ++blk) { pred_ptrs[blk] += 4 * stride; } \
+      orig_ptr += 4 * orig_stride; \
       height -= 4; \
     } \
     /* The rest can now be processed with 8x8 blocks. */ \
-    for (int y = height % 8; y < height; y += 8) { \
-      orig_ptr = &orig[y * orig_stride + width_mod_8]; \
-      pred_ptrs[0] = &preds[0][y * stride + width_mod_8]; \
-      pred_ptrs[1] = &preds[1][y * stride + width_mod_8]; \
-      pred_ptrs[2] = &preds[2][y * stride + width_mod_8]; \
-      pred_ptrs[3] = &preds[3][y * stride + width_mod_8]; \
-      for (int x = width_mod_8; x < width; x += 8) { \
-        satd_8x8_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
-        orig_ptr += 8; \
-        pred_ptrs[0] += 8; \
-        pred_ptrs[1] += 8; \
-        pred_ptrs[2] += 8; \
-        pred_ptrs[3] += 8; \
-        costs_out[0] += sums[0]; \
-        costs_out[1] += sums[1]; \
-        costs_out[2] += sums[2]; \
-        costs_out[3] += sums[3]; \
+    for (int y = 0; y < height; y += 8) { \
+      for (int x = 0; x < width; x += 8) { \
+        const kvz_pixel *pred_ptrs_tmp[4] = { pred_ptrs[0] + y * stride + x, pred_ptrs[1] + y * stride + x, \
+                                              pred_ptrs[2] + y * stride + x, pred_ptrs[3] + y * stride + x }; \
+        satd_8x8_subblock_ ## suffix(pred_ptrs_tmp, stride, &orig_ptr[y * orig_stride + x], orig_stride, sums); \
+        for (int blk = 0; blk < num_parallel_blocks; ++blk) { costs_out[blk] += sums[blk]; } \
       } \
     } \
     for(int i = 0; i < num_parallel_blocks; ++i){\

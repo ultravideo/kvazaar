@@ -255,6 +255,35 @@ TEST ss_test_satd_any_size_quad(void)
   PASS();
 }
 
+// The quad SATD of each prediction must equal the single any-size SATD, also
+// for sizes that are not multiples of 8 (the asymmetric partitions).
+TEST ss_test_satd_quad_matches_single(void)
+{
+  cost_pixel_any_size_multi_func *quad = ss_find("satd_any_size_quad", "generic");
+  cost_pixel_any_size_func *single = ss_find("satd_any_size", "generic");
+  if (!quad || !single) SKIPm("no generic satd_any_size");
+  for (int mode = 0; mode < SS_NUM_MODES; ++mode) {
+    ss_fill_all(mode);
+    for (int w = 4; w <= 64; w += 4) {
+      for (int h = 4; h <= 64; h += 4) {
+        const kvz_pixel *preds[4];
+        for (int k = 0; k < 4; ++k) preds[k] = ss_p[k] + SS_ORIGIN + k;
+        int8_t valid[4] = { 1, 1, 1, 1 };
+        unsigned costs[4] = { 0 };
+        quad(w, h, preds, 67, ss_a + SS_ORIGIN, SS_STRIDE, 4, costs, valid);
+        for (int k = 0; k < 4; ++k) {
+          const unsigned expected = single(w, h, preds[k], 67, ss_a + SS_ORIGIN, SS_STRIDE);
+          if (costs[k] != expected) {
+            printf("\n    w=%d h=%d pred=%d mode=%d quad=%u single=%u\n", w, h, k, mode, costs[k], expected);
+            FAILm("quad SATD differs from satd_any_size");
+          }
+        }
+      }
+    }
+  }
+  PASS();
+}
+
 TEST ss_test_bilinear_ssd(void)
 {
   bilinear_ssd_func *ref = ss_ref, *opt = ss_cur->fptr;
@@ -420,6 +449,7 @@ TEST ss_test_tf_filter_block(void)
 
 SUITE(simd_satd_tests)
 {
+  RUN_TEST(ss_test_satd_quad_matches_single);
   for (volatile unsigned i = 0; i < strategies.count; ++i) {
     ss_cur = &strategies.strategies[i];
     if (strcmp(ss_cur->strategy_name, "generic") == 0) continue;
