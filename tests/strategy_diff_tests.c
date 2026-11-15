@@ -69,24 +69,25 @@ static uint32_t rnd(void)
   return rng_state >> 8;
 }
 
-// mode 0: random, mode 1: random 0/255, mode 2: a=255 and b=0 (maximum differences).
+// mode 0: random, mode 1: random 0/PIXEL_MAX, mode 2: a=PIXEL_MAX and b=0 (maximum
+// differences). The pixels use the full range of KVZ_BIT_DEPTH.
 static void fill(int mode)
 {
   for (int i = 0; i < BUF_SIZE; ++i) {
     if (mode == 0) {
-      buf_a[i] = (kvz_pixel)(rnd() & 0xFF);
-      buf_b[i] = (kvz_pixel)(rnd() & 0xFF);
+      buf_a[i] = (kvz_pixel)(rnd() & PIXEL_MAX);
+      buf_b[i] = (kvz_pixel)(rnd() & PIXEL_MAX);
     } else if (mode == 1) {
-      buf_a[i] = (rnd() & 1) ? 255 : 0;
-      buf_b[i] = (rnd() & 1) ? 255 : 0;
+      buf_a[i] = (rnd() & 1) ? PIXEL_MAX : 0;
+      buf_b[i] = (rnd() & 1) ? PIXEL_MAX : 0;
     } else {
-      buf_a[i] = 255;
+      buf_a[i] = PIXEL_MAX;
       buf_b[i] = 0;
     }
   }
   for (int k = 0; k < 4; ++k) {
     for (int i = 0; i < 64 * 64 + 1024; ++i) {
-      pred_mem[k][i] = mode == 2 ? 0 : (kvz_pixel)(rnd() & 0xFF);
+      pred_mem[k][i] = mode == 2 ? 0 : (kvz_pixel)(rnd() & PIXEL_MAX);
     }
   }
 }
@@ -119,8 +120,8 @@ TEST test_pixel_var(void)
   static const uint32_t lens[] = { 1, 15, 16, 17, 1024, 4096, 4096 + 7, 352 * 288, VAR_LEN };
   for (int mode = 0; mode < 3; ++mode) {
     for (uint32_t i = 0; i < VAR_LEN; ++i) {
-      var_buf[i] = mode == 0 ? (kvz_pixel)(rnd() & 0xFF) :
-                   mode == 1 ? ((rnd() & 1) ? 255 : 0) : 255;
+      var_buf[i] = mode == 0 ? (kvz_pixel)(rnd() & PIXEL_MAX) :
+                   mode == 1 ? ((rnd() & 1) ? PIXEL_MAX : 0) : PIXEL_MAX;
     }
     for (unsigned li = 0; li < sizeof(lens) / sizeof(lens[0]); ++li) {
       const double r = ref(var_buf, lens[li]);
@@ -272,7 +273,7 @@ static ALIGNED(32) int16_t tr_in[32 * 32];
 static ALIGNED(32) int16_t tr_ref[32 * 32];
 static ALIGNED(32) int16_t tr_opt[32 * 32];
 
-// Forward transforms take 8-bit residuals (|x| <= 255). Inverse transforms take
+// Forward transforms take residuals of KVZ_BIT_DEPTH bits (|x| <= PIXEL_MAX). Inverse transforms take
 // dequantized coefficients, which dequant clips to the full int16 range, so
 // they are tested there, including all-extreme blocks that saturate.
 TEST test_transform(void)
@@ -288,8 +289,9 @@ TEST test_transform(void)
       for (int i = 0; i < n * n; ++i) {
         int v;
         if (!inverse) {
-          v = mode == 0 ? (int)(rnd() % 511) - 255 : mode == 1 ? ((rnd() & 1) ? 255 : -255) :
-              mode == 2 ? 255 : mode == 3 ? -255 : ((i ^ (i >> 3)) & 1 ? 255 : -255);
+          v = mode == 0 ? (int)(rnd() % (2 * PIXEL_MAX + 1)) - PIXEL_MAX :
+              mode == 1 ? ((rnd() & 1) ? PIXEL_MAX : -PIXEL_MAX) :
+              mode == 2 ? PIXEL_MAX : mode == 3 ? -PIXEL_MAX : ((i ^ (i >> 3)) & 1 ? PIXEL_MAX : -PIXEL_MAX);
         } else {
           v = mode == 0 ? (int)(rnd() & 0xFFFF) - 32768 : mode == 1 ? ((rnd() & 1) ? 32767 : -32768) :
               mode == 2 ? 32767 : mode == 3 ? -32768 : (int)(rnd() % 2001) - 1000;
@@ -298,8 +300,8 @@ TEST test_transform(void)
       }
       memset(tr_ref, 0x55, sizeof(tr_ref));
       memset(tr_opt, 0x55, sizeof(tr_opt));
-      ref(8, tr_in, tr_ref);
-      opt(8, tr_in, tr_opt);
+      ref(KVZ_BIT_DEPTH, tr_in, tr_ref);
+      opt(KVZ_BIT_DEPTH, tr_in, tr_opt);
       for (int i = 0; i < n * n; ++i) {
         if (tr_ref[i] != tr_opt[i]) {
           printf("\n    %s:%s mode=%d trial=%d idx=%d ref=%d opt=%d\n", cur->type,
