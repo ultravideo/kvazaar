@@ -673,9 +673,10 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
     const unsigned offset_chroma = (SUB_SCU(pu_y) >> shift_h) * lcu_w_c + (SUB_SCU(pu_x) >> shift_w);
     yuv_t lcu_adapter;
     lcu_adapter.size = pu_w * pu_h;
-    lcu_adapter.y = lcu->rec.y + offset_luma,
-    lcu_adapter.u = lcu->rec.u + offset_chroma,
-    lcu_adapter.v = lcu->rec.v + offset_chroma,
+    lcu_adapter.y = lcu->rec.y + offset_luma;
+    // There are no chroma buffers in 4:0:0.
+    lcu_adapter.u = lcu->rec.u ? lcu->rec.u + offset_chroma : NULL;
+    lcu_adapter.v = lcu->rec.v ? lcu->rec.v + offset_chroma : NULL;
 
     inter_recon_unipred(state,
       ref,

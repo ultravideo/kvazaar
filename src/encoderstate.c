@@ -443,7 +443,8 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
       const int lcu_y = (lcu->position_px.y + y) >> LOG2_LCU_WIDTH;
       const int lcu_index = lcu_x + lcu_y * frame->width_in_lcu;
       const sao_info_t *sao_luma   = &frame->sao_luma[lcu_index];
-      const sao_info_t *sao_chroma = &frame->sao_chroma[lcu_index];
+      // There is no chroma SAO info in 4:0:0.
+      const sao_info_t *sao_chroma = frame->sao_chroma ? &frame->sao_chroma[lcu_index] : NULL;
 
       if (!chroma_only) {
         kvz_sao_reconstruct(state,
@@ -723,7 +724,10 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Encode SAO
   state->cabac.update = 1;
   if (encoder->cfg.sao_type) {
-    encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
+    const int lcu_index = lcu->position.y * frame->width_in_lcu + lcu->position.x;
+    // There is no chroma SAO info in 4:0:0.
+    encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu_index],
+               frame->sao_chroma ? &frame->sao_chroma[lcu_index] : NULL);
   }
 
   //Encode coding tree
