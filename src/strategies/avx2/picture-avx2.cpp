@@ -444,21 +444,17 @@ void satd_quad_square_hbd_avx2(const kvz_pixel *const *preds, const int stride,
                                const kvz_pixel *orig, const int orig_stride,
                                unsigned *costs_out)
 {
-  unsigned c0 = 0, c1 = 0, c2 = 0, c3 = 0;
-  for (int y = 0; y < N; y += 8) {
-    for (int x = 0; x < N; x += 8) {
-      const int p = y * stride + x;
-      const kvz_pixel *o = orig + y * orig_stride + x;
-      unsigned s0, s1, s2, s3;
-      satd_8x8_subblock_dual_hbd_avx2(preds[0] + p, preds[1] + p, stride, o, orig_stride, &s0, &s1);
-      satd_8x8_subblock_dual_hbd_avx2(preds[2] + p, preds[3] + p, stride, o, orig_stride, &s2, &s3);
-      c0 += s0; c1 += s1; c2 += s2; c3 += s3;
+  if constexpr (N == 8) {
+    unsigned c[4];
+    satd_8x8_subblock_dual_hbd_avx2(preds[0], preds[1], stride, orig, orig_stride, &c[0], &c[1]);
+    satd_8x8_subblock_dual_hbd_avx2(preds[2], preds[3], stride, orig, orig_stride, &c[2], &c[3]);
+    for (int k = 0; k < 4; ++k) costs_out[k] = c[k] >> (KVZ_BIT_DEPTH - 8);
+  } else {
+    // Two horizontally adjacent blocks of a prediction at a time.
+    for (int k = 0; k < 4; ++k) {
+      costs_out[k] = satd_8x8_blocks_hbd_avx2(N, N, preds[k], stride, orig, orig_stride) >> (KVZ_BIT_DEPTH - 8);
     }
   }
-  costs_out[0] = c0 >> (KVZ_BIT_DEPTH - 8);
-  costs_out[1] = c1 >> (KVZ_BIT_DEPTH - 8);
-  costs_out[2] = c2 >> (KVZ_BIT_DEPTH - 8);
-  costs_out[3] = c3 >> (KVZ_BIT_DEPTH - 8);
 }
 
 /* Follows satd_any_size_quad_generic step by step, so the results are
