@@ -617,6 +617,10 @@ if(NOT DEFINED MSVC)
     add_test( NAME test_invalid_input COMMAND ${PROJECT_SOURCE_DIR}/tests/test_invalid_input.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()
 
+  if(NOT "test_scaling_list.sh" IN_LIST XFAIL)
+    add_test( NAME test_scaling_list COMMAND ${PROJECT_SOURCE_DIR}/tests/test_scaling_list.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+
   if(NOT "test_slices.sh" IN_LIST XFAIL)
     add_test( NAME test_slices COMMAND ${PROJECT_SOURCE_DIR}/tests/test_slices.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()

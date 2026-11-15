@@ -89,21 +89,14 @@ void kvz_scalinglist_init(scaling_list_t * const scaling_list)
 
   for (sizeId = 0; sizeId < 4; sizeId++) {
     for (listId = 0; listId < kvz_g_scaling_list_num[sizeId]; listId++) {
+      // The 32x32 lists 1, 2, 4 and 5 are the chroma lists of 4:4:4.
       for (qp = 0; qp < 6; qp++) {
-        if (!(sizeId == 3 && listId == 3)) {
-          scaling_list->quant_coeff[sizeId][listId][qp]    = (coeff_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
-          scaling_list->de_quant_coeff[sizeId][listId][qp] = (coeff_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
-          scaling_list->error_scale[sizeId][listId][qp]    = (double*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(double));
-        }
+        scaling_list->quant_coeff[sizeId][listId][qp]    = (int32_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(int32_t));
+        scaling_list->de_quant_coeff[sizeId][listId][qp] = (coeff_t*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(coeff_t));
+        scaling_list->error_scale[sizeId][listId][qp]    = (double*)calloc(kvz_g_scaling_list_size[sizeId], sizeof(double));
       }
-      scaling_list->scaling_list_coeff[sizeId][listId] = (coeff_t*)calloc(MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[sizeId]), sizeof(int32_t));
+      scaling_list->scaling_list_coeff[sizeId][listId] = (coeff_t*)calloc(MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[sizeId]), sizeof(coeff_t));
     }
-  }
-  // alias, assign pointer to an existing array
-  for (qp = 0; qp < 6; qp++) {
-    scaling_list->quant_coeff[3][3][qp]    = scaling_list->quant_coeff[3][1][qp];
-    scaling_list->de_quant_coeff[3][3][qp] = scaling_list->de_quant_coeff[3][1][qp];
-    scaling_list->error_scale[3][3][qp]    = scaling_list->error_scale[3][1][qp];
   }
   
   //Initialize dc (otherwise we switch on undef in kvz_scalinglist_set)
@@ -128,11 +121,9 @@ void kvz_scalinglist_destroy(scaling_list_t * const scaling_list)
   for (sizeId = 0; sizeId < 4; sizeId++) {
     for (listId = 0; listId < kvz_g_scaling_list_num[sizeId]; listId++) {
       for (qp = 0; qp < 6; qp++) {
-        if (!(sizeId == 3 && listId == 3)) {
-          FREE_POINTER(scaling_list->quant_coeff[sizeId][listId][qp]);
-          FREE_POINTER(scaling_list->de_quant_coeff[sizeId][listId][qp]);
-          FREE_POINTER(scaling_list->error_scale[sizeId][listId][qp]);
-        }
+        FREE_POINTER(scaling_list->quant_coeff[sizeId][listId][qp]);
+        FREE_POINTER(scaling_list->de_quant_coeff[sizeId][listId][qp]);
+        FREE_POINTER(scaling_list->error_scale[sizeId][listId][qp]);
       }
       FREE_POINTER(scaling_list->scaling_list_coeff[sizeId][listId]);
     }
@@ -169,8 +160,9 @@ int kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp)
       "INTER16X16_CHROMAV"
     },
     {
-      "INTRA32X32_LUMA",
-      "INTER32X32_LUMA",
+      // The chroma lists of 4:4:4 are those of 16x16 (see kvz_scalinglist_process).
+      "INTRA32X32_LUMA", "", "",
+      "INTER32X32_LUMA", "", "",
     },
   };
   static const char matrix_type_dc[2][6][22] =
@@ -184,8 +176,8 @@ int kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp)
       "INTER16X16_CHROMAV_DC"
     },
     {
-      "INTRA32X32_LUMA_DC",
-      "INTER32X32_LUMA_DC",
+      "INTRA32X32_LUMA_DC", "", "",
+      "INTER32X32_LUMA_DC", "", "",
     },
   };
 
@@ -195,12 +187,13 @@ int kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp)
     uint32_t size = MIN(MAX_MATRIX_COEF_NUM, (int32_t)kvz_g_scaling_list_size[size_id]);
     //const uint32_t * const scan = (size_id == 0) ? kvz_g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
 
-    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id++) {
+    // 32x32 has only the luma lists 0 and 3.
+    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id += (size_id == SCALING_LIST_32x32) ? 3 : 1) {
       int found;
       uint32_t i;
       int32_t data;
       //This IS valid (our pointer is dynamically allocated in kvz_scalinglist_init)
-      int32_t *coeff = (int32_t*) scaling_list->scaling_list_coeff[size_id][list_id];
+      coeff_t *coeff = (coeff_t*) scaling_list->scaling_list_coeff[size_id][list_id];
       char line[LINE_BUFSIZE + 1] = { 0 }; // +1 for null-terminator
 
       // Go back for each matrix.
@@ -275,7 +268,8 @@ const coeff_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_
       if (list_id > 2) list_ptr = g_quant_inter_default_8x8;
       break;
     case SCALING_LIST_32x32:
-      if (list_id > 0) list_ptr = g_quant_inter_default_8x8;
+      // Lists 0 to 2 are intra and 3 to 5 inter, as for the other sizes.
+      if (list_id > 2) list_ptr = g_quant_inter_default_8x8;
       break;
   }
   return list_ptr;
@@ -315,7 +309,7 @@ static void scalinglist_process_dec(const coeff_t * const coeff, coeff_t *dequan
  * \brief get scaling list for encoder
  *
  */
-void kvz_scalinglist_process_enc(const coeff_t * const coeff, coeff_t * quantcoeff, const int32_t quant_scales,
+void kvz_scalinglist_process_enc(const coeff_t * const coeff, int32_t * quantcoeff, const int32_t quant_scales,
                              const uint32_t height, const uint32_t width, const uint32_t ratio, 
                              const int32_t size_num, const uint32_t dc, const uint8_t flat)
 {
@@ -354,7 +348,7 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const s
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - bitdepth - log2_tr_size;  // Represents scaling through forward transform
 
   uint32_t i,max_num_coeff  = kvz_g_scaling_list_size[size];
-  const coeff_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
+  const int32_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
   //This cast is allowed, since error_scale is a malloc'd pointer in kvz_scalinglist_init
   double *err_scale         = (double *) scaling_list->error_scale[size][list][qp];
 
@@ -379,7 +373,7 @@ void kvz_scalinglist_set(scaling_list_t * const scaling_list, const coeff_t* con
   const uint32_t ratio  = g_scaling_list_size_x[sizeId] / MIN(8, g_scaling_list_size_x[sizeId]);
   const uint32_t dc = scaling_list->scaling_list_dc[sizeId][listId] != 0 ? scaling_list->scaling_list_dc[sizeId][listId] : 16;
   //These cast are allowed, since these are pointer's to malloc'd area in kvz_scalinglist_init
-  coeff_t*quantcoeff   = (coeff_t*) scaling_list->quant_coeff[sizeId][listId][qp];
+  int32_t*quantcoeff   = (int32_t*) scaling_list->quant_coeff[sizeId][listId][qp];
   coeff_t*dequantcoeff = (coeff_t*) scaling_list->de_quant_coeff[sizeId][listId][qp];
 
   // Encoder list
@@ -410,13 +404,31 @@ void kvz_scalinglist_process(scaling_list_t * const scaling_list, uint8_t bitdep
 
   for (size = 0; size < SCALING_LIST_SIZE_NUM; size++) {
     for (list = 0; list < kvz_g_scaling_list_num[size]; list++) {
+      // The 32x32 chroma lists, used in 4:4:4, are not coded: they are the
+      // 16x16 lists with their DC (ChromaArrayType == 3 in H.265 7.4.5).
+      const uint32_t coded_size = (size == SCALING_LIST_32x32 && list % 3 != 0) ? SCALING_LIST_16x16 : size;
       const coeff_t* const list_ptr = scaling_list->use_default_list ?
-                                       kvz_scalinglist_get_default(size, list) :
-                                       scaling_list->scaling_list_coeff[size][list];
+                                       kvz_scalinglist_get_default(coded_size, list) :
+                                       scaling_list->scaling_list_coeff[coded_size][list];
+      scaling_list->scaling_list_dc[size][list] = scaling_list->scaling_list_dc[coded_size][list];
 
       for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
         kvz_scalinglist_set(scaling_list, list_ptr, list, size, qp);
         scalinglist_set_err_scale(bitdepth, scaling_list, list, size, qp);
+      }
+    }
+  }
+
+  // Lists that share their tables (see kvz_scalinglist_init) share the flag.
+  for (size = 0; size < SCALING_LIST_SIZE_NUM; size++) {
+    for (list = 0; list < kvz_g_scaling_list_num[size]; list++) {
+      for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
+        const int32_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
+        uint8_t fits = 1;
+        for (uint32_t i = 0; i < kvz_g_scaling_list_size[size]; i++) {
+          if (quantcoeff[i] > INT16_MAX) fits = 0;
+        }
+        scaling_list->quant_coeff_fits_16bit[size][list][qp] = fits;
       }
     }
   }

@@ -87,14 +87,9 @@ static void *find_generic(const char *type)
 
 // Scaling lists: flat (off), the default lists, custom lists with entries of
 // 13 to 255 and custom lists with entries of 1 to 255. With entries below 13
-// the quantization scales (16 * 26214 / entry) do not fit in the int16 tables
-// and wrap, possibly to negative values; the coefficient functions are tested
-// with those too.
+// the quantization scales (16 * 26214 / entry) do not fit in 16 bits, which
+// the SIMD functions handle separately.
 #define NUM_SL 4
-// kvz_rdoq with sign hiding reads uninitialized values with the wrapped
-// scales, so its results are not deterministic and quantize_residual is
-// tested only with the first three.
-#define NUM_SL_RDOQ 3
 static encoder_control_t enc[NUM_SL];
 static encoder_state_t st;
 static encoder_state_config_frame_t frame_cfg;
@@ -315,7 +310,7 @@ TEST test_find_last_scanpos(void)
     const int32_t sl_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
     const int32_t qp_scaled = kvz_get_scaled_qp(type, (int8_t)qp, QP_BD_OFFSET, true);
     const int32_t q_bits = 14 + qp_scaled / 6 + transform_shift;
-    const coeff_t *quant_coeff = e->scaling_list.quant_coeff[log2_size - 2][sl_type][qp_scaled % 6];
+    const int32_t *quant_coeff = e->scaling_list.quant_coeff[log2_size - 2][sl_type][qp_scaled % 6];
     const uint32_t *scan = kvz_g_sig_last_scan[scan_mode][log2_size - 1];
     const uint32_t cg_num = n >> 4;
 
@@ -447,7 +442,7 @@ TEST test_quantize_residual(void)
 {
   quant_residual_func *ref = ref_fn, *opt = cur->fptr;
   for (int trial = 0; trial < 1200; ++trial) {
-    const int sl = trial % NUM_SL_RDOQ;
+    const int sl = trial % NUM_SL;
     encoder_control_t *e = &enc[sl];
     const int width = 4 << (rnd() % 4);
     const int mode = rnd() % NUM_PIXEL_MODES;

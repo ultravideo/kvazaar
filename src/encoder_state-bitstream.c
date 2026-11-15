@@ -221,20 +221,26 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
-    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id++) {
+    // 32x32 has only the luma lists 0 and 3 (matrixId += 3 in H.265 7.3.4).
+    const int32_t list_step = (size_id == SCALING_LIST_32x32) ? 3 : 1;
+    const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[size_id]);
+    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id += list_step) {
       uint8_t scaling_list_pred_mode_flag = 1;
       int32_t pred_list_idx;
       int32_t i;
       uint32_t ref_matrix_id = UINT32_MAX;
 
-      for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
-        const coeff_t* const pred_list  = (list_id == pred_list_idx) ?
+      for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx -= list_step) {
+        // A delta of 0 refers to the default list, whose DC is 16.
+        const bool is_default = list_id == pred_list_idx;
+        const coeff_t* const pred_list  = is_default ?
                                      kvz_scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
+        const int32_t pred_dc = is_default ? 16 : encoder->scaling_list.scaling_list_dc[size_id][pred_list_idx];
 
-        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, kvz_g_scaling_list_size[size_id])) &&
+        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(coeff_t) * coef_num) &&
             ((size_id < SCALING_LIST_16x16) ||
-             (encoder->scaling_list.scaling_list_dc[size_id][list_id] == encoder->scaling_list.scaling_list_dc[size_id][pred_list_idx]))) {
+             (encoder->scaling_list.scaling_list_dc[size_id][list_id] == pred_dc))) {
           ref_matrix_id = pred_list_idx;
           scaling_list_pred_mode_flag = 0;
           break;
@@ -243,10 +249,9 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
       WRITE_U(stream, scaling_list_pred_mode_flag, 1, "scaling_list_pred_mode_flag" );
 
       if (!scaling_list_pred_mode_flag) {
-        WRITE_UE(stream, list_id - ref_matrix_id, "scaling_list_pred_matrix_id_delta");
+        WRITE_UE(stream, (list_id - ref_matrix_id) / list_step, "scaling_list_pred_matrix_id_delta");
       } else {
         int32_t delta;
-        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[size_id]);
         const uint32_t * const scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
         const coeff_t* const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];

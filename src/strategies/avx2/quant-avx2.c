@@ -148,7 +148,7 @@ static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
   *min_pos = (int32_t)n;
 }
 
-static INLINE void scanord_read_vector_32(const coeff_t *__restrict quant_coeff,
+static INLINE void scanord_read_vector_32(const int32_t *__restrict quant_coeff,
                                           const uint32_t *__restrict scan,
                                           int8_t scan_mode,
                                           int32_t subpos,
@@ -186,14 +186,14 @@ static INLINE void scanord_read_vector_32(const coeff_t *__restrict quant_coeff,
     _mm256_setr_epi32(2, 6, 0, 4, 3, 7, 1, 5),
   };
 
-  coeff_t coeffs[16];
-  memcpy(coeffs, quant_coeff + row_offsets[0], sizeof(coeff_t) * 4);
-  memcpy(coeffs + 4, quant_coeff + row_offsets[1], sizeof(coeff_t) * 4);
-  memcpy(coeffs + 8, quant_coeff + row_offsets[2], sizeof(coeff_t) * 4);
-  memcpy(coeffs + 12, quant_coeff + row_offsets[3], sizeof(coeff_t) * 4);
+  int32_t coeffs[16];
+  memcpy(coeffs, quant_coeff + row_offsets[0], sizeof(int32_t) * 4);
+  memcpy(coeffs + 4, quant_coeff + row_offsets[1], sizeof(int32_t) * 4);
+  memcpy(coeffs + 8, quant_coeff + row_offsets[2], sizeof(int32_t) * 4);
+  memcpy(coeffs + 12, quant_coeff + row_offsets[3], sizeof(int32_t) * 4);
 
-  __m256i coeffs_upper = _mm256_cvtepi16_epi32(_mm_load_si128((__m128i const *)(coeffs)));
-  __m256i coeffs_lower = _mm256_cvtepi16_epi32(_mm_load_si128((__m128i const*)(coeffs + 8)));
+  __m256i coeffs_upper = _mm256_loadu_si256((__m256i const *)(coeffs));
+  __m256i coeffs_lower = _mm256_loadu_si256((__m256i const *)(coeffs + 8));
 
   __m256i lower_shuffled = _mm256_permutevar8x32_epi32(coeffs_lower, shufmasks[scan_mode]);
 
@@ -363,11 +363,18 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->cfg.chroma_format == KVZ_CSP_420);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const coeff_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
+  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
+
+  // The 32-bit products below need scales that fit in 16 bits. Custom scaling
+  // lists with entries below 13 give larger scales.
+  if (!encoder->scaling_list.quant_coeff_fits_16bit[log2_tr_size - 2][scalinglist_type][qp_scaled % 6]) {
+    kvz_quant_generic(state, coef, q_coef, width, height, type, scan_idx, block_type);
+    return;
+  }
 
   uint32_t ac_sum = 0;
   int32_t last_cg = -1;
@@ -388,8 +395,8 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
     v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
 
     if (state->encoder_control->scaling_list.enable) {
-      __m256i v_quant_coeff_lo = _mm256_cvtepi16_epi32(_mm_loadu_si128(((__m128i *)(quant_coeff + n)) + 0));
-      __m256i v_quant_coeff_hi = _mm256_cvtepi16_epi32(_mm_loadu_si128(((__m128i *)(quant_coeff + n)) + 1));
+      __m256i v_quant_coeff_lo = _mm256_loadu_si256((const __m256i *)(quant_coeff + n));
+      __m256i v_quant_coeff_hi = _mm256_loadu_si256((const __m256i *)(quant_coeff + n + 8));
 
       low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
                                          v_quant_coeff_hi,
@@ -1349,7 +1356,32 @@ static double fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t
   return (double)(temp) / 256.0;
 }
 
-static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
+/**
+ * \brief The generic search of one coefficient group, for groups whose
+ * scales do not fit in 16 bits.
+ * \return 1 if a non-zero level was found
+ */
+static int find_last_in_cg_scalar(const coeff_t *coef, coeff_t *dest_coeff, int8_t type, int32_t q_bits,
+  const int32_t *quant_coeff, struct kvz_sh_rates_t *sh_rates, uint16_t *ctx_set, const uint32_t *scan,
+  int32_t *cg_last_scanpos, int32_t *last_scanpos, int32_t cg_scanpos)
+{
+  for (int32_t scanpos = cg_scanpos * 16 + 15; scanpos >= cg_scanpos * 16; scanpos--) {
+    const uint32_t blkpos = scan[scanpos];
+    const int32_t level_double = (int32_t)MIN((int64_t)abs(coef[blkpos]) * quant_coeff[blkpos], MAX_INT - (1 << (q_bits - 1)));
+    const uint32_t max_abs_level = (level_double + (1 << (q_bits - 1))) >> q_bits;
+    if (max_abs_level > 0) {
+      *last_scanpos = scanpos;
+      *ctx_set = (scanpos > 0 && type == 0) ? 2 : 0;
+      *cg_last_scanpos = cg_scanpos;
+      sh_rates->sig_coeff_inc[blkpos] = 0;
+      return 1;
+    }
+    dest_coeff[blkpos] = 0;
+  }
+  return 0;
+}
+
+static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const int32_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
   uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode) {
 
   __m256i min_q_bits = _mm256_set1_epi32(MAX_INT - (1 << (q_bits - 1)));
@@ -1357,11 +1389,23 @@ static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
   for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
     int32_t scan_pos = *cg_scanpos * cg_size;
     int32_t block_pos = scan[scan_pos];
-    coeff_t q_array[16];
-    memcpy(q_array, &quant_coeff[block_pos], 4 * sizeof(coeff_t));
-    memcpy(q_array + 4, &quant_coeff[block_pos + width], 4 * sizeof(coeff_t));
-    memcpy(q_array + 8, &quant_coeff[block_pos + 2 * width], 4 * sizeof(coeff_t));
-    memcpy(q_array + 12, &quant_coeff[block_pos + 3 * width], 4 * sizeof(coeff_t));
+    int32_t q_array[16];
+    memcpy(q_array, &quant_coeff[block_pos], 4 * sizeof(int32_t));
+    memcpy(q_array + 4, &quant_coeff[block_pos + width], 4 * sizeof(int32_t));
+    memcpy(q_array + 8, &quant_coeff[block_pos + 2 * width], 4 * sizeof(int32_t));
+    memcpy(q_array + 12, &quant_coeff[block_pos + 3 * width], 4 * sizeof(int32_t));
+    const __m256i q_lo = _mm256_loadu_si256((__m256i const*)q_array);
+    const __m256i q_hi = _mm256_loadu_si256((__m256i const*)(q_array + 8));
+    const __m256i int16_max = _mm256_set1_epi32(INT16_MAX);
+    if (!_mm256_testz_si256(_mm256_or_si256(_mm256_cmpgt_epi32(q_lo, int16_max), _mm256_cmpgt_epi32(q_hi, int16_max)),
+                            _mm256_set1_epi32(-1))) {
+      // The 16-bit multiplies below need scales that fit in 16 bits.
+      if (find_last_in_cg_scalar(coef, dest_coeff, type, q_bits, quant_coeff, sh_rates, ctx_set, scan,
+                                 cg_last_scanpos, last_scanpos, *cg_scanpos)) {
+        return;
+      }
+      continue;
+    }
 
     coeff_t coef_array[16];
     memcpy(coef_array, &coef[block_pos], 4 * sizeof(coeff_t));
@@ -1369,7 +1413,8 @@ static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
     memcpy(coef_array + 8, &coef[block_pos + 2 * width], 4 * sizeof(coeff_t));
     memcpy(coef_array + 12, &coef[block_pos + 3 * width], 4 * sizeof(coeff_t));
 
-    __m256i q = _mm256_loadu_si256((__m256i const*)q_array);
+    // The scales in raster order as 16-bit values.
+    __m256i q = _mm256_permute4x64_epi64(_mm256_packs_epi32(q_lo, q_hi), _MM_SHUFFLE(3, 1, 2, 0));
 
     __m256i level_double = _mm256_loadu_si256((__m256i const*)coef_array);
 

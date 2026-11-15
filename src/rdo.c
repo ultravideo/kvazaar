@@ -673,7 +673,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  const coeff_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
   const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
@@ -759,7 +759,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       int32_t q               = quant_coeff[blkpos];
       double temp             = err_scale[blkpos];
       int32_t level_double    = coef[blkpos];
-      level_double            = MIN(abs(level_double) * q , MAX_INT - (1 << (q_bits - 1)));
+      // The scale can exceed 16 bits, so the product can exceed 32 bits.
+      level_double            = (int32_t)MIN((int64_t)abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
       uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
 
       double err              = (double)level_double;

@@ -57,7 +57,7 @@ void kvz_quant_generic(const encoder_state_t * const state, const coeff_t *coef,
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->cfg.chroma_format == KVZ_CSP_420);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const coeff_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
+  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
@@ -91,7 +91,7 @@ void kvz_quant_generic(const encoder_state_t * const state, const coeff_t *coef,
     int32_t curr_quant_coeff = quant_coeff[n];
 
     level = (abs_level * curr_quant_coeff + add) >> q_bits;
-    delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
+    delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - ((int64_t)level << q_bits)) >> q_bits8);
   }
 
   if (ac_sum >= 2) {
@@ -672,14 +672,14 @@ static double fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uint6
 
 
 
-static void find_last_scanpos_generic(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size, uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode) {
+static void find_last_scanpos_generic(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const int32_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size, uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode) {
   for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
     for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--) {
       int32_t  scanpos = *cg_scanpos * cg_size + scanpos_in_cg;
       uint32_t blkpos = scan[scanpos];
       int32_t q = quant_coeff[blkpos];
       int32_t level_double = coef[blkpos];
-      level_double = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
+      level_double = (int32_t)MIN((int64_t)abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
       uint32_t max_abs_level = (level_double + (1 << (q_bits - 1))) >> q_bits;
 
       if (max_abs_level > 0) {

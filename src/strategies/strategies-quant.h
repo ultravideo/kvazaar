@@ -61,7 +61,7 @@ typedef double (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint6
 
 typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
 
-typedef void (find_last_scanpos_func)(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
+typedef void (find_last_scanpos_func)(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const int32_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
   uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode);
 
 // Declare function pointers.

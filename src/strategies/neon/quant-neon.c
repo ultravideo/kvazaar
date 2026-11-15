@@ -84,12 +84,19 @@ static void kvz_quant_neon(const encoder_state_t * const state, const coeff_t *c
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->cfg.chroma_format == KVZ_CSP_420);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const coeff_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
+  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
   const int32_t n_total = width * height;
+
+  // The 32-bit products below need scales that fit in 16 bits. Custom scaling
+  // lists with entries below 13 give larger scales.
+  if (!encoder->scaling_list.quant_coeff_fits_16bit[log2_tr_size - 2][scalinglist_type][qp_scaled % 6]) {
+    kvz_quant_generic(state, coef, q_coef, width, height, type, scan_idx, block_type);
+    return;
+  }
 
   uint32_t ac_sum = 0;
   int32_t n = 0;
@@ -103,9 +110,10 @@ static void kvz_quant_neon(const encoder_state_t * const state, const coeff_t *c
   for (; n + 8 <= n_total; n += 8) {
     const int16x8_t c = vld1q_s16(coef + n);
     const uint16x8_t a16 = vreinterpretq_u16_s16(vabsq_s16(c));
-    const int16x8_t q = vld1q_s16(quant_coeff + n);
-    int32x4_t ll = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), vmovl_s16(vget_low_s16(q)));
-    int32x4_t lh = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_high_u16(a16)), vmovl_high_s16(q));
+    const int32x4_t q_lo = vld1q_s32(quant_coeff + n);
+    const int32x4_t q_hi = vld1q_s32(quant_coeff + n + 4);
+    int32x4_t ll = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), q_lo);
+    int32x4_t lh = vmlaq_s32(vadd, vreinterpretq_s32_u32(vmovl_high_u16(a16)), q_hi);
     ll = vshlq_s32(ll, vneg_qbits);
     lh = vshlq_s32(lh, vneg_qbits);
     vacc = vaddq_s32(vacc, vaddq_s32(ll, lh));
@@ -142,9 +150,8 @@ static void kvz_quant_neon(const encoder_state_t * const state, const coeff_t *c
   for (; n + 8 <= n_total; n += 8) {
     const int16x8_t c = vld1q_s16(coef + n);
     const uint16x8_t a16 = vreinterpretq_u16_s16(vabsq_s16(c));
-    const int16x8_t q = vld1q_s16(quant_coeff + n);
-    const int32x4_t pl = vmulq_s32(vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), vmovl_s16(vget_low_s16(q)));
-    const int32x4_t ph = vmulq_s32(vreinterpretq_s32_u32(vmovl_high_u16(a16)), vmovl_high_s16(q));
+    const int32x4_t pl = vmulq_s32(vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(a16))), vld1q_s32(quant_coeff + n));
+    const int32x4_t ph = vmulq_s32(vreinterpretq_s32_u32(vmovl_high_u16(a16)), vld1q_s32(quant_coeff + n + 4));
     const int32x4_t ll = vshlq_s32(vaddq_s32(pl, vadd), vneg_qbits);
     const int32x4_t lh = vshlq_s32(vaddq_s32(ph, vadd), vneg_qbits);
     // delta_u = (abs * q - (level << q_bits)) >> q_bits8; every term fits in int32.
@@ -395,7 +402,32 @@ static void init_cg_scan_tables(void)
  * non-zero mask is permuted to scan order to find the last level, and the
  * coefficients after it are cleared with one masked store per row.
  */
-static void find_last_scanpos_neon(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const coeff_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
+/**
+ * \brief The generic search of one coefficient group, for groups whose
+ * scales do not fit in 16 bits.
+ * \return 1 if a non-zero level was found
+ */
+static int find_last_in_cg_scalar(const coeff_t *coef, coeff_t *dest_coeff, int8_t type, int32_t q_bits,
+  const int32_t *quant_coeff, struct kvz_sh_rates_t *sh_rates, uint16_t *ctx_set, const uint32_t *scan,
+  int32_t *cg_last_scanpos, int32_t *last_scanpos, int32_t cg_scanpos)
+{
+  for (int32_t scanpos = cg_scanpos * 16 + 15; scanpos >= cg_scanpos * 16; scanpos--) {
+    const uint32_t blkpos = scan[scanpos];
+    const int32_t level_double = (int32_t)MIN((int64_t)abs(coef[blkpos]) * quant_coeff[blkpos], MAX_INT - (1 << (q_bits - 1)));
+    const uint32_t max_abs_level = (level_double + (1 << (q_bits - 1))) >> q_bits;
+    if (max_abs_level > 0) {
+      *last_scanpos = scanpos;
+      *ctx_set = (scanpos > 0 && type == 0) ? 2 : 0;
+      *cg_last_scanpos = cg_scanpos;
+      sh_rates->sig_coeff_inc[blkpos] = 0;
+      return 1;
+    }
+    dest_coeff[blkpos] = 0;
+  }
+  return 0;
+}
+
+static void find_last_scanpos_neon(coeff_t* coef, coeff_t* dest_coeff, int8_t type, int32_t q_bits, const int32_t* quant_coeff, struct kvz_sh_rates_t* sh_rates, const uint32_t cg_size,
   uint16_t* ctx_set, const uint32_t* scan, int32_t* cg_last_scanpos, int32_t* last_scanpos, uint32_t cg_num, int32_t* cg_scanpos, int32_t width, int8_t scan_mode)
 {
   const int32x4_t vmax = vdupq_n_s32(MAX_INT - (1 << (q_bits - 1)));
@@ -407,12 +439,26 @@ static void find_last_scanpos_neon(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
   for (*cg_scanpos = (cg_num - 1); *cg_scanpos >= 0; (*cg_scanpos)--) {
     const int32_t scan_pos = *cg_scanpos * 16;
     const uint32_t block_pos = scan[scan_pos];
+    int32x4_t q32[4];
+    int32x4_t q_max = vdupq_n_s32(0);
+    for (int r = 0; r < 4; ++r) {
+      q32[r] = vld1q_s32(quant_coeff + block_pos + r * width);
+      q_max = vmaxq_s32(q_max, q32[r]);
+    }
+    if (vmaxvq_s32(q_max) > INT16_MAX) {
+      // The 16-bit multiplies below need scales that fit in 16 bits.
+      if (find_last_in_cg_scalar(coef, dest_coeff, type, q_bits, quant_coeff, sh_rates, ctx_set, scan,
+                                 cg_last_scanpos, last_scanpos, *cg_scanpos)) {
+        return;
+      }
+      continue;
+    }
     coeff_t *dest[4];
     uint16x4_t nonzero[4];
     for (int r = 0; r < 4; ++r) {
       dest[r] = dest_coeff + block_pos + r * width;
       const int16x4_t c = vld1_s16(coef + block_pos + r * width);
-      const int16x4_t q = vld1_s16(quant_coeff + block_pos + r * width);
+      const int16x4_t q = vmovn_s32(q32[r]);
       // abs(c) * q as c * q with the sign of c removed; |c * q| <= 2^30.
       const int32x4_t neg = vmovl_s16(vshr_n_s16(c, 15));
       int32x4_t level = vsubq_s32(veorq_s32(vmull_s16(c, q), neg), neg);

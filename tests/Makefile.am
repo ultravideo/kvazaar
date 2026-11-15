@@ -9,6 +9,7 @@ TESTS = $(check_PROGRAMS) \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \
+    test_scaling_list.sh \
     test_slices.sh \
     test_smp.sh \
     test_tools.sh \
@@ -28,6 +29,7 @@ EXTRA_DIST = \
     test_mv_constraint.sh \
     test_owf_wpp_tiles.sh \
     test_rate_control.sh \
+    test_scaling_list.sh \
     test_slices.sh \
     test_smp.sh \
     test_tools.sh \

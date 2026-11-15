@@ -48,7 +48,12 @@ typedef struct {
         int8_t   use_default_list;
         int32_t  scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
   const coeff_t *scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-  const coeff_t *quant_coeff[4][6][6];
+  // Quantization scales of the encoder: (quant scale << 4) / scaling list
+  // entry, which exceeds 16 bits for entries below 13.
+  const int32_t *quant_coeff[4][6][6];
+  // Whether every scale of quant_coeff fits in an int16, which the SIMD
+  // quantization relies on.
+  uint8_t quant_coeff_fits_16bit[4][6][6];
   const coeff_t *de_quant_coeff  [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
   const double *error_scale[4][6][6];
 } scaling_list_t;
@@ -63,6 +68,9 @@ void kvz_scalinglist_destroy(scaling_list_t * const scaling_list);
 
 int  kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
 void kvz_scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
+void kvz_scalinglist_process_enc(const coeff_t * const coeff, int32_t * quantcoeff, const int32_t quant_scales,
+                                 const uint32_t height, const uint32_t width, const uint32_t ratio,
+                                 const int32_t size_num, const uint32_t dc, const uint8_t flat);
 
 
 
