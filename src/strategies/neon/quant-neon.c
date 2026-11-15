@@ -55,11 +55,15 @@
 
 /*
  * NEON versions of the element-wise loops of the quantization and
- * dequantization. The products are computed with the same widths as the
- * generic code: the quantizer multiplies 64-bit values, so it uses vmull_s32
- * to get 64-bit products. The sign-hiding search depends on the coefficients
- * in a data-dependent order, so it stays scalar and is the same code as the
+ * dequantization. The sign-hiding search depends on the coefficients in a
+ * data-dependent order, so it stays scalar and is the same code as the
  * generic version.
+ *
+ * The coefficient functions do not depend on the pixel type and are
+ * registered for every bit depth. The value ranges do not grow with the bit
+ * depth: the QP range is extended by QP_BD_OFFSET = 6 * (bitdepth - 8), but the
+ * transform shift is smaller by bitdepth - 8, so q_bits = 14 + qp_scaled / 6 +
+ * 15 - bitdepth - log2(size) is at most 27 at every bit depth.
  */
 
 /* Quantization of four coefficients: returns the unsigned levels in 32-bit
@@ -86,7 +90,7 @@ static void kvz_quant_neon(const encoder_state_t * const state, const coeff_t *c
   int32_t n = 0;
 
   /* 32-bit lanes are exact: |coef| <= 32768 and the scaling factor is an int16,
-   * so |abs * q| <= 2^30, and adding add (< 2^26 for 8-bit) still fits in int32.
+   * so |abs * q| <= 2^30, and adding add (< 2^26 as q_bits <= 27) still fits in int32.
    * vabsq_s16(-32768) wraps to -32768, which as u16 is the correct 32768. */
   const int32x4_t vadd = vdupq_n_s32(add);
   const int32x4_t vneg_qbits = vdupq_n_s32(-q_bits);
@@ -361,12 +365,15 @@ int kvz_strategy_register_quant_neon(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_ARM_NEON
-  if (bitdepth == 8) {
-    success &= kvz_strategyselector_register(opaque, "quant", "neon", 40, &kvz_quant_neon);
-    success &= kvz_strategyselector_register(opaque, "dequant", "neon", 40, &kvz_dequant_neon);
-    success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "neon", 40, &coeff_abs_sum_neon);
-    success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "neon", 40, &fast_coeff_cost_neon);
-  }
+  // The coefficient functions do not depend on the pixel type.
+  (void)bitdepth;
+  success &= kvz_strategyselector_register(opaque, "quant", "neon", 40, &kvz_quant_neon);
+  success &= kvz_strategyselector_register(opaque, "dequant", "neon", 40, &kvz_dequant_neon);
+  success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "neon", 40, &coeff_abs_sum_neon);
+  success &= kvz_strategyselector_register(opaque, "fast_coeff_cost", "neon", 40, &fast_coeff_cost_neon);
+#else
+  (void)opaque;
+  (void)bitdepth;
 #endif
   return success;
 }
