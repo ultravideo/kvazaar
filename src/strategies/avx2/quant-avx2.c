@@ -148,12 +148,6 @@ static INLINE void get_cheapest_alternative(__m256i costs_hi, __m256i costs_lo,
   *min_pos = (int32_t)n;
 }
 
-static INLINE __m256i concatenate_2x128i(__m128i lo, __m128i hi)
-{
-  __m256i v = _mm256_castsi128_si256(lo);
-  return _mm256_inserti128_si256(v, hi, 1);
-}
-
 static INLINE void scanord_read_vector_32(const coeff_t *__restrict quant_coeff,
                                           const uint32_t *__restrict scan,
                                           int8_t scan_mode,

@@ -47,7 +47,7 @@
 * \brief quantize transformed coefficents
 *
 */
-void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
+void kvz_quant_generic(const encoder_state_t * const state, const coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;

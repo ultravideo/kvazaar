@@ -65,7 +65,7 @@
 /* Quantization of four coefficients: returns the unsigned levels in 32-bit
  * lanes, and the 64-bit (abs * quant + add) >> q_bits values are kept for the
  * sign-hiding pass. */
-static void kvz_quant_neon(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
+static void kvz_quant_neon(const encoder_state_t * const state, const coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;

@@ -49,7 +49,7 @@
 typedef int (sao_edge_ddistortion_func)(const encoder_control_t* const encoder, 
   const kvz_pixel *orig_data, const kvz_pixel *rec_data,
   int block_width, int block_height,
-  int eo_class, int offsets[NUM_SAO_EDGE_CATEGORIES]);
+  int eo_class, const int offsets[NUM_SAO_EDGE_CATEGORIES]);
 
 typedef void (calc_sao_edge_dir_func)(const encoder_control_t* const encoder, 
   const kvz_pixel *orig_data, const kvz_pixel *rec_data,

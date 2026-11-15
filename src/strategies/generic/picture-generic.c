@@ -603,17 +603,18 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
-  int ssd = 0;
+  // 64x64 squared differences of 10 or more bits do not fit in an int.
+  uint64_t ssd = 0;
   int y, x;
 
   for (y = 0; y < width; ++y) {
     for (x = 0; x < width; ++x) {
       int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
-      ssd += diff * diff;
+      ssd += (uint32_t)(diff * diff);
     }
   }
 
-  return ssd >> (2*(KVZ_BIT_DEPTH-8));
+  return (unsigned)(ssd >> (2*(KVZ_BIT_DEPTH-8)));
 }
 
 static void bipred_average_px_px(kvz_pixel *dst,

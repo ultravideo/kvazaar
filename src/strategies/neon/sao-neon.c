@@ -88,7 +88,7 @@ static int sao_edge_ddistortion_neon(const encoder_control_t* const encoder,
                                      int block_width,
                                      int block_height,
                                      int eo_class,
-                                     int offsets[NUM_SAO_EDGE_CATEGORIES])
+                                     const int offsets[NUM_SAO_EDGE_CATEGORIES])
 {
   (void)encoder;
   const vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];

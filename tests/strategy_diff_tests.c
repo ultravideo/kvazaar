@@ -53,14 +53,14 @@
 #define BUF_SIZE (BUF_STRIDE * 80)
 #define BUF_ORIGIN (4 * BUF_STRIDE + 8)
 
-static kvz_pixel buf_a[BUF_SIZE];
-static kvz_pixel buf_b[BUF_SIZE];
-static kvz_pixel pred_mem[4][64 * 64 + 1024];
-static coeff_t coeffs[32 * 32];
+static ALIGNED(32) kvz_pixel buf_a[BUF_SIZE];
+static ALIGNED(32) kvz_pixel buf_b[BUF_SIZE];
+static ALIGNED(32) kvz_pixel pred_mem[4][64 * 64 + 1024];
+static ALIGNED(32) coeff_t coeffs[32 * 32];
 
 // Large enough for a 1080p luma plane, to cover whole-frame variance (VAQ).
 #define VAR_LEN (1920 * 1080)
-static kvz_pixel var_buf[VAR_LEN];
+static ALIGNED(32) kvz_pixel var_buf[VAR_LEN];
 
 static uint32_t rng_state = 0x2545F491u;
 static uint32_t rnd(void)
@@ -267,7 +267,10 @@ TEST test_fast_coeff_cost(void)
 }
 
 
-static int16_t tr_in[32 * 32], tr_ref[32 * 32], tr_opt[32 * 32];
+// The SIMD transforms load and store aligned vectors, like the encoder buffers.
+static ALIGNED(32) int16_t tr_in[32 * 32];
+static ALIGNED(32) int16_t tr_ref[32 * 32];
+static ALIGNED(32) int16_t tr_opt[32 * 32];
 
 // Forward transforms take 8-bit residuals (|x| <= 255). Inverse transforms take
 // dequantized coefficients, which dequant clips to the full int16 range, so
