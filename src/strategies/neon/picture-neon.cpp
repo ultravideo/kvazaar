@@ -498,32 +498,43 @@ static INLINE uint16x8_t tf_bilinear8_neon(uint16x8_t a, uint16x8_t b, uint16x8_
   return vrshrq_n_u16(p, 4);  // (p + 8) >> 4
 }
 
-/*
- * Sum of squared differences of a size x size block (a multiple of 8) and the
- * bilinear interpolation of ref with the fraction (fx, fy), or ref itself
- * when both are 0. The sum wraps like the unsigned sum of the generic code.
- */
-static uint32_t tf_bilinear_ssd_block_neon(const kvz_pixel *org, int org_stride,
-                                           const kvz_pixel *ref, int ref_stride,
-                                           int size, int fx, int fy)
+/* SSD of a row of 8 pixels and the prediction p, accumulated to acc. */
+static INLINE uint32x4_t tf_ssd8_neon(uint32x4_t acc, uint16x8_t o, uint16x8_t p)
 {
+  const uint16x8_t ad = vabdq_u16(o, p);
+  acc = vmlal_u16(acc, vget_low_u16(ad), vget_low_u16(ad));
+  return vmlal_high_u16(acc, ad, ad);
+}
+
+/*
+ * Sum of squared differences of a size x size block and the bilinear
+ * interpolation of ref with the fraction (fx, fy), or ref itself when both
+ * are 0. The sum wraps like the unsigned sum of the generic code.
+ */
+template <int size>
+uint32_t tf_bilinear_ssd_block_neon(const kvz_pixel *org, int org_stride,
+                                    const kvz_pixel *ref, int ref_stride,
+                                    int fx, int fy)
+{
+  uint32x4_t acc = vdupq_n_u32(0);
+  if (!fx && !fy) {
+    for (int y = 0; y < size; y++) {
+      for (int x = 0; x < size; x += 8) {
+        acc = tf_ssd8_neon(acc, tf_load8_neon(&org[y * org_stride + x]), tf_load8_neon(&ref[y * ref_stride + x]));
+      }
+    }
+    return vaddvq_u32(acc);
+  }
   const uint16_t w00 = (uint16_t)((4 - fx) * (4 - fy)), w10 = (uint16_t)(fx * (4 - fy));
   const uint16_t w01 = (uint16_t)((4 - fx) * fy), w11 = (uint16_t)(fx * fy);
-  const bool interp = fx || fy;
-  uint32x4_t acc = vdupq_n_u32(0);
   for (int y = 0; y < size; y++) {
     const kvz_pixel *r0 = &ref[y * ref_stride];
     const kvz_pixel *r1 = r0 + ref_stride;
-    const kvz_pixel *o = &org[y * org_stride];
     for (int x = 0; x < size; x += 8) {
-      uint16x8_t p = tf_load8_neon(r0 + x);
-      if (interp) {
-        p = tf_bilinear8_neon(p, tf_load8_neon(r0 + x + 1), tf_load8_neon(r1 + x), tf_load8_neon(r1 + x + 1),
-                              w00, w10, w01, w11);
-      }
-      const uint16x8_t ad = vabdq_u16(tf_load8_neon(o + x), p);
-      acc = vmlal_u16(acc, vget_low_u16(ad), vget_low_u16(ad));
-      acc = vmlal_high_u16(acc, ad, ad);
+      const uint16x8_t p = tf_bilinear8_neon(tf_load8_neon(r0 + x), tf_load8_neon(r0 + x + 1),
+                                             tf_load8_neon(r1 + x), tf_load8_neon(r1 + x + 1),
+                                             w00, w10, w01, w11);
+      acc = tf_ssd8_neon(acc, tf_load8_neon(&org[y * org_stride + x]), p);
     }
   }
   return vaddvq_u32(acc);
@@ -533,9 +544,8 @@ static unsigned bilinear_ssd_neon(const kvz_pixel *org, int org_stride,
                                   const kvz_pixel *ref, int ref_stride,
                                   int size, int fx, int fy)
 {
-  if (size % 8 == 0) {
-    return tf_bilinear_ssd_block_neon(org, org_stride, ref, ref_stride, size, fx, fy);
-  }
+  if (size == 8) return tf_bilinear_ssd_block_neon<8>(org, org_stride, ref, ref_stride, fx, fy);
+  if (size == 16) return tf_bilinear_ssd_block_neon<16>(org, org_stride, ref, ref_stride, fx, fy);
   // The generic code, for other block sizes.
   const int w00 = (4 - fx) * (4 - fy), w10 = fx * (4 - fy), w01 = (4 - fx) * fy, w11 = fx * fy;
   unsigned ssd = 0;
@@ -557,14 +567,15 @@ static void bilinear_ssd_multi_neon(const kvz_pixel *org, int org_stride,
                                     int size, const int *mv_x, const int *mv_y,
                                     int num, unsigned *out)
 {
-  if (size % 8 != 0) {
+  if (size != 8 && size != 16) {
     kvz_bilinear_ssd_multi_generic(org, org_stride, ref, ref_stride, size, mv_x, mv_y, num, out);
     return;
   }
   for (int i = 0; i < num; i++) {
     const int fx = mv_x[i] & 3, fy = mv_y[i] & 3;
     const kvz_pixel *r = ref + (mv_y[i] >> 2) * ref_stride + (mv_x[i] >> 2);
-    const uint32_t ssd = tf_bilinear_ssd_block_neon(org, org_stride, r, ref_stride, size, fx, fy);
+    const uint32_t ssd = size == 8 ? tf_bilinear_ssd_block_neon<8>(org, org_stride, r, ref_stride, fx, fy)
+                                   : tf_bilinear_ssd_block_neon<16>(org, org_stride, r, ref_stride, fx, fy);
     // Integer positions are scaled to 8 bits like kvz_pixels_calc_ssd.
     out[i] = (fx || fy) ? ssd : ssd >> (2 * (KVZ_BIT_DEPTH - 8));
   }
@@ -621,8 +632,43 @@ static void tf_bilinear_pred_neon(kvz_pixel *dst, int dst_stride,
 #else
   const int32x4_t neg_shift = vdupq_n_s32(-shift);
 #endif
+  if (width == 8) {
+    for (int y = 0; y < height; y++) {
+      const kvz_pixel *r0 = &ref[y * ref_stride];
+      const kvz_pixel *r1 = r0 + ref_stride;
+      const tf_px8_t p = tf_bilinear_pred8_neon(tf_load8_neon(r0), tf_load8_neon(r0 + 1),
+                                                tf_load8_neon(r1), tf_load8_neon(r1 + 1), w, neg_shift);
+#if KVZ_BIT_DEPTH == 8
+      vst1_u8(&dst[y * dst_stride], p);
+#else
+      vst1q_u16(&dst[y * dst_stride], p);
+#endif
+    }
+    return;
+  }
+  int y0 = 0;
+  if (width == 4) {
+    // Two rows at a time.
+    for (; y0 + 2 <= height; y0 += 2) {
+      const kvz_pixel *r0 = &ref[y0 * ref_stride];
+      const kvz_pixel *r1 = r0 + ref_stride;
+      const kvz_pixel *r2 = r1 + ref_stride;
+      const tf_px8_t p = tf_bilinear_pred8_neon(vcombine_u16(tf_load4_neon(r0), tf_load4_neon(r1)),
+                                                vcombine_u16(tf_load4_neon(r0 + 1), tf_load4_neon(r1 + 1)),
+                                                vcombine_u16(tf_load4_neon(r1), tf_load4_neon(r2)),
+                                                vcombine_u16(tf_load4_neon(r1 + 1), tf_load4_neon(r2 + 1)),
+                                                w, neg_shift);
+#if KVZ_BIT_DEPTH == 8
+      vst1_lane_u32((uint32_t *)(void *)&dst[y0 * dst_stride], vreinterpret_u32_u8(p), 0);
+      vst1_lane_u32((uint32_t *)(void *)&dst[(y0 + 1) * dst_stride], vreinterpret_u32_u8(p), 1);
+#else
+      vst1_u16(&dst[y0 * dst_stride], vget_low_u16(p));
+      vst1_u16(&dst[(y0 + 1) * dst_stride], vget_high_u16(p));
+#endif
+    }
+  }
   const int round = 1 << (shift - 1);
-  for (int y = 0; y < height; y++) {
+  for (int y = y0; y < height; y++) {
     const kvz_pixel *r0 = &ref[y * ref_stride];
     const kvz_pixel *r1 = r0 + ref_stride;
     kvz_pixel *d = &dst[y * dst_stride];
