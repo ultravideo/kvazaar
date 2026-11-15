@@ -623,8 +623,9 @@ static FORCE_INLINE void get_quantized_recon_avx2(int16_t *residual, const uint8
 static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state, cu_info_t* const cur_cu, color_t color,
   int16_t* luma_residual, int16_t* chroma_residual, int32_t tr_width, int32_t luma_stride, int32_t chroma_stride)
 {
-  uint32_t ss_xy = 0;
-  uint32_t ss_xx = 0;
+  // Signed, because a negative correlation gives a negative alpha.
+  int64_t ss_xy = 0;
+  int64_t ss_xx = 0;
 
   __m256i v_ss_xx = _mm256_setzero_si256();
   __m256i v_ss_xy = _mm256_setzero_si256();
@@ -660,7 +661,8 @@ static int8_t calc_cross_component_prediction_avx2(encoder_state_t* const state,
   int8_t sign = 0;
   if (ss_xx != 0) {
     double falpha = (double)ss_xy / (double)ss_xx;
-    alpha = (int8_t)(CLIP(-16, 16, (int)(falpha * 16)));
+    // Clip before the conversion, which is undefined for values out of the int range.
+    alpha = (int8_t)CLIP(-16.0, 16.0, falpha * 16);
     sign = alpha < 0 ? 1 : 0;
     alpha = alpha < 0 ? -alpha : alpha;
     // Original quantization tables from HM
