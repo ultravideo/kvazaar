@@ -71,7 +71,35 @@ test-10bit:
     CFLAGS: '-DKVZ_BIT_DEPTH=10'
     KVZ_TEST_CHROMASUBSAMPLING: 1
     
-#test-12bit:
-  #<<: *test-template
-  #variables:
-    #CFLAGS: '-DKVZ_BIT_DEPTH=12'
+test-12bit:
+  <<: *test-template
+  variables:
+    CFLAGS: '-DKVZ_BIT_DEPTH=12'
+    KVZ_TEST_CHROMASUBSAMPLING: 1
+
+test-macos:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    KVZ_TEST_CHROMASUBSAMPLING: 1
+
+test-macos-asan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    KVZ_TEST_CHROMASUBSAMPLING: 1
+    CFLAGS: '-fsanitize=address -g'
+    # LeakSanitizer is not supported on macOS.
+    ASAN_OPTIONS: 'detect_leaks=0'
+    # AddressSanitizer adds some extra symbols so we expect a failure from
+    # the external symbols test.
+    XFAIL_TESTS: test_external_symbols.sh
+
+test-macos-ubsan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
