@@ -342,9 +342,9 @@ static double pic_allocate_bits(encoder_state_t * const state)
       state->frame->gop_offset == 0 ||
       state->frame->num == 0)
   {
-    // A new GOP starts at this frame.
+    // A new GOP starts at this frame. cur_gop_bits_coded is reset when the
+    // bitstream of this frame is written.
     state->frame->cur_gop_target_bits = gop_allocate_bits(state);
-    state->frame->cur_gop_bits_coded  = 0;
   } else {
     state->frame->cur_gop_target_bits =
       state->previous_encoder_state->frame->cur_gop_target_bits;

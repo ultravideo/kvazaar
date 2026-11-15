@@ -1231,8 +1231,15 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     kvz_update_after_picture(state);
   }
 
-  if(state->frame->gop_offset)
+  // The bits of the GOP so far. Reset here rather than when the rate control
+  // of a GOP starts: by then the state of the previous picture can already
+  // be in use for a new picture, whose rate control would race with the
+  // reading of its cur_gop_bits_coded above.
+  if (state->frame->gop_offset) {
     state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
+  } else {
+    state->frame->cur_gop_bits_coded = 0;
+  }
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
