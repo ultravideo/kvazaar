@@ -110,6 +110,7 @@
     <ClCompile Include="..\..\tests\ipol_tests.c" />
     <ClCompile Include="..\..\tests\sao_tests.c" />
     <ClCompile Include="..\..\tests\simd_sad_tests.c" />
+    <ClCompile Include="..\..\tests\simd_satd_tests.c" />
     <ClCompile Include="..\..\tests\strategy_diff_tests.c" />
     <ClCompile Include="..\..\tests\temporal_filter_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />

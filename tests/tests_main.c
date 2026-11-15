@@ -48,6 +48,7 @@ extern SUITE(strategy_diff_tests);
 #endif //KVZ_BIT_DEPTH == 8
 extern SUITE(temporal_filter_tests);
 extern SUITE(simd_sad_tests);
+extern SUITE(simd_satd_tests);
 
 extern SUITE(coeff_sum_tests);
 extern SUITE(mv_cand_tests);
@@ -80,6 +81,7 @@ int main(int argc, char **argv)
   RUN_SUITE(coeff_sum_tests);
   RUN_SUITE(temporal_filter_tests);
   RUN_SUITE(simd_sad_tests);
+  RUN_SUITE(simd_satd_tests);
 
   RUN_SUITE(mv_cand_tests);
 
