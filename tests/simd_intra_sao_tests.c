@@ -91,7 +91,7 @@ static const strategy_t *cur;
 
 static void *find_generic(const char *type)
 {
-  for (int i = 0; i < strategies.count; ++i) {
+  for (unsigned i = 0; i < strategies.count; ++i) {
     if (strcmp(strategies.strategies[i].type, type) == 0 &&
         strcmp(strategies.strategies[i].strategy_name, "generic") == 0) {
       return strategies.strategies[i].fptr;
@@ -528,7 +528,7 @@ SUITE(simd_intra_sao_tests)
 
   RUN_TEST(test_sao_offset_array);
 
-  for (volatile int i = 0; i < strategies.count; ++i) {
+  for (volatile unsigned i = 0; i < strategies.count; ++i) {
     const strategy_t *s = &strategies.strategies[i];
     if (strcmp(s->strategy_name, "generic") == 0) continue;
     void *generic = find_generic(s->type);
