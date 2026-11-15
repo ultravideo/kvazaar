@@ -35,10 +35,11 @@
  * \file
  * AArch64 NEON implementation of the subpixel interpolation sample functions.
  *
- * Bit-exact with the generic implementation for 8-bit video. For 8-bit input
- * the horizontal filter result always fits in int16 (|sum| < 2^15), so it is
- * computed with 16-bit multiply-accumulate. The vertical filter needs 32-bit
- * accumulators because it operates on those 16-bit intermediates.
+ * Bit-exact with the generic implementation. For 8-bit input the horizontal
+ * filter result always fits in int16 (|sum| < 2^15), so it is computed with
+ * 16-bit multiply-accumulate. The vertical filter needs 32-bit accumulators
+ * because it operates on those 16-bit intermediates. The 10 and 12-bit
+ * versions are at the end of the file.
  */
 
 #include "strategies/strategies-cpp.h"
@@ -918,6 +919,756 @@ int kvz_strategy_register_ipol_neon(void* opaque, uint8_t bitdepth)
   bool success = true;
 
   if (bitdepth == 8) {
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "neon", 40, KVZ_STRATEGY_FPTR(sample_quarterpel_luma_neon));
+    success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "neon", 40, KVZ_STRATEGY_FPTR(sample_octpel_chroma_neon));
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "neon", 40, KVZ_STRATEGY_FPTR(sample_quarterpel_luma_hi_neon));
+    success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "neon", 40, KVZ_STRATEGY_FPTR(sample_octpel_chroma_hi_neon));
+    success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_hor_ver_luma", "neon", 40, KVZ_STRATEGY_FPTR(filter_hpel_blocks_hor_ver_luma_neon));
+    success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_diag_luma", "neon", 40, KVZ_STRATEGY_FPTR(filter_hpel_blocks_diag_luma_neon));
+    success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_hor_ver_luma", "neon", 40, KVZ_STRATEGY_FPTR(filter_qpel_blocks_hor_ver_luma_neon));
+    success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_diag_luma", "neon", 40, KVZ_STRATEGY_FPTR(filter_qpel_blocks_diag_luma_neon));
+  }
+
+  return success;
+}
+
+#elif COMPILE_ARM_NEON && KVZ_BIT_DEPTH > 8
+
+/*
+ * 10 and 12-bit interpolation.
+ *
+ * kvz_pixel is uint16_t and the samples are at most PIXEL_MAX < 2^15, so they
+ * are used as int16. Both passes accumulate in 32 bits with widening
+ * multiply-accumulates by a lane of the filter vector: the horizontal sum is
+ * up to 88 * PIXEL_MAX before the shift by KVZ_BIT_DEPTH - 8 (the shifted
+ * value fits int16), the vertical sum over int16 intermediates about 2^21.
+ *
+ * The intermediate buffers of the block filters (hor_intermediate and
+ * hor_first_cols) have the same layout and contents as in the generic
+ * functions, so these functions can be mixed with the generic ones. Like the
+ * 8-bit versions, the block filters require the width and height to be
+ * multiples of 8, which search_frac guarantees by rounding the block size up.
+ * Only the samples the generic functions read are loaded.
+ */
+
+#include <utility>
+
+namespace {
+
+constexpr int kShift1 = KVZ_BIT_DEPTH - 8;
+constexpr int kWpShift = 14 - KVZ_BIT_DEPTH;
+constexpr int kWpOffset = 1 << (kWpShift - 1);
+constexpr int kPixelMax = PIXEL_MAX;
+
+// Rounding of the vertical pass.
+enum VerMode {
+  // clip(((sum >> 6) + offset) >> shift) in 32 bits, as in the sample functions.
+  VER_PX,
+  // The block filters store sum >> 6 in an int16_t before the rounding, which
+  // wraps for the extreme half-pel diagonal sums (88 * 88 + 24 * 24 times
+  // PIXEL_MAX >> (KVZ_BIT_DEPTH - 2) > 32767). All other filter combinations
+  // stay below 30000, where VER_PX gives the same result.
+  VER_PX_WRAP,
+  // (int16_t)(sum >> 6), the _hi sample functions.
+  VER_HI,
+};
+
+inline kvz_pixel clip_px(int32_t value)
+{
+  return (kvz_pixel)(value < 0 ? 0 : (value > kPixelMax ? kPixelMax : value));
+}
+
+// The taps of a filter row as int16 lanes (the upper four are 0 for 4 taps).
+template <int TAPS>
+inline int16x8_t load_taps(const int8_t *filter)
+{
+  if constexpr (TAPS == 8) {
+    return vmovl_s8(vld1_s8(filter));
+  } else {
+    const int16_t taps[8] = { filter[0], filter[1], filter[2], filter[3], 0, 0, 0, 0 };
+    return vld1q_s16(taps);
+  }
+}
+
+inline int16x8_t load8(const kvz_pixel *p) { return vreinterpretq_s16_u16(vld1q_u16(p)); }
+inline int16x8_t load8(const int16_t *p) { return vld1q_s16(p); }
+inline int16x4_t load4(const kvz_pixel *p) { return vreinterpret_s16_u16(vld1_u16(p)); }
+inline int16x4_t load4(const int16_t *p) { return vld1_s16(p); }
+
+// lo/hi += c[K] * v for eight samples (lo/hi = c[K] * v for K = 0).
+template <int K>
+KVZ_FORCE_INLINE void mac8(int32x4_t &lo, int32x4_t &hi, int16x8_t v, int16x8_t c)
+{
+  if constexpr (K == 0) {
+    lo = vmull_laneq_s16(vget_low_s16(v), c, K);
+    hi = vmull_high_laneq_s16(v, c, K);
+  } else {
+    lo = vmlal_laneq_s16(lo, vget_low_s16(v), c, K);
+    hi = vmlal_high_laneq_s16(hi, v, c, K);
+  }
+}
+
+/*
+ * Eight sums sum_k c[k] * p[k * step + i], i < 8: horizontal (step 1) or
+ * vertical (step = stride) filtering of samples or intermediates.
+ */
+template <int TAPS, typename T>
+KVZ_FORCE_INLINE void sums8(const T *p, intptr_t step, int16x8_t c, int32x4_t &lo, int32x4_t &hi)
+{
+  mac8<0>(lo, hi, load8(p + 0 * step), c);
+  mac8<1>(lo, hi, load8(p + 1 * step), c);
+  mac8<2>(lo, hi, load8(p + 2 * step), c);
+  mac8<3>(lo, hi, load8(p + 3 * step), c);
+  if constexpr (TAPS == 8) {
+    mac8<4>(lo, hi, load8(p + 4 * step), c);
+    mac8<5>(lo, hi, load8(p + 5 * step), c);
+    mac8<6>(lo, hi, load8(p + 6 * step), c);
+    mac8<7>(lo, hi, load8(p + 7 * step), c);
+  }
+}
+
+// Four sums, see sums8.
+template <int TAPS, typename T>
+KVZ_FORCE_INLINE int32x4_t sums4(const T *p, intptr_t step, int16x8_t c)
+{
+  int32x4_t acc = vmull_laneq_s16(load4(p + 0 * step), c, 0);
+  acc = vmlal_laneq_s16(acc, load4(p + 1 * step), c, 1);
+  acc = vmlal_laneq_s16(acc, load4(p + 2 * step), c, 2);
+  acc = vmlal_laneq_s16(acc, load4(p + 3 * step), c, 3);
+  if constexpr (TAPS == 8) {
+    acc = vmlal_laneq_s16(acc, load4(p + 4 * step), c, 4);
+    acc = vmlal_laneq_s16(acc, load4(p + 5 * step), c, 5);
+    acc = vmlal_laneq_s16(acc, load4(p + 6 * step), c, 6);
+    acc = vmlal_laneq_s16(acc, load4(p + 7 * step), c, 7);
+  }
+  return acc;
+}
+
+inline int16_t hor_scalar(const int8_t *filter, int taps, const kvz_pixel *p)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < taps; ++k) sum += filter[k] * p[k];
+  return (int16_t)(sum >> kShift1);
+}
+
+/*
+ * Horizontal pass: dst[y][x] = (sum_k f[k] * src[y][x + k]) >> shift1 for
+ * `rows` rows. src points to the first tap of output (0, 0).
+ */
+template <int TAPS>
+void hor_pass_t(const int8_t *filter, int width, int rows, const kvz_pixel *src, int src_stride,
+                int16_t *dst, int dst_stride)
+{
+  constexpr int center = TAPS / 2 - 1;
+
+  if (filter[center] == 64) {
+    // Integer position: (64 * p) >> shift1 == p << (6 - shift1).
+    for (int y = 0; y < rows; ++y) {
+      const kvz_pixel *s = src + (intptr_t)y * src_stride + center;
+      int16_t *d = dst + (intptr_t)y * dst_stride;
+      int x = 0;
+      for (; x + 8 <= width; x += 8) vst1q_s16(d + x, vreinterpretq_s16_u16(vshlq_n_u16(vld1q_u16(s + x), 6 - kShift1)));
+      for (; x + 4 <= width; x += 4) vst1_s16(d + x, vreinterpret_s16_u16(vshl_n_u16(vld1_u16(s + x), 6 - kShift1)));
+      for (; x < width; ++x) d[x] = (int16_t)(s[x] << (6 - kShift1));
+    }
+    return;
+  }
+
+  const int16x8_t c = load_taps<TAPS>(filter);
+  for (int y = 0; y < rows; ++y) {
+    const kvz_pixel *s = src + (intptr_t)y * src_stride;
+    int16_t *d = dst + (intptr_t)y * dst_stride;
+    int x = 0;
+    for (; x + 8 <= width; x += 8) {
+      int32x4_t lo, hi;
+      sums8<TAPS>(s + x, 1, c, lo, hi);
+      vst1q_s16(d + x, vcombine_s16(vshrn_n_s32(lo, kShift1), vshrn_n_s32(hi, kShift1)));
+    }
+    if (x + 4 <= width) {
+      vst1_s16(d + x, vshrn_n_s32((sums4<TAPS>(s + x, 1, c)), kShift1));
+      x += 4;
+    }
+    // Chroma blocks of width 2 and 6.
+    for (; x < width; ++x) d[x] = hor_scalar(filter, TAPS, s + x);
+  }
+}
+
+void hor_pass(const int8_t *filter, int taps, int width, int rows, const kvz_pixel *src, int src_stride,
+              int16_t *dst, int dst_stride)
+{
+  if (taps == 8) hor_pass_t<8>(filter, width, rows, src, src_stride, dst, dst_stride);
+  else hor_pass_t<4>(filter, width, rows, src, src_stride, dst, dst_stride);
+}
+
+// Rounds eight 32-bit vertical sums, see VerMode.
+template <VerMode MODE>
+inline int16x8_t ver_round8(int32x4_t lo, int32x4_t hi)
+{
+  if constexpr (MODE == VER_PX) {
+    // ((sum >> 6) + offset) >> shift == (sum + (offset << 6)) >> (shift + 6),
+    // a rounding shift; the saturating narrow and min clip to the pixel range.
+    const uint16x8_t px = vcombine_u16(vqrshrun_n_s32(lo, 6 + kWpShift), vqrshrun_n_s32(hi, 6 + kWpShift));
+    return vreinterpretq_s16_u16(vminq_u16(px, vdupq_n_u16(kPixelMax)));
+  } else {
+    // int16_t sample = sum >> 6
+    const int16x8_t sample = vcombine_s16(vshrn_n_s32(lo, 6), vshrn_n_s32(hi, 6));
+    if constexpr (MODE == VER_HI) return sample;
+    // vrshrq_n_s16 computes (sample + offset) >> shift without overflow.
+    const int16x8_t v = vrshrq_n_s16(sample, kWpShift);
+    return vminq_s16(vmaxq_s16(v, vdupq_n_s16(0)), vdupq_n_s16(kPixelMax));
+  }
+}
+
+template <VerMode MODE>
+inline int16x4_t ver_round4(int32x4_t acc)
+{
+  if constexpr (MODE == VER_PX) {
+    return vreinterpret_s16_u16(vmin_u16(vqrshrun_n_s32(acc, 6 + kWpShift), vdup_n_u16(kPixelMax)));
+  } else {
+    const int16x4_t sample = vshrn_n_s32(acc, 6);
+    if constexpr (MODE == VER_HI) return sample;
+    const int16x4_t v = vrshr_n_s16(sample, kWpShift);
+    return vmin_s16(vmax_s16(v, vdup_n_s16(0)), vdup_n_s16(kPixelMax));
+  }
+}
+
+/*
+ * Vertical sums of four output rows: row I uses input rows I .. I + TAPS - 1,
+ * so the TAPS + 3 input rows are loaded once. N is 8 or 4 columns (lo only).
+ */
+template <int TAPS, int N, int J, int I>
+KVZ_FORCE_INLINE void ver_acc4(int32x4_t (&lo)[4], int32x4_t (&hi)[4], int16x8_t v, int16x8_t c)
+{
+  constexpr int K = J - I;
+  if constexpr (K >= 0 && K < TAPS) {
+    if constexpr (K == 0) {
+      lo[I] = vmull_laneq_s16(vget_low_s16(v), c, K);
+      if constexpr (N == 8) hi[I] = vmull_high_laneq_s16(v, c, K);
+    } else {
+      lo[I] = vmlal_laneq_s16(lo[I], vget_low_s16(v), c, K);
+      if constexpr (N == 8) hi[I] = vmlal_high_laneq_s16(hi[I], v, c, K);
+    }
+  }
+}
+
+template <int TAPS, int N, int J>
+KVZ_FORCE_INLINE void ver_row4(const int16_t *s, intptr_t stride, int16x8_t c,
+                               int32x4_t (&lo)[4], int32x4_t (&hi)[4])
+{
+  const int16x8_t v = N == 8 ? vld1q_s16(s + J * stride) : vcombine_s16(vld1_s16(s + J * stride), vdup_n_s16(0));
+  ver_acc4<TAPS, N, J, 0>(lo, hi, v, c);
+  ver_acc4<TAPS, N, J, 1>(lo, hi, v, c);
+  ver_acc4<TAPS, N, J, 2>(lo, hi, v, c);
+  ver_acc4<TAPS, N, J, 3>(lo, hi, v, c);
+}
+
+template <int TAPS, int N, size_t... J>
+KVZ_FORCE_INLINE void ver_sums_x4(const int16_t *s, intptr_t stride, int16x8_t c,
+                                  int32x4_t (&lo)[4], int32x4_t (&hi)[4], std::index_sequence<J...>)
+{
+  (ver_row4<TAPS, N, (int)J>(s, stride, c, lo, hi), ...);
+}
+
+template <VerMode MODE>
+inline void ver_scalar(const int8_t *filter, int taps, const int16_t *src, int src_stride, int16_t *dst)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < taps; ++k) sum += filter[k] * src[(intptr_t)k * src_stride];
+  if constexpr (MODE == VER_PX) {
+    *dst = (int16_t)clip_px(((sum >> 6) + kWpOffset) >> kWpShift);
+  } else {
+    const int16_t sample = (int16_t)(sum >> 6);
+    if constexpr (MODE == VER_HI) *dst = sample;
+    else *dst = (int16_t)clip_px((sample + kWpOffset) >> kWpShift);
+  }
+}
+
+/*
+ * Vertical pass over int16 intermediates. src points to the first tap row of
+ * output row 0 and has height + taps - 1 rows. dst holds pixels for the
+ * VER_PX modes and int16 values for VER_HI; both are 16-bit.
+ */
+template <int TAPS, VerMode MODE>
+void ver_pass_t(const int8_t *filter, int width, int height, const int16_t *src, int src_stride,
+                int16_t *dst, int dst_stride)
+{
+  const int16x8_t c = load_taps<TAPS>(filter);
+  int y = 0;
+
+  // Four rows at a time.
+  for (; y + 4 <= height; y += 4) {
+    const int16_t *s = src + (intptr_t)y * src_stride;
+    int16_t *d = dst + (intptr_t)y * dst_stride;
+    int x = 0;
+    for (; x + 8 <= width; x += 8) {
+      int32x4_t lo[4], hi[4];
+      ver_sums_x4<TAPS, 8>(s + x, src_stride, c, lo, hi, std::make_index_sequence<TAPS + 3>());
+      vst1q_s16(d + x + 0 * dst_stride, ver_round8<MODE>(lo[0], hi[0]));
+      vst1q_s16(d + x + 1 * dst_stride, ver_round8<MODE>(lo[1], hi[1]));
+      vst1q_s16(d + x + 2 * dst_stride, ver_round8<MODE>(lo[2], hi[2]));
+      vst1q_s16(d + x + 3 * dst_stride, ver_round8<MODE>(lo[3], hi[3]));
+    }
+    if (x + 4 <= width) {
+      int32x4_t lo[4], hi[4];
+      ver_sums_x4<TAPS, 4>(s + x, src_stride, c, lo, hi, std::make_index_sequence<TAPS + 3>());
+      vst1_s16(d + x + 0 * dst_stride, ver_round4<MODE>(lo[0]));
+      vst1_s16(d + x + 1 * dst_stride, ver_round4<MODE>(lo[1]));
+      vst1_s16(d + x + 2 * dst_stride, ver_round4<MODE>(lo[2]));
+      vst1_s16(d + x + 3 * dst_stride, ver_round4<MODE>(lo[3]));
+      x += 4;
+    }
+    // Chroma blocks of width 2 and 6.
+    for (; x < width; ++x) {
+      for (int i = 0; i < 4; ++i) {
+        ver_scalar<MODE>(filter, TAPS, s + (intptr_t)i * src_stride + x, src_stride, d + (intptr_t)i * dst_stride + x);
+      }
+    }
+  }
+
+  for (; y < height; ++y) {
+    const int16_t *s = src + (intptr_t)y * src_stride;
+    int16_t *d = dst + (intptr_t)y * dst_stride;
+    int x = 0;
+    for (; x + 8 <= width; x += 8) {
+      int32x4_t lo, hi;
+      sums8<TAPS>(s + x, src_stride, c, lo, hi);
+      vst1q_s16(d + x, ver_round8<MODE>(lo, hi));
+    }
+    if (x + 4 <= width) {
+      vst1_s16(d + x, ver_round4<MODE>(sums4<TAPS>(s + x, src_stride, c)));
+      x += 4;
+    }
+    // Chroma blocks of width 2 and 6.
+    for (; x < width; ++x) ver_scalar<MODE>(filter, TAPS, s + x, src_stride, d + x);
+  }
+}
+
+void ver_pass(const int8_t *filter, int taps, int width, int height, const int16_t *src, int src_stride,
+              int16_t *dst, int dst_stride, VerMode mode)
+{
+  const int center = taps / 2 - 1;
+
+  if (filter[center] == 64) {
+    // Integer position: (64 * h) >> 6 == h, so the int16 store does not wrap.
+    for (int y = 0; y < height; ++y) {
+      const int16_t *s = src + (intptr_t)(y + center) * src_stride;
+      int16_t *d = dst + (intptr_t)y * dst_stride;
+      if (mode == VER_HI) {
+        memcpy(d, s, width * sizeof(int16_t));
+        continue;
+      }
+      const int16x8_t max = vdupq_n_s16(kPixelMax);
+      const int16x8_t zero = vdupq_n_s16(0);
+      int x = 0;
+      for (; x + 8 <= width; x += 8) {
+        vst1q_s16(d + x, vminq_s16(vmaxq_s16(vrshrq_n_s16(vld1q_s16(s + x), kWpShift), zero), max));
+      }
+      for (; x + 4 <= width; x += 4) {
+        vst1_s16(d + x, vmin_s16(vmax_s16(vrshr_n_s16(vld1_s16(s + x), kWpShift), vget_low_s16(zero)), vget_low_s16(max)));
+      }
+      for (; x < width; ++x) d[x] = (int16_t)clip_px((s[x] + kWpOffset) >> kWpShift);
+    }
+    return;
+  }
+
+  if (taps == 8) {
+    switch (mode) {
+      case VER_PX: ver_pass_t<8, VER_PX>(filter, width, height, src, src_stride, dst, dst_stride); break;
+      case VER_PX_WRAP: ver_pass_t<8, VER_PX_WRAP>(filter, width, height, src, src_stride, dst, dst_stride); break;
+      default: ver_pass_t<8, VER_HI>(filter, width, height, src, src_stride, dst, dst_stride); break;
+    }
+  } else {
+    if (mode == VER_PX) ver_pass_t<4, VER_PX>(filter, width, height, src, src_stride, dst, dst_stride);
+    else ver_pass_t<4, VER_HI>(filter, width, height, src, src_stride, dst, dst_stride);
+  }
+}
+
+inline int16_t *px16(kvz_pixel *p) { return reinterpret_cast<int16_t *>(p); }
+
+/*
+ * The first column of the block filters: col[y] = (sum_k f[k] * src[y][k]) >> shift1
+ * for y < rows, src pointing to the first tap of row 0.
+ */
+void hor_first_col(const int8_t *filter, const kvz_pixel *src, int src_stride, int rows, int16_t *col)
+{
+  const int16x8_t c = load_taps<8>(filter);
+  for (int y = 0; y < rows; ++y) {
+    const int16x8_t v = load8(src + (intptr_t)y * src_stride);
+    int32x4_t acc = vmull_s16(vget_low_s16(v), vget_low_s16(c));
+    acc = vmlal_high_s16(acc, v, c);
+    col[y] = (int16_t)(vaddvq_s32(acc) >> kShift1);
+  }
+}
+
+// One sample of a first column: clip(((int16_t)(sum >> 6) + offset) >> shift).
+kvz_pixel col_sample(const int8_t *filter, const int16_t *col)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < 8; ++k) sum += filter[k] * col[k];
+  const int16_t sample = (int16_t)(sum >> 6);
+  return clip_px((sample + kWpOffset) >> kWpShift);
+}
+
+/*
+ * Vertical 8-tap filter of a first column, written to column 0 of the n rows
+ * of dst: dst[y][0] = col_sample(filter, &col[y]). n is a multiple of 8.
+ */
+void col_filter(const int8_t *filter, const int16_t *col, int n, kvz_pixel *dst, int dst_stride)
+{
+  const int16x8_t c = load_taps<8>(filter);
+  for (int i = 0; i < n; i += 8) {
+    int32x4_t lo, hi;
+    sums8<8>(col + i, 1, c, lo, hi);
+    const uint16x8_t v = vreinterpretq_u16_s16(ver_round8<VER_PX_WRAP>(lo, hi));
+    kvz_pixel *d = dst + (intptr_t)i * dst_stride;
+    d[0 * dst_stride] = vgetq_lane_u16(v, 0);
+    d[1 * dst_stride] = vgetq_lane_u16(v, 1);
+    d[2 * dst_stride] = vgetq_lane_u16(v, 2);
+    d[3 * dst_stride] = vgetq_lane_u16(v, 3);
+    d[4 * dst_stride] = vgetq_lane_u16(v, 4);
+    d[5 * dst_stride] = vgetq_lane_u16(v, 5);
+    d[6 * dst_stride] = vgetq_lane_u16(v, 6);
+    d[7 * dst_stride] = vgetq_lane_u16(v, 7);
+  }
+}
+
+// dst[y][x] = src[y][x - 1] for 1 <= x < width; dst[y][0] is set by the caller.
+// width is a multiple of 8. src[0][-1] must be readable.
+void copy_shifted(const kvz_pixel *src, kvz_pixel *dst, int width, int height, int stride)
+{
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; x += 8) {
+      vst1q_u16(dst + (intptr_t)y * stride + x, vld1q_u16(src + (intptr_t)y * stride + x - 1));
+    }
+  }
+}
+
+void copy_rows(const kvz_pixel *src, kvz_pixel *dst, int width, int height, int stride)
+{
+  for (int y = 0; y < height; ++y) {
+    memcpy(dst + (intptr_t)y * stride, src + (intptr_t)y * stride, width * sizeof(kvz_pixel));
+  }
+}
+
+/*
+ * A quarter-pel block of the block filters: the vertical filter over the
+ * horizontal intermediate rows starting at im. When shift is set, output
+ * column x comes from intermediate column x - 1 and column 0 from the first
+ * column buffer col. The vertical pass then reads column -1 (the end of the
+ * previous row or buffer) for column 0, which is overwritten.
+ */
+void qpel_block(const int8_t *filter, const int16_t *im, const int16_t *col, int shift,
+                int width, int height, kvz_pixel *dst)
+{
+  ver_pass(filter, 8, width, height, im - shift, LCU_WIDTH, px16(dst), LCU_WIDTH, VER_PX);
+  if (shift) col_filter(filter, col, height, dst, LCU_WIDTH);
+}
+
+void filter_hpel_blocks_hor_ver_luma_neon(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  (void)encoder; (void)hpel_off_x; (void)hpel_off_y;
+  const int8_t *fir0 = kvz_g_luma_filter[0];
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int stride = LCU_WIDTH;
+
+  // Horizontally filtered samples from the top row are
+  // not needed unless samples for diagonal positions are filtered later.
+  const int first_y = fme_level > 1 ? 0 : 1;
+  const int rows = height + KVZ_EXT_PADDING_LUMA + 1;
+
+  // First taps of hor_intermediate[][0] and of the first columns.
+  const kvz_pixel *col_base = src - KVZ_LUMA_FILTER_OFFSET * src_stride - KVZ_LUMA_FILTER_OFFSET;
+  const kvz_pixel *im_base = col_base + 1;
+
+  int16_t *col_pos0 = hor_first_cols[0];
+  int16_t *col_pos2 = hor_first_cols[2];
+
+  // HORIZONTAL STEP
+  // Integer pixels
+  hor_pass(fir0, 8, width, rows, im_base, src_stride, hor_intermediate[0], stride);
+  for (int y = 0; y < rows; ++y) {
+    col_pos0[y] = (int16_t)(col_base[(intptr_t)y * src_stride + KVZ_LUMA_FILTER_OFFSET] << (6 - kShift1));
+  }
+
+  // Half pixels
+  hor_pass(fir2, 8, width, rows - first_y, im_base + (intptr_t)first_y * src_stride, src_stride,
+           hor_intermediate[1] + first_y * stride, stride);
+  hor_first_col(fir2, col_base + (intptr_t)first_y * src_stride, src_stride, rows - first_y, col_pos2 + first_y);
+
+  // VERTICAL STEP
+  kvz_pixel *out_l = filtered[0];
+  kvz_pixel *out_r = filtered[1];
+  kvz_pixel *out_t = filtered[2];
+  kvz_pixel *out_b = filtered[3];
+
+  // Right: only the horizontal filter (rows 4 .. height + 3 of the intermediate)
+  ver_pass(fir0, 8, width, height, hor_intermediate[1] + stride, stride, px16(out_r), stride, VER_PX);
+
+  // Left: the right block shifted by one column and the extra column
+  copy_shifted(out_r, out_l, width, height, stride);
+  for (int y = 0; y < height; ++y) {
+    out_l[y * stride] = clip_px((col_pos2[y + KVZ_LUMA_FILTER_OFFSET + 1] + kWpOffset) >> kWpShift);
+  }
+
+  // Top: only the vertical filter. The integer intermediate is the sample
+  // times 1 << (6 - shift1), so filtering it and rounding by 6 + wp_shift
+  // equals the generic (sum >> shift1 + offset) >> wp_shift.
+  ver_pass(fir2, 8, width, height, hor_intermediate[0], stride, px16(out_t), stride, VER_PX);
+
+  // Bottom: the top block shifted by one row and the last row
+  copy_rows(out_t + stride, out_b, width, height - 1, stride);
+  ver_pass(fir2, 8, width, 1, hor_intermediate[0] + height * stride, stride,
+           px16(out_b + (height - 1) * stride), stride, VER_PX);
+}
+
+void filter_hpel_blocks_diag_luma_neon(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  (void)encoder; (void)src; (void)src_stride; (void)fme_level; (void)hpel_off_x; (void)hpel_off_y;
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int stride = LCU_WIDTH;
+
+  const int16_t *hor_pos2 = hor_intermediate[1];
+  const int16_t *col_pos2 = hor_first_cols[2];
+
+  kvz_pixel *out_tl = filtered[0];
+  kvz_pixel *out_tr = filtered[1];
+  kvz_pixel *out_bl = filtered[2];
+  kvz_pixel *out_br = filtered[3];
+
+  // Top-right
+  ver_pass(fir2, 8, width, height, hor_pos2, stride, px16(out_tr), stride, VER_PX_WRAP);
+
+  // Top-left: the top-right block shifted by one column and the filtered extra column
+  copy_shifted(out_tr, out_tl, width, height, stride);
+  col_filter(fir2, col_pos2, height, out_tl, stride);
+
+  // Bottom-right: the top-right block shifted by one row and the last row
+  copy_rows(out_tr + stride, out_br, width, height - 1, stride);
+  ver_pass(fir2, 8, width, 1, hor_pos2 + height * stride, stride,
+           px16(out_br + (height - 1) * stride), stride, VER_PX_WRAP);
+
+  // Bottom-left: the top-left block shifted by one row, the last row from
+  // the bottom-right block and the last sample from the column buffer
+  copy_rows(out_tl + stride, out_bl, width, height - 1, stride);
+  copy_shifted(out_br + (height - 1) * stride, out_bl + (height - 1) * stride, width, 1, stride);
+  out_bl[(height - 1) * stride] = col_sample(fir2, col_pos2 + height);
+}
+
+void filter_qpel_blocks_hor_ver_luma_neon(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  (void)encoder; (void)fme_level;
+  const int8_t *fir0 = kvz_g_luma_filter[0];
+  const int8_t *fir1 = kvz_g_luma_filter[1];
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int8_t *fir3 = kvz_g_luma_filter[3];
+  const int stride = LCU_WIDTH;
+
+  // Horizontal positions. Positions 0 and 2 have already been calculated.
+  const int16_t *hor_pos0 = hor_intermediate[0];
+  const int16_t *hor_pos2 = hor_intermediate[1];
+  int16_t *hor_pos_l = hor_intermediate[3];
+  int16_t *hor_pos_r = hor_intermediate[4];
+  const int8_t *hor_fir_l = hpel_off_x != 0 ? fir1 : fir3;
+  const int8_t *hor_fir_r = hpel_off_x != 0 ? fir3 : fir1;
+  int16_t *col_pos_l = hor_first_cols[1];
+  int16_t *col_pos_r = hor_first_cols[3];
+
+  const int16_t *hor_hpel_pos = hpel_off_x != 0 ? hor_pos2 : hor_pos0;
+  const int16_t *col_pos_hor = hpel_off_x != 0 ? hor_first_cols[2] : hor_first_cols[0];
+
+  // Specify if integer pixels are filtered from left or/and top integer samples
+  const int off_x_fir_l = hpel_off_x < 1 ? 0 : 1;
+  const int off_x_fir_r = hpel_off_x < 0 ? 0 : 1;
+  const int off_y_fir_t = hpel_off_y < 1 ? 0 : 1;
+  const int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
+  const int sample_off_y = hpel_off_y < 0 ? 0 : 1;
+  const int sample_off_x = hpel_off_x > -1 ? 1 : 0;
+
+  const int rows = height + KVZ_EXT_PADDING_LUMA + 1;
+  const kvz_pixel *col_base = src - KVZ_LUMA_FILTER_OFFSET * src_stride - KVZ_LUMA_FILTER_OFFSET;
+  const kvz_pixel *im_base = col_base + 1;
+
+  // HORIZONTAL STEP
+  hor_pass(hor_fir_l, 8, width, rows, im_base, src_stride, hor_pos_l, stride);
+  hor_first_col(hor_fir_l, col_base, src_stride, rows, col_pos_l);
+  hor_pass(hor_fir_r, 8, width, rows, im_base, src_stride, hor_pos_r, stride);
+  hor_first_col(hor_fir_r, col_base, src_stride, rows, col_pos_r);
+
+  // VERTICAL STEP
+  const int8_t *ver_fir_l = hpel_off_y != 0 ? fir2 : fir0;
+  const int8_t *ver_fir_r = hpel_off_y != 0 ? fir2 : fir0;
+  const int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
+  const int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
+
+  // Left QPEL (1/4 or 3/4 x positions)
+  qpel_block(ver_fir_l, hor_pos_l + sample_off_y * stride, col_pos_l + sample_off_y,
+             !off_x_fir_l, width, height, filtered[0]);
+  // Right QPEL (3/4 or 1/4 x positions)
+  qpel_block(ver_fir_r, hor_pos_r + sample_off_y * stride, col_pos_r + sample_off_y,
+             !off_x_fir_r, width, height, filtered[1]);
+  // Top QPEL (1/4 or 3/4 y positions)
+  qpel_block(ver_fir_t, hor_hpel_pos + off_y_fir_t * stride, col_pos_hor + off_y_fir_t,
+             !sample_off_x, width, height, filtered[2]);
+  // Bottom QPEL (3/4 or 1/4 y positions)
+  qpel_block(ver_fir_b, hor_hpel_pos + off_y_fir_b * stride, col_pos_hor + off_y_fir_b,
+             !sample_off_x, width, height, filtered[3]);
+}
+
+void filter_qpel_blocks_diag_luma_neon(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  (void)encoder; (void)src; (void)src_stride; (void)fme_level;
+  const int8_t *fir1 = kvz_g_luma_filter[1];
+  const int8_t *fir3 = kvz_g_luma_filter[3];
+  const int stride = LCU_WIDTH;
+
+  const int16_t *hor_pos_l = hor_intermediate[3];
+  const int16_t *hor_pos_r = hor_intermediate[4];
+  const int16_t *col_pos_l = hor_first_cols[1];
+  const int16_t *col_pos_r = hor_first_cols[3];
+
+  const int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
+  const int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
+
+  // Specify if integer pixels are filtered from left or/and top integer samples
+  const int off_x_fir_l = hpel_off_x < 1 ? 0 : 1;
+  const int off_x_fir_r = hpel_off_x < 0 ? 0 : 1;
+  const int off_y_fir_t = hpel_off_y < 1 ? 0 : 1;
+  const int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
+
+  // Top-left QPEL
+  qpel_block(ver_fir_t, hor_pos_l + off_y_fir_t * stride, col_pos_l + off_y_fir_t,
+             !off_x_fir_l, width, height, filtered[0]);
+  // Top-right QPEL
+  qpel_block(ver_fir_t, hor_pos_r + off_y_fir_t * stride, col_pos_r + off_y_fir_t,
+             !off_x_fir_r, width, height, filtered[1]);
+  // Bottom-left QPEL
+  qpel_block(ver_fir_b, hor_pos_l + off_y_fir_b * stride, col_pos_l + off_y_fir_b,
+             !off_x_fir_l, width, height, filtered[2]);
+  // Bottom-right QPEL
+  qpel_block(ver_fir_b, hor_pos_r + off_y_fir_b * stride, col_pos_r + off_y_fir_b,
+             !off_x_fir_r, width, height, filtered[3]);
+}
+
+/*
+ * Motion compensation: horizontal pass into an int16 buffer and vertical
+ * pass. When the vertical filter is the integer one, only the rows it uses
+ * are filtered horizontally.
+ */
+void sample_block(const int8_t *hor_fir, const int8_t *ver_fir, int taps,
+                  const kvz_pixel *src, int src_stride, int width, int height,
+                  int16_t *dst, int dst_stride, VerMode mode)
+{
+  int16_t im[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
+  const int offset = taps / 2 - 1;
+  const kvz_pixel *base = src - (intptr_t)offset * src_stride - offset;
+
+  if (ver_fir[offset] == 64) {
+    hor_pass(hor_fir, taps, width, height, base + (intptr_t)offset * src_stride, src_stride,
+             im + offset * LCU_WIDTH, LCU_WIDTH);
+  } else {
+    hor_pass(hor_fir, taps, width, height + taps - 1, base, src_stride, im, LCU_WIDTH);
+  }
+  ver_pass(ver_fir, taps, width, height, im, LCU_WIDTH, dst, dst_stride, mode);
+}
+
+const int8_t *chroma_filter(const encoder_control_t *encoder, int16_t mv, bool vertical)
+{
+  const int shift = vertical ? encoder->cfg.chroma_shift_h : encoder->cfg.chroma_shift_w;
+  const int mask = shift ? 7 : 3;
+  return kvz_g_chroma_filter[(mv & mask) << (1 - shift)];
+}
+
+void sample_quarterpel_luma_neon(const encoder_control_t *const encoder,
+                                 kvz_pixel *src, int16_t src_stride,
+                                 int width, int height,
+                                 kvz_pixel *dst, int16_t dst_stride,
+                                 int8_t hor_flag, int8_t ver_flag,
+                                 const int16_t mv[2])
+{
+  (void)encoder; (void)hor_flag; (void)ver_flag;
+  sample_block(kvz_g_luma_filter[mv[0] & 3], kvz_g_luma_filter[mv[1] & 3], 8,
+               src, src_stride, width, height, px16(dst), dst_stride, VER_PX);
+}
+
+void sample_quarterpel_luma_hi_neon(const encoder_control_t *const encoder,
+                                    kvz_pixel *src, int16_t src_stride,
+                                    int width, int height,
+                                    int16_t *dst, int16_t dst_stride,
+                                    int8_t hor_flag, int8_t ver_flag,
+                                    const int16_t mv[2])
+{
+  (void)encoder; (void)hor_flag; (void)ver_flag;
+  sample_block(kvz_g_luma_filter[mv[0] & 3], kvz_g_luma_filter[mv[1] & 3], 8,
+               src, src_stride, width, height, dst, dst_stride, VER_HI);
+}
+
+void sample_octpel_chroma_neon(const encoder_control_t *const encoder,
+                               kvz_pixel *src, int16_t src_stride,
+                               int width, int height,
+                               kvz_pixel *dst, int16_t dst_stride,
+                               int8_t hor_flag, int8_t ver_flag,
+                               const int16_t mv[2])
+{
+  (void)hor_flag; (void)ver_flag;
+  sample_block(chroma_filter(encoder, mv[0], false), chroma_filter(encoder, mv[1], true), 4,
+               src, src_stride, width, height, px16(dst), dst_stride, VER_PX);
+}
+
+void sample_octpel_chroma_hi_neon(const encoder_control_t *const encoder,
+                                  kvz_pixel *src, int16_t src_stride,
+                                  int width, int height,
+                                  int16_t *dst, int16_t dst_stride,
+                                  int8_t hor_flag, int8_t ver_flag,
+                                  const int16_t mv[2])
+{
+  (void)hor_flag; (void)ver_flag;
+  sample_block(chroma_filter(encoder, mv[0], false), chroma_filter(encoder, mv[1], true), 4,
+               src, src_stride, width, height, dst, dst_stride, VER_HI);
+}
+
+} // namespace
+
+int kvz_strategy_register_ipol_neon(void* opaque, uint8_t bitdepth)
+{
+  bool success = true;
+
+  if (bitdepth == KVZ_BIT_DEPTH) {
     success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "neon", 40, KVZ_STRATEGY_FPTR(sample_quarterpel_luma_neon));
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "neon", 40, KVZ_STRATEGY_FPTR(sample_octpel_chroma_neon));
     success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "neon", 40, KVZ_STRATEGY_FPTR(sample_quarterpel_luma_hi_neon));

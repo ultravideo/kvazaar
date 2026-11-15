@@ -49,6 +49,7 @@ extern SUITE(strategy_diff_tests);
 extern SUITE(temporal_filter_tests);
 extern SUITE(simd_sad_tests);
 extern SUITE(simd_satd_tests);
+extern SUITE(simd_ipol_tests);
 
 extern SUITE(coeff_sum_tests);
 extern SUITE(mv_cand_tests);
@@ -82,6 +83,7 @@ int main(int argc, char **argv)
   RUN_SUITE(temporal_filter_tests);
   RUN_SUITE(simd_sad_tests);
   RUN_SUITE(simd_satd_tests);
+  RUN_SUITE(simd_ipol_tests);
 
   RUN_SUITE(mv_cand_tests);
 

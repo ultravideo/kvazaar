@@ -1315,6 +1315,845 @@ static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
   kvz_ipol_4tap_ver_im_hi_avx2(ver_fir, width, height, hor_intermediate, hor_stride, dst, dst_stride);
 }
 
+
+#if KVZ_BIT_DEPTH > 8
+
+/*
+ * 10 and 12-bit interpolation.
+ *
+ * kvz_pixel is uint16_t and the samples are at most PIXEL_MAX < 2^15, so they
+ * can be used directly as int16 operands of _mm256_madd_epi16. The products
+ * and sums of both passes need 32-bit lanes: the horizontal sum is up to
+ * 88 * PIXEL_MAX before the shift by KVZ_BIT_DEPTH - 8 (the shifted value fits
+ * int16), and the vertical sum over int16 intermediates is up to about 2^21.
+ *
+ * The intermediate buffers of the block filters (hor_intermediate and
+ * hor_first_cols) have the same layout and contents as in the generic
+ * functions, so these functions can be mixed with the generic ones. Like the
+ * 8-bit versions, the block filters require the width and height to be
+ * multiples of 8, which search_frac guarantees by rounding the block size up.
+ *
+ * Only the samples the generic functions read are loaded.
+ */
+
+#define HBD_SHIFT1 (KVZ_BIT_DEPTH - 8)
+#define HBD_WP_SHIFT (14 - KVZ_BIT_DEPTH)
+#define HBD_WP_OFFSET (1 << (HBD_WP_SHIFT - 1))
+
+// Rounding of the vertical pass.
+enum {
+  // clip(((sum >> 6) + offset) >> shift) in 32 bits, as in the sample functions.
+  HBD_VER_PX = 0,
+  // The block filters store sum >> 6 in an int16_t before the rounding, which
+  // wraps for the extreme half-pel diagonal sums (88 * 88 + 24 * 24 times
+  // PIXEL_MAX >> (KVZ_BIT_DEPTH - 2) > 32767). All other filter combinations
+  // stay below 30000, where HBD_VER_PX gives the same result.
+  HBD_VER_PX_WRAP = 1,
+  // (int16_t)(sum >> 6), the _hi sample functions.
+  HBD_VER_HI = 2,
+};
+
+// Taps k and k + 1 as a pair of int16 in every 32-bit lane.
+static INLINE __m256i hbd_tap_pair(const int8_t *filter, int k)
+{
+  const uint32_t lo = (uint16_t)(int16_t)filter[k];
+  const uint32_t hi = (uint16_t)(int16_t)filter[k + 1];
+  return _mm256_set1_epi32((int32_t)(lo | (hi << 16)));
+}
+
+static INLINE kvz_pixel hbd_clip_px(int32_t value)
+{
+  return (kvz_pixel)CLIP(0, PIXEL_MAX, value);
+}
+
+/*
+ * Eight horizontal sums per 128-bit lane: out[j] = sum_k f[k] * p[j + k] with
+ * the lane's samples p[0..7] in v0 and p[8..14] in v1. The even outputs come
+ * from v0 shifted by 0, 2, 4 and 6 samples, the odd ones from v0 shifted by
+ * 1, 3, 5 and 7 samples. Returns outputs 0..3 in *lo and 4..7 in *hi.
+ */
+static FORCE_INLINE void hbd_hor_sums(__m256i v0, __m256i v1, const __m256i *w, int taps,
+                                __m256i *lo, __m256i *hi)
+{
+  __m256i even = _mm256_madd_epi16(v0, w[0]);
+  __m256i odd = _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 2), w[0]);
+  even = _mm256_add_epi32(even, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 4), w[1]));
+  odd = _mm256_add_epi32(odd, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 6), w[1]));
+  if (taps == 8) {
+    even = _mm256_add_epi32(even, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 8), w[2]));
+    odd = _mm256_add_epi32(odd, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 10), w[2]));
+    even = _mm256_add_epi32(even, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 12), w[3]));
+    odd = _mm256_add_epi32(odd, _mm256_madd_epi16(_mm256_alignr_epi8(v1, v0, 14), w[3]));
+  }
+  *lo = _mm256_unpacklo_epi32(even, odd);
+  *hi = _mm256_unpackhi_epi32(even, odd);
+}
+
+// (sum >> shift1) as int16. The shifted sums always fit int16.
+static INLINE __m256i hbd_hor_pack(__m256i lo, __m256i hi)
+{
+  return _mm256_packs_epi32(_mm256_srai_epi32(lo, HBD_SHIFT1), _mm256_srai_epi32(hi, HBD_SHIFT1));
+}
+
+/*
+ * v1 for eight outputs: samples p[8 .. taps + 6]. The load ends at the last
+ * sample used and is shifted down so that the lane starts at p[8].
+ */
+static FORCE_INLINE __m128i hbd_load_v1(const kvz_pixel *p, int taps)
+{
+  const __m128i t = _mm_loadu_si128((const __m128i *)(p + taps - 1));
+  return taps == 8 ? _mm_srli_si128(t, 2) : _mm_srli_si128(t, 10);
+}
+
+// v0 and v1 for four outputs (samples p[0 .. taps + 2]).
+static FORCE_INLINE __m128i hbd_load_4out(const kvz_pixel *p, int taps, __m128i *v1)
+{
+  if (taps == 8) {
+    *v1 = _mm_srli_si128(_mm_loadl_epi64((const __m128i *)(p + 7)), 2);
+    return _mm_loadu_si128((const __m128i *)p);
+  }
+  *v1 = _mm_setzero_si128();
+  // p[0..3] and p[3..6]; sample 3 is in both.
+  return _mm_or_si128(_mm_loadl_epi64((const __m128i *)p),
+                      _mm_slli_si128(_mm_loadl_epi64((const __m128i *)(p + 3)), 6));
+}
+
+static INLINE __m256i hbd_combine(__m128i lane0, __m128i lane1)
+{
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(lane0), lane1, 1);
+}
+
+static int16_t hbd_hor_scalar(const int8_t *filter, int taps, const kvz_pixel *p)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < taps; ++k) sum += filter[k] * p[k];
+  return (int16_t)(sum >> HBD_SHIFT1);
+}
+
+/*
+ * Horizontal pass: dst[y][x] = (sum_k f[k] * src[y][x + k]) >> shift1 for
+ * `rows` rows. src points to the first tap of output (0, 0).
+ */
+static FORCE_INLINE void hbd_hor_pass_taps(const int8_t *filter, const int taps, int width, int rows,
+                                           const kvz_pixel *src, int src_stride,
+                                           int16_t *dst, int dst_stride)
+{
+  const int center = taps / 2 - 1;
+
+  if (filter[center] == 64) {
+    // Integer position: (64 * p) >> shift1 == p << (6 - shift1).
+    for (int y = 0; y < rows; ++y) {
+      const kvz_pixel *s = src + y * src_stride + center;
+      int16_t *d = dst + y * dst_stride;
+      int x = 0;
+      for (; x + 16 <= width; x += 16) {
+        __m256i v = _mm256_loadu_si256((const __m256i *)(s + x));
+        _mm256_storeu_si256((__m256i *)(d + x), _mm256_slli_epi16(v, 6 - HBD_SHIFT1));
+      }
+      if (x + 8 <= width) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(s + x));
+        _mm_storeu_si128((__m128i *)(d + x), _mm_slli_epi16(v, 6 - HBD_SHIFT1));
+        x += 8;
+      }
+      if (x + 4 <= width) {
+        __m128i v = _mm_loadl_epi64((const __m128i *)(s + x));
+        _mm_storel_epi64((__m128i *)(d + x), _mm_slli_epi16(v, 6 - HBD_SHIFT1));
+        x += 4;
+      }
+      for (; x < width; ++x) d[x] = (int16_t)(s[x] << (6 - HBD_SHIFT1));
+    }
+    return;
+  }
+
+  __m256i w[4];
+  for (int k = 0; k < taps / 2; ++k) w[k] = hbd_tap_pair(filter, 2 * k);
+
+  int x = 0;
+
+  // 16 outputs of one row: lane 0 has outputs 0..7 and lane 1 outputs 8..15.
+  for (; x + 16 <= width; x += 16) {
+    for (int y = 0; y < rows; ++y) {
+      const kvz_pixel *p = src + y * src_stride + x;
+      __m256i v0 = _mm256_loadu_si256((const __m256i *)p);
+      __m256i v1 = _mm256_loadu_si256((const __m256i *)(p + taps - 1));
+      v1 = taps == 8 ? _mm256_srli_si256(v1, 2) : _mm256_srli_si256(v1, 10);
+      __m256i lo, hi;
+      hbd_hor_sums(v0, v1, w, taps, &lo, &hi);
+      _mm256_storeu_si256((__m256i *)(dst + y * dst_stride + x), hbd_hor_pack(lo, hi));
+    }
+  }
+
+  // Narrower columns: two rows at a time, one in each lane. With an odd row
+  // count the last row is computed twice.
+  if (x + 8 <= width) {
+    for (int y = 0; y < rows; y += 2) {
+      const int y1 = y + 1 < rows ? y + 1 : y;
+      const kvz_pixel *p0 = src + y * src_stride + x;
+      const kvz_pixel *p1 = src + y1 * src_stride + x;
+      __m256i v0 = hbd_combine(_mm_loadu_si128((const __m128i *)p0), _mm_loadu_si128((const __m128i *)p1));
+      __m256i v1 = hbd_combine(hbd_load_v1(p0, taps), hbd_load_v1(p1, taps));
+      __m256i lo, hi;
+      hbd_hor_sums(v0, v1, w, taps, &lo, &hi);
+      __m256i res = hbd_hor_pack(lo, hi);
+      _mm_storeu_si128((__m128i *)(dst + y * dst_stride + x), _mm256_castsi256_si128(res));
+      _mm_storeu_si128((__m128i *)(dst + y1 * dst_stride + x), _mm256_extracti128_si256(res, 1));
+    }
+    x += 8;
+  }
+
+  if (x + 4 <= width) {
+    for (int y = 0; y < rows; y += 2) {
+      const int y1 = y + 1 < rows ? y + 1 : y;
+      __m128i v1_0, v1_1;
+      __m128i v0_0 = hbd_load_4out(src + y * src_stride + x, taps, &v1_0);
+      __m128i v0_1 = hbd_load_4out(src + y1 * src_stride + x, taps, &v1_1);
+      __m256i lo, hi;
+      hbd_hor_sums(hbd_combine(v0_0, v0_1), hbd_combine(v1_0, v1_1), w, taps, &lo, &hi);
+      __m256i res = hbd_hor_pack(lo, hi);
+      _mm_storel_epi64((__m128i *)(dst + y * dst_stride + x), _mm256_castsi256_si128(res));
+      _mm_storel_epi64((__m128i *)(dst + y1 * dst_stride + x), _mm256_extracti128_si256(res, 1));
+    }
+    x += 4;
+  }
+
+  // Chroma blocks of width 2 and 6.
+  for (; x < width; ++x) {
+    for (int y = 0; y < rows; ++y) {
+      dst[y * dst_stride + x] = hbd_hor_scalar(filter, taps, src + y * src_stride + x);
+    }
+  }
+}
+
+static void hbd_hor_pass_avx2(const int8_t *filter, int taps, int width, int rows,
+                              const kvz_pixel *src, int src_stride,
+                              int16_t *dst, int dst_stride)
+{
+  if (taps == 8) hbd_hor_pass_taps(filter, 8, width, rows, src, src_stride, dst, dst_stride);
+  else hbd_hor_pass_taps(filter, 4, width, rows, src, src_stride, dst, dst_stride);
+}
+
+// Rounds the 32-bit vertical sums of two rows of eight (or four) columns and
+// packs them to 16 bits. Lane 0 holds the first row and lane 1 the second.
+static FORCE_INLINE __m256i hbd_ver_round(__m256i lo, __m256i hi, const int mode)
+{
+  const __m256i max = _mm256_set1_epi16(PIXEL_MAX);
+  if (mode == HBD_VER_PX) {
+    // ((sum >> 6) + offset) >> shift == (sum + (offset << 6)) >> (shift + 6)
+    const __m256i rnd = _mm256_set1_epi32(HBD_WP_OFFSET << 6);
+    lo = _mm256_srai_epi32(_mm256_add_epi32(lo, rnd), 6 + HBD_WP_SHIFT);
+    hi = _mm256_srai_epi32(_mm256_add_epi32(hi, rnd), 6 + HBD_WP_SHIFT);
+    return _mm256_min_epu16(_mm256_packus_epi32(lo, hi), max);
+  }
+  // int16_t sample = sum >> 6
+  lo = _mm256_srai_epi32(_mm256_slli_epi32(_mm256_srai_epi32(lo, 6), 16), 16);
+  hi = _mm256_srai_epi32(_mm256_slli_epi32(_mm256_srai_epi32(hi, 6), 16), 16);
+  if (mode == HBD_VER_HI) return _mm256_packs_epi32(lo, hi);
+  const __m256i off = _mm256_set1_epi32(HBD_WP_OFFSET);
+  lo = _mm256_srai_epi32(_mm256_add_epi32(lo, off), HBD_WP_SHIFT);
+  hi = _mm256_srai_epi32(_mm256_add_epi32(hi, off), HBD_WP_SHIFT);
+  return _mm256_min_epu16(_mm256_packus_epi32(lo, hi), max);
+}
+
+static void hbd_ver_scalar(const int8_t *filter, int taps, const int16_t *src, int src_stride,
+                           kvz_pixel *dst, int16_t *dst_hi, int mode)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < taps; ++k) sum += filter[k] * src[k * src_stride];
+  if (mode == HBD_VER_PX) {
+    *dst = hbd_clip_px(((sum >> 6) + HBD_WP_OFFSET) >> HBD_WP_SHIFT);
+  } else {
+    const int16_t sample = (int16_t)(sum >> 6);
+    if (mode == HBD_VER_HI) *dst_hi = sample;
+    else *dst = hbd_clip_px((sample + HBD_WP_OFFSET) >> HBD_WP_SHIFT);
+  }
+}
+
+/*
+ * One column strip of eight (n = 8) or four (n = 4) columns, two output rows
+ * per iteration. Every input row is broadcast to both lanes and
+ * R(k) = [row k | row k + 1]. Unpacking R(k) with R(k + 1) gives the sample
+ * pairs of rows (k, k + 1) for the first output row in lane 0 and of rows
+ * (k + 1, k + 2) for the second output row in lane 1, and each pair is used
+ * for taps / 2 consecutive iterations. With an odd height the last row is
+ * computed twice; no row after src row height + taps - 2 is read.
+ */
+static FORCE_INLINE void hbd_ver_strip(const int16_t *s, int src_stride, int height,
+                                       const __m256i *w, const int taps, const int n, const int mode,
+                                       kvz_pixel *dst, int16_t *dst_hi, int dst_stride)
+{
+#define HBD_BROW(r) (n == 8 ? \
+    _mm256_broadcastsi128_si256(_mm_loadu_si128((const __m128i *)(s + (r) * src_stride))) : \
+    _mm256_broadcastq_epi64(_mm_loadl_epi64((const __m128i *)(s + (r) * src_stride))))
+
+  const int last_row = height + taps - 2;
+  __m256i l0, l1 = _mm256_setzero_si256(), l2 = _mm256_setzero_si256();
+  __m256i h0, h1 = _mm256_setzero_si256(), h2 = _mm256_setzero_si256();
+  __m256i b0 = HBD_BROW(0);
+  __m256i b1 = HBD_BROW(1);
+  __m256i b2 = HBD_BROW(2);
+  __m256i r0 = _mm256_blend_epi32(b0, b1, 0xF0);
+  __m256i r1 = _mm256_blend_epi32(b1, b2, 0xF0);
+  l0 = _mm256_unpacklo_epi16(r0, r1);
+  h0 = _mm256_unpackhi_epi16(r0, r1);
+  if (taps == 8) {
+    b1 = HBD_BROW(3);
+    b0 = HBD_BROW(4);
+    r0 = _mm256_blend_epi32(b2, b1, 0xF0);
+    r1 = _mm256_blend_epi32(b1, b0, 0xF0);
+    l1 = _mm256_unpacklo_epi16(r0, r1);
+    h1 = _mm256_unpackhi_epi16(r0, r1);
+    b1 = HBD_BROW(5);
+    b2 = HBD_BROW(6);
+    r0 = _mm256_blend_epi32(b0, b1, 0xF0);
+    r1 = _mm256_blend_epi32(b1, b2, 0xF0);
+    l2 = _mm256_unpacklo_epi16(r0, r1);
+    h2 = _mm256_unpackhi_epi16(r0, r1);
+  }
+  // b2 is the last row loaded.
+
+  for (int y = 0; y < height; y += 2) {
+    b0 = b2;
+    b1 = HBD_BROW(y + taps - 1);
+    b2 = HBD_BROW(MIN(y + taps, last_row));
+    r0 = _mm256_blend_epi32(b0, b1, 0xF0);
+    r1 = _mm256_blend_epi32(b1, b2, 0xF0);
+    const __m256i ln = _mm256_unpacklo_epi16(r0, r1);
+    const __m256i hn = n == 8 ? _mm256_unpackhi_epi16(r0, r1) : ln;
+
+    __m256i lo, hi;
+    if (taps == 8) {
+      lo = _mm256_add_epi32(_mm256_add_epi32(_mm256_madd_epi16(l0, w[0]), _mm256_madd_epi16(l1, w[1])),
+                            _mm256_add_epi32(_mm256_madd_epi16(l2, w[2]), _mm256_madd_epi16(ln, w[3])));
+      l0 = l1;
+      l1 = l2;
+      l2 = ln;
+      if (n == 8) {
+        hi = _mm256_add_epi32(_mm256_add_epi32(_mm256_madd_epi16(h0, w[0]), _mm256_madd_epi16(h1, w[1])),
+                              _mm256_add_epi32(_mm256_madd_epi16(h2, w[2]), _mm256_madd_epi16(hn, w[3])));
+        h0 = h1;
+        h1 = h2;
+        h2 = hn;
+      } else {
+        hi = lo;
+      }
+    } else {
+      lo = _mm256_add_epi32(_mm256_madd_epi16(l0, w[0]), _mm256_madd_epi16(ln, w[1]));
+      l0 = ln;
+      if (n == 8) {
+        hi = _mm256_add_epi32(_mm256_madd_epi16(h0, w[0]), _mm256_madd_epi16(hn, w[1]));
+        h0 = hn;
+      } else {
+        hi = lo;
+      }
+    }
+
+    const __m256i res = hbd_ver_round(lo, hi, mode);
+    const __m128i res0 = _mm256_castsi256_si128(res);
+    const __m128i res1 = _mm256_extracti128_si256(res, 1);
+    const int second = y + 1 < height;
+    void *d = mode == HBD_VER_HI ? (void *)(dst_hi + y * dst_stride) : (void *)(dst + y * dst_stride);
+    void *d1 = mode == HBD_VER_HI ? (void *)(dst_hi + (y + 1) * dst_stride) : (void *)(dst + (y + 1) * dst_stride);
+    if (n == 8) {
+      _mm_storeu_si128((__m128i *)d, res0);
+      if (second) _mm_storeu_si128((__m128i *)d1, res1);
+    } else {
+      _mm_storel_epi64((__m128i *)d, res0);
+      if (second) _mm_storel_epi64((__m128i *)d1, res1);
+    }
+  }
+#undef HBD_BROW
+}
+
+static FORCE_INLINE void hbd_ver_pass_taps(const int8_t *filter, const int taps, int width, int height,
+                                           const int16_t *src, int src_stride,
+                                           kvz_pixel *dst, int16_t *dst_hi, int dst_stride, const int mode)
+{
+  __m256i w[4];
+  for (int k = 0; k < taps / 2; ++k) w[k] = hbd_tap_pair(filter, 2 * k);
+
+  int x = 0;
+  for (; x + 8 <= width; x += 8) {
+    hbd_ver_strip(src + x, src_stride, height, w, taps, 8, mode,
+                  mode == HBD_VER_HI ? NULL : dst + x, mode == HBD_VER_HI ? dst_hi + x : NULL, dst_stride);
+  }
+  if (x + 4 <= width) {
+    hbd_ver_strip(src + x, src_stride, height, w, taps, 4, mode,
+                  mode == HBD_VER_HI ? NULL : dst + x, mode == HBD_VER_HI ? dst_hi + x : NULL, dst_stride);
+    x += 4;
+  }
+  // Chroma blocks of width 2 and 6.
+  for (; x < width; ++x) {
+    for (int y = 0; y < height; ++y) {
+      hbd_ver_scalar(filter, taps, src + y * src_stride + x, src_stride,
+                     mode == HBD_VER_HI ? NULL : dst + y * dst_stride + x,
+                     mode == HBD_VER_HI ? dst_hi + y * dst_stride + x : NULL, mode);
+    }
+  }
+}
+
+/*
+ * Vertical pass over int16 intermediates. src points to the first tap row of
+ * output row 0 and has height + taps - 1 rows. Writes pixels to dst, or int16
+ * values to dst_hi for HBD_VER_HI.
+ */
+static void hbd_ver_pass_avx2(const int8_t *filter, int taps, int width, int height,
+                              const int16_t *src, int src_stride,
+                              kvz_pixel *dst, int16_t *dst_hi, int dst_stride, int mode)
+{
+  const int center = taps / 2 - 1;
+
+  if (filter[center] == 64) {
+    // Integer position: (64 * h) >> 6 == h, so the int16 store does not wrap,
+    // and h + offset fits int16.
+    for (int y = 0; y < height; ++y) {
+      const int16_t *s = src + (y + center) * src_stride;
+      if (mode == HBD_VER_HI) {
+        memcpy(dst_hi + y * dst_stride, s, width * sizeof(int16_t));
+        continue;
+      }
+      kvz_pixel *d = dst + y * dst_stride;
+      int x = 0;
+      for (; x + 16 <= width; x += 16) {
+        __m256i v = _mm256_loadu_si256((const __m256i *)(s + x));
+        v = _mm256_srai_epi16(_mm256_add_epi16(v, _mm256_set1_epi16(HBD_WP_OFFSET)), HBD_WP_SHIFT);
+        v = _mm256_min_epi16(_mm256_max_epi16(v, _mm256_setzero_si256()), _mm256_set1_epi16(PIXEL_MAX));
+        _mm256_storeu_si256((__m256i *)(d + x), v);
+      }
+      for (; x + 8 <= width; x += 8) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(s + x));
+        v = _mm_srai_epi16(_mm_add_epi16(v, _mm_set1_epi16(HBD_WP_OFFSET)), HBD_WP_SHIFT);
+        v = _mm_min_epi16(_mm_max_epi16(v, _mm_setzero_si128()), _mm_set1_epi16(PIXEL_MAX));
+        _mm_storeu_si128((__m128i *)(d + x), v);
+      }
+      for (; x < width; ++x) d[x] = hbd_clip_px((s[x] + HBD_WP_OFFSET) >> HBD_WP_SHIFT);
+    }
+    return;
+  }
+
+  if (taps == 8) {
+    switch (mode) {
+      case HBD_VER_PX: hbd_ver_pass_taps(filter, 8, width, height, src, src_stride, dst, dst_hi, dst_stride, HBD_VER_PX); break;
+      case HBD_VER_PX_WRAP: hbd_ver_pass_taps(filter, 8, width, height, src, src_stride, dst, dst_hi, dst_stride, HBD_VER_PX_WRAP); break;
+      default: hbd_ver_pass_taps(filter, 8, width, height, src, src_stride, dst, dst_hi, dst_stride, HBD_VER_HI); break;
+    }
+  } else {
+    if (mode == HBD_VER_PX) hbd_ver_pass_taps(filter, 4, width, height, src, src_stride, dst, dst_hi, dst_stride, HBD_VER_PX);
+    else hbd_ver_pass_taps(filter, 4, width, height, src, src_stride, dst, dst_hi, dst_stride, HBD_VER_HI);
+  }
+}
+
+/*
+ * The first column of the block filters: col[y] = (sum_k f[k] * src[y][k]) >> shift1
+ * for y < rows, src pointing to the first tap of row 0. Four rows at a time.
+ */
+static void hbd_hor_first_col_avx2(const int8_t *filter, const kvz_pixel *src, int src_stride,
+                                   int rows, int16_t *col)
+{
+  const __m128i f = _mm_cvtepi8_epi16(_mm_loadl_epi64((const __m128i *)filter));
+  int y = 0;
+  for (; y + 4 <= rows; y += 4) {
+    const kvz_pixel *p = src + y * src_stride;
+    __m128i m0 = _mm_madd_epi16(_mm_loadu_si128((const __m128i *)(p + 0 * src_stride)), f);
+    __m128i m1 = _mm_madd_epi16(_mm_loadu_si128((const __m128i *)(p + 1 * src_stride)), f);
+    __m128i m2 = _mm_madd_epi16(_mm_loadu_si128((const __m128i *)(p + 2 * src_stride)), f);
+    __m128i m3 = _mm_madd_epi16(_mm_loadu_si128((const __m128i *)(p + 3 * src_stride)), f);
+    __m128i sum = _mm_hadd_epi32(_mm_hadd_epi32(m0, m1), _mm_hadd_epi32(m2, m3));
+    sum = _mm_srai_epi32(sum, HBD_SHIFT1);
+    _mm_storel_epi64((__m128i *)(col + y), _mm_packs_epi32(sum, sum));
+  }
+  for (; y < rows; ++y) col[y] = hbd_hor_scalar(filter, 8, src + y * src_stride);
+}
+
+// One sample of a first column: clip(((int16_t)(sum >> 6) + offset) >> shift).
+static kvz_pixel hbd_col_sample(const int8_t *filter, const int16_t *col)
+{
+  int32_t sum = 0;
+  for (int k = 0; k < 8; ++k) sum += filter[k] * col[k];
+  const int16_t sample = (int16_t)(sum >> 6);
+  return hbd_clip_px((sample + HBD_WP_OFFSET) >> HBD_WP_SHIFT);
+}
+
+/*
+ * Vertical 8-tap filter of a first column, written to column 0 of the n rows
+ * of dst: dst[y][0] = hbd_col_sample(filter, &col[y]). n is a multiple of 8.
+ */
+static void hbd_col_filter_avx2(const int8_t *filter, const int16_t *col, int n,
+                                kvz_pixel *dst, int dst_stride)
+{
+  __m256i w[4];
+  for (int k = 0; k < 4; ++k) w[k] = hbd_tap_pair(filter, 2 * k);
+
+  for (int i = 0; i < n; i += 16) {
+    const int16_t *p = col + i;
+    __m256i v0, v1;
+    if (i + 16 <= n) {
+      v0 = _mm256_loadu_si256((const __m256i *)p);
+      v1 = _mm256_srli_si256(_mm256_loadu_si256((const __m256i *)(p + 7)), 2);
+    } else {
+      // The last eight outputs; lane 1 is not used.
+      __m128i a0 = _mm_loadu_si128((const __m128i *)p);
+      __m128i a1 = hbd_load_v1((const kvz_pixel *)p, 8);
+      v0 = hbd_combine(a0, a0);
+      v1 = hbd_combine(a1, a1);
+    }
+    __m256i lo, hi;
+    hbd_hor_sums(v0, v1, w, 8, &lo, &hi);
+    // hbd_ver_round packs lane by lane: the outputs are in order.
+    ALIGNED(32) kvz_pixel out[16];
+    _mm256_store_si256((__m256i *)out, hbd_ver_round(lo, hi, HBD_VER_PX_WRAP));
+    const int count = MIN(16, n - i);
+    for (int j = 0; j < count; ++j) dst[(i + j) * dst_stride] = out[j];
+  }
+}
+
+// dst[y][x] = src[y][x - 1] for 1 <= x < width; dst[y][0] is set by the caller.
+// width is a multiple of 8. src[0][-1] must be readable.
+static void hbd_copy_shifted(const kvz_pixel *src, kvz_pixel *dst, int width, int height, int stride)
+{
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; x += 8) {
+      _mm_storeu_si128((__m128i *)(dst + y * stride + x), _mm_loadu_si128((const __m128i *)(src + y * stride + x - 1)));
+    }
+  }
+}
+
+// Copies height rows of width (a multiple of 8) samples.
+static void hbd_copy_rows(const kvz_pixel *src, kvz_pixel *dst, int width, int height, int stride)
+{
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; x += 8) {
+      _mm_storeu_si128((__m128i *)(dst + y * stride + x), _mm_loadu_si128((const __m128i *)(src + y * stride + x)));
+    }
+  }
+}
+
+/*
+ * A quarter-pel block of the block filters: the vertical filter over the
+ * horizontal intermediate rows starting at im. When shift is set, output
+ * column x comes from intermediate column x - 1 and column 0 from the first
+ * column buffer col. The vertical pass then reads column -1 (the end of the
+ * previous row or buffer) for column 0, which is overwritten.
+ */
+static void hbd_qpel_block_avx2(const int8_t *filter, const int16_t *im, const int16_t *col,
+                                int shift, int width, int height, kvz_pixel *dst)
+{
+  hbd_ver_pass_avx2(filter, 8, width, height, im - shift, LCU_WIDTH, dst, NULL, LCU_WIDTH, HBD_VER_PX);
+  if (shift) hbd_col_filter_avx2(filter, col, height, dst, LCU_WIDTH);
+}
+
+static void hbd_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  const int8_t *fir0 = kvz_g_luma_filter[0];
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int stride = LCU_WIDTH;
+
+  // Horizontally filtered samples from the top row are
+  // not needed unless samples for diagonal positions are filtered later.
+  const int first_y = fme_level > 1 ? 0 : 1;
+  const int rows = height + KVZ_EXT_PADDING_LUMA + 1;
+
+  // First taps of hor_intermediate[][0] and of the first columns.
+  const kvz_pixel *col_base = src - KVZ_LUMA_FILTER_OFFSET * src_stride - KVZ_LUMA_FILTER_OFFSET;
+  const kvz_pixel *im_base = col_base + 1;
+
+  int16_t *col_pos0 = hor_first_cols[0];
+  int16_t *col_pos2 = hor_first_cols[2];
+
+  // HORIZONTAL STEP
+  // Integer pixels
+  hbd_hor_pass_avx2(fir0, 8, width, rows, im_base, src_stride, hor_intermediate[0], stride);
+  for (int y = 0; y < rows; ++y) {
+    col_pos0[y] = (int16_t)(col_base[y * src_stride + KVZ_LUMA_FILTER_OFFSET] << (6 - HBD_SHIFT1));
+  }
+
+  // Half pixels
+  hbd_hor_pass_avx2(fir2, 8, width, rows - first_y, im_base + first_y * src_stride, src_stride,
+                    hor_intermediate[1] + first_y * stride, stride);
+  hbd_hor_first_col_avx2(fir2, col_base + first_y * src_stride, src_stride, rows - first_y, col_pos2 + first_y);
+
+  // VERTICAL STEP
+  kvz_pixel *out_l = filtered[0];
+  kvz_pixel *out_r = filtered[1];
+  kvz_pixel *out_t = filtered[2];
+  kvz_pixel *out_b = filtered[3];
+
+  // Right: only the horizontal filter (rows 4 .. height + 3 of the intermediate)
+  hbd_ver_pass_avx2(fir0, 8, width, height, hor_intermediate[1] + stride, stride, out_r, NULL, stride, HBD_VER_PX);
+
+  // Left: the right block shifted by one column and the extra column
+  hbd_copy_shifted(out_r, out_l, width, height, stride);
+  for (int y = 0; y < height; ++y) {
+    out_l[y * stride] = hbd_clip_px((col_pos2[y + KVZ_LUMA_FILTER_OFFSET + 1] + HBD_WP_OFFSET) >> HBD_WP_SHIFT);
+  }
+
+  // Top: only the vertical filter. The integer intermediate is the sample
+  // times 1 << (6 - shift1), so filtering it and rounding by 6 + wp_shift
+  // equals the generic (sum >> shift1 + offset) >> wp_shift.
+  hbd_ver_pass_avx2(fir2, 8, width, height, hor_intermediate[0], stride, out_t, NULL, stride, HBD_VER_PX);
+
+  // Bottom: the top block shifted by one row and the last row
+  hbd_copy_rows(out_t + stride, out_b, width, height - 1, stride);
+  hbd_ver_pass_avx2(fir2, 8, width, 1, hor_intermediate[0] + height * stride, stride,
+                    out_b + (height - 1) * stride, NULL, stride, HBD_VER_PX);
+}
+
+static void hbd_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int stride = LCU_WIDTH;
+
+  const int16_t *hor_pos2 = hor_intermediate[1];
+  const int16_t *col_pos2 = hor_first_cols[2];
+
+  kvz_pixel *out_tl = filtered[0];
+  kvz_pixel *out_tr = filtered[1];
+  kvz_pixel *out_bl = filtered[2];
+  kvz_pixel *out_br = filtered[3];
+
+  // Top-right
+  hbd_ver_pass_avx2(fir2, 8, width, height, hor_pos2, stride, out_tr, NULL, stride, HBD_VER_PX_WRAP);
+
+  // Top-left: the top-right block shifted by one column and the filtered extra column
+  hbd_copy_shifted(out_tr, out_tl, width, height, stride);
+  hbd_col_filter_avx2(fir2, col_pos2, height, out_tl, stride);
+
+  // Bottom-right: the top-right block shifted by one row and the last row
+  hbd_copy_rows(out_tr + stride, out_br, width, height - 1, stride);
+  hbd_ver_pass_avx2(fir2, 8, width, 1, hor_pos2 + height * stride, stride,
+                    out_br + (height - 1) * stride, NULL, stride, HBD_VER_PX_WRAP);
+
+  // Bottom-left: the top-left block shifted by one row, the last row from
+  // the bottom-right block and the last sample from the column buffer
+  hbd_copy_rows(out_tl + stride, out_bl, width, height - 1, stride);
+  hbd_copy_shifted(out_br + (height - 1) * stride, out_bl + (height - 1) * stride, width, 1, stride);
+  out_bl[(height - 1) * stride] = hbd_col_sample(fir2, col_pos2 + height);
+}
+
+static void hbd_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  const int8_t *fir0 = kvz_g_luma_filter[0];
+  const int8_t *fir1 = kvz_g_luma_filter[1];
+  const int8_t *fir2 = kvz_g_luma_filter[2];
+  const int8_t *fir3 = kvz_g_luma_filter[3];
+  const int stride = LCU_WIDTH;
+
+  // Horizontal positions. Positions 0 and 2 have already been calculated.
+  int16_t *hor_pos0 = hor_intermediate[0];
+  int16_t *hor_pos2 = hor_intermediate[1];
+  int16_t *hor_pos_l = hor_intermediate[3];
+  int16_t *hor_pos_r = hor_intermediate[4];
+  const int8_t *hor_fir_l = hpel_off_x != 0 ? fir1 : fir3;
+  const int8_t *hor_fir_r = hpel_off_x != 0 ? fir3 : fir1;
+  int16_t *col_pos_l = hor_first_cols[1];
+  int16_t *col_pos_r = hor_first_cols[3];
+
+  const int16_t *hor_hpel_pos = hpel_off_x != 0 ? hor_pos2 : hor_pos0;
+  const int16_t *col_pos_hor = hpel_off_x != 0 ? hor_first_cols[2] : hor_first_cols[0];
+
+  // Specify if integer pixels are filtered from left or/and top integer samples
+  const int off_x_fir_l = hpel_off_x < 1 ? 0 : 1;
+  const int off_x_fir_r = hpel_off_x < 0 ? 0 : 1;
+  const int off_y_fir_t = hpel_off_y < 1 ? 0 : 1;
+  const int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
+  const int sample_off_y = hpel_off_y < 0 ? 0 : 1;
+  const int sample_off_x = hpel_off_x > -1 ? 1 : 0;
+
+  const int rows = height + KVZ_EXT_PADDING_LUMA + 1;
+  const kvz_pixel *col_base = src - KVZ_LUMA_FILTER_OFFSET * src_stride - KVZ_LUMA_FILTER_OFFSET;
+  const kvz_pixel *im_base = col_base + 1;
+
+  // HORIZONTAL STEP
+  hbd_hor_pass_avx2(hor_fir_l, 8, width, rows, im_base, src_stride, hor_pos_l, stride);
+  hbd_hor_first_col_avx2(hor_fir_l, col_base, src_stride, rows, col_pos_l);
+  hbd_hor_pass_avx2(hor_fir_r, 8, width, rows, im_base, src_stride, hor_pos_r, stride);
+  hbd_hor_first_col_avx2(hor_fir_r, col_base, src_stride, rows, col_pos_r);
+
+  // VERTICAL STEP
+  const int8_t *ver_fir_l = hpel_off_y != 0 ? fir2 : fir0;
+  const int8_t *ver_fir_r = hpel_off_y != 0 ? fir2 : fir0;
+  const int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
+  const int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
+
+  // Left QPEL (1/4 or 3/4 x positions)
+  hbd_qpel_block_avx2(ver_fir_l, hor_pos_l + sample_off_y * stride, col_pos_l + sample_off_y,
+                      !off_x_fir_l, width, height, filtered[0]);
+  // Right QPEL (3/4 or 1/4 x positions)
+  hbd_qpel_block_avx2(ver_fir_r, hor_pos_r + sample_off_y * stride, col_pos_r + sample_off_y,
+                      !off_x_fir_r, width, height, filtered[1]);
+  // Top QPEL (1/4 or 3/4 y positions)
+  hbd_qpel_block_avx2(ver_fir_t, hor_hpel_pos + off_y_fir_t * stride, col_pos_hor + off_y_fir_t,
+                      !sample_off_x, width, height, filtered[2]);
+  // Bottom QPEL (3/4 or 1/4 y positions)
+  hbd_qpel_block_avx2(ver_fir_b, hor_hpel_pos + off_y_fir_b * stride, col_pos_hor + off_y_fir_b,
+                      !sample_off_x, width, height, filtered[3]);
+}
+
+static void hbd_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t *encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel filtered[4][LCU_LUMA_SIZE],
+  int16_t hor_intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD],
+  int8_t fme_level,
+  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1],
+  int8_t hpel_off_x, int8_t hpel_off_y)
+{
+  const int8_t *fir1 = kvz_g_luma_filter[1];
+  const int8_t *fir3 = kvz_g_luma_filter[3];
+  const int stride = LCU_WIDTH;
+
+  const int16_t *hor_pos_l = hor_intermediate[3];
+  const int16_t *hor_pos_r = hor_intermediate[4];
+  const int16_t *col_pos_l = hor_first_cols[1];
+  const int16_t *col_pos_r = hor_first_cols[3];
+
+  const int8_t *ver_fir_t = hpel_off_y != 0 ? fir1 : fir3;
+  const int8_t *ver_fir_b = hpel_off_y != 0 ? fir3 : fir1;
+
+  // Specify if integer pixels are filtered from left or/and top integer samples
+  const int off_x_fir_l = hpel_off_x < 1 ? 0 : 1;
+  const int off_x_fir_r = hpel_off_x < 0 ? 0 : 1;
+  const int off_y_fir_t = hpel_off_y < 1 ? 0 : 1;
+  const int off_y_fir_b = hpel_off_y < 0 ? 0 : 1;
+
+  // Top-left QPEL
+  hbd_qpel_block_avx2(ver_fir_t, hor_pos_l + off_y_fir_t * stride, col_pos_l + off_y_fir_t,
+                      !off_x_fir_l, width, height, filtered[0]);
+  // Top-right QPEL
+  hbd_qpel_block_avx2(ver_fir_t, hor_pos_r + off_y_fir_t * stride, col_pos_r + off_y_fir_t,
+                      !off_x_fir_r, width, height, filtered[1]);
+  // Bottom-left QPEL
+  hbd_qpel_block_avx2(ver_fir_b, hor_pos_l + off_y_fir_b * stride, col_pos_l + off_y_fir_b,
+                      !off_x_fir_l, width, height, filtered[2]);
+  // Bottom-right QPEL
+  hbd_qpel_block_avx2(ver_fir_b, hor_pos_r + off_y_fir_b * stride, col_pos_r + off_y_fir_b,
+                      !off_x_fir_r, width, height, filtered[3]);
+}
+
+/*
+ * Motion compensation: horizontal pass into an int16 buffer and vertical
+ * pass. When the vertical filter is the integer one, only the rows it uses
+ * are filtered horizontally.
+ */
+static void hbd_sample_avx2(const int8_t *hor_fir, const int8_t *ver_fir, int taps,
+                            const kvz_pixel *src, int src_stride, int width, int height,
+                            kvz_pixel *dst, int16_t *dst_hi, int dst_stride, int mode)
+{
+  ALIGNED(32) int16_t im[KVZ_EXT_BLOCK_W_LUMA * LCU_WIDTH];
+  const int offset = taps / 2 - 1;
+  const kvz_pixel *base = src - offset * src_stride - offset;
+
+  if (ver_fir[offset] == 64) {
+    hbd_hor_pass_avx2(hor_fir, taps, width, height, base + offset * src_stride, src_stride,
+                      im + offset * LCU_WIDTH, LCU_WIDTH);
+  } else {
+    hbd_hor_pass_avx2(hor_fir, taps, width, height + taps - 1, base, src_stride, im, LCU_WIDTH);
+  }
+  hbd_ver_pass_avx2(ver_fir, taps, width, height, im, LCU_WIDTH, dst, dst_hi, dst_stride, mode);
+}
+
+static void hbd_sample_quarterpel_luma_avx2(const encoder_control_t *const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
+{
+  hbd_sample_avx2(kvz_g_luma_filter[mv[0] & 3], kvz_g_luma_filter[mv[1] & 3], 8,
+                  src, src_stride, width, height, dst, NULL, dst_stride, HBD_VER_PX);
+}
+
+static void hbd_sample_quarterpel_luma_hi_avx2(const encoder_control_t *const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  int16_t *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
+{
+  hbd_sample_avx2(kvz_g_luma_filter[mv[0] & 3], kvz_g_luma_filter[mv[1] & 3], 8,
+                  src, src_stride, width, height, NULL, dst, dst_stride, HBD_VER_HI);
+}
+
+static void hbd_sample_octpel_chroma_avx2(const encoder_control_t *const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  kvz_pixel *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
+{
+  const uint8_t shift_w = encoder->cfg.chroma_shift_w;
+  const uint8_t shift_h = encoder->cfg.chroma_shift_h;
+  const int mv_mask_x = shift_w ? 7 : 3;
+  const int mv_mask_y = shift_h ? 7 : 3;
+  const int8_t *hor_fir = kvz_g_chroma_filter[(mv[0] & mv_mask_x) << (1 - shift_w)];
+  const int8_t *ver_fir = kvz_g_chroma_filter[(mv[1] & mv_mask_y) << (1 - shift_h)];
+
+  hbd_sample_avx2(hor_fir, ver_fir, 4, src, src_stride, width, height, dst, NULL, dst_stride, HBD_VER_PX);
+}
+
+static void hbd_sample_octpel_chroma_hi_avx2(const encoder_control_t *const encoder,
+  kvz_pixel *src,
+  int16_t src_stride,
+  int width,
+  int height,
+  int16_t *dst,
+  int16_t dst_stride,
+  int8_t hor_flag,
+  int8_t ver_flag,
+  const int16_t mv[2])
+{
+  const uint8_t shift_w = encoder->cfg.chroma_shift_w;
+  const uint8_t shift_h = encoder->cfg.chroma_shift_h;
+  const int mv_mask_x = shift_w ? 7 : 3;
+  const int mv_mask_y = shift_h ? 7 : 3;
+  const int8_t *hor_fir = kvz_g_chroma_filter[(mv[0] & mv_mask_x) << (1 - shift_w)];
+  const int8_t *ver_fir = kvz_g_chroma_filter[(mv[1] & mv_mask_y) << (1 - shift_h)];
+
+  hbd_sample_avx2(hor_fir, ver_fir, 4, src, src_stride, width, height, NULL, dst, dst_stride, HBD_VER_HI);
+}
+
+#endif // KVZ_BIT_DEPTH > 8
+
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
@@ -1331,6 +2170,18 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "avx2", 40, &kvz_sample_quarterpel_luma_hi_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "avx2", 40, &kvz_sample_octpel_chroma_hi_avx2);
   }
+#if KVZ_BIT_DEPTH > 8
+  if (bitdepth == KVZ_BIT_DEPTH) {
+    success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_hor_ver_luma", "avx2", 40, &hbd_filter_hpel_blocks_hor_ver_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_diag_luma", "avx2", 40, &hbd_filter_hpel_blocks_diag_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_hor_ver_luma", "avx2", 40, &hbd_filter_qpel_blocks_hor_ver_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_diag_luma", "avx2", 40, &hbd_filter_qpel_blocks_diag_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "avx2", 40, &hbd_sample_quarterpel_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "avx2", 40, &hbd_sample_octpel_chroma_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "avx2", 40, &hbd_sample_quarterpel_luma_hi_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "avx2", 40, &hbd_sample_octpel_chroma_hi_avx2);
+  }
+#endif // KVZ_BIT_DEPTH > 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }
