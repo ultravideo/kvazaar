@@ -1255,13 +1255,15 @@ static void find_last_scanpos_avx2(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
 
     __m256i level_double = _mm256_loadu_si256((__m256i const*)coef_array);
 
-    __m256i abs_level_double = _mm256_abs_epi16(level_double);
-
-    __m256i levels_mul_q_low = _mm256_mullo_epi16(abs_level_double, q);
-    __m256i levels_mul_q_high = _mm256_mulhi_epi16(abs_level_double, q);
+    // abs(level) * q is computed as level * q with the sign of level removed:
+    // the signed 16-bit multiply cannot take abs(-32768) = 32768 as an input.
+    __m256i levels_mul_q_low = _mm256_mullo_epi16(level_double, q);
+    __m256i levels_mul_q_high = _mm256_mulhi_epi16(level_double, q);
 
     __m256i levels_mul_0 = _mm256_unpacklo_epi16(levels_mul_q_low, levels_mul_q_high);
     __m256i levels_mul_1 = _mm256_unpackhi_epi16(levels_mul_q_low, levels_mul_q_high);
+    levels_mul_0 = _mm256_sign_epi32(levels_mul_0, _mm256_unpacklo_epi16(level_double, level_double));
+    levels_mul_1 = _mm256_sign_epi32(levels_mul_1, _mm256_unpackhi_epi16(level_double, level_double));
 
     __m256i min_mask = _mm256_cmpgt_epi32(min_q_bits, levels_mul_0);
     levels_mul_0 = _mm256_blendv_epi8(min_q_bits, levels_mul_0, min_mask);
