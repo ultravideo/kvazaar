@@ -42,6 +42,9 @@
     <ClCompile Include="..\..\tests\sao_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\simd_ipol_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\strategy_diff_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
