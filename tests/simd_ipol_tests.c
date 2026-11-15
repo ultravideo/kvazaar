@@ -165,8 +165,11 @@ static int run_sample(int luma, int hi, int width, int height, const int16_t mv[
 {
   const int pad = luma ? KVZ_LUMA_FILTER_OFFSET : KVZ_CHROMA_FILTER_OFFSET;
   const int ext = luma ? KVZ_EXT_PADDING_LUMA : KVZ_EXT_PADDING_CHROMA;
+  // The encoder provides one extra row for luma and three for chroma
+  // (pad_b_simd in inter.c), which the 8-bit AVX2 functions read.
+  const int pad_b_simd = luma ? 1 : 3;
   src_block_t b;
-  alloc_src(&b, width, height, pad, ext - pad, pad, ext - pad, (variant % 3) * 5, mode);
+  alloc_src(&b, width, height, pad, ext - pad, pad, ext - pad + pad_b_simd, (variant % 3) * 5, mode);
 
   const int dst_stride = (variant & 1) ? width : LCU_WIDTH;
   const int8_t hor_flag = (int8_t)(mv[0] & (luma ? 3 : 7));

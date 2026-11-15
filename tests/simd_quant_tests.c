@@ -149,6 +149,10 @@ static void set_state(int sl, int qp, enum kvz_slice_type slicetype)
   st.lambda = 0.57 * pow(2.0, (CLIP(0, 51, qp) - 12) / 3.0);
   frame_cfg.slicetype = slicetype;
   kvz_init_contexts(&st, (int8_t)CLIP(0, 51, qp), slicetype);
+  // As kvz_search_lcu: the search counts bits with a copy of a started CABAC.
+  kvz_cabac_start(&st.cabac);
+  st.search_cabac = st.cabac;
+  st.search_cabac.only_count = 1;
 }
 
 // The encoder clips the QP to [0, 51]; at high bit depth the quantizers add
@@ -237,8 +241,16 @@ TEST test_dequant(void)
     enc[sl].cfg.chroma_format = (rnd() & 1) ? KVZ_CSP_420 : KVZ_CSP_422;
     set_state(sl, qp, KVZ_SLICE_P);
     // Quantized levels: the full range, or the small levels quant produces.
+    // Without scaling lists dequant multiplies the level by
+    // inv_quant_scale << (qp_scaled / 6) in 32 bits. At 12-bit and high QPs
+    // full-range levels would overflow, which quant never produces (its levels
+    // dequantize back to the int16 transform range), so the levels are limited
+    // to what fits.
+    const int max_scaled_qp = qp + (KVZ_BIT_DEPTH - 8) * 6;
+    const int level_max = MIN(32767, 0x7FFF0000 / (72 << (max_scaled_qp / 6)));
     for (int i = 0; i < n; ++i) {
-      c_in[i] = mode < 2 ? gen_coeff(mode == 0 ? 0 : 4, i, n) : gen_coeff(mode, i, n);
+      const int level = mode < 2 ? gen_coeff(mode == 0 ? 0 : 4, i, n) : gen_coeff(mode, i, n);
+      c_in[i] = (coeff_t)CLIP(-level_max, level_max, level);
     }
     memset(c_ref, 0x55, sizeof(c_ref));
     memset(c_opt, 0x55, sizeof(c_opt));

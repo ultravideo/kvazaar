@@ -275,7 +275,9 @@ static int search_size_ok(int w, int h)
 // Offset sets. 0: random in the valid range, 1: all +max, 2: all -max,
 // 3: zeros, 4: random sparse, 5: beyond the valid range. The last one checks
 // the robustness of the 10 and 12-bit implementations; the 8-bit ones are
-// only correct for valid offsets.
+// only correct for valid offsets. Kind 5 stays within +-48: the int32 sums of
+// the generic ddistortion functions overflow with larger offsets on 64x64
+// blocks at 12-bit (|offset| * (|offset| + 2 * 4095) * 4096 < 2^31).
 #if KVZ_BIT_DEPTH > 8
 #define NUM_OFFSET_KINDS 6
 #else
@@ -290,7 +292,7 @@ static int rnd_offset(int kind)
     case 2: return -max;
     case 3: return 0;
     case 4: return (rnd() & 3) ? 0 : (int)(rnd() % (2 * max + 1)) - max;
-    default: return (int)(rnd() % 2001) - 1000;
+    default: return (int)(rnd() % 97) - 48;
   }
 }
 
