@@ -18,6 +18,16 @@ print_and_run() {
     "$@"
 }
 
+# Run a program built in the source tree: through libtool with autotools,
+# where ../src/kvazaar is a libtool wrapper script, and directly with CMake.
+kvz_execute() {
+    if [ -x ../libtool ]; then
+        ../libtool execute "$@"
+    else
+        "$@"
+    fi
+}
+
 prepare_422() {
     cleanup
     print_and_run \
@@ -45,7 +55,7 @@ valgrind_test_422() {
     # No quotes for $valgrind because it expands to multiple (or zero)
     # arguments.
     print_and_run \
-        ../libtool execute $valgrind \
+        kvz_execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" --input-format=P422 "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
@@ -81,7 +91,7 @@ valgrind_test_444() {
     # No quotes for $valgrind because it expands to multiple (or zero)
     # arguments.
     print_and_run \
-        ../libtool execute $valgrind \
+        kvz_execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" --input-format=P444 "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
@@ -117,7 +127,7 @@ valgrind_test() {
     # No quotes for $valgrind because it expands to multiple (or zero)
     # arguments.
     print_and_run \
-        ../libtool execute $valgrind \
+        kvz_execute $valgrind \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
@@ -138,7 +148,7 @@ encode_test() {
 
     set +e
     print_and_run \
-        ../libtool execute \
+        kvz_execute \
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     actual_status="$?"
     set -e

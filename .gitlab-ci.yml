@@ -14,7 +14,7 @@ test-kvazaar: &test-template
     paths:
     - src/kvazaar
     - src/.libs
-    expire_in: 1 week
+    expire_in: 1 day
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
 
@@ -77,17 +77,30 @@ test-12bit:
     CFLAGS: '-DKVZ_BIT_DEPTH=12'
     KVZ_TEST_CHROMASUBSAMPLING: 1
 
-test-macos:
-  <<: *test-template
+# The macOS runners have no autotools, so build and test with CMake there.
+test-macos: &test-macos-template
+  stage: test
   tags:
     - macOS
+  script:    
+    - export PATH="/opt/homebrew/bin/:${HOME}/bin:${PATH}"
+    - git submodule update --init --depth 1
+    # RelWithDebInfo without -DNDEBUG, to keep the assertions like autotools.
+    - cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -g" -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g"
+    - cmake --build build --parallel 8
+    - ctest --test-dir build --output-on-failure --parallel 8 --timeout ${UVG_CTEST_TIMEOUT}
+  artifacts:
+    paths:
+    - src/kvazaar
+    - build/libkvazaar*
+    expire_in: 1 day
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
+    UVG_CTEST_TIMEOUT: 1800
 
 test-macos-asan:
-  <<: *test-template
-  tags:
-    - macOS
+  <<: *test-macos-template
   variables:
     KVZ_TEST_CHROMASUBSAMPLING: 1
     CFLAGS: '-fsanitize=address -g'
@@ -96,10 +109,10 @@ test-macos-asan:
     # AddressSanitizer adds some extra symbols so we expect a failure from
     # the external symbols test.
     XFAIL_TESTS: test_external_symbols.sh
+    UVG_CTEST_TIMEOUT: 1800
 
 test-macos-ubsan:
-  <<: *test-template
-  tags:
-    - macOS
+  <<: *test-macos-template
   variables:
     CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
+    UVG_CTEST_TIMEOUT: 1800

@@ -253,6 +253,7 @@ endif()
 # The C++ strategy files need no C++ runtime, so link the library as C to avoid
 # a libstdc++ dependency. MSVC and the Crypto++ build do use the runtime.
 # The library has no sources of its own, so set the language in both cases.
+# Linking as C also uses the C flags, such as -fsanitize=address.
 if(NOT MSVC AND NOT USE_CRYPTO)
   set_target_properties(kvazaar PROPERTIES LINKER_LANGUAGE C)
 else()
@@ -316,6 +317,9 @@ endif()
 
 if(BUILD_KVAZAAR_BINARY)
   add_executable(kvazaar-bin ${CLI_SOURCES})
+  if(NOT MSVC AND NOT USE_CRYPTO)
+    set_target_properties(kvazaar-bin PROPERTIES LINKER_LANGUAGE C)
+  endif()
 
   if(MSVC AND BUILD_SHARED_LIBS)
     set_target_properties(kvazaar PROPERTIES
@@ -596,12 +600,17 @@ if(NOT DEFINED MSVC)
     add_test( NAME test_weird_shapes COMMAND ${PROJECT_SOURCE_DIR}/tests/test_weird_shapes.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()
 
-  if(NOT "test_external_symbols.sh" IN_LIST XFAIL)
-    add_test( NAME test_external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  # Checks the external symbols of the library objects, so it needs a static
+  # library: the shared library only exports the API.
+  if(BUILD_SHARED_LIBS AND TARGET kvazaar_tests_lib)
+    set(KVZ_STATIC_LIBRARY_TARGET kvazaar_tests_lib)
+  elseif(NOT BUILD_SHARED_LIBS)
+    set(KVZ_STATIC_LIBRARY_TARGET kvazaar)
   endif()
-
-  if(NOT "util.sh" IN_LIST XFAIL)
-    add_test( NAME util COMMAND ${PROJECT_SOURCE_DIR}/tests/util.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  if(NOT "test_external_symbols.sh" IN_LIST XFAIL AND KVZ_STATIC_LIBRARY_TARGET)
+    add_test( NAME test_external_symbols COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+    set_tests_properties(test_external_symbols PROPERTIES
+      ENVIRONMENT "KVZ_STATIC_LIBRARY=$<TARGET_FILE:${KVZ_STATIC_LIBRARY_TARGET}>")
   endif()
 
   if(NOT "test_invalid_input.sh" IN_LIST XFAIL)

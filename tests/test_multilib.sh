@@ -7,7 +7,7 @@ set -eu
 
 . "${0%/*}/util.sh"
 
-bit_depths="$(../libtool execute ../src/kvazaar --version | sed -n 's/^Bit depths://p')"
+bit_depths="$(kvz_execute ../src/kvazaar --version | sed -n 's/^Bit depths://p')"
 printf 'Bit depths:%s\n' "${bit_depths}"
 [ -n "${bit_depths}" ]
 
@@ -30,7 +30,7 @@ print_and_run \
     ffmpeg -f lavfi -i "mandelbrot=size=264x130" -vframes 2 -pix_fmt yuv420p10le \
         -f rawvideo "${yuvfile}"
 output="$(print_and_run \
-    ../libtool execute \
+    kvz_execute \
         ../src/kvazaar -i "${yuvfile}" --input-res=264x130 --input-bitdepth=10 \
             -o "${hevcfile}" 2>&1)"
 printf '%s\n' "${output}"

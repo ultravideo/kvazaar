@@ -60,3 +60,9 @@ if(BUILD_SHARED_LIBS)
 else()
   target_link_libraries(kvazaar_tests PUBLIC kvazaar)
 endif()
+
+# Link as C like the library (see the top-level CMakeLists.txt), so that the
+# C flags such as -fsanitize=address are used for linking too.
+if(NOT MSVC)
+  set_target_properties(kvazaar_tests PROPERTIES LINKER_LANGUAGE C)
+endif()
