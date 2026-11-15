@@ -264,28 +264,29 @@ static void kvz_dequant_neon(const encoder_state_t * const state, coeff_t *q_coe
 
     if (shift > qp_scaled / 6) {
       add = 1 << (shift - qp_scaled / 6 - 1);
+      const int32x4_t vadd = vdupq_n_s32(add);
       const int32x4_t sh = vdupq_n_s32(-(shift - qp_scaled / 6));
-      for (; n + 4 <= n_total; n += 4) {
-        const int32x4_t q32 = vmovl_s16(vld1_s16(q_coef + n));
-        const int32x4_t d32 = vmovl_s16(vld1_s16(dequant_coef + n));
-        const int32x4_t p = vmulq_s32(q32, d32);
-        // (q * dq + add) >> (shift - qp/6), with add a rounding offset
-        const int32x4_t r = vshlq_s32(vaddq_s32(p, vdupq_n_s32(add)), sh);
-        vst1_s16(coef + n, vqmovn_s32(r));
+      for (; n + 8 <= n_total; n += 8) {
+        const int16x8_t q = vld1q_s16(q_coef + n);
+        const int16x8_t d = vld1q_s16(dequant_coef + n);
+        // (q * dq + add) >> (shift - qp/6); the int16 x int16 products are exact.
+        const int32x4_t lo = vshlq_s32(vaddq_s32(vmull_s16(vget_low_s16(q), vget_low_s16(d)), vadd), sh);
+        const int32x4_t hi = vshlq_s32(vaddq_s32(vmull_high_s16(q, d), vadd), sh);
+        vst1q_s16(coef + n, vqmovn_high_s32(vqmovn_s32(lo), hi));
       }
       for (; n < n_total; ++n) {
         int32_t coeff_q = ((q_coef[n] * dequant_coef[n]) + add) >> (shift - qp_scaled / 6);
         coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q);
       }
     } else {
-      const int32x4_t ls = vdupq_n_s32(qp_scaled / 6 - shift);
-      for (; n + 4 <= n_total; n += 4) {
-        const int32x4_t q32 = vmovl_s16(vld1_s16(q_coef + n));
-        const int32x4_t d32 = vmovl_s16(vld1_s16(dequant_coef + n));
-        // Clip to 16 bits before the left shift, as the generic code does.
-        const int32x4_t p = vmovl_s16(vqmovn_s32(vmulq_s32(q32, d32)));
-        const int32x4_t r = vshlq_s32(p, ls);
-        vst1_s16(coef + n, vqmovn_s32(r));
+      const int16x8_t ls = vdupq_n_s16((int16_t)(qp_scaled / 6 - shift));
+      for (; n + 8 <= n_total; n += 8) {
+        const int16x8_t q = vld1q_s16(q_coef + n);
+        const int16x8_t d = vld1q_s16(dequant_coef + n);
+        // Clip to 16 bits before the left shift, as the generic code does; the
+        // saturating 16-bit shift is the clipped 32-bit shift.
+        const int16x8_t p = vqmovn_high_s32(vqmovn_s32(vmull_s16(vget_low_s16(q), vget_low_s16(d))), vmull_high_s16(q, d));
+        vst1q_s16(coef + n, vqshlq_s16(p, ls));
       }
       for (; n < n_total; ++n) {
         int32_t coeff_q = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
@@ -298,10 +299,12 @@ static void kvz_dequant_neon(const encoder_state_t * const state, coeff_t *q_coe
     const int32x4_t vscale = vdupq_n_s32(scale);
     const int32x4_t sh = vdupq_n_s32(-shift);
     const int32x4_t vadd = vdupq_n_s32(add);
-    for (; n + 4 <= n_total; n += 4) {
-      const int32x4_t q32 = vmovl_s16(vld1_s16(q_coef + n));
-      const int32x4_t p = vaddq_s32(vmulq_s32(q32, vscale), vadd);
-      vst1_s16(coef + n, vqmovn_s32(vshlq_s32(p, sh)));
+    for (; n + 8 <= n_total; n += 8) {
+      // (q * scale + add) >> shift, with the products wrapping like the generic int32 code.
+      const int16x8_t q = vld1q_s16(q_coef + n);
+      const int32x4_t lo = vshlq_s32(vmlaq_s32(vadd, vmovl_s16(vget_low_s16(q)), vscale), sh);
+      const int32x4_t hi = vshlq_s32(vmlaq_s32(vadd, vmovl_high_s16(q), vscale), sh);
+      vst1q_s16(coef + n, vqmovn_high_s32(vqmovn_s32(lo), hi));
     }
     for (; n < n_total; ++n) {
       int32_t coeff_q = (q_coef[n] * scale + add) >> shift;
