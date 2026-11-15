@@ -48,6 +48,607 @@ extern "C" {
 #include "strategies/generic/picture-generic.h"
 }
 
+#if COMPILE_INTEL_AVX2 && KVZ_BIT_DEPTH > 8
+
+// In a namespace of their own to keep the names apart from the other
+// high bit depth functions of this file.
+namespace {
+namespace hbd_sad {
+
+/*
+ * AVX2 versions of the SAD, SSD, variance and bi-prediction functions for
+ * 10 and 12-bit pixels (kvz_pixel = uint16_t). Every function except
+ * pixel_var computes exactly the same result as the generic version.
+ *
+ * |a - b| of two pixels fits in an int16 lane, so SAD sums are accumulated in
+ * 16-bit lanes and moved to 32-bit lanes with madd every kHbdSadAdds
+ * additions, before a lane could exceed INT16_MAX.
+ */
+constexpr int kHbdSadAdds = 32767 / PIXEL_MAX;
+static_assert(kHbdSadAdds >= 8, "SAD accumulation needs at least 8 additions per lane");
+
+KVZ_FORCE_INLINE __m128i hbd_load4(const kvz_pixel *p)
+{
+  return _mm_loadl_epi64((const __m128i *)p);
+}
+
+KVZ_FORCE_INLINE __m128i hbd_load8(const kvz_pixel *p)
+{
+  return _mm_loadu_si128((const __m128i *)p);
+}
+
+KVZ_FORCE_INLINE __m256i hbd_load16(const kvz_pixel *p)
+{
+  return _mm256_loadu_si256((const __m256i *)p);
+}
+
+// Two 4-pixel rows in one 128-bit vector.
+KVZ_FORCE_INLINE __m128i hbd_load_2x4(const kvz_pixel *p, unsigned stride)
+{
+  return _mm_unpacklo_epi64(hbd_load4(p), hbd_load4(p + stride));
+}
+
+// Two 8-pixel rows in one 256-bit vector.
+KVZ_FORCE_INLINE __m256i hbd_load_2x8(const kvz_pixel *p, unsigned stride)
+{
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(hbd_load8(p)), hbd_load8(p + stride), 1);
+}
+
+// Four 4-pixel rows in one 256-bit vector.
+KVZ_FORCE_INLINE __m256i hbd_load_4x4(const kvz_pixel *p, unsigned stride)
+{
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(hbd_load_2x4(p, stride)),
+                                 hbd_load_2x4(p + 2 * stride, stride), 1);
+}
+
+KVZ_FORCE_INLINE __m256i hbd_absdiff(__m256i a, __m256i b)
+{
+  return _mm256_abs_epi16(_mm256_sub_epi16(a, b));
+}
+
+KVZ_FORCE_INLINE __m128i hbd_absdiff(__m128i a, __m128i b)
+{
+  return _mm_abs_epi16(_mm_sub_epi16(a, b));
+}
+
+KVZ_FORCE_INLINE __m256i hbd_widen_add(__m256i acc32, __m256i acc16)
+{
+  return _mm256_add_epi32(acc32, _mm256_madd_epi16(acc16, _mm256_set1_epi16(1)));
+}
+
+KVZ_FORCE_INLINE __m128i hbd_widen_add(__m128i acc32, __m128i acc16)
+{
+  return _mm_add_epi32(acc32, _mm_madd_epi16(acc16, _mm_set1_epi16(1)));
+}
+
+KVZ_FORCE_INLINE uint32_t hbd_hsum_epi32(__m128i v)
+{
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(1, 0, 3, 2)));
+  v = _mm_add_epi32(v, _mm_shuffle_epi32(v, _MM_SHUFFLE(2, 3, 0, 1)));
+  return (uint32_t)_mm_cvtsi128_si32(v);
+}
+
+KVZ_FORCE_INLINE uint32_t hbd_hsum_epi32(__m256i v)
+{
+  return hbd_hsum_epi32(_mm_add_epi32(_mm256_castsi256_si128(v), _mm256_extracti128_si256(v, 1)));
+}
+
+/*
+ * SAD of a W-wide block. Rows are processed in pairs: 16-pixel parts are
+ * loaded one row at a time, an 8-pixel part as a row pair in one 256-bit
+ * vector and a 4-pixel part as a row pair in one 128-bit vector. Only the
+ * pixels of the block are read.
+ */
+template <int W>
+uint32_t reg_sad_hbd_w(const kvz_pixel *const data1, const kvz_pixel *const data2,
+                       const int32_t height, const uint32_t stride1, const uint32_t stride2)
+{
+  static_assert(W > 0 && W % 4 == 0 && W <= 64, "unsupported width");
+  constexpr int k16 = W / 16;
+  constexpr bool k8 = (W & 8) != 0;
+  constexpr bool k4 = (W & 4) != 0;
+
+  __m256i total = _mm256_setzero_si256();
+  __m128i total4 = _mm_setzero_si128();
+  int y = 0;
+
+  if constexpr (W == 4) {
+    // Four rows per vector.
+    const int h4 = height & ~3;
+    while (y < h4) {
+      const int y_end = h4 - y < 4 * kHbdSadAdds ? h4 : y + 4 * kHbdSadAdds;
+      __m256i acc = _mm256_setzero_si256();
+      for (; y < y_end; y += 4) {
+        acc = _mm256_add_epi16(acc, hbd_absdiff(hbd_load_4x4(data1 + y * stride1, stride1),
+                                                hbd_load_4x4(data2 + y * stride2, stride2)));
+      }
+      total = hbd_widen_add(total, acc);
+    }
+    __m128i acc = _mm_setzero_si128();
+    if (height - y >= 2) {
+      acc = hbd_absdiff(hbd_load_2x4(data1 + y * stride1, stride1),
+                        hbd_load_2x4(data2 + y * stride2, stride2));
+      y += 2;
+    }
+    if (y < height) {
+      acc = _mm_add_epi16(acc, hbd_absdiff(hbd_load4(data1 + y * stride1),
+                                           hbd_load4(data2 + y * stride2)));
+    }
+    total4 = hbd_widen_add(total4, acc);
+  } else {
+    // Additions to a lane of acc per row pair.
+    constexpr int kAddsPerPair = 2 * k16 + (k8 ? 1 : 0);
+    constexpr int kPairs = kHbdSadAdds / kAddsPerPair;
+    static_assert(kPairs >= 1, "too wide for 16-bit accumulation");
+
+    const int h2 = height & ~1;
+    while (y < h2) {
+      const int y_end = h2 - y < 2 * kPairs ? h2 : y + 2 * kPairs;
+      __m256i acc = _mm256_setzero_si256();
+      __m128i acc4 = _mm_setzero_si128();
+      for (; y < y_end; y += 2) {
+        const kvz_pixel *a = data1 + y * stride1;
+        const kvz_pixel *b = data2 + y * stride2;
+        KVZ_UNROLL
+        for (int i = 0; i < k16; ++i) {
+          acc = _mm256_add_epi16(acc, hbd_absdiff(hbd_load16(a + 16 * i), hbd_load16(b + 16 * i)));
+          acc = _mm256_add_epi16(acc, hbd_absdiff(hbd_load16(a + stride1 + 16 * i),
+                                                  hbd_load16(b + stride2 + 16 * i)));
+        }
+        if constexpr (k8) {
+          acc = _mm256_add_epi16(acc, hbd_absdiff(hbd_load_2x8(a + 16 * k16, stride1),
+                                                  hbd_load_2x8(b + 16 * k16, stride2)));
+        }
+        if constexpr (k4) {
+          acc4 = _mm_add_epi16(acc4, hbd_absdiff(hbd_load_2x4(a + W - 4, stride1),
+                                                 hbd_load_2x4(b + W - 4, stride2)));
+        }
+      }
+      total = hbd_widen_add(total, acc);
+      if constexpr (k4) {
+        total4 = hbd_widen_add(total4, acc4);
+      }
+    }
+    if (y < height) {
+      // Last row of an odd height.
+      const kvz_pixel *a = data1 + y * stride1;
+      const kvz_pixel *b = data2 + y * stride2;
+      if constexpr (k16 > 0) {
+        __m256i acc = _mm256_setzero_si256();
+        KVZ_UNROLL
+        for (int i = 0; i < k16; ++i) {
+          acc = _mm256_add_epi16(acc, hbd_absdiff(hbd_load16(a + 16 * i), hbd_load16(b + 16 * i)));
+        }
+        total = hbd_widen_add(total, acc);
+      }
+      if constexpr (k8 || k4) {
+        __m128i acc = _mm_setzero_si128();
+        if constexpr (k8) {
+          acc = hbd_absdiff(hbd_load8(a + 16 * k16), hbd_load8(b + 16 * k16));
+        }
+        if constexpr (k4) {
+          acc = _mm_add_epi16(acc, hbd_absdiff(hbd_load4(a + W - 4), hbd_load4(b + W - 4)));
+        }
+        total4 = hbd_widen_add(total4, acc);
+      }
+    }
+  }
+  return hbd_hsum_epi32(total) + hbd_hsum_epi32(total4);
+}
+
+uint32_t reg_sad_hbd_w0(const kvz_pixel *const, const kvz_pixel *const,
+                        const int32_t, const uint32_t, const uint32_t)
+{
+  return 0;
+}
+
+/*
+ * SAD of a block of any width. With kHor, every row of data1 is compared
+ * with the single pixel data2[y * stride2] (hor_sad). Each vector of absolute
+ * differences is widened to 32 bits right away.
+ */
+template <bool kHor>
+uint32_t sad_hbd_any(const kvz_pixel *data1, const kvz_pixel *data2,
+                     int width, int height, unsigned stride1, unsigned stride2)
+{
+  __m256i acc = _mm256_setzero_si256();
+  __m128i acc4 = _mm_setzero_si128();
+  uint32_t tail = 0;
+  for (int y = 0; y < height; ++y) {
+    const kvz_pixel *a = data1 + y * stride1;
+    const kvz_pixel *b = data2 + y * stride2;
+    const __m256i ref16 = _mm256_set1_epi16(kHor ? (short)b[0] : 0);
+    int x = 0;
+    for (; x + 16 <= width; x += 16) {
+      acc = hbd_widen_add(acc, hbd_absdiff(hbd_load16(a + x), kHor ? ref16 : hbd_load16(b + x)));
+    }
+    if (x + 8 <= width) {
+      acc4 = hbd_widen_add(acc4, hbd_absdiff(hbd_load8(a + x), kHor ? _mm256_castsi256_si128(ref16)
+                                                                    : hbd_load8(b + x)));
+      x += 8;
+    }
+    if (x + 4 <= width) {
+      // With kHor the upper half of the reference vector is not zero, so
+      // zero the result instead.
+      __m128i d = hbd_absdiff(hbd_load4(a + x), kHor ? _mm256_castsi256_si128(ref16) : hbd_load4(b + x));
+      acc4 = hbd_widen_add(acc4, _mm_move_epi64(d));
+      x += 4;
+    }
+    for (; x < width; ++x) {
+      tail += abs((int)a[x] - (int)(kHor ? b[0] : b[x]));
+    }
+  }
+  return hbd_hsum_epi32(acc) + hbd_hsum_epi32(acc4) + tail;
+}
+
+uint32_t reg_sad_hbd_avx2(const kvz_pixel *const data1, const kvz_pixel *const data2,
+                          const int width, const int height,
+                          const unsigned stride1, const unsigned stride2)
+{
+  switch (width) {
+    case 0:  return 0;
+    case 4:  return reg_sad_hbd_w<4>(data1, data2, height, stride1, stride2);
+    case 8:  return reg_sad_hbd_w<8>(data1, data2, height, stride1, stride2);
+    case 12: return reg_sad_hbd_w<12>(data1, data2, height, stride1, stride2);
+    case 16: return reg_sad_hbd_w<16>(data1, data2, height, stride1, stride2);
+    case 24: return reg_sad_hbd_w<24>(data1, data2, height, stride1, stride2);
+    case 32: return reg_sad_hbd_w<32>(data1, data2, height, stride1, stride2);
+    case 48: return reg_sad_hbd_w<48>(data1, data2, height, stride1, stride2);
+    case 64: return reg_sad_hbd_w<64>(data1, data2, height, stride1, stride2);
+    default: return sad_hbd_any<false>(data1, data2, width, height, stride1, stride2);
+  }
+}
+
+optimized_sad_func_ptr_t get_optimized_sad_hbd_avx2(int32_t width)
+{
+  switch (width) {
+    case 0:  return reg_sad_hbd_w0;
+    case 4:  return reg_sad_hbd_w<4>;
+    case 8:  return reg_sad_hbd_w<8>;
+    case 12: return reg_sad_hbd_w<12>;
+    case 16: return reg_sad_hbd_w<16>;
+    case 24: return reg_sad_hbd_w<24>;
+    case 32: return reg_sad_hbd_w<32>;
+    case 48: return reg_sad_hbd_w<48>;
+    case 64: return reg_sad_hbd_w<64>;
+    default: return NULL;
+  }
+}
+
+template <int N>
+unsigned sad_nxn_hbd_avx2(const kvz_pixel *block1, const kvz_pixel *block2)
+{
+  return reg_sad_hbd_w<N>(block1, block2, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+}
+
+template <int N>
+void sad_nxn_dual_hbd_avx2(const pred_buffer preds, const kvz_pixel *const orig,
+                           unsigned /* num_modes */, unsigned *costs_out)
+{
+  costs_out[0] = reg_sad_hbd_w<N>(preds[0], orig, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+  costs_out[1] = reg_sad_hbd_w<N>(preds[1], orig, N, N, N) >> (KVZ_BIT_DEPTH - 8);
+}
+
+// The reference row is the same for every row of the block.
+uint32_t ver_sad_hbd_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                          int32_t width, int32_t height, uint32_t stride)
+{
+  return reg_sad_hbd_avx2(pic_data, ref_data, width, height, stride, 0);
+}
+
+uint32_t hor_sad_hbd_avx2(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+                          int32_t width, int32_t height, uint32_t pic_stride,
+                          uint32_t ref_stride, uint32_t left, uint32_t right)
+{
+  uint32_t result = 0;
+  if (left) {
+    result += sad_hbd_any<true>(pic_data, ref_data + left, left, height, pic_stride, ref_stride);
+    result += reg_sad_hbd_avx2(pic_data + left, ref_data + left, width - left,
+                               height, pic_stride, ref_stride);
+  } else if (right) {
+    result += reg_sad_hbd_avx2(pic_data, ref_data, width - right,
+                               height, pic_stride, ref_stride);
+    result += sad_hbd_any<true>(pic_data + width - right, ref_data + width - right - 1,
+                                right, height, pic_stride, ref_stride);
+  } else {
+    result += reg_sad_hbd_avx2(pic_data, ref_data, width, height, pic_stride, ref_stride);
+  }
+  return result;
+}
+
+/*
+ * SSD of a W x W block. madd of a difference with itself adds two squares,
+ * at most 2 * PIXEL_MAX^2, to a 32-bit lane; the lanes are moved to 64-bit
+ * lanes before they could overflow as unsigned.
+ */
+constexpr uint32_t kHbdSsdAdds = 0xFFFFFFFFu / (2u * PIXEL_MAX * PIXEL_MAX);
+
+KVZ_FORCE_INLINE __m256i hbd_sqdiff(__m256i a, __m256i b)
+{
+  const __m256i d = _mm256_sub_epi16(a, b);
+  return _mm256_madd_epi16(d, d);
+}
+
+KVZ_FORCE_INLINE __m256i hbd_widen_add64(__m256i acc64, __m256i acc32)
+{
+  const __m256i zero = _mm256_setzero_si256();
+  acc64 = _mm256_add_epi64(acc64, _mm256_unpacklo_epi32(acc32, zero));
+  return _mm256_add_epi64(acc64, _mm256_unpackhi_epi32(acc32, zero));
+}
+
+template <int W>
+unsigned pixels_calc_ssd_hbd_w(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                               const int ref_stride, const int rec_stride)
+{
+  // Rows per vector and vectors per row.
+  constexpr int kRowsPerVec = W >= 16 ? 1 : 16 / W;
+  constexpr int kVecsPerRow = W >= 16 ? W / 16 : 1;
+  constexpr int kRowsPerFlush = (int)(kHbdSsdAdds / kVecsPerRow) * kRowsPerVec;
+  static_assert(kRowsPerFlush >= kRowsPerVec, "SSD accumulation overflows");
+
+  __m256i acc64 = _mm256_setzero_si256();
+  for (int y0 = 0; y0 < W; y0 += kRowsPerFlush) {
+    const int y1 = W - y0 < kRowsPerFlush ? W : y0 + kRowsPerFlush;
+    __m256i acc = _mm256_setzero_si256();
+    for (int y = y0; y < y1; y += kRowsPerVec) {
+      const kvz_pixel *a = ref + y * ref_stride;
+      const kvz_pixel *b = rec + y * rec_stride;
+      if constexpr (W == 4) {
+        acc = _mm256_add_epi32(acc, hbd_sqdiff(hbd_load_4x4(a, ref_stride), hbd_load_4x4(b, rec_stride)));
+      } else if constexpr (W == 8) {
+        acc = _mm256_add_epi32(acc, hbd_sqdiff(hbd_load_2x8(a, ref_stride), hbd_load_2x8(b, rec_stride)));
+      } else {
+        KVZ_UNROLL
+        for (int i = 0; i < kVecsPerRow; ++i) {
+          acc = _mm256_add_epi32(acc, hbd_sqdiff(hbd_load16(a + 16 * i), hbd_load16(b + 16 * i)));
+        }
+      }
+    }
+    acc64 = hbd_widen_add64(acc64, acc);
+  }
+  __m128i s = _mm_add_epi64(_mm256_castsi256_si128(acc64), _mm256_extracti128_si256(acc64, 1));
+  s = _mm_add_epi64(s, _mm_unpackhi_epi64(s, s));
+  uint64_t ssd;
+  _mm_storel_epi64((__m128i *)&ssd, s);
+  return (unsigned)(ssd >> (2 * (KVZ_BIT_DEPTH - 8)));
+}
+
+unsigned pixels_calc_ssd_hbd_avx2(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                                  const int ref_stride, const int rec_stride, const int width)
+{
+  switch (width) {
+    case 4:  return pixels_calc_ssd_hbd_w<4>(ref, rec, ref_stride, rec_stride);
+    case 8:  return pixels_calc_ssd_hbd_w<8>(ref, rec, ref_stride, rec_stride);
+    case 16: return pixels_calc_ssd_hbd_w<16>(ref, rec, ref_stride, rec_stride);
+    case 32: return pixels_calc_ssd_hbd_w<32>(ref, rec, ref_stride, rec_stride);
+    case 64: return pixels_calc_ssd_hbd_w<64>(ref, rec, ref_stride, rec_stride);
+    default: break;
+  }
+  uint64_t ssd = 0;
+  for (int y = 0; y < width; ++y) {
+    for (int x = 0; x < width; ++x) {
+      const int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
+      ssd += (uint32_t)(diff * diff);
+    }
+  }
+  return (unsigned)(ssd >> (2 * (KVZ_BIT_DEPTH - 8)));
+}
+
+/*
+ * Bi-prediction average. The generic code computes
+ * clip((s0 + s1 + offset) >> shift) with shift = 15 - KVZ_BIT_DEPTH,
+ * offset = 1 << (shift - 1) and samples s0, s1 at 14-bit precision.
+ * - Two pixels: s = p << (shift - 1), so the result is (p0 + p1 + 1) >> 1,
+ *   which is avg_epu16 and needs no clipping.
+ * - Otherwise the sums are computed with saturating 16-bit additions. When a
+ *   sum saturates to INT16_MAX, the result 32767 >> shift equals PIXEL_MAX,
+ *   which is also what clipping the exact result gives; a sum saturated to
+ *   INT16_MIN gives a negative result, which clips to 0 like the exact one.
+ */
+constexpr int kBipredShift = 15 - KVZ_BIT_DEPTH;
+static_assert((32767 >> kBipredShift) == PIXEL_MAX, "saturation must clip to PIXEL_MAX");
+
+enum { BIPRED_PX_PX, BIPRED_IM_IM, BIPRED_PX_IM };
+
+template <int MODE>
+KVZ_FORCE_INLINE __m256i bipred_hbd_combine(__m256i a, __m256i b)
+{
+  if constexpr (MODE == BIPRED_PX_PX) {
+    return _mm256_avg_epu16(a, b);
+  } else {
+    if constexpr (MODE == BIPRED_PX_IM) {
+      a = _mm256_slli_epi16(a, 14 - KVZ_BIT_DEPTH);
+    }
+    __m256i s = _mm256_adds_epi16(_mm256_adds_epi16(a, b), _mm256_set1_epi16(1 << (kBipredShift - 1)));
+    s = _mm256_srai_epi16(s, kBipredShift);
+    return _mm256_min_epi16(_mm256_max_epi16(s, _mm256_setzero_si256()), _mm256_set1_epi16(PIXEL_MAX));
+  }
+}
+
+template <int MODE>
+KVZ_FORCE_INLINE __m128i bipred_hbd_combine(__m128i a, __m128i b)
+{
+  if constexpr (MODE == BIPRED_PX_PX) {
+    return _mm_avg_epu16(a, b);
+  } else {
+    if constexpr (MODE == BIPRED_PX_IM) {
+      a = _mm_slli_epi16(a, 14 - KVZ_BIT_DEPTH);
+    }
+    __m128i s = _mm_adds_epi16(_mm_adds_epi16(a, b), _mm_set1_epi16(1 << (kBipredShift - 1)));
+    s = _mm_srai_epi16(s, kBipredShift);
+    return _mm_min_epi16(_mm_max_epi16(s, _mm_setzero_si128()), _mm_set1_epi16(PIXEL_MAX));
+  }
+}
+
+// The generic formula for one pixel.
+template <int MODE, typename T0, typename T1>
+KVZ_FORCE_INLINE kvz_pixel bipred_hbd_scalar(T0 a, T1 b)
+{
+  const int32_t offset = 1 << (kBipredShift - 1);
+  const int16_t s0 = MODE == BIPRED_IM_IM ? (int16_t)a : (int16_t)(a << (14 - KVZ_BIT_DEPTH));
+  const int16_t s1 = MODE == BIPRED_PX_PX ? (int16_t)(b << (14 - KVZ_BIT_DEPTH)) : (int16_t)b;
+  return kvz_fast_clip_32bit_to_pixel((s0 + s1 + offset) >> kBipredShift);
+}
+
+/*
+ * src0 and src1 are w x h blocks with a stride of w. The 4-pixel wide blocks
+ * are processed four rows (16 contiguous source samples) at a time.
+ */
+template <int MODE, typename T0, typename T1>
+void bipred_average_hbd_block(kvz_pixel *dst, const T0 *src0, const T1 *src1,
+                              unsigned w, unsigned h, unsigned dst_stride)
+{
+  unsigned y = 0;
+  if (w == 4) {
+    for (; y + 4 <= h; y += 4) {
+      const __m256i r = bipred_hbd_combine<MODE>(hbd_load16((const kvz_pixel *)src0 + 4 * y),
+                                                 hbd_load16((const kvz_pixel *)src1 + 4 * y));
+      const __m128i lo = _mm256_castsi256_si128(r);
+      const __m128i hi = _mm256_extracti128_si256(r, 1);
+      _mm_storel_epi64((__m128i *)(dst + (y + 0) * dst_stride), lo);
+      _mm_storeh_pd((double *)(dst + (y + 1) * dst_stride), _mm_castsi128_pd(lo));
+      _mm_storel_epi64((__m128i *)(dst + (y + 2) * dst_stride), hi);
+      _mm_storeh_pd((double *)(dst + (y + 3) * dst_stride), _mm_castsi128_pd(hi));
+    }
+  }
+  for (; y < h; ++y) {
+    const T0 *a = src0 + y * w;
+    const T1 *b = src1 + y * w;
+    kvz_pixel *d = dst + y * dst_stride;
+    unsigned x = 0;
+    for (; x + 16 <= w; x += 16) {
+      _mm256_storeu_si256((__m256i *)(d + x),
+                          bipred_hbd_combine<MODE>(hbd_load16((const kvz_pixel *)a + x),
+                                                   hbd_load16((const kvz_pixel *)b + x)));
+    }
+    if (x + 8 <= w) {
+      _mm_storeu_si128((__m128i *)(d + x),
+                       bipred_hbd_combine<MODE>(hbd_load8((const kvz_pixel *)a + x),
+                                                hbd_load8((const kvz_pixel *)b + x)));
+      x += 8;
+    }
+    if (x + 4 <= w) {
+      _mm_storel_epi64((__m128i *)(d + x),
+                       bipred_hbd_combine<MODE>(hbd_load4((const kvz_pixel *)a + x),
+                                                hbd_load4((const kvz_pixel *)b + x)));
+      x += 4;
+    }
+    for (; x < w; ++x) {
+      d[x] = bipred_hbd_scalar<MODE>(a[x], b[x]);
+    }
+  }
+}
+
+void bipred_average_hbd_avx2(lcu_t *const lcu,
+                             const yuv_t *const px_L0,
+                             const yuv_t *const px_L1,
+                             const yuv_im_t *const im_L0,
+                             const yuv_im_t *const im_L1,
+                             const unsigned pu_x,
+                             const unsigned pu_y,
+                             const unsigned pu_w,
+                             const unsigned pu_h,
+                             const unsigned im_flags_L0,
+                             const unsigned im_flags_L1,
+                             const bool predict_luma,
+                             const bool predict_chroma,
+                             const uint8_t chroma_shift_w,
+                             const uint8_t chroma_shift_h)
+{
+  if (predict_luma) {
+    const unsigned pb_offset = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
+    kvz_pixel *dst = lcu->rec.y + pb_offset;
+
+    if (!(im_flags_L0 & 1) && !(im_flags_L1 & 1)) {
+      bipred_average_hbd_block<BIPRED_PX_PX>(dst, px_L0->y, px_L1->y, pu_w, pu_h, LCU_WIDTH);
+    } else if ((im_flags_L0 & 1) && (im_flags_L1 & 1)) {
+      bipred_average_hbd_block<BIPRED_IM_IM>(dst, im_L0->y, im_L1->y, pu_w, pu_h, LCU_WIDTH);
+    } else {
+      const kvz_pixel    *src_px = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      const kvz_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
+      bipred_average_hbd_block<BIPRED_PX_IM>(dst, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
+    }
+  }
+  if (predict_chroma) {
+    const unsigned pb_offset = ((SUB_SCU(pu_y) >> chroma_shift_h) * (LCU_WIDTH >> chroma_shift_w)) +
+                               (SUB_SCU(pu_x) >> chroma_shift_w);
+    const unsigned pb_w = pu_w >> chroma_shift_w;
+    const unsigned pb_h = pu_h >> chroma_shift_h;
+    const unsigned stride = LCU_WIDTH >> chroma_shift_w;
+
+    if (!(im_flags_L0 & 2) && !(im_flags_L1 & 2)) {
+      bipred_average_hbd_block<BIPRED_PX_PX>(lcu->rec.u + pb_offset, px_L0->u, px_L1->u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_PX_PX>(lcu->rec.v + pb_offset, px_L0->v, px_L1->v, pb_w, pb_h, stride);
+    } else if ((im_flags_L0 & 2) && (im_flags_L1 & 2)) {
+      bipred_average_hbd_block<BIPRED_IM_IM>(lcu->rec.u + pb_offset, im_L0->u, im_L1->u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_IM_IM>(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, stride);
+    } else {
+      const kvz_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      const kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
+      const kvz_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      const kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
+      bipred_average_hbd_block<BIPRED_PX_IM>(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, stride);
+      bipred_average_hbd_block<BIPRED_PX_IM>(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, stride);
+    }
+  }
+}
+
+/*
+ * Variance as (n * sum(x^2) - sum(x)^2) / n^2. The sums are exact. The
+ * numerator is computed exactly in 64 bits when it fits, otherwise in double;
+ * either way the result agrees with the generic two-pass loop to within its
+ * rounding error.
+ */
+double pixel_var_hbd_finish(uint64_t sum, uint64_t sumsq, uint32_t len)
+{
+  const double n = (double)len;
+  if (len <= 65536) {
+    // len * sumsq <= 2^16 * 2^16 * PIXEL_MAX^2 < 2^64.
+    const uint64_t num = (uint64_t)len * sumsq - sum * sum;
+    return (double)num / (n * n);
+  }
+  const double mean = (double)sum / n;
+  const double var = ((double)sumsq - mean * (double)sum) / n;
+  return var < 0 ? 0 : var;
+}
+
+double pixel_var_hbd_avx2(const kvz_pixel *arr, const uint32_t len)
+{
+  // A madd lane of the squares takes at most 2 * PIXEL_MAX^2 per vector.
+  constexpr uint32_t kBlock = 16 * (kHbdSsdAdds < 1024 ? kHbdSsdAdds : 1024);
+  const __m256i ones = _mm256_set1_epi16(1);
+  __m256i sum64 = _mm256_setzero_si256();
+  __m256i sq64 = _mm256_setzero_si256();
+  uint32_t i = 0;
+  while (i + 16 <= len) {
+    const uint32_t end = len - i < kBlock ? i + ((len - i) & ~15u) : i + kBlock;
+    __m256i sum32 = _mm256_setzero_si256();
+    __m256i sq32 = _mm256_setzero_si256();
+    for (; i < end; i += 16) {
+      const __m256i v = hbd_load16(arr + i);
+      sum32 = _mm256_add_epi32(sum32, _mm256_madd_epi16(v, ones));
+      sq32 = _mm256_add_epi32(sq32, _mm256_madd_epi16(v, v));
+    }
+    sum64 = hbd_widen_add64(sum64, sum32);
+    sq64 = hbd_widen_add64(sq64, sq32);
+  }
+  ALIGNED(32) uint64_t s[4], q[4];
+  _mm256_store_si256((__m256i *)s, sum64);
+  _mm256_store_si256((__m256i *)q, sq64);
+  uint64_t sum = s[0] + s[1] + s[2] + s[3];
+  uint64_t sumsq = q[0] + q[1] + q[2] + q[3];
+  for (; i < len; ++i) {
+    sum += arr[i];
+    sumsq += (uint32_t)arr[i] * arr[i];
+  }
+  return pixel_var_hbd_finish(sum, sumsq, len);
+}
+
+} // namespace hbd_sad
+} // namespace
+
+#endif // COMPILE_INTEL_AVX2 && KVZ_BIT_DEPTH > 8
+
 #if COMPILE_INTEL_AVX2
 #if KVZ_BIT_DEPTH == 8
 
@@ -2104,6 +2705,27 @@ static void bilinear_ssd_multi_avx2(const kvz_pixel *org, int org_stride,
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
+#if COMPILE_INTEL_AVX2 && KVZ_BIT_DEPTH > 8
+  if (bitdepth == KVZ_BIT_DEPTH) {
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::reg_sad_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "sad_4x4", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_avx2<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_avx2<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_avx2<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_avx2<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_hbd_avx2<64>));
+    success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_avx2<4>));
+    success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_avx2<8>));
+    success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_avx2<16>));
+    success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_avx2<32>));
+    success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::sad_nxn_dual_hbd_avx2<64>));
+    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::pixels_calc_ssd_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "bipred_average", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::bipred_average_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::get_optimized_sad_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "ver_sad", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::ver_sad_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "hor_sad", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::hor_sad_hbd_avx2));
+    success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, KVZ_STRATEGY_FPTR(hbd_sad::pixel_var_hbd_avx2));
+  }
+#endif // COMPILE_INTEL_AVX2 && KVZ_BIT_DEPTH > 8
 #if COMPILE_INTEL_AVX2
 #if KVZ_BIT_DEPTH == 8
   // We don't actually use SAD for intra right now, other than 4x4 for
