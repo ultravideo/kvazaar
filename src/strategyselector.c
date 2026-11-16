@@ -593,5 +593,11 @@ static void set_hardware_flags(int32_t cpuid, uint8_t logging) {
     fprintf(stderr, "\n");
   }
 #endif
+
+#if COMPILE_RISCV
+  if (logging) {
+    fprintf(stderr, "Compiled: RISC-V, using generic C strategies\n");
+  }
+#endif
   
 }
