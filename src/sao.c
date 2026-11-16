@@ -268,6 +268,7 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
 
       // Store best distortion and offset
       if(temp_dist < best_dist) {
+        best_dist = temp_dist;
         dist[band] = temp_dist;
         temp_offsets[band] = value;
       }
