@@ -615,7 +615,7 @@ void print_help(void)
     "                                     complexity, adjusted to reach the\n"
     "                                     bitrate. Enables the lookahead.\n"
     "      --(no-)intra-bits      : Use Hadamard cost based allocation for intra\n"
-    "                               frames. Default on for gop 8 and off for lp-gop\n"
+    "                               frames. Default on for lp-gop and off for RA GOPs\n"
     "      --(no-)clip-neighbour  : On oba based rate control whether to clip \n"
     "                               lambda values to same frame's ctus or previous'.\n"
     "                               Default on for RA GOPS and disabled for LP.\n"

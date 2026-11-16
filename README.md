@@ -160,7 +160,7 @@ Video structure:
                                      complexity, adjusted to reach the
                                      bitrate. Enables the lookahead.
       --(no-)intra-bits      : Use Hadamard cost based allocation for intra
-                               frames. Default on for gop 8 and off for lp-gop
+                               frames. Default on for lp-gop and off for RA GOPs
       --(no-)clip-neighbour  : On oba based rate control whether to clip 
                                lambda values to same frame's ctus or previous'.
                                Default on for RA GOPS and disabled for LP.
@@ -214,6 +214,8 @@ Video structure:
                                [enabled with lookahead]
       --cutree-strength <float>: CU-tree QP offset strength.
                                [3.75 * (1 - qcomp)]
+      --(no-)cutree-qg32     : CU-tree QP for 32x32 blocks instead of
+                               64x64 (experimental). [disabled]
       --(no-)scenecut <integer>: Scene cut detection threshold, 1..100.
                                Inserts an IDR picture at scene changes.
                                [40 with lookahead]
@@ -420,153 +422,46 @@ QP
 ```
 
 ### Lookahead
-`--lookahead N` keeps N input pictures queued before they are encoded.
-Each queued picture is downscaled by two and analysed with a cheap intra
-and motion search on 8x8 low resolution blocks. The analysis is used by:
+The lookahead analyses upcoming pictures before they are encoded and uses
+the analysis to distribute the bits better. It is off by default
+(`--lookahead 0`), and enabling it adds latency of the given number of
+pictures.
 
-- **Scene cut detection** (`--scenecut`, default 40): when the inter cost
-  of a picture is close to its intra cost the pictures before it are
-  flushed with a shortened GOP and the picture is coded as an IDR that
-  starts a new coded video sequence. The intra period restarts from it.
-- **CU-tree** (`--cutree`, default on): the amount of information each
-  block passes on to the following pictures is propagated backwards
-  through the lookahead and converted into CTU QP offsets
-  (`-strength * log2((intra + propagate) / intra)`, zero mean per picture,
-  limited to +-4). Pictures that are not used for reference are not
-  adapted.
-- **CRF** (`--crf X`, `--qcomp`): the base QP of a picture is
-  `X + 6 * (1 - qcomp) * log2(complexity / reference)`, where the
-  complexity is the low resolution inter cost blurred over the neighbouring
-  pictures of the same scene. The GOP QP offsets are applied on top as in
-  the constant QP mode. CRF X gives roughly the bitrate of QP X.
-- **ABR rate control** (`--bitrate N --rc-algorithm abr`): bits are
-  modelled per GOP position as `k * complexity / qscale^1.3` with k learned
-  from the coded pictures. Once per GOP the rate factor is chosen so that
-  the pictures up to the end of the lookahead hit the target bitrate after
-  correcting the error so far (including the pictures still being coded).
-  The base QP changes at most 2 per GOP.
+`--lookahead N` sets the number of pictures analysed ahead (0..250). It
+also enables these tools:
 
-- **VBV** (`--vbv-maxrate`, `--vbv-bufsize`, `--vbv-init`, with CRF or
-  ABR): before a picture is coded the buffer is simulated over the
-  pictures being coded and the lookahead with the bits model, and the base
-  QP is raised (by at most 20) until the buffer stays above 20 % of its
-  size. The increase is released by at most 1 QP per picture. No HRD
-  parameters are written to the bitstream.
+- **CU-tree** (`--cutree`, on by default with the lookahead): blocks that
+  are referenced a lot by later pictures get a lower QP.
+- **Scene cut detection** (`--scenecut`, threshold 40 by default): an IDR
+  picture is inserted at a scene change.
 
-- **Temporal filter** (`--mctf`, random access GOP of 8 or 16): every
-  8th picture (counted from the start of the scene) is replaced before
-  coding by a motion compensated, bilateral weighted average of itself and
-  the two previous and two following pictures of the same scene, like the
-  GOP based temporal filter of HM / VTM (8x8 hierarchical motion search,
-  block error and noise based weights). These pictures are the references
-  of the rest of the GOP, so removing their noise helps the whole GOP. The
-  original pictures are still used for the PSNR output.
+These options need the lookahead and set `--lookahead 20` if no length
+is given:
 
-- **Motion search starting point**: the low resolution motion of each
-  16x16 block is followed picture by picture (up to 16 pictures in each
-  direction within the scene) to each reference picture and checked as an
-  extra starting point of the integer motion search. This helps the
-  hexagon / diamond searches of the fast presets to find large motion
-  (-4.1 % ultrafast, -2.8 % medium, -0.6 % veryslow on top of the other
-  lookahead tools, up to 5 % more time).
+- **CRF** (`--crf X`): constant quality mode. The QP of each picture
+  follows its complexity, and CRF X gives roughly the bitrate of QP X.
+  `--qcomp` controls how strongly the QP follows the complexity.
+- **ABR rate control** (`--bitrate N --rc-algorithm abr`): reaches the
+  target bitrate using the complexity measured by the lookahead.
+- **VBV** (`--vbv-maxrate`, `--vbv-bufsize`, `--vbv-init`): limits the
+  bitrate peaks with CRF or ABR.
+- **Temporal filter** (`--mctf`): denoises the GOP key pictures before
+  coding. Needs a random access GOP.
+- **Adaptive GOP** (`--adaptive-gop`): picks the length of each mini-GOP
+  (1..2 * `--gop` pictures) to suit the content, and does not insert IDR
+  pictures at flashes. Needs a random access GOP of 8 or 16 and adds
+  2 * `--gop` pictures of latency.
 
-- **Adaptive GOP** (`--adaptive-gop`, random access GOP of 8 or 16): the
-  pictures are released from the lookahead in coding order, one mini-GOP
-  at a time, and the lookahead decides the structure:
-  - Mini-GOP length: hierarchical mini-GOPs of 1 to 2 * `--gop` pictures.
-    A mini-GOP is halved when the low resolution cost of the anchor
-    predicted over the whole length plus the bi-predicted middle picture
-    is more than 1.25 times the cost of the two halves predicted as
-    anchors (searches seeded by the followed motion, range +-87 low
-    resolution pixels). The pictures keep the QP and layer settings of
-    the GOP table pictures at the same distance from their references. A
-    32 picture mini-GOP uses the settings of the GOP 16 anchor for its
-    middle picture and a 3 lower QP offset for its anchor.
-  - References: a picture keeps the ends of the enclosing intervals of the
-    hierarchy (and one earlier picture as in the GOP tables), an anchor
-    the three pictures of the lowest layers. With mini-GOPs of `--gop`
-    pictures the output is identical to the GOP tables.
-  - Intra pictures: the periodic intra picture is the first mini-GOP
-    anchor within the last `--gop` / 2 pictures of `--period` (a CRA, or
-    an IDR with a closed GOP), so the mini-GOPs are not broken up before
-    it. `--period` no longer needs to be a multiple of `--gop`.
-  - Flashes: a scene cut is cancelled when one of the next three pictures
-    is predicted well (inter cost below 0.7 * intra cost) from the
-    picture before the cut, so a flash or a short disturbance does not
-    insert IDR pictures. The flash pictures are coded as non-reference
-    pictures with the QP of the highest GOP layer, they are left out of
-    the references of the other pictures and a mini-GOP anchor is moved
-    off a flash picture (to the nearest power of two length). Fades are
-    still coded as references: coding the pictures of a cross-fade or a
-    fade to black as non-reference pictures was 33-69 % worse.
+Examples:
+```
+kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --lookahead 20
+kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --crf 28
+kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --bitrate 5000000 --rc-algorithm abr
+kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --crf 28 --mctf --adaptive-gop
+```
 
-  The pictures are held in the lookahead for 2 * `--gop` more pictures
-  (latency and memory). The ABR bits model averages the GOP positions of
-  the longest mini-GOP, and the rate factor is updated at the anchors and
-  at the starts of the halves of the 32 picture mini-GOPs.
-
-The lookahead analysis runs in its own thread when threads are enabled.
-The results do not depend on the number of threads. With `--lookahead 0`
-(the default) the encoder output is unchanged.
-
-Measured BD-rate (Y-PSNR) against constant QP with the same preset,
-QP 22..37 (bitrate targets taken from the constant QP runs), 96 frames of
-BQMall, BasketballDrillText, Johnny, ChinaSpeed and a BQMall /
-BasketballDrillText splice with two scene cuts, 2 threads:
-
-| Mode                                     | ultrafast | medium  |
-|------------------------------------------|-----------|---------|
-| `--lookahead 20 --no-cutree` (scene cut) | -1.5 %    |         |
-| `--lookahead 20`                         | -3.4 %    | -2.5 %  |
-| `--crf X`                                | -4.0 %    | -2.6 %  |
-| `--bitrate N` (lambda)                   | +17.7 %   | +22.5 % |
-| `--bitrate N --lookahead 20` (lambda)    | +13.4 %   |         |
-| `--bitrate N --rc-algorithm abr`         | +2.2 %    | +2.9 %  |
-| `--lookahead 20 --mctf`                  | -6.2 %    |         |
-
-With `--preset veryslow` (64 frames of the same sequences) `--lookahead
-20` gives -2.7 % and `--lookahead 20 --mctf` -3.6 % (-4.5 % YUV). The
-temporal filter (AVX2 motion search) adds about 80 ms of CPU time per
-filtered 832x480 picture (one in eight pictures), about 4 % of the
-veryslow encoding time but 1.8x the ultrafast time.
-
-`--adaptive-gop` against `--lookahead 20` with the same preset (constant
-QP 22-37, the first 96-144 pictures, `--period 64`):
-
-| Sequence                     | ultrafast | medium  |
-|------------------------------|-----------|---------|
-| BQMall                       | -0.6 %    | -1.0 %  |
-| BasketballDrillText          | -3.0 %    |         |
-| Foreman                      | -3.3 %    | -1.0 %  |
-| ChinaSpeed                   | -0.7 %    |         |
-| Johnny                       | -3.0 %    | -2.4 %  |
-| KristenAndSara               | -2.7 %    |         |
-| SlideShow                    | -5.6 %    | -5.0 %  |
-| Stockholm 1x / 4x speed mix  | -2.2 %    |         |
-| Stockholm 4x speed           | -5.7 %    | -4.0 %  |
-| Johnny-Kristen cross-fade    | -4.6 %    | -3.3 %  |
-| Stockholm with 4 flashes     | -43.9 %   | -42.3 % |
-
-Most of the gain of the natural sequences comes from the 32 picture
-mini-GOPs. Shorter mini-GOPs than the GOP table were worse on all of these
-sequences (`--gop 16` content coded as GOP 8: +1.0..+5.1 %), so the model
-splits a mini-GOP only with a clear margin. The flash sequence gains from
-not inserting IDR pictures at the flashes. Coding the flash pictures as
-non-reference pictures gives a further -4.8 % (ultrafast) / -3.7 %
-(medium) on it, and -21.1 % / -15.6 % on a version with weaker (+30 luma)
-flashes where a 32 picture anchor fell on a flash; the other sequences
-are unchanged. The CPU time is 0-5 % higher.
-
-`--cutree-qg32` (CU-tree offsets per 32x32 quantization group instead of
-per CTU) is experimental and off by default: -3.4 % at ultrafast like the
-per-CTU offsets, and less gain than per-CTU offsets at veryslow.
-
-The scene cut gain comes from the splice (-7.5 %), the other sequences
-have no cuts. The mean absolute bitrate error of the ABR mode on these
-short sequences is 3.3 % (ultrafast) / 7.5 % (medium) compared to 7.1 % /
-8.1 % with the lambda rate control. The lookahead analysis takes about
-11 ms per 2560x1600 picture, about 10 % of the encoding time with
-ultrafast on two cores.
+The lookahead runs in its own thread, and the output does not depend on
+the number of threads. It is not supported with interlaced coding.
 
 ## Presets
 The names of the presets are the same as with x264: ultrafast,
@@ -741,7 +636,7 @@ We are happy to look at pull requests in Github. There is still lots of work to 
 ### Code documentation
 You can generate Doxygen documentation pages by running the command
 "doxygen docs.doxy". Here is a rough sketch of the module structure:
-![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
+![Kvazaar module hierarchy](doc/kvazaar_module_hierarchy.svg)
 
 
 ### For version control we try to follow these conventions:

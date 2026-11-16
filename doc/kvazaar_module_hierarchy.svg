@@ -1,0 +1,300 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1330" viewBox="0 0 1500 1330" font-family="Arial, Helvetica, sans-serif" xmlns:c2pa="http://c2pa.org/manifest">
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#222"/></marker>
+<style>
+.grp{fill:#f2f2f2;stroke:#555;stroke-width:1;stroke-dasharray:5,3}
+.grp .grp{fill:#e4e4e4}
+.grphead{fill:#e6e6e6;stroke:none}
+.gtitle{font-size:14px;fill:#111}
+.node{fill:#ffcc00;stroke:#c99a00;stroke-width:1}
+.nlabel{font-size:12px;font-weight:bold;text-anchor:middle;fill:#111}
+.nsub{font-size:10px;text-anchor:middle;fill:#333}
+.func{font-size:10.5px;fill:#111}
+.sep{stroke:#c99a00;stroke-width:1}
+.edge{fill:none;stroke:#222;stroke-width:1.1}
+.note{fill:#ffcc00;stroke:#c99a00}
+.ntext{font-size:12px;fill:#111}
+.small{font-size:11px;fill:#333}
+</style></defs>
+<rect width="1500" height="1330" fill="#fff"/>
+<path class="note" d="M20,20 H372 L392,40 V150 H20 Z"/><path d="M372,20 V40 H392" fill="none" stroke="#c99a00"/>
+<text class="ntext" x="32" y="42">A rough sketch of the module hierarchy in Kvazaar.</text>
+<text class="ntext" x="32" y="60"></text>
+<text class="ntext" x="32" y="78">Arrows mean that a module uses another. Only the important</text>
+<text class="ntext" x="32" y="96">relationships are shown, to keep the hierarchy readable.</text>
+<text class="ntext" x="32" y="114"></text>
+<text class="ntext" x="32" y="132">Updated: 16.11.2026</text>
+<rect class="grp" x="715" y="15" width="300" height="135" rx="4"/>
+<rect class="grphead" x="716" y="16" width="298" height="20" rx="3"/>
+<text class="gtitle" x="1007" y="30" text-anchor="end">Kvazaar command line interface</text>
+<rect class="node" x="820.0" y="47.0" width="90.0" height="26"/>
+<text class="nlabel" x="865" y="64">encmain</text>
+<rect class="node" x="730.0" y="107.0" width="90.0" height="26"/>
+<text class="nlabel" x="775" y="124">cli</text>
+<rect class="node" x="910.0" y="107.0" width="90.0" height="26"/>
+<text class="nlabel" x="955" y="124">yuv_io</text>
+<rect class="grp" x="15" y="175" width="1470" height="1140" rx="4"/>
+<rect class="grphead" x="16" y="176" width="1468" height="20" rx="3"/>
+<text class="gtitle" x="1477" y="190" text-anchor="end">Kvazaar library</text>
+<rect class="grp" x="30" y="205" width="520" height="115" rx="4"/>
+<rect class="grphead" x="31" y="206" width="518" height="20" rx="3"/>
+<text class="gtitle" x="542" y="220" text-anchor="end">CU depth constraints</text>
+<rect class="node" x="390.0" y="242.0" width="140.0" height="26"/>
+<text class="nlabel" x="460" y="259">constraint</text>
+<rect class="node" x="55.0" y="242.0" width="250.0" height="26"/>
+<text class="nlabel" x="180" y="259">ml_intra_cu_depth_pred</text>
+<rect class="node" x="55.0" y="282.0" width="250.0" height="26"/>
+<text class="nlabel" x="180" y="299">ml_classifier_intra_depth_pred</text>
+<rect class="grp" x="30" y="340" width="520" height="235" rx="4"/>
+<rect class="grphead" x="31" y="341" width="518" height="20" rx="3"/>
+<text class="gtitle" x="38" y="355">Coding tree unit (CTU) compression</text>
+<rect class="node" x="135.0" y="527.0" width="130.0" height="26"/>
+<text class="nlabel" x="200" y="544">work_tree_pool</text>
+<rect class="node" x="400.0" y="377.0" width="120.0" height="26"/>
+<text class="nlabel" x="460" y="394">search</text>
+<rect class="node" x="230.0" y="371.0" width="120.0" height="38"/>
+<text class="nlabel" x="290" y="387">reconstruct</text>
+<text class="nsub" x="290" y="402">chroma recon</text>
+<rect class="node" x="40.0" y="457.0" width="140.0" height="26"/>
+<text class="nlabel" x="110" y="474">search_inter</text>
+<rect class="node" x="220.0" y="457.0" width="140.0" height="26"/>
+<text class="nlabel" x="290" y="474">search_intra</text>
+<rect class="node" x="400.0" y="457.0" width="120.0" height="26"/>
+<text class="nlabel" x="460" y="474">rdo</text>
+<rect class="node" x="390.0" y="527.0" width="140.0" height="26"/>
+<text class="nlabel" x="460" y="544">fast_coeff_cost</text>
+<rect class="grp" x="30" y="595" width="520" height="350" rx="4"/>
+<rect class="grphead" x="31" y="596" width="518" height="20" rx="3"/>
+<text class="gtitle" x="542" y="610" text-anchor="end">Reconstruction</text>
+<rect class="node" x="40.0" y="637.0" width="140.0" height="26"/>
+<text class="nlabel" x="110" y="654">inter</text>
+<rect class="node" x="220.0" y="637.0" width="140.0" height="26"/>
+<text class="nlabel" x="290" y="654">intra</text>
+<rect class="node" x="130.0" y="752.0" width="140.0" height="26"/>
+<text class="nlabel" x="200" y="769">transform</text>
+<rect class="node" x="130.0" y="867.0" width="140.0" height="26"/>
+<text class="nlabel" x="200" y="884">scalinglist</text>
+<rect class="node" x="340.0" y="867.0" width="120.0" height="26"/>
+<text class="nlabel" x="400" y="884">tables</text>
+<rect class="grp" x="570" y="205" width="590" height="320" rx="4"/>
+<rect class="grphead" x="571" y="206" width="588" height="20" rx="3"/>
+<text class="gtitle" x="1152" y="220" text-anchor="end">Initialization and control</text>
+<rect class="node" x="815.0" y="231.0" width="90.0" height="38"/>
+<text class="nlabel" x="860" y="247">kvazaar</text>
+<text class="nsub" x="860" y="262">library API</text>
+<rect class="node" x="595.0" y="237.0" width="170.0" height="26"/>
+<text class="nlabel" x="680" y="254">input_frame_buffer</text>
+<rect class="node" x="955.0" y="237.0" width="90.0" height="26"/>
+<text class="nlabel" x="1000" y="254">cfg</text>
+<rect class="node" x="1060.0" y="231.0" width="90.0" height="38"/>
+<text class="nlabel" x="1105" y="247">gop</text>
+<text class="nsub" x="1105" y="262">GOP tables</text>
+<rect class="node" x="595.0" y="301.0" width="170.0" height="38"/>
+<text class="nlabel" x="680" y="317">encoder</text>
+<text class="nsub" x="680" y="332">encoder control</text>
+<rect class="node" x="805.0" y="367.0" width="150.0" height="26"/>
+<text class="nlabel" x="880" y="384">encoderstate</text>
+<rect class="node" x="580.0" y="427.0" width="200.0" height="26"/>
+<text class="nlabel" x="680" y="444">encoder_state-ctors_dtors</text>
+<rect class="node" x="580.0" y="482.0" width="200.0" height="26"/>
+<text class="nlabel" x="680" y="499">encoder_state-geometry</text>
+<rect class="node" x="1015.0" y="427.0" width="120.0" height="26"/>
+<text class="nlabel" x="1075" y="444">rate_control</text>
+<rect class="grp" x="570" y="545" width="590" height="90" rx="4"/>
+<rect class="grphead" x="571" y="546" width="588" height="20" rx="3"/>
+<text class="gtitle" x="1152" y="560" text-anchor="end">In-loop filters</text>
+<rect class="node" x="730.0" y="571.0" width="120.0" height="38"/>
+<text class="nlabel" x="790" y="587">filter</text>
+<text class="nsub" x="790" y="602">deblocking</text>
+<rect class="node" x="940.0" y="577.0" width="120.0" height="26"/>
+<text class="nlabel" x="1000" y="594">sao</text>
+<rect class="grp" x="570" y="655" width="590" height="135" rx="4"/>
+<rect class="grphead" x="571" y="656" width="588" height="20" rx="3"/>
+<text class="gtitle" x="1152" y="670" text-anchor="end">HEVC bitstream coding</text>
+<rect class="node" x="775.0" y="687.0" width="210.0" height="26"/>
+<text class="nlabel" x="880" y="704">encoder_state-bitstream</text>
+<rect class="node" x="790.0" y="747.0" width="180.0" height="26"/>
+<text class="nlabel" x="880" y="764">encode_coding_tree</text>
+<rect class="node" x="1055.0" y="687.0" width="90.0" height="26"/>
+<text class="nlabel" x="1100" y="704">nal</text>
+<rect class="node" x="1055.0" y="747.0" width="90.0" height="26"/>
+<text class="nlabel" x="1100" y="764">sei</text>
+<rect class="grp" x="570" y="810" width="590" height="135" rx="4"/>
+<rect class="grphead" x="571" y="811" width="588" height="20" rx="3"/>
+<text class="gtitle" x="1152" y="825" text-anchor="end">CABAC</text>
+<rect class="node" x="820.0" y="842.0" width="120.0" height="26"/>
+<text class="nlabel" x="880" y="859">cabac</text>
+<rect class="node" x="1000.0" y="842.0" width="120.0" height="26"/>
+<text class="nlabel" x="1060" y="859">context</text>
+<rect class="node" x="820.0" y="902.0" width="120.0" height="26"/>
+<text class="nlabel" x="880" y="919">bitstream</text>
+<rect class="grp" x="1180" y="205" width="290" height="115" rx="4"/>
+<rect class="grphead" x="1181" y="206" width="288" height="20" rx="3"/>
+<text class="gtitle" x="1462" y="220" text-anchor="end">Threading</text>
+<rect class="node" x="1272.1" y="232.0" width="105.8" height="26"/>
+<text class="nlabel" x="1325" y="249">threadqueue</text>
+<rect class="node" x="1279.5" y="282.0" width="91.0" height="26"/>
+<text class="nlabel" x="1325" y="299">threads.h</text>
+<rect class="grp" x="1180" y="340" width="290" height="185" rx="4"/>
+<rect class="grphead" x="1181" y="341" width="288" height="20" rx="3"/>
+<text class="gtitle" x="1462" y="355" text-anchor="end">Lookahead</text>
+<rect class="node" x="1252.6" y="371.0" width="144.8" height="38"/>
+<text class="nlabel" x="1325" y="387">lookahead</text>
+<text class="nsub" x="1325" y="402">scene cut, CU-tree, CRF</text>
+<rect class="node" x="1257.2" y="456.0" width="135.6" height="38"/>
+<text class="nlabel" x="1325" y="472">temporal_filter</text>
+<text class="nsub" x="1325" y="487">--mctf</text>
+<rect class="grp" x="1180" y="545" width="290" height="200" rx="4"/>
+<rect class="grphead" x="1181" y="546" width="288" height="20" rx="3"/>
+<text class="gtitle" x="1462" y="560" text-anchor="end">Data structures (used throughout)</text>
+<rect class="node" x="1185.0" y="586.0" width="130.0" height="38"/>
+<text class="nlabel" x="1250" y="602">videoframe</text>
+<text class="nsub" x="1250" y="617">frame / tile</text>
+<rect class="node" x="1335.0" y="586.0" width="130.0" height="38"/>
+<text class="nlabel" x="1400" y="602">imagelist</text>
+<text class="nsub" x="1400" y="617">reference pictures</text>
+<rect class="node" x="1185.0" y="681.0" width="130.0" height="38"/>
+<text class="nlabel" x="1250" y="697">image</text>
+<text class="nsub" x="1250" y="712">YUV buffers</text>
+<rect class="node" x="1335.0" y="681.0" width="130.0" height="38"/>
+<text class="nlabel" x="1400" y="697">cu</text>
+<text class="nsub" x="1400" y="712">CU data</text>
+<rect class="grp" x="1180" y="765" width="290" height="180" rx="4"/>
+<rect class="grphead" x="1181" y="766" width="288" height="20" rx="3"/>
+<text class="gtitle" x="1462" y="780" text-anchor="end">Common headers and extras</text>
+<rect class="node" x="1182.5" y="802.0" width="135.0" height="26"/>
+<text class="nlabel" x="1250" y="819">global.h</text>
+<rect class="node" x="1182.5" y="847.0" width="135.0" height="26"/>
+<text class="nlabel" x="1250" y="864">kvz_math.h</text>
+<rect class="node" x="1182.5" y="892.0" width="135.0" height="26"/>
+<text class="nlabel" x="1250" y="909">multilib_rename.h</text>
+<rect class="node" x="1332.5" y="802.0" width="135.0" height="26"/>
+<text class="nlabel" x="1400" y="819">checkpoint</text>
+<rect class="node" x="1332.5" y="847.0" width="135.0" height="26"/>
+<text class="nlabel" x="1400" y="864">extras/crypto</text>
+<rect class="node" x="1332.5" y="892.0" width="135.0" height="26"/>
+<text class="nlabel" x="1400" y="909">extras/libmd5</text>
+<rect class="grp" x="30" y="975" width="1440" height="325" rx="4"/>
+<rect class="grphead" x="31" y="976" width="1438" height="20" rx="3"/>
+<text class="gtitle" x="1462" y="990" text-anchor="end">SIMD optimizations</text>
+<rect class="node" x="665.0" y="1007.0" width="170.0" height="26"/>
+<text class="nlabel" x="750" y="1024">strategyselector</text>
+<rect class="node" x="45" y="1080" width="170" height="122"/>
+<text class="nlabel" x="130.0" y="1097">strategies-quant</text>
+<line class="sep" x1="45" y1="1106" x2="215" y2="1106"/>
+<text class="func" x="51" y="1121">+quant</text>
+<text class="func" x="51" y="1135">+dequant</text>
+<text class="func" x="51" y="1149">+quantize_residual</text>
+<text class="func" x="51" y="1163">+coeff_abs_sum</text>
+<text class="func" x="51" y="1177">+fast_coeff_cost</text>
+<text class="func" x="51" y="1191">+find_last_scanpos</text>
+<rect class="node" x="223" y="1080" width="170" height="94"/>
+<text class="nlabel" x="308.0" y="1097">strategies-dct</text>
+<line class="sep" x1="223" y1="1106" x2="393" y2="1106"/>
+<text class="func" x="229" y="1121">+dct_NxN</text>
+<text class="func" x="229" y="1135">+idct_NxN</text>
+<text class="func" x="229" y="1149">+fast_forward_dst_4x4</text>
+<text class="func" x="229" y="1163">+fast_inverse_dst_4x4</text>
+<rect class="node" x="401" y="1080" width="170" height="178"/>
+<text class="nlabel" x="486.0" y="1097">strategies-picture</text>
+<line class="sep" x1="401" y1="1106" x2="571" y2="1106"/>
+<text class="func" x="407" y="1121">+reg_sad</text>
+<text class="func" x="407" y="1135">+sad_NxN(_dual)</text>
+<text class="func" x="407" y="1149">+satd_NxN(_dual)</text>
+<text class="func" x="407" y="1163">+satd_any_size(_quad)</text>
+<text class="func" x="407" y="1177">+pixels_calc_ssd</text>
+<text class="func" x="407" y="1191">+bipred_average</text>
+<text class="func" x="407" y="1205">+ver_sad, hor_sad</text>
+<text class="func" x="407" y="1219">+pixel_var</text>
+<text class="func" x="407" y="1233">+bilinear_ssd(_multi)</text>
+<text class="func" x="407" y="1247">+tf_* (temporal filter)</text>
+<rect class="node" x="579" y="1080" width="170" height="108"/>
+<text class="nlabel" x="664.0" y="1097">strategies-ipol</text>
+<line class="sep" x1="579" y1="1106" x2="749" y2="1106"/>
+<text class="func" x="585" y="1121">+filter_hpel_blocks_*</text>
+<text class="func" x="585" y="1135">+filter_qpel_blocks_*</text>
+<text class="func" x="585" y="1149">+sample_quarterpel_luma(_hi)</text>
+<text class="func" x="585" y="1163">+sample_octpel_chroma(_hi)</text>
+<text class="func" x="585" y="1177">+get_extended_block</text>
+<rect class="node" x="757" y="1080" width="170" height="80"/>
+<text class="nlabel" x="842.0" y="1097">strategies-intra</text>
+<line class="sep" x1="757" y1="1106" x2="927" y2="1106"/>
+<text class="func" x="763" y="1121">+angular_pred</text>
+<text class="func" x="763" y="1135">+intra_pred_planar</text>
+<text class="func" x="763" y="1149">+intra_pred_filtered_dc</text>
+<rect class="node" x="935" y="1080" width="170" height="94"/>
+<text class="nlabel" x="1020.0" y="1097">strategies-sao</text>
+<line class="sep" x1="935" y1="1106" x2="1105" y2="1106"/>
+<text class="func" x="941" y="1121">+sao_edge_ddistortion</text>
+<text class="func" x="941" y="1135">+calc_sao_edge_dir</text>
+<text class="func" x="941" y="1149">+sao_band_ddistortion</text>
+<text class="func" x="941" y="1163">+sao_reconstruct_color</text>
+<rect class="node" x="1113" y="1080" width="170" height="52"/>
+<text class="nlabel" x="1198.0" y="1097">strategies-encode</text>
+<line class="sep" x1="1113" y1="1106" x2="1283" y2="1106"/>
+<text class="func" x="1119" y="1121">+encode_coeff_nxn</text>
+<rect class="node" x="1291" y="1080" width="170" height="66"/>
+<text class="nlabel" x="1376.0" y="1097">strategies-nal</text>
+<line class="sep" x1="1291" y1="1106" x2="1461" y2="1106"/>
+<text class="func" x="1297" y="1121">+array_checksum</text>
+<text class="func" x="1297" y="1135">+array_md5</text>
+<text class="small" x="45" y="1270">Used by the search, reconstruction, SAO, lookahead and bitstream coding modules.</text>
+<text class="small" x="45" y="1287">Implementations in strategies/generic, sse2, sse41, avx2, neon and altivec; the strategyselector picks the fastest one the CPU supports at startup.</text>
+<path class="edge" d="M847.0,73.0 L775.0,107.0" marker-end="url(#arr)"/>
+<path class="edge" d="M883.0,73.0 L955.0,107.0" marker-end="url(#arr)"/>
+<path class="edge" d="M865.0,73.0 L860.0,231.0" marker-end="url(#arr)"/>
+<path class="edge" d="M815.0,250.0 L765.0,250.0" marker-end="url(#arr)"/>
+<path class="edge" d="M905.0,250.0 L955.0,250.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1045.0,250.0 L1060.0,250.0" marker-end="url(#arr)"/>
+<path class="edge" d="M828.5,269.0 L765.0,320.0" marker-end="url(#arr)"/>
+<path class="edge" d="M879.8,269.0 L865.0,367.0" marker-end="url(#arr)"/>
+<path class="edge" d="M805.0,385.2 L780.0,440.0" marker-end="url(#arr)"/>
+<path class="edge" d="M812.5,393.0 L780.0,495.0" marker-end="url(#arr)"/>
+<path class="edge" d="M955.0,385.2 L1015.0,440.0" marker-end="url(#arr)"/>
+<path class="edge" d="M955.0,369.6 L1272.1,245.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1325.0,258.0 L1325.0,282.0" marker-end="url(#arr)"/>
+<path class="edge" d="M955.0,377.4 L1252.6,382.4" marker-end="url(#arr)"/>
+<path class="edge" d="M1135.0,440.0 L1252.6,401.4" marker-end="url(#arr)"/>
+<path class="edge" d="M1325.0,409.0 L1325.0,456.0" marker-end="url(#arr)"/>
+<path class="edge" d="M805.0,377.4 L520.0,390.0" marker-end="url(#arr)"/>
+<path class="edge" d="M850.0,393.0 L790.0,571.0" marker-end="url(#arr)"/>
+<path class="edge" d="M917.5,393.0 L1000.0,577.0" marker-end="url(#arr)"/>
+<path class="edge" d="M880.0,393.0 L880.0,687.0" marker-end="url(#arr)"/>
+<path class="edge" d="M460.0,377.0 L460.0,268.0" marker-end="url(#arr)"/>
+<path class="edge" d="M390.0,255.0 L305.0,255.0" marker-end="url(#arr)"/>
+<path class="edge" d="M180.0,282.0 L180.0,268.0" marker-end="url(#arr)"/>
+<path class="edge" d="M400.0,397.8 L380.0,398.0 L380.0,540.0 L265.0,540.0" marker-end="url(#arr)"/>
+<path class="edge" d="M400.0,387.4 L350.0,390.0" marker-end="url(#arr)"/>
+<path class="edge" d="M412.0,403.0 L152.0,457.0" marker-end="url(#arr)"/>
+<path class="edge" d="M436.0,403.0 L318.0,457.0" marker-end="url(#arr)"/>
+<path class="edge" d="M460.0,403.0 L460.0,457.0" marker-end="url(#arr)"/>
+<path class="edge" d="M360.0,470.0 L400.0,470.0" marker-end="url(#arr)"/>
+<path class="edge" d="M460.0,483.0 L460.0,527.0" marker-end="url(#arr)"/>
+<path class="edge" d="M110.0,483.0 L110.0,637.0" marker-end="url(#arr)"/>
+<path class="edge" d="M290.0,483.0 L290.0,637.0" marker-end="url(#arr)"/>
+<path class="edge" d="M124.0,663.0 L172.0,752.0" marker-end="url(#arr)"/>
+<path class="edge" d="M276.0,663.0 L228.0,752.0" marker-end="url(#arr)"/>
+<path class="edge" d="M200.0,778.0 L200.0,867.0" marker-end="url(#arr)"/>
+<path class="edge" d="M270.0,880.0 L340.0,880.0" marker-end="url(#arr)"/>
+<path class="edge" d="M880.0,713.0 L880.0,747.0" marker-end="url(#arr)"/>
+<path class="edge" d="M985.0,700.0 L1055.0,700.0" marker-end="url(#arr)"/>
+<path class="edge" d="M985.0,709.1 L1055.0,760.0" marker-end="url(#arr)"/>
+<path class="edge" d="M880.0,773.0 L880.0,842.0" marker-end="url(#arr)"/>
+<path class="edge" d="M940.0,855.0 L1000.0,855.0" marker-end="url(#arr)"/>
+<path class="edge" d="M880.0,868.0 L880.0,902.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1145.0,700.0 L1170.0,700.0 L1170.0,915.0 L940.0,915.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1250.0,624.0 L1250.0,681.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1289.0,624.0 L1361.0,681.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1361.0,624.0 L1289.0,681.0" marker-end="url(#arr)"/>
+<path class="edge" d="M1400.0,624.0 L1400.0,681.0" marker-end="url(#arr)"/>
+<path class="edge" d="M290.0,945.0 L263.3,975.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1045.0 L750.0,1060.0 L130.0,1060.0 L130.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L308.0,1060.0 L308.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L486.0,1060.0 L486.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L664.0,1060.0 L664.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L842.0,1060.0 L842.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L1020.0,1060.0 L1020.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L1198.0,1060.0 L1198.0,1080.0" marker-end="url(#arr)"/>
+<path class="edge" d="M750.0,1033.0 L750.0,1060.0 L1376.0,1060.0 L1376.0,1080.0" marker-end="url(#arr)"/>
+<metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTpkYzQ0N2NkNy1mNzA1LTQxNGYtOTY1MS04ODUxYjQzM2I0YmUAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaDUzujHbYchmy1xLBqBiuYAAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo1NjVlY2M1ZS1jZmI5LTQ2OGQtYjZkNi1lZWNlNjQxYzA1ZWRscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoweHwBm0n3YKDRghvT5Wl3wAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggUa5LUO9t8CB3gpe0KCWDDkwtPtr/goDV6VAjvCxfcnqkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaJc3lshN5HwKKzqYudAFVgcAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIPdfwB9cBPMTr/fqAX/9uuw8Wcyz2IiSVEPKyCMUR9LCZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GU3VZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmRjNDQ3Y2Q3LWY3MDUtNDE0Zi05NjUxLTg4NTFiNDMzYjRiZS9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmZiMTdhMGY0LWI5ZDYtNDA4Ny1hMDgyLWZmMzhhOTEwOGZmZnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCBRrktQ723wIHeCl7QoJYMOTC0+2v+CgNXpUCO8LF9yeqJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggk4nVT22kpy5bGBnhU1SZwRzspN/btE/p0ODltTmm6kaiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgg8d1lbjMDoSOQ+wxomPfwxFuqFyKUqdb6FcxeOieaKg90Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQOSToD2vzR5C/TGPU9X9VfBgfED9ryAaiHQs2DqbgFvjEUKlYlwY3DZMbjL1I+xvNJA9p9bdi+g4cLX/GWdcOHg=</c2pa:manifest></metadata></svg>

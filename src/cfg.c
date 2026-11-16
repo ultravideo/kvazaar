@@ -1099,7 +1099,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_lp_definition.d = 0;
       cfg->gop_lp_definition.t = 0;
     } else if (atoi(value)) {
-      fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
+      fprintf(stderr, "Input error: unsupported gop length, must be 0, 8 or 16\n");
       return 0;
     }
   }
