@@ -55,6 +55,23 @@ static double sao_lambda(const encoder_state_t * const state)
   return state->lambda * (double)(1 << (2 * (state->encoder_control->bitdepth - 8)));
 }
 
+/**
+ * \brief Coded offset (sao_offset_abs with sign) for the mean error.
+ *
+ * The offsets in sample units are the coded offsets << SAO_OFFSET_SHIFT
+ * (log2_sao_offset_scale), so the mean is divided by that step too.
+ *
+ * \param sum  sum of the errors (original - reconstructed)
+ * \param cnt  number of samples
+ */
+static int sao_coded_offset(int sum, int cnt)
+{
+  if (cnt == 0) return 0;
+  const int div = cnt << SAO_OFFSET_SHIFT;
+  const int offset = (sum + (div >> 1)) / div;
+  return CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
+}
+
 static void init_sao_info(sao_info_t *sao) {
   sao->type = SAO_TYPE_NONE;
   sao->merge_left_flag = 0;
@@ -125,7 +142,7 @@ static double sao_mode_bits_edge(const encoder_state_t * const state,
   for (unsigned buf_index = 0; buf_index < buf_cnt; buf_index++) {
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
-      int abs_offset = abs(offsets[edge_cat+5*buf_index]);
+      int abs_offset = abs(offsets[edge_cat+5*buf_index]) >> SAO_OFFSET_SHIFT;
       if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
         mode_bits += abs_offset + 1;
       } else {
@@ -167,7 +184,7 @@ static double sao_mode_bits_band(const encoder_state_t * const state,
   {
     int i;
     for (i = 0; i < 4; ++i) {
-      int abs_offset = abs(offsets[i + 1 + buf_index*5]);
+      int abs_offset = abs(offsets[i + 1 + buf_index*5]) >> SAO_OFFSET_SHIFT;
       if (abs_offset == 0) {
         mode_bits += abs_offset + 1;
       } else if(abs_offset == SAO_ABS_OFFSET_MAX) {
@@ -241,20 +258,18 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
   // Calculate distortion for each band using N*h^2 - 2*h*E
   for (band = 0; band < 32; band++) {
     best_dist = INT_MAX;
-    offset = 0;
-    if (sao_bands[1][band] != 0) {
-      offset = (sao_bands[0][band] + (sao_bands[1][band] >> 1)) / sao_bands[1][band];
-      offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
-    }
+    offset = sao_coded_offset(sao_bands[0][band], sao_bands[1][band]);
     dist[band] = offset==0?0:INT_MAX;
     temp_offsets[band] = 0;
     while(offset != 0) {
-      temp_dist = sao_bands[1][band]*offset*offset - 2*offset*sao_bands[0][band];
+      // Offset in sample units.
+      const int value = offset * (1 << SAO_OFFSET_SHIFT);
+      temp_dist = sao_bands[1][band]*value*value - 2*value*sao_bands[0][band];
 
       // Store best distortion and offset
       if(temp_dist < best_dist) {
         dist[band] = temp_dist;
-        temp_offsets[band] = offset;
+        temp_offsets[band] = value;
       }
       offset += (offset > 0) ? -1:1;
     }
@@ -414,11 +429,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
         // The optimum offset can be calculated by getting the minima of the
         // fast ddistortion estimation formula. The minima is the mean error
         // and we round that to the nearest integer.
-        int offset = 0;
-        if (cat_cnt != 0) {
-          offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
-          offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
-        }
+        int offset = sao_coded_offset(cat_sum, cat_cnt) * (1 << SAO_OFFSET_SHIFT);
 
         // Sharpening edge offsets can't be encoded, so set them to 0 here.
         if (edge_cat >= SAO_EO_CAT1 && edge_cat <= SAO_EO_CAT2 && offset < 0) {

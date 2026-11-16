@@ -515,8 +515,11 @@ static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
 
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
+  /// The offsets are in sample units, scaled by 1 << log2_sao_offset_scale.
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    kvz_cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
+    const int abs_offset = abs(sao->offsets[i + offset_index]);
+    assert((abs_offset & ((1 << SAO_OFFSET_SHIFT) - 1)) == 0);
+    kvz_cabac_write_unary_max_symbol_ep(cabac, abs_offset >> SAO_OFFSET_SHIFT, SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}

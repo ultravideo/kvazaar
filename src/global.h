@@ -279,6 +279,13 @@ typedef int16_t coeff_t;
 //#define VERBOSE 1
 
 #define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
+/**
+ * log2_sao_offset_scale_luma/chroma: the coded SAO offsets are scaled by
+ * 1 << SAO_OFFSET_SHIFT. The largest allowed value is used, so that above
+ * 10 bits the offsets cover the same range relative to the sample range as
+ * at 10 bits (offsets up to 31 << 2 at 12 bits instead of 31).
+ */
+#define SAO_OFFSET_SHIFT (KVZ_BIT_DEPTH > 10 ? KVZ_BIT_DEPTH - 10 : 0)
 
 #define MAX_TILES_PER_DIM 48
 #define MAX_SLICES 16

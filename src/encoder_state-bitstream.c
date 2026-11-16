@@ -417,8 +417,10 @@ static void encoder_state_write_bitstream_PPS_extension(bitstream_t* stream,
 {
   const kvz_config* cfg = &state->encoder_control->cfg;
   bool enable_ccp = cfg->enable_cross_component_prediction && KVZ_IS_444(cfg->chroma_format);
+  // Above 10 bits the SAO offsets are scaled (log2_sao_offset_scale).
+  const int sao_offset_scale = cfg->sao_type ? SAO_OFFSET_SHIFT : 0;
   // Always write PPS extension for 4:4:4 to ensure HM initializes range extension defaults properly
-  bool need_pps_extension = enable_ccp || KVZ_IS_444(cfg->chroma_format);
+  bool need_pps_extension = enable_ccp || KVZ_IS_444(cfg->chroma_format) || sao_offset_scale > 0;
   WRITE_U(stream, need_pps_extension, 1, "pps_extension_present_flag");
   if (need_pps_extension) {
     WRITE_U(stream, 1, 1, "pps_range_extension_flag");
@@ -439,8 +441,8 @@ static void encoder_state_write_bitstream_PPS_extension(bitstream_t* stream,
         //WRITE_SE(stream, 0, "cr_qp_offset_list[i]");
       //end for
     //ENDIF
-    WRITE_UE(stream, 0, "log2_sao_offset_scale_luma");
-    WRITE_UE(stream, 0, "log2_sao_offset_scale_chroma");
+    WRITE_UE(stream, sao_offset_scale, "log2_sao_offset_scale_luma");
+    WRITE_UE(stream, sao_offset_scale, "log2_sao_offset_scale_chroma");
   }
 }
 
