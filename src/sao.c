@@ -68,7 +68,10 @@ static int sao_coded_offset(int sum, int cnt)
 {
   if (cnt == 0) return 0;
   const int div = cnt << SAO_OFFSET_SHIFT;
-  const int offset = (sum + (div >> 1)) / div;
+  // Round to the nearest (halves away from zero) also for negative sums;
+  // C division truncates towards zero, which made the negative offsets up
+  // to one step too small.
+  const int offset = sum >= 0 ? (sum + (div >> 1)) / div : -((-sum + (div >> 1)) / div);
   return CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
 }
 
