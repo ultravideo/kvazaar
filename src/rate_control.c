@@ -287,6 +287,8 @@ static int xCalcHADs8x8_ISlice(kvz_pixel * piOrg, int y, int iStrideOrg)
   }
   iSumHad -= abs(m2[0][0]);
   iSumHad = (iSumHad + 2) >> 2;
+  // The intra R-lambda model is for 8-bit sample values.
+  iSumHad = (iSumHad + ((1 << (KVZ_BIT_DEPTH - 8)) >> 1)) >> (KVZ_BIT_DEPTH - 8);
   return(iSumHad);
 }
 
@@ -717,7 +719,6 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     alpha = -state->frame->c_para[index] * state->frame->k_para[index];
     beta = state->frame->k_para[index] - 1;
   }
-  alpha *= (double)(1 << (KVZ_BIT_DEPTH - 8));
   double est_lambda;
   int est_qp;
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
@@ -938,7 +939,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
 
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
-      int ctu_distortion = 0;
+      int64_t ctu_distortion = 0;
       lcu_stats_t *ctu = kvz_get_lcu_stats(state, x_ctu, y_ctu);
       for (int y = y_ctu * 64; y < MIN((y_ctu + 1) * 64, state->tile->frame->height); y++) {
         for (int x = x_ctu * 64; x < MIN((x_ctu + 1) * 64, state->tile->frame->width); x++) {
@@ -947,8 +948,10 @@ void kvz_update_after_picture(encoder_state_t * const state) {
           ctu_distortion += temp * temp;
         }        
       }
-      ctu->distortion = (double)ctu_distortion / ctu->pixels;
-      total_distortion += (double)ctu_distortion / ctu->pixels;
+      // MSE at 8-bit scale, like the lambda: the R-lambda model
+      // (k = -bpp * lambda / distortion) needs both at the same scale.
+      ctu->distortion = (double)ctu_distortion / ctu->pixels / (double)(1 << (2 * (KVZ_BIT_DEPTH - 8)));
+      total_distortion += ctu->distortion;
       lambda += ctu->lambda / (state->encoder_control->in.width_in_lcu * state->encoder_control->in.height_in_lcu);
       if(encoder->cfg.stats_file_prefix) {
         fprintf(state->frame->new_ratecontrol->dist_file, "%f ", ctu->distortion);
