@@ -438,11 +438,10 @@ static inline int32x4_t ddist_acc(int32x4_t acc, int16x8_t off, int16x8_t diff)
   return vmlal_high_s16(acc, off, t);
 }
 
-// (orig - c + (1 << (bitdepth - 9))) >> (bitdepth - 8)
+// orig - c
 static inline int16x8_t edge_diff(uint16x8_t orig, uint16x8_t c)
 {
-  const int16x8_t d = vreinterpretq_s16_u16(vsubq_u16(orig, c));
-  return vshrq_n_s16(vaddq_s16(d, vdupq_n_s16(1 << (KVZ_BIT_DEPTH - 9))), KVZ_BIT_DEPTH - 8);
+  return vreinterpretq_s16_u16(vsubq_u16(orig, c));
 }
 
 static int sao_edge_ddistortion_neon(const encoder_control_t* const encoder,
@@ -498,7 +497,7 @@ static int sao_edge_ddistortion_neon(const encoder_control_t* const encoder,
       for (; x < x_end; ++x) {
         const int c = c_row[x];
         const int off = tab[2 + sign3_int(c - a_row[x]) + sign3_int(c - b_row[x])];
-        const int diff = (o_row[x] - c + (1 << (KVZ_BIT_DEPTH - 9))) >> (KVZ_BIT_DEPTH - 8);
+        const int diff = o_row[x] - c;
         sum += off * (off - 2 * diff);
       }
     }
@@ -526,7 +525,7 @@ static void calc_sao_edge_dir_neon(const encoder_control_t* const encoder,
   const uint16x8_t all = vdupq_n_u16(0xFFFF);
   const uint16x8_t tail = last_lanes_mask(rem ? rem : 1);
 
-  // Per edge_idx: sum of the scaled differences and the negated count.
+  // Per edge_idx: sum of the differences and the negated count.
   int32x4_t sum_acc[5];
   int32x4_t cnt_acc[5];
   for (int k = 0; k < 5; ++k) {
@@ -569,7 +568,7 @@ static void calc_sao_edge_dir_neon(const encoder_control_t* const encoder,
     for (; x < x_end; ++x) {
       const int c = c_row[x];
       const int idx = 2 + sign3_int(c - a_row[x]) + sign3_int(c - b_row[x]);
-      sum_s[idx] += (o_row[x] - c + (1 << (KVZ_BIT_DEPTH - 9))) >> (KVZ_BIT_DEPTH - 8);
+      sum_s[idx] += o_row[x] - c;
       cnt_s[idx] += 1;
     }
   }

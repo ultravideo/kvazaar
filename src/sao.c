@@ -42,6 +42,19 @@
 #include "strategies/strategies-sao.h"
 
 
+/**
+ * \brief Lambda for the SAO decisions.
+ *
+ * The SAO offsets are applied to the samples at the coding bit depth, so the
+ * distortions here are sums of squared errors at that bit depth. The lambda
+ * is for errors at 8-bit scale (the other distortion functions shift their
+ * results down by the extra bits), so scale it to the coding bit depth.
+ */
+static double sao_lambda(const encoder_state_t * const state)
+{
+  return state->lambda * (double)(1 << (2 * (state->encoder_control->bitdepth - 8)));
+}
+
 static void init_sao_info(sao_info_t *sao) {
   sao->type = SAO_TYPE_NONE;
   sao->merge_left_flag = 0;
@@ -429,7 +442,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
 
     {
       float mode_bits = sao_mode_bits_edge(state, edge_class, edge_offset, sao_top, sao_left, buf_cnt);
-      sum_ddistortion += (int)((double)mode_bits*state->lambda +0.5);
+      sum_ddistortion += (int)((double)mode_bits * sao_lambda(state) + 0.5);
     }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
@@ -473,7 +486,7 @@ static void sao_search_band_sao(const encoder_state_t * const state, const kvz_p
     }
 
     temp_rate = sao_mode_bits_band(state, sao_out->band_position, temp_offsets, sao_top, sao_left, buf_cnt);
-    ddistortion += (int)((double)temp_rate*state->lambda + 0.5);
+    ddistortion += (int)((double)temp_rate * sao_lambda(state) + 0.5);
 
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
@@ -515,7 +528,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   if (state->encoder_control->cfg.sao_type & 1){
     sao_search_edge_sao(state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_edge(state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left, buf_cnt);
-    int ddistortion = (int)(mode_bits * state->lambda + 0.5);
+    int ddistortion = (int)(mode_bits * sao_lambda(state) + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -533,7 +546,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   if (state->encoder_control->cfg.sao_type & 2){
     sao_search_band_sao(state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
     float mode_bits = sao_mode_bits_band(state, band_sao.band_position, band_sao.offsets, sao_top, sao_left, buf_cnt);
-    int ddistortion = (int)(mode_bits * state->lambda + 0.5);
+    int ddistortion = (int)(mode_bits * sao_lambda(state) + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -560,7 +573,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   // rate-distortion cost of coding do nothing.
   {
     float mode_bits_none = sao_mode_bits_none(state, sao_top, sao_left);
-    int cost_of_nothing = (int)(mode_bits_none * state->lambda + 0.5);
+    int cost_of_nothing = (int)(mode_bits_none * sao_lambda(state) + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
       merge_cost[0] = cost_of_nothing;
@@ -577,7 +590,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
       if (merge_cand) {
         unsigned buf_i;
         float mode_bits = sao_mode_bits_merge(state, i + 1);
-        int ddistortion = (int)(mode_bits * state->lambda + 0.5);
+        int ddistortion = (int)(mode_bits * sao_lambda(state) + 0.5);
 
         switch (merge_cand->type) {
           case SAO_TYPE_EDGE:

@@ -1012,10 +1012,7 @@ static INLINE __m256i edge_ddist16(const kvz_pixel *c_row, const kvz_pixel *a_ro
   const __m256i c = loadu16(c_row + x);
   const __m256i idx = mask_idx(edge_idx_epi16(loadu16(a_row + x), loadu16(b_row + x), c), valid);
   const __m256i off = lookup_table16(tab, idx);
-  // diff = (orig - c + (1 << (bitdepth - 9))) >> (bitdepth - 8)
-  const __m256i diff = _mm256_srai_epi16(_mm256_add_epi16(_mm256_sub_epi16(loadu16(o_row + x), c),
-                                                          _mm256_set1_epi16(1 << (KVZ_BIT_DEPTH - 9))),
-                                         KVZ_BIT_DEPTH - 8);
+  const __m256i diff = _mm256_sub_epi16(loadu16(o_row + x), c);
   return _mm256_madd_epi16(off, _mm256_sub_epi16(off, _mm256_add_epi16(diff, diff)));
 }
 
@@ -1068,7 +1065,7 @@ static int sao_edge_ddistortion_hbd_avx2(const encoder_control_t *const encoder,
       for (; x < x_end; ++x) {
         const int c = c_row[x];
         const int off = tab[2 + sign3_int(c - a_row[x]) + sign3_int(c - b_row[x])];
-        const int diff = (o_row[x] - c + (1 << (KVZ_BIT_DEPTH - 9))) >> (KVZ_BIT_DEPTH - 8);
+        const int diff = o_row[x] - c;
         sum += off * (off - 2 * diff);
       }
     }
@@ -1096,9 +1093,8 @@ static void calc_sao_edge_dir_hbd_avx2(const encoder_control_t *const encoder,
   const __m256i all = _mm256_set1_epi16(-1);
   const __m256i tail = last_lanes_mask(rem ? rem : 1);
   const __m256i ones = _mm256_set1_epi16(1);
-  const __m256i round = _mm256_set1_epi16(1 << (KVZ_BIT_DEPTH - 9));
 
-  // Per edge_idx: sums of the scaled differences (negated, as madd with the
+  // Per edge_idx: sums of the differences (negated, as madd with the
   // -1 masks) and counts in 32-bit lanes.
   __m256i sum_acc[5], cnt_acc[5];
   for (int k = 0; k < 5; ++k) {
@@ -1134,8 +1130,7 @@ static void calc_sao_edge_dir_hbd_avx2(const encoder_control_t *const encoder,
       }
       const __m256i c = loadu16(c_row + pos);
       const __m256i idx = mask_idx(edge_idx_epi16(loadu16(a_row + pos), loadu16(b_row + pos), c), valid);
-      const __m256i diff = _mm256_srai_epi16(_mm256_add_epi16(_mm256_sub_epi16(loadu16(o_row + pos), c), round),
-                                             KVZ_BIT_DEPTH - 8);
+      const __m256i diff = _mm256_sub_epi16(loadu16(o_row + pos), c);
       for (int k = 0; k < 5; ++k) {
         const __m256i m = _mm256_cmpeq_epi16(idx, _mm256_set1_epi16((int16_t)k));
         sum_acc[k] = _mm256_add_epi32(sum_acc[k], _mm256_madd_epi16(diff, m));
@@ -1145,7 +1140,7 @@ static void calc_sao_edge_dir_hbd_avx2(const encoder_control_t *const encoder,
     for (; x < x_end; ++x) {
       const int c = c_row[x];
       const int idx = 2 + sign3_int(c - a_row[x]) + sign3_int(c - b_row[x]);
-      sum_s[idx] += (o_row[x] - c + (1 << (KVZ_BIT_DEPTH - 9))) >> (KVZ_BIT_DEPTH - 8);
+      sum_s[idx] += o_row[x] - c;
       cnt_s[idx] += 1;
     }
     for (int k = 0; k < 5; ++k) {

@@ -62,7 +62,7 @@ static int sao_edge_ddistortion_generic(const encoder_control_t* const encoder,
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
-  const int bit_offset = encoder->bitdepth != 8 ? 1 << (encoder->bitdepth - 9) : 0;
+  (void)encoder;
 
   for (y = 1; y < block_height - 1; y++) {
     for (x = 1; x < block_width - 1; x++) {
@@ -79,7 +79,7 @@ static int sao_edge_ddistortion_generic(const encoder_control_t* const encoder,
       int32_t offset = offsets[eo_cat];
 
       if (offset != 0) {
-        int32_t diff   = (orig - c + bit_offset) >> (encoder->bitdepth - 8);
+        int32_t diff   = orig - c;
         int32_t delta  = diff - offset;
         int32_t curr   = delta * delta - diff * diff;
 

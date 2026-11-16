@@ -63,7 +63,9 @@ static void calc_sao_edge_dir_generic(const encoder_control_t* const encoder,
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
 
-  const int offset = encoder->bitdepth != 8 ? 1 << (encoder->bitdepth - 9) : 0;
+  // The offsets are applied to the samples at the coding bit depth, so the
+  // mean error is computed at that bit depth too.
+  (void)encoder;
 
   for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
@@ -74,7 +76,7 @@ static void calc_sao_edge_dir_generic(const encoder_control_t* const encoder,
 
       int eo_cat = sao_calc_eo_cat(a, b, c);
 
-      cat_sum_cnt[0][eo_cat] += (orig_data[y * block_width + x] - c + offset) >> (encoder->bitdepth - 8);
+      cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
       cat_sum_cnt[1][eo_cat] += 1;
     }
   }
