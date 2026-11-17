@@ -1146,7 +1146,10 @@ static FORCE_INLINE double search_cu_csp(encoder_state_t * const state, int x, i
       if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
       if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
-      split_cost = INT_MAX;
+      // Not split. This has to be larger than any real cost: at 12 bits the
+      // cost of a 64x64 CU can exceed INT_MAX, and an INT_MAX here would make
+      // the unsearched split look better (copying uninitialized CUs up).
+      split_cost = MAX_DOUBLE;
     }
 
     // If no search is not performed for this depth, try just the best mode

@@ -176,12 +176,12 @@ static void get_cost_dual(encoder_state_t * const state,
 * \param cost_treshold  RD cost at which search can be stopped.
 */
 static double search_intra_trdepth(encoder_state_t * const state, int x_px, int y_px, int depth,
-                                   int max_depth, int intra_mode, int cost_treshold,
+                                   int max_depth, int intra_mode, double cost_treshold,
                                    cu_info_t *const pred_cu, lcu_t *const lcu);
 
 static FORCE_INLINE double search_intra_trdepth_csp(encoder_state_t * const state,
                                                     int x_px, int y_px, int depth, int max_depth,
-                                                    int intra_mode, int cost_treshold,
+                                                    int intra_mode, double cost_treshold,
                                                     cu_info_t *const pred_cu,
                                                     lcu_t *const lcu,
                                                     const enum kvz_chroma_format csp)
@@ -208,8 +208,8 @@ static FORCE_INLINE double search_intra_trdepth_csp(encoder_state_t * const stat
   } nosplit_pixels;
   uint16_t nosplit_cbf = 0;
 
-  double split_cost = INT32_MAX;
-  double nosplit_cost = INT32_MAX;
+  double split_cost = MAX_DOUBLE;
+  double nosplit_cost = MAX_DOUBLE;
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
@@ -324,7 +324,7 @@ static FORCE_INLINE double search_intra_trdepth_csp(encoder_state_t * const stat
 }
 
 static double search_intra_trdepth(encoder_state_t * const state, int x_px, int y_px, int depth,
-                                   int max_depth, int intra_mode, int cost_treshold,
+                                   int max_depth, int intra_mode, double cost_treshold,
                                    cu_info_t *const pred_cu, lcu_t *const lcu)
 {
   // Specialize the body for 4:2:0, see KVZ_CSP_SHIFT_W in global.h.
@@ -666,7 +666,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     // Reset transform split data in lcu.cu for this area.
     kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
     
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_DOUBLE, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
 
     // Early termination if no coefficients has to be coded
@@ -691,7 +691,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.intra.mode = modes[0];
     pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
-    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
+    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_DOUBLE, &pred_cu, lcu);
   }
 
   return modes_to_check;
@@ -776,7 +776,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
     } chroma, best_chroma;
 
     best_chroma.mode = 0;
-    best_chroma.cost = MAX_INT;
+    best_chroma.cost = MAX_DOUBLE;
 
     for (int8_t chroma_mode_i = 0; chroma_mode_i < num_modes; ++chroma_mode_i) {
       chroma.mode = modes[chroma_mode_i];
