@@ -1119,8 +1119,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->bipred = atobool(value);
   else if OPT("bitrate") {
     cfg->target_bitrate = atoi(value);
-    if (!cfg->rc_algorithm) {
-      cfg->rc_algorithm = KVZ_LAMBDA;
+    if (!cfg->rc_algorithm && cfg->target_bitrate > 0) {
+      cfg->rc_algorithm = KVZ_ABR;
     }
   }
   else if OPT("preset") {

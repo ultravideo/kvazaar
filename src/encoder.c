@@ -244,6 +244,16 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   // Resolve the lookahead related automatic settings.
   {
     kvz_config *const c = &encoder->cfg;
+    if (c->target_bitrate > 0 && c->rc_algorithm == KVZ_ABR &&
+        c->source_scan_type != KVZ_INTERLACING_NONE) {
+      // The lookahead does not support interlaced coding.
+      fprintf(stderr, "The abr rate control is not supported with interlaced coding, "
+                      "using the lambda rate control%s.\n",
+              c->vbv_maxrate > 0 ? " without VBV" : "");
+      c->rc_algorithm = KVZ_LAMBDA;
+      c->vbv_maxrate = 0;
+      c->vbv_bufsize = 0;
+    }
     if (c->mctf && (c->gop_len < 8 || c->gop_lowdelay || c->intra_period == 1)) {
       fprintf(stderr, "--mctf requires a random access GOP of length 8 or 16, disabling it.\n");
       c->mctf = 0;

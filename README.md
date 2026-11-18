@@ -152,7 +152,7 @@ Video structure:
       --bitrate <integer>    : Target bitrate [0]
                                    - 0: Disable rate control.
                                    - N: Target N bits per second.
-      --rc-algorithm <string>: Select used rc-algorithm. [lambda]
+      --rc-algorithm <string>: Select used rc-algorithm. [abr]
                                    - lambda: rate control from:
                                      DOI: 10.1109/TIP.2014.2336550 
                                    - oba: DOI: 10.1109/TCSVT.2016.2589878
@@ -206,7 +206,7 @@ Video structure:
       --lookahead <integer>  : Number of frames analysed ahead of encoding,
                                0..250. Used for CRF, CU-tree, scene cut
                                detection and bitrate allocation. Adds
-                               latency. [0, 20 with --crf]
+                               latency. [0, 20 with --crf or --bitrate]
       --qcomp <float>        : QP curve compression for CRF and lookahead
                                bit allocation, 0.0..1.0. [0.6]
       --(no-)cutree          : Temporal QP adaptation by propagating block
@@ -424,8 +424,8 @@ QP
 ### Lookahead
 The lookahead analyses upcoming pictures before they are encoded and uses
 the analysis to distribute the bits better. It is off by default
-(`--lookahead 0`), and enabling it adds latency of the given number of
-pictures.
+(`--lookahead 0`) unless `--crf` or `--bitrate` is used, and enabling it
+adds latency of the given number of pictures.
 
 `--lookahead N` sets the number of pictures analysed ahead (0..250). It
 also enables these tools:
@@ -441,8 +441,10 @@ is given:
 - **CRF** (`--crf X`): constant quality mode. The QP of each picture
   follows its complexity, and CRF X gives roughly the bitrate of QP X.
   `--qcomp` controls how strongly the QP follows the complexity.
-- **ABR rate control** (`--bitrate N --rc-algorithm abr`): reaches the
-  target bitrate using the complexity measured by the lookahead.
+- **ABR rate control** (`--bitrate N`, the default `--rc-algorithm abr`):
+  reaches the target bitrate using the complexity measured by the
+  lookahead. `--rc-algorithm lambda` and `--rc-algorithm oba` do not use
+  the lookahead.
 - **VBV** (`--vbv-maxrate`, `--vbv-bufsize`, `--vbv-init`): limits the
   bitrate peaks with CRF or ABR.
 - **Temporal filter** (`--mctf`): denoises the GOP key pictures before
@@ -456,12 +458,13 @@ Examples:
 ```
 kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --lookahead 20
 kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --crf 28
-kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --bitrate 5000000 --rc-algorithm abr
+kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --bitrate 5000000
 kvazaar -i input.yuv --input-res 1920x1080 -o out.hevc --crf 28 --mctf --adaptive-gop
 ```
 
 The lookahead runs in its own thread, and the output does not depend on
-the number of threads. It is not supported with interlaced coding.
+the number of threads. It is not supported with interlaced coding, and
+`--bitrate` uses the lambda rate control with interlaced coding.
 
 ## Presets
 The names of the presets are the same as with x264: ultrafast,
