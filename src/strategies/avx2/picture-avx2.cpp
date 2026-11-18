@@ -946,7 +946,7 @@ static unsigned satd_4x4_hbd_avx2(const kvz_pixel *org, const kvz_pixel *cur)
 {
   return hbd_satd_4x4_core(_mm_sub_epi16(_mm_loadu_si128((const __m128i *)org), _mm_loadu_si128((const __m128i *)cur)),
                            _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(org + 8)),
-                                         _mm_loadu_si128((const __m128i *)(cur + 8))));
+                                         _mm_loadu_si128((const __m128i *)(cur + 8)))) >> (KVZ_BIT_DEPTH - 8);
 }
 
 static void satd_4x4_dual_hbd_avx2(const pred_buffer preds, const kvz_pixel *const orig,
@@ -957,6 +957,8 @@ static void satd_4x4_dual_hbd_avx2(const pred_buffer preds, const kvz_pixel *con
   const __m256i lo = _mm256_sub_epi16(hbd_load_2x128(preds[0], preds[1]), o_lo);
   const __m256i hi = _mm256_sub_epi16(hbd_load_2x128(preds[0] + 8, preds[1] + 8), o_hi);
   hbd_store_dual(hbd_satd_4x4_dual_core(lo, hi), costs_out);
+  costs_out[0] >>= KVZ_BIT_DEPTH - 8;
+  costs_out[1] >>= KVZ_BIT_DEPTH - 8;
 }
 
 /* Sum of the 8x8 SATDs of an area of width x height pixels, both multiples of 8. */

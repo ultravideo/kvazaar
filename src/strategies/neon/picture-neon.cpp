@@ -787,7 +787,7 @@ static void satd_8x8_subblock_quad_hbd_neon(const kvz_pixel **preds, const int s
 
 static unsigned satd_4x4_hbd_neon(const kvz_pixel *org, const kvz_pixel *cur)
 {
-  return satd_4x4_subblock_hbd_neon(org, 4, cur, 4);
+  return satd_4x4_subblock_hbd_neon(org, 4, cur, 4) >> (KVZ_BIT_DEPTH - 8);
 }
 
 static void satd_4x4_dual_hbd_neon(const pred_buffer preds, const kvz_pixel *const orig,
@@ -800,8 +800,8 @@ static void satd_4x4_dual_hbd_neon(const pred_buffer preds, const kvz_pixel *con
                                            vcombine_u16(vld1_u16(preds[0] + 4 * i), vld1_u16(preds[1] + 4 * i))));
   }
   const uint64x2_t s = hbd_satd_4x4_x2(r);
-  costs_out[0] = (unsigned)vgetq_lane_u64(s, 0);
-  costs_out[1] = (unsigned)vgetq_lane_u64(s, 1);
+  costs_out[0] = (unsigned)vgetq_lane_u64(s, 0) >> (KVZ_BIT_DEPTH - 8);
+  costs_out[1] = (unsigned)vgetq_lane_u64(s, 1) >> (KVZ_BIT_DEPTH - 8);
 }
 
 /* Sum of the 8x8 SATDs of an area of width x height pixels, both multiples of 8. */

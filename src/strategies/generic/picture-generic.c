@@ -160,7 +160,8 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
   for (int i = 0; i < 4 * 4; i++) {
     diff[i] = piOrg[i] - piCur[i];
   }
-  return hadamard_4x4_generic(diff);
+  // Scaled to 8-bit precision like the SATDs of the other block sizes.
+  return hadamard_4x4_generic(diff) >> (KVZ_BIT_DEPTH - 8);
 }
 
 /**
