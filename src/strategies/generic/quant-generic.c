@@ -685,7 +685,7 @@ static void find_last_scanpos_generic(coeff_t* coef, coeff_t* dest_coeff, int8_t
 
       if (max_abs_level > 0) {
         *last_scanpos = scanpos;
-        *ctx_set = (scanpos > 0 && type == 0) ? 2 : 0;
+        *ctx_set = (*cg_scanpos > 0 && type == 0) ? 2 : 0;
         *cg_last_scanpos = *cg_scanpos;
         sh_rates->sig_coeff_inc[blkpos] = 0;
         return;

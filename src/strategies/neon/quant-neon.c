@@ -418,7 +418,7 @@ static int find_last_in_cg_scalar(const coeff_t *coef, coeff_t *dest_coeff, int8
     const uint32_t max_abs_level = (level_double + (1 << (q_bits - 1))) >> q_bits;
     if (max_abs_level > 0) {
       *last_scanpos = scanpos;
-      *ctx_set = (scanpos > 0 && type == 0) ? 2 : 0;
+      *ctx_set = (cg_scanpos > 0 && type == 0) ? 2 : 0;
       *cg_last_scanpos = cg_scanpos;
       sh_rates->sig_coeff_inc[blkpos] = 0;
       return 1;
@@ -497,7 +497,7 @@ static void find_last_scanpos_neon(coeff_t* coef, coeff_t* dest_coeff, int8_t ty
 
     const int32_t scanpos = scan_pos + last;
     *last_scanpos = scanpos;
-    *ctx_set = (scanpos > 0 && type == 0) ? 2 : 0;
+    *ctx_set = (*cg_scanpos > 0 && type == 0) ? 2 : 0;
     *cg_last_scanpos = *cg_scanpos;
     sh_rates->sig_coeff_inc[scan[scanpos]] = 0;
     return;
