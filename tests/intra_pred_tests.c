@@ -35,6 +35,7 @@
 #include "test_strategies.h"
 
 #include "strategies/strategies-intra.h"
+#include "intra.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -150,6 +151,73 @@ static int run_dc(void)
   return 1;
 }
 
+// With every reference sample at the largest sample value, every intra mode
+// must predict that value. The sums in DC and planar prediction exceed 16 bits
+// at 10 bits (64 * 1023 for a 32x32 DC), which overflowed where int_fast16_t
+// is 16 bits (Apple platforms).
+static int block_is_max(const kvz_pixel *block, int width, const char *what,
+                        int mode, int log2)
+{
+  for (int i = 0; i < width * width; ++i) {
+    if (block[i] != PIXEL_MAX) {
+      printf("\n    %s mode=%d log2=%d at (%d,%d): expected %d, got %d\n",
+             what, mode, log2, i % width, i / width, PIXEL_MAX, block[i]);
+      return 0;
+    }
+  }
+  return 1;
+}
+
+TEST test_intra_predict_flat_max(void)
+{
+  kvz_intra_references refs;
+  for (int i = 0; i < 2 * 32 + 1; ++i) {
+    refs.ref.top[i] = refs.ref.left[i] = PIXEL_MAX;
+  }
+  const color_t colors[2] = { COLOR_Y, COLOR_U };
+  for (int c = 0; c < 2; ++c) {
+    for (int log2 = 2; log2 <= 5; ++log2) {
+      for (int mode = 0; mode <= 34; ++mode) {
+        refs.filtered_initialized = false;
+        memset(out_opt, 0, sizeof(out_opt));
+        kvz_intra_predict(&refs, (int_fast8_t)log2, (int_fast8_t)mode,
+                          colors[c], out_opt, true, false);
+        const char *what = colors[c] == COLOR_Y ? "luma" : "chroma";
+        ASSERT(block_is_max(out_opt, 1 << log2, what, mode, log2));
+      }
+    }
+  }
+  PASS();
+}
+
+TEST test_intra_strategies_flat_max(void)
+{
+  for (int i = 0; i < REF_LEN; ++i) {
+    ref_above[i] = ref_left[i] = PIXEL_MAX;
+  }
+  for (int i = 0; i < strategies.count; ++i) {
+    const strategy_t *s = &strategies.strategies[i];
+    const bool planar = strcmp(s->type, "intra_pred_planar") == 0;
+    const bool dc = strcmp(s->type, "intra_pred_filtered_dc") == 0;
+    if (!planar && !dc) continue;
+    const kvz_pixel *above = ref_above + REF_OFFSET;
+    const kvz_pixel *left = ref_left + REF_OFFSET;
+    for (int log2 = 2; log2 <= 5; ++log2) {
+      const int_fast8_t log2_width = (int_fast8_t)log2;
+      memset(out_opt, 0, sizeof(out_opt));
+      if (planar) {
+        ((intra_pred_planar_func *)s->fptr)(log2_width, above, left, out_opt);
+      } else {
+        ((intra_pred_filtered_dc_func *)s->fptr)(log2_width, above, left,
+                                                 out_opt);
+      }
+      ASSERT(block_is_max(out_opt, 1 << log2, s->strategy_name,
+                          planar ? 0 : 1, log2));
+    }
+  }
+  PASS();
+}
+
 TEST test_angular_pred(void)
 {
   ASSERT(run_angular());
@@ -202,4 +270,11 @@ SUITE(intra_pred_tests)
       RUN_TEST(test_intra_pred_filtered_dc);
     }
   }
+}
+
+// Runs at every bit depth, unlike intra_pred_tests (whose fills are 8-bit).
+SUITE(intra_pred_flat_tests)
+{
+  RUN_TEST(test_intra_predict_flat_max);
+  RUN_TEST(test_intra_strategies_flat_max);
 }

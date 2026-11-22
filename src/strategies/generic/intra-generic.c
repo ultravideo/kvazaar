@@ -174,23 +174,26 @@ static void kvz_intra_pred_planar_generic(
   const kvz_pixel top_right = ref_top[width + 1];
   const kvz_pixel bottom_left = ref_left[width + 1];
 
+  // The sums need 32 bits: for a 32x32 block at 10 bits, (31 * left + 32 *
+  // top_right) reaches 64449, and int_fast16_t is 16 bits on some platforms
+  // (Apple; glibc makes it 64 bits).
 #if 0
   // Unoptimized version for reference.
   for (int y = 0; y < width; ++y) {
     for (int x = 0; x < width; ++x) {
-      int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
-      int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
+      int32_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
+      int32_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
       dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
     }
   }
 #else
-  int_fast16_t top[32];
+  int32_t top[32];
   for (int i = 0; i < width; ++i) {
     top[i] = ref_top[i + 1] << log2_width;
   }
 
   for (int y = 0; y < width; ++y) {
-    int_fast16_t hor = (ref_left[y + 1] << log2_width) + width;
+    int32_t hor = (ref_left[y + 1] << log2_width) + width;
     for (int x = 0; x < width; ++x) {
       hor += top_right - ref_left[y + 1];
       top[x] += bottom_left - ref_top[x + 1];
@@ -217,7 +220,8 @@ static void kvz_intra_pred_filtered_dc_generic(
 
   const int_fast8_t width = 1 << log2_width;
 
-  int_fast16_t sum = 0;
+  // 32-bit: up to 32 references at 12 bits, see intra_pred_dc.
+  int32_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
     sum += ref_top[i + 1];
     sum += ref_left[i + 1];

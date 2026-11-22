@@ -45,6 +45,7 @@ extern SUITE(ipol_tests);
 extern SUITE(intra_pred_tests);
 extern SUITE(sao_tests);
 #endif //KVZ_BIT_DEPTH == 8
+extern SUITE(intra_pred_flat_tests);
 extern SUITE(strategy_diff_tests);
 extern SUITE(temporal_filter_tests);
 extern SUITE(simd_sad_tests);
@@ -80,6 +81,7 @@ int main(int argc, char **argv)
   printf("10-bit tests are not yet supported\n");
 #endif //KVZ_BIT_DEPTH == 8
 
+  RUN_SUITE(intra_pred_flat_tests);
   RUN_SUITE(strategy_diff_tests);
   RUN_SUITE(simd_intra_sao_tests);
   RUN_SUITE(coeff_sum_tests);
