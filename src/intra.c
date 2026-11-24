@@ -234,7 +234,9 @@ static void intra_pred_dc(
 {
   int_fast8_t width = 1 << log2_width;
 
-  int_fast16_t sum = 0;
+  // 32-bit: 64 references at 10 bits sum to up to 65472, and int_fast16_t
+  // is 16 bits on Apple platforms (glibc makes it 64 bits).
+  int32_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
     sum += ref_top[i + 1];
     sum += ref_left[i + 1];
